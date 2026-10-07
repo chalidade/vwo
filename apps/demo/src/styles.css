@@ -124,3 +124,20 @@ h1 { margin: 0; }
   .hud-bottom { bottom: 136px; }
   nav.top { gap: 12px; font-size: 14px; }
 }
+
+/* ---- Job fair ---- */
+.mine { position: absolute; z-index: 7; left: 12px; bottom: 136px; width: min(320px, calc(100% - 24px)); max-height: 50%; overflow: auto; padding: 10px 12px; }
+.mine-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.mine ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mine li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #e2e8f0; color: #334155; white-space: nowrap; }
+.status[data-status="Dilihat"] { background: #dbeafe; color: #1d4ed8; }
+.status[data-status="Diundang interview"] { background: #dcfce7; color: #15803d; }
+.status[data-status="Belum cocok"] { background: #fee2e2; color: #b91c1c; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #3b2a20; vertical-align: -1px; }
+.small-btn { padding: 2px 8px; font-size: 12px; border-width: 2px; box-shadow: 0 2px 0 #3b2a20; }
+.small-btn:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 640px) {
+  .mine { top: 112px; bottom: auto; }
+}
+.home-sub { margin: 22px 0 0; font-size: 20px; }

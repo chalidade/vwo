@@ -4,6 +4,32 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Room Job Fair
+
+**Konteks:** owner minta room lain bertema job fair: ada stand (kotak) tiap perusahaan, pengunjung bisa tanya-tanya, lihat banner lowongan, melamar kerja, dan jalan-jalan dari stand ke stand.
+
+**Yang berubah**
+
+- Room baru `#/jobfair` di demo: aula pameran dengan spanduk acara, bendera kecil, lantai karpet abu-abu, dan meja informasi panitia (Dewi) dekat pintu masuk.
+- Enam stand perusahaan fiktif (Nusantara Tech, Kopi Kita Group, Bank Sejahtera, Gerak Logistik, Hijau Energi, Kreatif Studio) dengan 18 lowongan. Tiap stand punya dinding berlogo dan nama perusahaan, poster, meja dengan brosur dan laptop, roll-up banner "LOWONGAN" berisi judul posisi, karpet berwarna perusahaan, dan recruiter di belakang meja.
+- Interaksi: berdiri di depan meja lalu tekan E untuk ngobrol dengan recruiter (Tanya-tanya berisi FAQ per perusahaan, Lihat lowongan, Lamar kerja). Mendekati atau mengklik roll-up banner membuka pop up lowongan: satu halaman per posisi (tipe, lokasi, gaji, kualifikasi) plus halaman "Tentang kami". Foto banner cetak bisa ditambahkan lewat `bannerImages`.
+- Form lamaran: posisi, nama, email, no. HP, link CV, pesan singkat. Satu lamaran per posisi. Panel "📋 Lamaranku" menampilkan status (Terkirim, Dilihat, Diundang interview, Belum cocok).
+- Panitia di meja informasi bisa mengantar ke stand mana pun (karakter berjalan sendiri ke sana). Klik meja stand juga langsung berjalan ke depannya.
+- Pengunjung bot datang, mampir ke 2 sampai 4 stand, bertanya ke recruiter atau membaca banner, sebagian melamar, lalu pulang. Recruiter menjawab dan sesekali memanggil pengunjung ke standnya.
+- Dashboard panitia `#/jobfair/admin`: denah live, jumlah pengunjung, kunjungan dan lamaran per stand, riwayat, dan daftar lamaran dengan tombol "Undang interview" / "Belum cocok".
+- Data stand dan lowongan ada di `packages/shared/src/jobfair.ts` (`DEMO_JOB_FAIR`, `buildJobFairFloor`). `CafeScene` sekarang menerima `extras` (gambar tambahan seperti stand), `onNpcClick`, dan tema lantai `hall`, jadi room lain bisa memakai scene yang sama.
+- Kontrol jalan (tombol keyboard dan pad sentuh) dipindah ke `apps/demo/src/controls.tsx` supaya dipakai cafe dan job fair.
+- Pembuatan karakter bisa dipakai tanpa pilihan rombongan (job fair).
+
+**Belum**
+
+- Job fair baru ada di demo statis. Versi server (tabel stand, lowongan, dan lamaran di database, plus realtime) jadi langkah berikutnya.
+
+**Verifikasi**
+
+- Tes: shared 9, demo 12 (baru: semua meja dan banner stand bisa dicapai dari pintu, satu lamaran per posisi dan status dari panitia, bot berkeliling tanpa menembus stand). Typecheck semua paket dan build web lulus.
+- Dicoba di browser (1280px dan 390px): masuk, jalan ke stand, dialog recruiter, FAQ, pop up lowongan, form lamaran, panel Lamaranku, dashboard panitia, dan cafe tetap normal. Tidak ada error di console.
+
 ## 2026-10-07 · Pop up menu, pelayan, dan obrolan pelanggan
 
 **Konteks:** owner minta papan menu dirapikan, menu muncul sebagai pop up berisi semua menu (bisa beberapa halaman dan nanti bisa diganti gambar), serta interaksi antar pelanggan dan pegawai supaya cafe terasa hidup. Referensi tampilan menu: foto menu cafe yang dikirim owner (kategori dengan pita judul, foto minuman, harga).
