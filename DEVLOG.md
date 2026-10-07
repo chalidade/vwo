@@ -4,6 +4,32 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: koin, level, rating, food court, psikotes, seminar
+
+**Konteks:** owner minta: rating pelamar dari perusahaan dan rating perusahaan dari pelamar dengan level seperti game, koin untuk melamar dan masuk tempat premium, stand untuk beli koin, food court untuk dapat voucher, ruang psikotes dan ruang seminar yang masuknya memotong koin lalu duduk di kursi.
+
+**Yang berubah**
+
+- **Koin.** Pengunjung mulai dengan 50 koin. Melamar memotong 5 koin (atau pakai voucher "lamar gratis"). Ada koin gratis harian +20. Tombol 🪙 di HUD membuka dompet: isi koin, voucher, dan riwayat transaksi.
+- **Stand Koin** di Lantai 1 sebelah kiri pintu masuk. Paket 50, 100+20, dan 250+50 koin, bayar pakai QRIS/GoPay/OVO/transfer. Ini pembayaran demo, tidak ada uang sungguhan.
+- **Food Court** (gratis masuk, pintu di Lantai 2): 4 stand makanan, 8 meja. Tiap pesanan memotong koin dan memberi voucher acak: lamar gratis, diskon 50% psikotes, gratis seminar, cashback koin, atau kode promo sponsor. Bisa duduk di meja untuk makan.
+- **Ruang Psikotes** (20 koin, pintu di Lantai 3): 12 meja ujian dan pengawas. Duduk di meja lalu kerjakan 12 soal (deret angka, logika, verbal, spasial) dengan waktu 5 menit. Nilai terbaik ikut terkirim bersama lamaran dan memengaruhi penilaian perusahaan.
+- **Ruang Seminar** (15 koin, pintu di Lantai 3): panggung, layar, pembicara, 40 kursi. Duduk lalu ikuti salah satu dari 3 sesi; selesai dapat e-sertifikat.
+- Pintu ruangan premium bergembok 🔒 sampai tiket dibeli. Saat masuk, panitia menawarkan bayar atau isi koin. Panitia di meja info juga bisa mengantar ke tiap ruangan dan ke Stand Koin.
+- **Level pelamar:** XP dari mampir ke stand, melamar, rating dari perusahaan, nilai psikotes, seminar, memberi ulasan, dan makan. Ada 10 level (Pemula sampai Legenda Job Fair) dengan bar XP di HUD dan profil, dan notifikasi saat naik level.
+- **Perusahaan menilai pelamar:** beberapa detik setelah lamaran dibaca, perusahaan memberi 1–5 bintang dan catatan singkat. Nilainya dipengaruhi CV, kelengkapan form, dan nilai psikotes. Bintang 4–5 otomatis diundang interview. Panitia bisa mengubah bintang di halaman panitia.
+- **Pelamar menilai perusahaan:** pilihan "⭐ Beri rating" di dialog recruiter. Bot juga memberi ulasan. Rating rata-rata dan level perusahaan tampil di papan stand, dialog recruiter, kartu stempel, dan halaman panitia.
+- Ruangan terisi pengunjung bot yang duduk, makan, mengerjakan tes, dan menyimak. Pembicara seminar membacakan materi.
+- Halaman panitia: tab untuk tiap ruangan, kolom rating dan level stand, kolom nilai psikotes dan bintang di daftar lamaran.
+- Data koin, voucher, tiket, XP, hasil psikotes, sertifikat, dan ulasan tersimpan di localStorage (format v2; data v1 tetap terbaca).
+
+**Verifikasi**
+
+- Tes baru: pintu ruangan, kursi, dan stand makanan bisa dicapai dan pintu keluar tidak memantul; koin dipotong untuk melamar dan tiket; voucher dari makanan; lamaran ditolak saat koin habis lalu bisa lagi setelah isi koin; rating perusahaan dan pelamar serta naik level; satu kursi satu orang. Tes demo 16 dan shared 9 lulus, typecheck bersih.
+- Dicoba di browser desktop dan 390px layar sentuh: beli koin, makan dan dapat voucher, bayar tiket psikotes lalu duduk dan mengerjakan tes, bayar tiket seminar lalu ikut sesi sampai sertifikat, profil dengan level, halaman panitia.
+
+---
+
 ## 2026-10-07 · Job fair 3 lantai
 
 **Konteks:** owner minta job fair dibuat 3 lantai, tiap lantai ada lowongan.

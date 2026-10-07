@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { CafeScene, boothExtras, infoDeskExtras, lookFor, sponsorExtras } from "@vwo/ui";
+import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, psikotesExtras, roomDoorExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "./jobfair-engine";
 import { staffLook } from "./JobFair";
+import { COMPANY_TITLES, levelOf } from "./fair/content";
+import { Stars } from "./fair/Modal";
 import { fair, useFair } from "./useFair";
 
-const EVENT_TEXT = { arrive: "datang", visit: "mampir ke stand", apply: "melamar", leave: "pulang", sponsor: "melihat sponsor" } as const;
+const EVENT_TEXT = {
+  arrive: "datang",
+  visit: "mampir ke stand",
+  apply: "melamar",
+  leave: "pulang",
+  sponsor: "melihat sponsor",
+  rate: "dinilai",
+  review: "memberi rating",
+  room: "masuk",
+  coins: "membeli koin",
+} as const;
 const time = (at: number) => new Date(at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 /** The organiser's view: the whole hall live, traffic per booth, and every application. */
@@ -13,6 +25,7 @@ export function JobFairAdmin() {
   const booths = fair.fair.booths;
   const [level, setLevel] = useState(0);
   const floor = fair.floors[level] ?? fair.floors[0]!;
+  const room = fair.roomOf(floor.id);
   const visitors = [...fair.visitors.values()];
   const decide = (id: string, status: ApplicationStatus) => fair.setStatus(id, status);
 
@@ -46,9 +59,9 @@ export function JobFairAdmin() {
         </div>
       </div>
       <div className="floor-tabs" role="tablist">
-        {fair.fair.floors.map((f, i) => (
-          <button key={f.name} type="button" role="tab" aria-selected={i === level} data-active={i === level ? "" : undefined} onClick={() => setLevel(i)}>
-            {f.name} · {f.theme} <span className="muted">({visitors.filter((v) => v.floorId === fair.floors[i]!.id).length} orang)</span>
+        {fair.floors.map((f, i) => (
+          <button key={f.id} type="button" role="tab" aria-selected={i === level} data-active={i === level ? "" : undefined} onClick={() => setLevel(i)}>
+            {fair.roomOf(f.id)?.emoji} {f.name} <span className="muted">({visitors.filter((v) => v.floorId === f.id).length} orang)</span>
           </button>
         ))}
       </div>
@@ -57,17 +70,28 @@ export function JobFairAdmin() {
           className="admin-scene"
           floor={floor}
           floorName={(id) => fair.fair.floors[fair.floors.findIndex((f) => f.id === id)]?.name ?? "Tangga"}
-          hallTitle={fair.fair.name}
-          occupiedSeatIds={new Set()}
+          hallTitle={room ? undefined : fair.fair.name}
+          hallBanner={!room}
+          occupiedSeatIds={fair.occupiedSeats()}
           avatars={[...fair.visitors.values()]}
           lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
           npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
           bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-          extras={[
-            ...booths.filter((b) => b.floor === level).flatMap((b) => boothExtras(b)),
-            ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
-            ...fair.fair.sponsors.filter((sp) => sp.floor === level).map((sp) => sponsorExtras(sp)),
-          ]}
+          extras={
+            room
+              ? room.kind === "foodcourt"
+                ? foodStallExtras(room)
+                : room.kind === "psikotes"
+                  ? psikotesExtras(room)
+                  : seminarStageExtras(room, null)
+              : [
+                  ...booths.filter((b) => b.floor === level).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
+                  ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
+                  ...fair.fair.sponsors.filter((sp) => sp.floor === level).map((sp) => sponsorExtras(sp)),
+                  ...fair.fair.rooms.filter((r) => r.floor === level).flatMap((r) => roomDoorExtras(r)),
+                  ...(fair.fair.coinStand.floor === level ? coinStandExtras(fair.fair.coinStand) : []),
+                ]
+          }
           hallSponsors={fair.fair.sponsors}
         />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>
@@ -78,7 +102,7 @@ export function JobFairAdmin() {
                 <tr key={i}>
                   <td className="muted">{time(e.at)}</td>
                   <td>
-                    {e.name} {EVENT_TEXT[e.type]} {e.type === "apply" ? `${e.jobTitle} · ${e.company}` : (e.company ?? "")}
+                    {e.name} {EVENT_TEXT[e.type]} {e.type === "apply" ? `${e.jobTitle} · ${e.company}` : e.type === "rate" ? `oleh ${e.company} ${e.jobTitle}` : e.type === "review" ? `${e.company} ${e.jobTitle}` : (e.company ?? "")}
                   </td>
                 </tr>
               ))}
@@ -97,6 +121,8 @@ export function JobFairAdmin() {
               <th>Di stand sekarang</th>
               <th>Kunjungan</th>
               <th>Lamaran</th>
+              <th>Rating</th>
+              <th>Level</th>
             </tr>
           </thead>
           <tbody>
@@ -110,6 +136,15 @@ export function JobFairAdmin() {
                 <td>{fair.peopleAt(b.id)}</td>
                 <td>{fair.visits.get(b.id) ?? 0}</td>
                 <td>{fair.applications.filter((a) => a.boothId === b.id).length}</td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <Stars value={fair.companyRating(b.id).average} count={fair.companyRating(b.id).count} />
+                </td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  {(() => {
+                    const lv = levelOf(fair.companyXp(b.id)).level;
+                    return `Lv ${lv} · ${COMPANY_TITLES[lv - 1]}`;
+                  })()}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -166,6 +201,21 @@ export function JobFairAdmin() {
                   <td>
                     <span className="status" data-status={a.status}>
                       {a.status}
+                    </span>
+                    {a.psych != null && (
+                      <>
+                        <br />
+                        <span className="muted small">🧠 Psikotes {a.psych}</span>
+                      </>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <span className="rate-pick" title="Nilai pelamar">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button key={n} type="button" data-on={(a.rating ?? 0) >= n ? "" : undefined} onClick={() => fair.rateApplicant(a.id, n)} aria-label={`${n} bintang`}>
+                          ★
+                        </button>
+                      ))}
                     </span>
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>

@@ -117,7 +117,7 @@ export function findPath(floor: FloorView, from: { x: number; y: number }, to: {
   return null;
 }
 
-/** The stairs or elevator a walker standing at (x, y) is on, if any. */
+/** The stairs, elevator or door to another room a walker standing at (x, y) is on, if any. */
 export function portalAt(floor: FloorView, x: number, y: number) {
-  return (floor.objects ?? []).find((o) => (o.type === "stairs" || o.type === "elevator") && o.targetFloorId && inside(o, x, y, 0)) ?? null;
+  return (floor.objects ?? []).find((o) => (o.type === "stairs" || o.type === "elevator" || o.type === "door") && o.targetFloorId && inside(o, x, y, 0)) ?? null;
 }

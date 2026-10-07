@@ -115,6 +115,8 @@ export interface CafeSceneProps {
   hallSponsors?: SponsorView[];
   /** Big title on the hall banner; the floor's name then goes underneath. */
   hallTitle?: string;
+  /** Hide the hall banner and sponsor plates (rooms hang their own screen). */
+  hallBanner?: boolean;
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -154,6 +156,7 @@ export function CafeScene({
   extras = [],
   hallSponsors,
   hallTitle,
+  hallBanner = true,
   className,
   style,
   children,
@@ -397,7 +400,8 @@ export function CafeScene({
 
   ents.sort((a, b) => a.z - b.z);
 
-  const doors = (floor.objects ?? []).filter((o) => o.type === "door");
+  // Doors in the bottom wall; doors standing inside a room (spriteKey "room:…") are drawn by the room.
+  const doors = (floor.objects ?? []).filter((o) => o.type === "door" && !o.spriteKey?.startsWith("room:"));
   const counter = floor.theme === "indoor" || !floor.theme ? floor.objects?.find((o) => o.type === "counter") : undefined;
   const board = counter ? { w: 176, h: Math.round(wall * 0.5), x: px(counter.x + counter.width / 2) - 88, y: Math.round(wall * 0.1) } : null;
   const windows: number[] = [];
@@ -434,7 +438,7 @@ export function CafeScene({
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
         ) : floor.theme === "hall" ? (
-          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallTitle ? floor.name : undefined} sponsors={hallSponsors} />
+          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallTitle ? floor.name : undefined} sponsors={hallSponsors} banner={hallBanner} />
         ) : (
           <IndoorWall w={worldW} h={wall} windows={windows} />
         )}
