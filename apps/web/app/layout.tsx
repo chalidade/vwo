@@ -1,3 +1,4 @@
+import "@vwo/ui/src/rpg/rpg.css";
 import "./globals.css";
 import type { ReactNode } from "react";
 

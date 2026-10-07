@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { FloorMap } from "@vwo/ui";
+import { CafeScene } from "@vwo/ui";
 import type { LiveSnapshot, VenueLayout } from "@/lib/types";
 
 /** Staff view of who is inside, per floor. Polls the live endpoint; realtime push comes later. */
@@ -55,7 +55,7 @@ export function LiveView({ slug, floors }: { slug: string; floors: VenueLayout }
           </button>
         ))}
       </div>
-      {floor && <FloorMap floor={floor} occupiedSeatIds={occupied} />}
+      {floor && <CafeScene floor={floor} floorName={(id) => floors.find((f) => f.id === id)?.name ?? ""} occupiedSeatIds={occupied} showFreeSeats style={{ height: 520, borderRadius: 12 }} />}
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Siapa di dalam</h2>
         {groups.length === 0 && <p className="muted">Belum ada pelanggan.</p>}

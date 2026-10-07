@@ -54,3 +54,40 @@ describe("DemoCafe", () => {
     expect(cafe.events.some((e) => e.type === "check_out")).toBe(true);
   });
 });
+
+describe("DemoCafe walking", () => {
+  it("bots walk around furniture and also use the rooftop", () => {
+    let t = 0;
+    const cafe = new DemoCafe(Math.random, () => t);
+    const ground = cafe.floors[0]!;
+    let roofVisits = 0;
+    for (let i = 0; i < 4000; i++) {
+      t += 100;
+      cafe.tick(100);
+      for (const m of cafe.members.values()) {
+        if (m.floorId !== ground.id) roofVisits++;
+        if (m.seatId || m.memberType === "companion" || m.floorId !== ground.id) continue;
+        // A walking host never stands inside a table.
+        const inside = ground.tables.some((tb) => m.x > tb.x + 0.05 && m.x < tb.x + tb.width - 0.05 && m.y > tb.y + 0.05 && m.y < tb.y + tb.height - 0.05);
+        expect(inside, `${m.displayName} at ${m.x},${m.y}`).toBe(false);
+      }
+    }
+    expect(roofVisits).toBeGreaterThan(0);
+  });
+
+  it("companions follow behind the host and stand up beside their chairs", () => {
+    const cafe = new DemoCafe(() => 0.1);
+    const v = cafe.checkIn("Host", 2);
+    for (let i = 0; i < 20; i++) cafe.move(v.memberId, 10, 12.6 - i * 0.2);
+    const host = cafe.members.get(v.memberId)!;
+    const [a, b] = v.companionIds.map((id) => cafe.members.get(id)!);
+    expect(a!.y).toBeGreaterThan(host.y);
+    expect(b!.y).toBeGreaterThan(a!.y);
+    expect(Math.hypot(a!.x - host.x, a!.y - host.y)).toBeCloseTo(0.75, 1);
+
+    cafe.claimSeats(v.visitId, [{ memberId: v.memberId, seatId: "M-01-A" }]);
+    cafe.releaseSeat(v.memberId);
+    const t = cafe.floors[0]!.tables[0]!;
+    expect(host.y).toBeLessThan(t.y); // stepped back from the top chair, not into the table
+  });
+});

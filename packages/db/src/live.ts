@@ -1,7 +1,7 @@
 // Read model for the live "who is inside" view (DFD process 12.0).
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Db } from "./client";
-import { cafeTables, floors, seatOccupancies, seats, venues, visitMembers, visits } from "./schema";
+import { cafeTables, floors, mapObjects, seatOccupancies, seats, venues, visitMembers, visits } from "./schema";
 
 export async function getVenueBySlug(db: Db, slug: string) {
   return db.query.venues.findFirst({ where: eq(venues.slug, slug) });
@@ -12,8 +12,10 @@ export async function getVenueLayout(db: Db, venueId: string) {
   const floorRows = await db.select().from(floors).where(eq(floors.venueId, venueId)).orderBy(asc(floors.sortOrder));
   const tableRows = await db.select().from(cafeTables).where(eq(cafeTables.venueId, venueId));
   const seatRows = await db.select().from(seats).where(eq(seats.venueId, venueId));
+  const objectRows = await db.select().from(mapObjects).where(eq(mapObjects.venueId, venueId));
   return floorRows.map((floor) => ({
     ...floor,
+    objects: objectRows.filter((o) => o.floorId === floor.id),
     tables: tableRows
       .filter((t) => t.floorId === floor.id)
       .map((t) => ({ ...t, capacity: seatRows.filter((s) => s.tableId === t.id && s.isActive).length })),
