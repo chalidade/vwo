@@ -7,6 +7,8 @@ import {
   type FloorView,
   DEMO_JOB_FAIR,
   type JobFairView,
+  SPONSOR_H,
+  SPONSOR_W,
   boothSpot,
   buildJobFairFloor,
   facingFor,
@@ -51,16 +53,32 @@ export interface FairApplication {
 
 export interface FairEvent {
   at: number;
-  type: "arrive" | "visit" | "apply" | "leave";
+  type: "arrive" | "visit" | "apply" | "leave" | "sponsor";
   name: string;
   company?: string;
   jobTitle?: string;
 }
 
-interface Stop {
-  boothId: string;
-  spot: "talk" | "banner";
+type Stop = { boothId: string; spot: "talk" | "banner" } | { sponsorId: string };
+
+/** What the demo keeps between visits (in localStorage in the browser). */
+export interface FairSaved {
+  version: 1;
+  applications: FairApplication[];
+  visits: Record<string, number>;
+  sponsorViews: Record<string, number>;
+  /** Stamp cards of real visitors (not bots), by their stable id. */
+  visitedBy: Record<string, string[]>;
 }
+
+export interface FairStorage {
+  load(): FairSaved | null;
+  save(data: FairSaved): void;
+  clear(): void;
+}
+
+/** The player always uses this id, so their applications and stamps survive a reload. */
+export const PLAYER_ID = "player";
 
 interface Bot {
   id: string;
@@ -101,6 +119,10 @@ export class DemoJobFair {
   readonly events: FairEvent[] = [];
   /** Visits counted per booth (a visitor stopping at its desk or banner). */
   readonly visits = new Map<string, number>();
+  /** Booths each visitor has stopped by, for their stamp card. */
+  readonly visitedBy = new Map<string, Set<string>>();
+  /** How often each sponsor's banner was opened or read. */
+  readonly sponsorViews = new Map<string, number>();
   readonly bubbles = new Map<string, { text: string; until: number }>();
   private bots: Bot[] = [];
   private seq = 0;
@@ -113,6 +135,7 @@ export class DemoJobFair {
     private readonly rand: () => number = Math.random,
     private readonly now: () => number = () => Date.now(),
     fair: JobFairView = DEMO_JOB_FAIR,
+    private readonly storage: FairStorage | null = null,
   ) {
     this.fair = fair;
     this.floor = buildJobFairFloor(fair);
@@ -122,6 +145,52 @@ export class DemoJobFair {
     ];
     this.nextBotAt = this.now() + 400;
     this.nextCalloutAt = this.now() + 5000;
+    this.restore();
+  }
+
+  private dirty = false;
+
+  private restore() {
+    const saved = this.storage?.load();
+    if (!saved || saved.version !== 1) return;
+    for (const a of saved.applications ?? []) {
+      if (!this.booth(a.boothId)) continue;
+      this.applications.push({ ...a, status: a.status === "Terkirim" ? "Dilihat" : a.status });
+    }
+    for (const [k, n] of Object.entries(saved.visits ?? {})) this.visits.set(k, n);
+    for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
+    for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
+  }
+
+  private persist() {
+    this.dirty = true;
+  }
+
+  /** Write pending changes to storage now. */
+  flush() {
+    if (!this.dirty || !this.storage) return;
+    this.dirty = false;
+    const real = new Set([...this.visitors.values()].filter((v) => !v.isBot).map((v) => v.memberId));
+    real.add(PLAYER_ID);
+    this.storage.save({
+      version: 1,
+      applications: this.applications.slice(0, 80),
+      visits: Object.fromEntries(this.visits),
+      sponsorViews: Object.fromEntries(this.sponsorViews),
+      visitedBy: Object.fromEntries([...this.visitedBy].filter(([id]) => real.has(id)).map(([id, set]) => [id, [...set]])),
+    });
+  }
+
+  /** Forget everything saved: applications, stamps and counters. */
+  reset() {
+    this.applications.length = 0;
+    this.visits.clear();
+    this.sponsorViews.clear();
+    this.visitedBy.clear();
+    this.events.length = 0;
+    this.storage?.clear();
+    this.dirty = false;
+    this.emit();
   }
 
   booth(id: string) {
@@ -154,8 +223,8 @@ export class DemoJobFair {
     this.emit();
   }
 
-  join(name: string, isBot = false) {
-    const id = this.id(isBot ? "bot" : "visitor");
+  join(name: string, isBot = false, id = this.id(isBot ? "bot" : "visitor")) {
+    this.leave(id);
     const { x, y } = this.fair.spawn;
     const v: FairVisitor = { memberId: id, visitId: id, displayName: name, memberType: "host", floorId: this.floor.id, x, y, facing: "back", isBot, arrivedAt: this.now() };
     this.visitors.set(id, v);
@@ -169,6 +238,7 @@ export class DemoJobFair {
     const v = this.visitors.get(id);
     if (!v) return;
     this.visitors.delete(id);
+    if (v.isBot) this.visitedBy.delete(id);
     this.bubbles.delete(id);
     this.bots = this.bots.filter((b) => b.id !== id);
     this.log({ type: "leave", name: v.displayName });
@@ -189,8 +259,23 @@ export class DemoJobFair {
     const v = this.visitors.get(visitorId);
     const b = this.booth(boothId);
     if (!v || !b) return;
+    const seen = this.visitedBy.get(visitorId) ?? new Set<string>();
+    seen.add(boothId);
+    this.visitedBy.set(visitorId, seen);
+    this.persist();
     this.visits.set(boothId, (this.visits.get(boothId) ?? 0) + 1);
     this.log({ type: "visit", name: v.displayName, company: b.company });
+    this.emit();
+  }
+
+  /** Someone opened or read a sponsor's banner. */
+  viewSponsor(visitorId: string, sponsorId: string) {
+    const v = this.visitors.get(visitorId);
+    const sp = this.fair.sponsors.find((x) => x.id === sponsorId);
+    if (!v || !sp) return;
+    this.sponsorViews.set(sponsorId, (this.sponsorViews.get(sponsorId) ?? 0) + 1);
+    this.persist();
+    this.log({ type: "sponsor", name: v.displayName, company: sp.name });
     this.emit();
   }
 
@@ -218,9 +303,11 @@ export class DemoJobFair {
     };
     this.applications.unshift(a);
     this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
+    this.persist();
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
     this.after(6000, () => {
       if (a.status === "Terkirim") a.status = "Dilihat";
+      this.persist();
       this.emit();
     });
     this.emit();
@@ -232,6 +319,7 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
     a.status = status;
+    this.persist();
     this.emit();
   }
 
@@ -249,8 +337,14 @@ export class DemoJobFair {
     this.events.length = Math.min(this.events.length, 60);
   }
 
+  private nextFlushAt = 0;
+
   tick(dtMs: number) {
     const now = this.now();
+    if (this.dirty && now >= this.nextFlushAt) {
+      this.nextFlushAt = now + 1000;
+      this.flush();
+    }
     let changed = false;
     for (const [id, b] of this.bubbles) if (b.until <= now) {
       this.bubbles.delete(id);
@@ -288,7 +382,8 @@ export class DemoJobFair {
   private spawnBot() {
     const v = this.join(this.pick(BOT_NAMES), true);
     const booths = [...this.fair.booths].sort(() => this.rand() - 0.5).slice(0, 2 + Math.floor(this.rand() * 3));
-    const plan = booths.map((b) => ({ boothId: b.id, spot: this.rand() < 0.65 ? "talk" : "banner" }) as Stop);
+    const plan: Stop[] = booths.map((b) => ({ boothId: b.id, spot: this.rand() < 0.65 ? "talk" : "banner" }) as Stop);
+    if (this.fair.sponsors.length && this.rand() < 0.4) plan.splice(Math.floor(this.rand() * plan.length), 0, { sponsorId: this.pick(this.fair.sponsors).id });
     this.bots.push({ id: v.memberId, plan, phase: "walking", target: null, path: null, until: 0 });
   }
 
@@ -304,6 +399,18 @@ export class DemoJobFair {
         bot.phase = "leaving";
         bot.target = { x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
         bot.path = null;
+        return true;
+      }
+      if ("sponsorId" in stop) {
+        const sp = this.fair.sponsors.find((x) => x.id === stop.sponsorId)!;
+        if (!bot.target) bot.target = { x: sp.x + SPONSOR_W / 2 + (this.rand() - 0.5) * 0.6, y: sp.y + SPONSOR_H + 0.75 };
+        if (this.walk(v, bot, bot.target, step)) return true;
+        v.facing = "back";
+        bot.target = null;
+        bot.phase = "reading";
+        bot.until = now + 2200 + this.rand() * 1800;
+        this.viewSponsor(v.memberId, sp.id);
+        this.after(500, () => this.visitors.has(v.memberId) && this.say(v.memberId, sp.promo ? "Wah, ada promo!" : `Oh, ${sp.name}!`, 1800));
         return true;
       }
       const booth = this.booth(stop.boothId)!;

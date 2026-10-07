@@ -1,8 +1,8 @@
 "use client";
 // The job fair room: the hall's back wall, company booths (back panel, desk, roll-up banner),
 // the organisers' info desk, and the popups for reading vacancies and applying.
-import { type FormEvent, useEffect, useId, useState } from "react";
-import { BOOTH_H, BOOTH_W, type CompanyBooth, type JobPosting } from "@vwo/shared";
+import { type CSSProperties, type FormEvent, useEffect, useId, useState } from "react";
+import { BOOTH_H, BOOTH_W, type CompanyBooth, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView } from "@vwo/shared";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -10,7 +10,7 @@ const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, s
 const T = 48;
 
 /** The back wall of an exhibition hall: panels, the event banner, bunting and spotlights. */
-export function HallWall({ w, h, title }: { w: number; h: number; title: string }) {
+export function HallWall({ w, h, title, sponsors = [] }: { w: number; h: number; title: string; sponsors?: SponsorView[] }) {
   const bw = Math.min(520, w * 0.5);
   const flags = Math.ceil(w / 26);
   const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
@@ -31,25 +31,113 @@ export function HallWall({ w, h, title }: { w: number; h: number; title: string 
           );
         })}
         {/* Bunting. */}
-        <path d={`M0 ${h * 0.12}${Array.from({ length: Math.ceil(w / 130) }, (_, i) => `Q${i * 130 + 65} ${h * 0.24} ${(i + 1) * 130} ${h * 0.12}`).join("")}`} fill="none" stroke={INK} strokeWidth={1.4} />
+        <path d={`M0 16${Array.from({ length: Math.ceil(w / 130) }, (_, i) => `Q${i * 130 + 65} 32 ${(i + 1) * 130} 16`).join("")}`} fill="none" stroke={INK} strokeWidth={1.4} />
         {Array.from({ length: flags }, (_, i) => {
           const x = i * 26 + 10;
           const t = (x % 130) / 130;
-          const y = h * 0.12 + Math.sin(t * Math.PI) * h * 0.06;
+          const y = 16 + Math.sin(t * Math.PI) * 8;
           return <path key={i} d={`M${x - 7} ${y}h14l-7 13Z`} fill={colors[i % colors.length]} stroke={INK} strokeWidth={1} />;
         })}
         {/* The event banner. */}
-        <g transform={`translate(${(w - bw) / 2}, ${h * 0.24})`}>
-          <rect x={0} y={0} width={bw} height={h * 0.5} rx={8} fill="#1e3a8a" {...ink} />
-          <rect x={6} y={6} width={bw - 12} height={h * 0.5 - 12} rx={5} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" />
-          <text x={bw / 2} y={h * 0.25 - 2} textAnchor="middle" fontSize={26} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
+        <g transform={`translate(${(w - bw) / 2}, 32)`}>
+          <rect x={0} y={0} width={bw} height={72} rx={8} fill="#1e3a8a" {...ink} />
+          <rect x={6} y={6} width={bw - 12} height={60} rx={5} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" />
+          <text x={bw / 2} y={36} textAnchor="middle" fontSize={26} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
             {title.toUpperCase()}
           </text>
-          <text x={bw / 2} y={h * 0.25 + 20} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
+          <text x={bw / 2} y={56} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
             Temukan karier impianmu · Gratis untuk semua pencari kerja
           </text>
         </g>
       </svg>
+      {sponsors.length > 0 && (
+        <>
+          <SponsorStrip sponsors={sponsors.slice(0, Math.ceil(sponsors.length / 2))} style={{ right: (w + bw) / 2 + 16, top: 40 }} />
+          <SponsorStrip sponsors={sponsors.slice(Math.ceil(sponsors.length / 2))} style={{ left: (w + bw) / 2 + 16, top: 40 }} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** "Didukung oleh" plate with sponsor logos, hung on the hall wall. */
+function SponsorStrip({ sponsors, style }: { sponsors: SponsorView[]; style: CSSProperties }) {
+  return (
+    <div className="jb-strip" style={style}>
+      <div className="jb-strip-title">Didukung oleh</div>
+      <div className="jb-strip-logos">
+        {sponsors.map((sp) => (
+          <span key={sp.id} className="jb-strip-logo" style={{ ["--c" as string]: sp.color }}>
+            <b>{sp.logo}</b> {sp.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A sponsor's standing banner on the hall floor. */
+function SponsorStand({ sponsor }: { sponsor: SponsorView }) {
+  return (
+    <div className="jb-stand" style={{ width: SPONSOR_W * T + 8, height: 2.6 * T, ["--c" as string]: sponsor.color }}>
+      {sponsor.imageUrl ? (
+        <img src={sponsor.imageUrl} alt={sponsor.name} />
+      ) : (
+        <>
+          <div className="jb-stand-tier">{sponsor.tier.toUpperCase()} SPONSOR</div>
+          <div className="jb-stand-logo">{sponsor.logo}</div>
+          <div className="jb-stand-name">{sponsor.name}</div>
+          <div className="jb-stand-tag">{sponsor.tagline}</div>
+          {sponsor.promo && <div className="jb-stand-promo">PROMO</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function sponsorExtras(sponsor: SponsorView, onClick?: () => void): SceneExtra {
+  return {
+    key: `sponsor-${sponsor.id}`,
+    x: sponsor.x - 4 / T,
+    y: sponsor.y + SPONSOR_H - 2.6,
+    z: sponsor.y + SPONSOR_H,
+    node: <SponsorStand sponsor={sponsor} />,
+    onClick,
+    title: onClick ? `Sponsor ${sponsor.name}` : undefined,
+  };
+}
+
+/** A sponsor's details: what they do, their promo, and their website. */
+export function SponsorCard({ sponsor, onClose }: { sponsor: SponsorView; onClose: () => void }) {
+  useEscape(onClose);
+  return (
+    <div className="mb-backdrop" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
+      <div className="rpg-box mb jb-form" role="dialog" aria-label={`Sponsor ${sponsor.name}`} onClick={(e) => e.stopPropagation()}>
+        <div className="mb-head">
+          <span className="mb-title">⭐ Sponsor</span>
+          <button type="button" className="mb-close" onClick={onClose} aria-label="Tutup">
+            ✕
+          </button>
+        </div>
+        <div className="mb-page jb-page" style={{ ["--c" as string]: sponsor.color }}>
+          <div className="jb-job">
+            <div className="jb-job-head" style={{ ["--c" as string]: sponsor.color }}>
+              <div>
+                <div className="jb-job-title">{sponsor.name}</div>
+                <div className="jb-job-co">{sponsor.tagline}</div>
+              </div>
+              <span className="jb-badge">{sponsor.tier}</span>
+            </div>
+            <p className="jb-about">{sponsor.about}</p>
+            {sponsor.promo && <div className="jb-promo">🎁 {sponsor.promo}</div>}
+            <div className="jb-job-foot">
+              <a className="mb-order jb-apply jb-link" href={sponsor.website} target="_blank" rel="noopener noreferrer">
+                Kunjungi website ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -283,19 +371,22 @@ export function JobBoard({
   onApply,
   appliedJobIds = new Set(),
   startJobId,
+  startAbout,
 }: {
   booth: CompanyBooth;
   onClose: () => void;
   onApply?: (job: JobPosting) => void;
   appliedJobIds?: Set<string>;
   startJobId?: string;
+  /** Open on the company page instead of the first vacancy. */
+  startAbout?: boolean;
 }) {
   const pages: BoardPage[] = [
     ...(booth.bannerImages ?? []).map((b) => ({ kind: "image" as const, ...b })),
     ...booth.jobs.map((job) => ({ kind: "job" as const, job })),
     { kind: "about" },
   ];
-  const [page, setPage] = useState(() => Math.max(0, pages.findIndex((p) => p.kind === "job" && p.job.id === startJobId)));
+  const [page, setPage] = useState(() => (startAbout ? pages.length - 1 : Math.max(0, pages.findIndex((p) => p.kind === "job" && p.job.id === startJobId))));
   const go = (d: number) => setPage((p) => Math.min(pages.length - 1, Math.max(0, p + d)));
   useEscape(onClose, (e) => {
     if (e.code === "ArrowLeft" || e.code === "KeyA") go(-1);
@@ -304,7 +395,7 @@ export function JobBoard({
     return true;
   });
   const current = pages[page];
-  const tab = (p: BoardPage) => (p.kind === "job" ? p.job.title : p.kind === "image" ? p.title : "Tentang kami");
+  const tab = (p: BoardPage) => (p.kind === "job" ? p.job.title : p.kind === "image" ? p.title : "Profil perusahaan");
 
   return (
     <div className="mb-backdrop" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
@@ -343,6 +434,69 @@ export function JobBoard({
                 </div>
               </div>
               <p className="jb-about">{booth.about}</p>
+              <dl className="jb-info">
+                {booth.website && (
+                  <>
+                    <dt>🌐 Website</dt>
+                    <dd>
+                      <a href={booth.website} target="_blank" rel="noopener noreferrer">
+                        {booth.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    </dd>
+                  </>
+                )}
+                {booth.email && (
+                  <>
+                    <dt>✉️ Email HR</dt>
+                    <dd>
+                      <a href={`mailto:${booth.email}`}>{booth.email}</a>
+                    </dd>
+                  </>
+                )}
+                {booth.address && (
+                  <>
+                    <dt>📍 Kantor</dt>
+                    <dd>{booth.address}</dd>
+                  </>
+                )}
+                {booth.founded && (
+                  <>
+                    <dt>📅 Berdiri</dt>
+                    <dd>{booth.founded}</dd>
+                  </>
+                )}
+                {booth.employees && (
+                  <>
+                    <dt>👥 Karyawan</dt>
+                    <dd>{booth.employees}</dd>
+                  </>
+                )}
+                {booth.socials && booth.socials.length > 0 && (
+                  <>
+                    <dt>🔗 Sosial media</dt>
+                    <dd>
+                      {booth.socials.map((so, i) => (
+                        <span key={so.url}>
+                          {i > 0 && " · "}
+                          <a href={so.url} target="_blank" rel="noopener noreferrer">
+                            {so.label}
+                          </a>
+                        </span>
+                      ))}
+                    </dd>
+                  </>
+                )}
+              </dl>
+              {booth.benefits && booth.benefits.length > 0 && (
+                <>
+                  <div className="jb-req-title">Benefit</div>
+                  <ul className="jb-req">
+                    {booth.benefits.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
               <div className="jb-req-title">Posisi yang dibuka</div>
               <ul className="jb-req">
                 {booth.jobs.map((j) => (
@@ -384,6 +538,7 @@ export function ApplyForm({
   booth,
   jobId,
   defaultName = "",
+  defaults = {},
   appliedJobIds = new Set(),
   onSubmit,
   onClose,
@@ -391,6 +546,8 @@ export function ApplyForm({
   booth: CompanyBooth;
   jobId?: string;
   defaultName?: string;
+  /** Prefill from the visitor's profile. */
+  defaults?: Partial<Omit<ApplicationInput, "jobId">>;
   appliedJobIds?: Set<string>;
   onSubmit: (a: ApplicationInput) => void;
   onClose: () => void;
@@ -398,11 +555,11 @@ export function ApplyForm({
   const open = booth.jobs.filter((j) => !appliedJobIds.has(j.id));
   const [form, setForm] = useState<ApplicationInput>({
     jobId: jobId && !appliedJobIds.has(jobId) ? jobId : (open[0]?.id ?? ""),
-    name: defaultName,
-    email: "",
-    phone: "",
-    cvUrl: "",
-    message: "",
+    name: defaults.name || defaultName,
+    email: defaults.email ?? "",
+    phone: defaults.phone ?? "",
+    cvUrl: defaults.cvUrl ?? "",
+    message: defaults.message ?? "",
   });
   const id = useId();
   useEscape(onClose);

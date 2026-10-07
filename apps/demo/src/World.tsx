@@ -3,7 +3,7 @@ import { type AvatarState, type Emote, DEMO_MENU, EMOTES, findPath, menuPages, p
 import { CafeScene, type DialogChoice, DialogBox, type Look, MenuBook, counterFront, lookFor } from "@vwo/ui";
 import { WAITER_LOOK } from "./staff";
 import { CharacterCreator, type Character } from "./CharacterCreator";
-import { KEY_DIRS, RUN, TouchPad, WALK, facingOf } from "./controls";
+import { KEY_DIRS, RUN, WALK, facingOf } from "./controls";
 import { cafe, onFrame, useCafe } from "./useCafe";
 
 interface Session {
@@ -370,7 +370,10 @@ export function World() {
             </button>
           ) : session ? (
             <div className="rpg-box hint">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">Shift</span> lari · <span className="rpg-kbd">E</span> duduk / bicara · klik lantai untuk berjalan
+              <span className="hint-keys">
+                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">Shift</span> lari · <span className="rpg-kbd">E</span> duduk / bicara · klik lantai untuk berjalan
+              </span>
+              <span className="hint-touch">Tap lantai untuk berjalan · tap kursi untuk duduk · tap orang untuk menyapa</span>
             </div>
           ) : null}
         </div>
@@ -395,8 +398,6 @@ export function World() {
             <div className="group-code">Kode rombongan {session.groupCode}</div>
           </div>
         )}
-
-        {session && <TouchPad keys={keys} onA={interact} />}
 
         {menuOpen && (
           <MenuBook

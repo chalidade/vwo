@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type AvatarState, type CompanyBooth, EMOTES, type Emote, boothSpot, findPath, slide } from "@vwo/shared";
+import { type AvatarState, type CompanyBooth, EMOTES, type Emote, SPONSOR_H, SPONSOR_W, type SponsorView, boothSpot, findPath, slide } from "@vwo/shared";
 import {
   type ApplicationInput,
   ApplyForm,
@@ -8,14 +8,18 @@ import {
   DialogBox,
   JobBoard,
   type Look,
+  SponsorCard,
   type NpcView,
   boothExtras,
   infoDeskExtras,
   lookFor,
+  sponsorExtras,
 } from "@vwo/ui";
 import { CharacterCreator, type Character } from "./CharacterCreator";
-import { KEY_DIRS, RUN, TouchPad, WALK, facingOf } from "./controls";
-import { recruiterId } from "./jobfair-engine";
+import { KEY_DIRS, RUN, WALK, facingOf } from "./controls";
+import { PLAYER_ID, recruiterId } from "./jobfair-engine";
+import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
+import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./useCafe";
 import { fair, useFair } from "./useFair";
 
@@ -35,6 +39,7 @@ type Reach =
   | { kind: "recruiter"; booth: CompanyBooth }
   | { kind: "banner"; booth: CompanyBooth }
   | { kind: "info" }
+  | { kind: "sponsor"; sponsor: SponsorView }
   | { kind: "person"; memberId: string; name: string };
 
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
@@ -50,16 +55,18 @@ export function JobFair() {
   useFair();
   const [session, setSession] = useState<Session | null>(() => (savedSession && fair.visitors.has(savedSession.visitorId) ? savedSession : null));
   const [talk, setTalk] = useState<Talk | null>(null);
-  const [board, setBoard] = useState<{ boothId: string; jobId?: string } | null>(null);
+  const [board, setBoard] = useState<{ boothId: string; jobId?: string; about?: boolean } | null>(null);
   const [applying, setApplying] = useState<{ boothId: string; jobId?: string } | null>(null);
-  const [showMine, setShowMine] = useState(false);
+  const [panel, setPanel] = useState<SeekerTab | null>(null);
+  const [sponsor, setSponsor] = useState<SponsorView | null>(null);
+  const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [toast, setToast] = useState<string | null>(null);
   savedSession = session;
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ x: number; y: number }[] | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying);
+  busy.current = !!(talk || board || applying || panel || sponsor);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -80,6 +87,9 @@ export function JobFair() {
       if (Math.abs(self.x - talkAt.x) < 1.9 && self.y > b.y + 2.6 && self.y < b.y + 4.4) return { kind: "recruiter", booth: b };
       const bannerAt = boothSpot(b, "banner");
       if (Math.hypot(self.x - bannerAt.x, self.y - bannerAt.y) < 0.9) return { kind: "banner", booth: b };
+    }
+    for (const sp of fair.fair.sponsors) {
+      if (Math.abs(self.x - (sp.x + SPONSOR_W / 2)) < 0.9 && self.y > sp.y + SPONSOR_H && self.y < sp.y + SPONSOR_H + 1.2) return { kind: "sponsor", sponsor: sp };
     }
     const d = fair.fair.infoDesk;
     if (self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
@@ -170,7 +180,8 @@ export function JobFair() {
   }, [session]);
 
   const enter = (c: Character) => {
-    const v = fair.join(c.name);
+    const v = fair.join(c.name, false, PLAYER_ID);
+    if (!profile.name) updateProfile({ ...profile, name: c.name });
     counted.current.clear();
     setSession({ visitorId: v.memberId, name: c.name, look: c.look });
     setTalk({
@@ -190,6 +201,7 @@ export function JobFair() {
     if (r.kind === "recruiter") talkToRecruiter(r.booth);
     else if (r.kind === "banner") setBoard({ boothId: r.booth.id });
     else if (r.kind === "info") talkToInfo();
+    else if (r.kind === "sponsor") openSponsor(r.sponsor);
     else talkToVisitor(r.memberId);
   }
 
@@ -214,7 +226,8 @@ export function JobFair() {
       choices: [
         { label: "Tanya-tanya", onPick: () => setTalk(faq()) },
         { label: "Lihat lowongan", onPick: () => { setTalk(null); setBoard({ boothId: b.id }); } },
-        { label: open ? "Lamar kerja" : "Lamaranku di sini", onPick: () => { setTalk(null); if (open) setApplying({ boothId: b.id }); else setShowMine(true); } },
+        { label: "Info perusahaan", onPick: () => { setTalk(null); setBoard({ boothId: b.id, about: true }); } },
+        { label: open ? "Lamar kerja" : "Lamaranku", onPick: () => { setTalk(null); if (open) setApplying({ boothId: b.id }); else setPanel("applications"); } },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     });
@@ -227,6 +240,16 @@ export function JobFair() {
       ],
     });
     setTalk(main([`Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`, `${b.about} Saat ini kami buka ${b.jobs.length} posisi.`]));
+  }
+
+  function updateProfile(p: SeekerProfile) {
+    setProfile(p);
+    saveProfile(p);
+  }
+
+  function openSponsor(sp: SponsorView) {
+    setSponsor(sp);
+    if (session) fair.viewSponsor(session.visitorId, sp.id);
   }
 
   function talkToInfo() {
@@ -280,6 +303,7 @@ export function JobFair() {
   const submit = (boothId: string, input: ApplicationInput) => {
     if (!session) return;
     const a = fair.apply(session.visitorId, { boothId, ...input });
+    updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
     if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}`);
   };
@@ -289,7 +313,7 @@ export function JobFair() {
     fair.leave(session.visitorId);
     setSession(null);
     setTalk(null);
-    setShowMine(false);
+    setPanel(null);
   };
 
   // --- Scene.
@@ -301,6 +325,7 @@ export function JobFair() {
       }),
     ),
     ...infoDeskExtras(fair.fair.infoDesk),
+    ...fair.fair.sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
   ];
   const npcs: NpcView[] = fair.staff.map((s) => {
     const b = s.boothId ? fair.booth(s.boothId) : undefined;
@@ -317,6 +342,8 @@ export function JobFair() {
         ? `Lihat lowongan ${reach.booth.company}`
         : reach?.kind === "info"
           ? "Tanya panitia"
+          : reach?.kind === "sponsor"
+            ? `Lihat sponsor ${reach.sponsor.name}`
           : reach?.kind === "person"
             ? `Sapa ${reach.name}`
             : null;
@@ -337,6 +364,7 @@ export function JobFair() {
         npcs={npcs}
         bubbles={bubbles}
         extras={extras}
+        hallSponsors={fair.fair.sponsors}
         follow={self ? { x: self.x, y: self.y } : null}
         onTileClick={session ? walkTo : undefined}
         onAvatarClick={session ? (id) => id !== session.visitorId && talkToVisitor(id) : undefined}
@@ -357,6 +385,7 @@ export function JobFair() {
           <div className="hud-title">🎪 {fair.fair.name}</div>
           <div className="hud-stats">
             <span>🏢 {fair.fair.booths.length} perusahaan</span>
+            <span>⭐ {fair.fair.sponsors.length} sponsor</span>
             <span>💼 {totalJobs} lowongan</span>
             <span>👥 {fair.visitors.size} pengunjung</span>
           </div>
@@ -370,6 +399,9 @@ export function JobFair() {
                 <rect x={b.x} y={b.y} width={6} height={3.6} rx={0.3} fill={b.color} opacity={0.35} />
                 <rect x={b.x} y={b.y} width={6} height={0.6} fill={b.color} />
               </g>
+            ))}
+            {fair.fair.sponsors.map((sp) => (
+              <rect key={sp.id} x={sp.x} y={sp.y} width={0.9} height={0.9} fill={sp.color} />
             ))}
             <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />
             {avatars.map((a) => (
@@ -388,7 +420,10 @@ export function JobFair() {
             </button>
           ) : session ? (
             <div className="rpg-box hint">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik meja stand untuk berjalan ke sana · klik banner untuk lihat lowongan
+              <span className="hint-keys">
+                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik meja stand untuk berjalan ke sana · klik banner untuk lihat lowongan
+              </span>
+              <span className="hint-touch">Tap lantai untuk berjalan · tap meja stand untuk ke sana · tap banner untuk lihat lowongan</span>
             </div>
           ) : null}
         </div>
@@ -398,8 +433,11 @@ export function JobFair() {
         {session && (
           <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
             <div className="rpg-box actions">
-              <button type="button" className="menu-btn" onClick={() => setShowMine((v) => !v)} title="Lamaran yang sudah kamu kirim">
-                📋 Lamaranku ({mine.length})
+              <button type="button" className="menu-btn" onClick={() => setPanel("profile")} title="Profil, lamaran, dan stempel stand">
+                🎒 Profil
+              </button>
+              <button type="button" className="menu-btn" onClick={() => setPanel("applications")} title="Lamaran yang sudah kamu kirim">
+                📋 Lamaran ({mine.length})
               </button>
               <button type="button" className="leave" onClick={leave} title="Keluar dari job fair">
                 🚪 Keluar
@@ -408,41 +446,50 @@ export function JobFair() {
           </div>
         )}
 
-        {session && showMine && (
-          <div className="rpg-box mine" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="mine-head">
-              <b>📋 Lamaranku</b>
-              <button type="button" className="mb-close" onClick={() => setShowMine(false)} aria-label="Tutup">
-                ✕
-              </button>
-            </div>
-            {mine.length === 0 ? (
-              <p className="muted small">Belum ada lamaran. Datangi stand dan pilih "Lamar kerja".</p>
-            ) : (
-              <ul>
-                {mine.map((a) => (
-                  <li key={a.id}>
-                    <span>
-                      <b>{a.jobTitle}</b>
-                      <br />
-                      <span className="muted small">{a.company}</span>
-                    </span>
-                    <span className="status" data-status={a.status}>
-                      {a.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {session && panel && (
+          <SeekerPanel
+            tab={panel}
+            look={session.look}
+            profile={profile}
+            applications={mine}
+            booths={fair.fair.booths}
+            visited={fair.visitedBy.get(session.visitorId) ?? new Set()}
+            onSaveProfile={updateProfile}
+            onOpenJob={(boothId, jobId) => {
+              setPanel(null);
+              setBoard({ boothId, jobId });
+            }}
+            onOpenCompany={(boothId) => {
+              setPanel(null);
+              setBoard({ boothId, about: true });
+            }}
+            onGoTo={(boothId) => {
+              const b = fair.booth(boothId);
+              setPanel(null);
+              if (b) {
+                goToBooth(b);
+                setToast(`Menuju stand ${b.company}`);
+              }
+            }}
+            onReset={() => {
+              fair.reset();
+              clearProfile();
+              setProfile(loadProfile());
+              counted.current.clear();
+              setPanel(null);
+              setToast("Data demo dihapus");
+            }}
+            onClose={() => setPanel(null)}
+          />
         )}
 
-        {session && <TouchPad keys={keys} onA={interact} />}
+        {sponsor && <SponsorCard sponsor={sponsor} onClose={() => setSponsor(null)} />}
 
         {boardBooth && (
           <JobBoard
             booth={boardBooth}
             startJobId={board?.jobId}
+            startAbout={board?.about}
             appliedJobIds={appliedIds}
             onClose={() => setBoard(null)}
             onApply={
@@ -461,6 +508,7 @@ export function JobFair() {
             booth={applyBooth}
             jobId={applying?.jobId}
             defaultName={session.name}
+            defaults={profile}
             appliedJobIds={appliedIds}
             onClose={() => setApplying(null)}
             onSubmit={(input) => submit(applyBooth.id, input)}

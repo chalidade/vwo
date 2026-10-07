@@ -1,9 +1,9 @@
-import { CafeScene, boothExtras, infoDeskExtras, lookFor } from "@vwo/ui";
+import { CafeScene, boothExtras, infoDeskExtras, lookFor, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "./jobfair-engine";
 import { staffLook } from "./JobFair";
 import { fair, useFair } from "./useFair";
 
-const EVENT_TEXT = { arrive: "datang", visit: "mampir ke stand", apply: "melamar", leave: "pulang" } as const;
+const EVENT_TEXT = { arrive: "datang", visit: "mampir ke stand", apply: "melamar", leave: "pulang", sponsor: "melihat sponsor" } as const;
 const time = (at: number) => new Date(at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 /** The organiser's view: the whole hall live, traffic per booth, and every application. */
@@ -14,7 +14,19 @@ export function JobFairAdmin() {
 
   return (
     <main style={{ display: "grid", gap: 16 }}>
-      <h1 style={{ margin: 0 }}>{fair.fair.name} · Live</h1>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h1 style={{ margin: 0 }}>{fair.fair.name} · Live</h1>
+        <button
+          type="button"
+          className="small-btn ghost"
+          onClick={() => {
+            if (confirm("Hapus semua data demo job fair (lamaran, kunjungan, sponsor) di browser ini?")) fair.reset();
+          }}
+        >
+          Hapus data demo
+        </button>
+      </div>
+      <p className="muted small" style={{ margin: 0 }}>Data demo tersimpan di localStorage browser ini, jadi tetap ada setelah halaman dimuat ulang.</p>
       <div className="row">
         <div className="card">
           <div className="muted">Pengunjung di aula</div>
@@ -38,7 +50,8 @@ export function JobFairAdmin() {
           lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
           npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: fair.floor.id, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
           bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-          extras={[...booths.flatMap((b) => boothExtras(b)), ...infoDeskExtras(fair.fair.infoDesk)]}
+          extras={[...booths.flatMap((b) => boothExtras(b)), ...infoDeskExtras(fair.fair.infoDesk), ...fair.fair.sponsors.map((sp) => sponsorExtras(sp))]}
+          hallSponsors={fair.fair.sponsors}
         />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Riwayat</h2>
@@ -78,6 +91,31 @@ export function JobFairAdmin() {
                 <td>{fair.peopleAt(b.id)}</td>
                 <td>{fair.visits.get(b.id) ?? 0}</td>
                 <td>{fair.applications.filter((a) => a.boothId === b.id).length}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="card">
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>Sponsor</h2>
+        <table className="list">
+          <thead>
+            <tr>
+              <th>Sponsor</th>
+              <th>Paket</th>
+              <th>Dilihat</th>
+              <th>Website</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fair.fair.sponsors.map((sp) => (
+              <tr key={sp.id}>
+                <td>
+                  <span className="dot" style={{ background: sp.color }} /> {sp.name}
+                </td>
+                <td>{sp.tier}</td>
+                <td>{fair.sponsorViews.get(sp.id) ?? 0}</td>
+                <td className="muted small">{sp.website.replace(/^https?:\/\//, "")}</td>
               </tr>
             ))}
           </tbody>
