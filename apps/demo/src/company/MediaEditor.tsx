@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CompanyBooth } from "@vwo/shared";
+import { MASCOT_KINDS, Mascot } from "@vwo/ui";
 import { mediaOf } from "../fair/BoothMedia";
 import { ACCESSORY_PRODUCTS } from "../fair/company";
 import { fair } from "../useFair";
@@ -15,6 +16,8 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
   const m = mediaOf(booth);
   const has = (id: string) => fair.owns(booth.id, id);
   const [videoUrl, setVideoUrl] = useState(m.videoUrl);
+  const [mascot, setMascot] = useState(m.mascot);
+  const [mascotName, setMascotName] = useState(booth.media?.mascotName ?? "");
   const [mascotLine, setMascotLine] = useState(m.mascotLine);
   const [brochure, setBrochure] = useState(m.brochure.map((p) => `${p.title} | ${p.text}`).join("\n"));
   const [merchName, setMerchName] = useState(m.merch.name);
@@ -67,6 +70,8 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
             fair.editBooth(booth.id, {
               media: {
                 videoUrl: videoUrl.trim(),
+                mascot,
+                mascotName: mascotName.trim(),
                 mascotLine: mascotLine.trim(),
                 brochure: lines(brochure)
                   .map((l) => {
@@ -99,8 +104,23 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
           )}
           {has("standee") && (
             <>
-              <label className="cp-span">
-                🧍 Sapaan maskot
+              <div className="cp-span">
+                <span className="muted small">🐣 Pilih maskot</span>
+                <div className="cp-mascots">
+                  {MASCOT_KINDS.map((k) => (
+                    <button key={k.id} type="button" className="cp-mascot" data-active={mascot === k.id ? "" : undefined} onClick={() => setMascot(k.id)} title={k.about}>
+                      <Mascot kind={k.id} color={booth.color} logo={booth.logo} still />
+                      <span>{k.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label>
+                Nama maskot
+                <input value={mascotName} onChange={(e) => setMascotName(e.target.value)} maxLength={20} placeholder={MASCOT_KINDS.find((k) => k.id === mascot)?.name} />
+              </label>
+              <label>
+                Sapaan maskot
                 <input value={mascotLine} onChange={(e) => setMascotLine(e.target.value)} maxLength={140} />
               </label>
               <label className="cp-span">

@@ -478,4 +478,20 @@ describe("DemoJobFair", () => {
     expect(Math.hypot(npc.x - me.x, npc.y - me.y)).toBeLessThan(2.4);
     expect(fair.bubbles.get(npc.id)?.text).toContain(p.headline);
   });
+  it("gives a company that buys a promoter its own walker, which points to its vacancies", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const b = fair.fair.booths.find((x) => x.floor === 2)!;
+    const before = fair.fair.promoters.length;
+    const inv = fair.createInvoice(b.id, ["promoter"])!;
+    expect(inv.total).toBe(1_000_000);
+    expect(fair.fair.promoters).toHaveLength(before);
+    fair.payInvoice(b.id, inv.id, "QRIS");
+    const p = fair.fair.promoters.find((x) => x.boothId === b.id)!;
+    expect(p.walks).toBe(true);
+    expect(p.level).toBe(b.floor);
+    expect(fair.staff.some((s) => s.id === promoterId(p.id))).toBe(true);
+    expect(b.accessories ?? []).not.toContain("promoter");
+    fair.editBooth(b.id, { promoter: { headline: "Walk-in interview jam 13.00" } });
+    expect(fair.fair.promoters.find((x) => x.boothId === b.id)!.headline).toBe("Walk-in interview jam 13.00");
+  });
 });

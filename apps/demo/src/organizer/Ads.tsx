@@ -15,6 +15,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [note, setNote] = useState("");
   const promoters = fair.allPromoters();
+  const companyPromoters = fair.fair.promoters.filter((p) => p.boothId);
   const ann = fair.org.announcement;
   const floorName = (level: number) => fair.stops.find((s) => s.level === level)?.name ?? `Lantai ${level + 1}`;
   const stalls = fair.fair.rooms.flatMap((r) => r.stalls ?? []);
@@ -95,6 +96,32 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
           })}
         </ul>
       </div>
+
+      {companyPromoters.length > 0 && (
+        <div className="card">
+          <h2 className="cp-h2">💼 Promotor milik perusahaan</h2>
+          <p className="muted small">Dibeli perusahaan lewat portal perusahaan. Isinya diatur perusahaan sendiri.</p>
+          <ul className="org-cards">
+            {companyPromoters.map((p) => {
+              const a = fair.ads.get(`promo:${p.id}`);
+              return (
+                <li key={p.id} style={{ ["--c" as string]: p.color }}>
+                  <span className="org-emoji">{p.emoji}</span>
+                  <span className="org-card-main">
+                    <b>
+                      {p.brand} <span className="muted small">· {p.name}</span>
+                    </b>
+                    <span className="small">{p.headline}</span>
+                    <span className="muted small">
+                      {floorName(p.level)} · 🚶 Keliling · 👁 {a?.views ?? 0} · 👆 {a?.clicks ?? 0} ({pct(a?.clicks ?? 0, a?.views ?? 0)})
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       <div className="card">
         <h2 className="cp-h2">🏷️ Banner sponsor</h2>

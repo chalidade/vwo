@@ -19,6 +19,14 @@ export const VIP_PRODUCT: CompanyProduct = {
   about: "Bingkai emas, lampu sorot, LED berjalan dengan teks sendiri, mahkota VIP, dan posisi teratas di daftar stand.",
 };
 
+export const PROMOTER_PRODUCT: CompanyProduct = {
+  id: "promoter",
+  name: "NPC promotor keliling",
+  emoji: "📣",
+  price: 1_000_000,
+  about: "Seorang promotor berbaju warna brand-mu berjalan di lantai stand, mendatangi pelamar, dan mengajak mereka melihat lowonganmu.",
+};
+
 const ACCESSORY_PRICES: Record<string, number> = {
   plant: 0,
   flag: 0,
@@ -42,7 +50,7 @@ export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_A
     a.slot === "floor" ? "Diletakkan di depan stand (maks. 4 barang lantai)." : a.slot === "air" ? "Melayang di dua sudut atas stand." : a.slot === "wall" ? "Menyala di dinding stand." : "Di sudut belakang stand.",
 }));
 
-export const productOf = (id: string) => (id === VIP_PRODUCT.id ? VIP_PRODUCT : ACCESSORY_PRODUCTS.find((p) => p.id === id));
+export const productOf = (id: string) => (id === VIP_PRODUCT.id ? VIP_PRODUCT : id === PROMOTER_PRODUCT.id ? PROMOTER_PRODUCT : ACCESSORY_PRODUCTS.find((p) => p.id === id));
 
 export const PAY_METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mandiri", "Kartu kredit", "Transfer bank"] as const;
 
