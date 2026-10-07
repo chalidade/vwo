@@ -4,6 +4,37 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Base aplikasi: monorepo, skema database, realtime, live view
+
+**Yang dibangun**
+
+- Monorepo pnpm: `apps/web` (Next.js 15), `apps/realtime` (Socket.IO), `packages/db` (Drizzle + Postgres), `packages/shared` (protokol dan helper).
+- Skema 34 tabel sesuai ERD v0.4 dalam satu migrasi, lengkap dengan aturan di database: satu kursi satu orang, satu kursi per anggota, satu kunjungan aktif per user per cafe, satu host per rombongan, format slug, dan tangga harus menuju lantai lain.
+- Logika kunjungan di `packages/db`: check-in dengan companion (NPC), gabung rombongan pakai kode (ambil alih NPC), duduk satu rombongan sekaligus (semua atau tidak sama sekali), pindah kursi, berdiri, anggota pulang duluan, check-out. Semua tercatat di `visit_events`.
+- Server realtime: masuk dunia per lantai, gerak dengan batas kecepatan, arah hadap 4 arah, companion mengikuti pemain, emote, duduk dan berdiri, counter orang dan kursi kosong. Menutup aplikasi tidak membuat orang check-out.
+- Web: `/vwo/{slug}` (dunia pelanggan, check-in demo, WASD, klik kursi untuk duduk, emote) dan `/admin/{slug}` (live view: orang di dalam, rombongan, kursi kosong, denah per lantai, daftar siapa di dalam).
+- Seed cafe contoh `cafe-a`: 2 lantai dihubungkan tangga, 7 meja, 30 kursi, QR pintu, menu kopi dan makanan, item karakter dasar.
+- Referensi gaya karakter dari owner (chibi 2D, 4 arah) disimpan di `docs/design/references/`. Slot item ditambah `eyewear` dan `back`.
+- CI GitHub Actions: typecheck, tes dengan Postgres, build web.
+
+**Verifikasi**
+
+- 18 tes lulus: 9 tes logika kunjungan dan kursi di Postgres sungguhan, 3 tes realtime lewat socket (dua pemain berebut kursi, hanya satu menang), 6 tes helper.
+- Dicoba di browser: rombongan 3 orang check-in, berjalan, duduk di satu meja; pemain kedua melihat mereka dan kursinya merah; live view admin menampilkan 4 orang, 2 rombongan, 27/30 kursi kosong.
+
+**Catatan**
+
+- `orders.business_date` ditambahkan (tidak ada di ERD) agar nomor order unik per hari per cafe.
+- Check-in masih lewat tombol demo, dan realtime mempercayai `visitId` + `memberId` yang dicek ke database. Keduanya diganti saat login dan QR token dibangun.
+- Dunia virtual baru menampilkan lantai pertama; pindah lantai lewat tangga sudah ada di skema tapi belum di realtime.
+
+**Berikutnya**
+
+- Login + peran staff, lalu check-in QR dengan token berganti.
+- Editor denah drag-and-drop untuk admin.
+- Menu, order, dan layar kasir.
+- Sprite karakter chibi 4 arah menggantikan bentuk sementara.
+
 ## 2026-10-07 · ERD + DFD v0.4: karakter pelanggan dan interaksi
 
 **Konteks:** pelanggan perlu bisa mengatur karakternya dan berinteraksi dengan pelanggan lain.

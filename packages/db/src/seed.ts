@@ -1,0 +1,162 @@
+// Seeds a demo venue reachable at /vwo/cafe-a: two floors joined by stairs, tables with
+// auto-placed seats, an entrance QR, a small menu, default avatar items and demo users.
+import { randomBytes } from "node:crypto";
+import { seatPositionsAround } from "@vwo/shared";
+import { eq } from "drizzle-orm";
+import { createDb } from "./client";
+import {
+  avatarItems,
+  cafeTables,
+  checkinPoints,
+  floors,
+  mapObjects,
+  menuCategories,
+  menuItemModifierGroups,
+  menuItems,
+  modifierGroups,
+  modifierOptions,
+  profiles,
+  seats,
+  users,
+  venueMembers,
+  venues,
+} from "./schema";
+
+const { db, close } = createDb();
+
+const existing = await db.query.venues.findFirst({ where: eq(venues.slug, "cafe-a") });
+if (existing) {
+  console.log("seed: cafe-a already exists, skipping");
+  await close();
+  process.exit(0);
+}
+
+await db.transaction(async (tx) => {
+  const [owner, customer] = await tx
+    .insert(users)
+    .values([
+      { email: "owner@cafe-a.test", displayName: "Owner Cafe A", platformRole: "super_admin" },
+      { email: "pelanggan@cafe-a.test", displayName: "Pelanggan Demo" },
+    ])
+    .returning();
+  if (!owner || !customer) throw new Error("seed users failed");
+  await tx.insert(profiles).values([
+    { userId: owner.id, nickname: "Owner" },
+    { userId: customer.id, nickname: "Rina", bio: "Suka kopi susu", interests: ["kopi", "musik"] },
+  ]);
+
+  const [venue] = await tx
+    .insert(venues)
+    .values({
+      slug: "cafe-a",
+      name: "Cafe A",
+      description: "Cafe contoh untuk pengembangan",
+      status: "open",
+      taxRate: "0.1100",
+      serviceRate: "0.0500",
+      openingHours: { mon: ["08:00", "22:00"], tue: ["08:00", "22:00"], wed: ["08:00", "22:00"], thu: ["08:00", "22:00"], fri: ["08:00", "23:00"], sat: ["08:00", "23:00"], sun: ["09:00", "22:00"] },
+      ownerUserId: owner.id,
+    })
+    .returning();
+  if (!venue) throw new Error("seed venue failed");
+  await tx.insert(venueMembers).values({ venueId: venue.id, userId: owner.id, role: "owner" });
+
+  const [ground, rooftop] = await tx
+    .insert(floors)
+    .values([
+      { venueId: venue.id, name: "Lantai 1", width: 20, height: 14, sortOrder: 0, status: "published", layoutVersion: 1 },
+      { venueId: venue.id, name: "Rooftop", width: 16, height: 10, sortOrder: 1, status: "published", layoutVersion: 1 },
+    ])
+    .returning();
+  if (!ground || !rooftop) throw new Error("seed floors failed");
+
+  await tx.insert(mapObjects).values([
+    { floorId: ground.id, venueId: venue.id, type: "door", x: 9, y: 13, width: 2, height: 1, isWalkable: true },
+    { floorId: ground.id, venueId: venue.id, type: "spawn_point", x: 10, y: 12, isWalkable: true },
+    { floorId: ground.id, venueId: venue.id, type: "counter", x: 1, y: 1, width: 6, height: 1 },
+    { floorId: ground.id, venueId: venue.id, type: "stairs", x: 18, y: 1, width: 1, height: 2, isWalkable: true, targetFloorId: rooftop.id, targetX: 1, targetY: 1 },
+    { floorId: rooftop.id, venueId: venue.id, type: "stairs", x: 0, y: 1, width: 1, height: 2, isWalkable: true, targetFloorId: ground.id, targetX: 17, targetY: 2 },
+  ]);
+
+  const tableSpecs = [
+    { floor: ground, label: "M-01", shape: "square" as const, x: 3, y: 5, width: 2, height: 2, capacity: 4 },
+    { floor: ground, label: "M-02", shape: "square" as const, x: 8, y: 5, width: 2, height: 2, capacity: 4 },
+    { floor: ground, label: "M-03", shape: "round" as const, x: 13, y: 5, width: 2, height: 2, capacity: 2 },
+    { floor: ground, label: "M-04", shape: "rect" as const, x: 4, y: 9, width: 4, height: 2, capacity: 6 },
+    { floor: ground, label: "BAR", shape: "bar" as const, x: 12, y: 9, width: 5, height: 1, capacity: 4 },
+    { floor: rooftop, label: "R-01", shape: "round" as const, x: 4, y: 4, width: 2, height: 2, capacity: 4 },
+    { floor: rooftop, label: "R-02", shape: "rect" as const, x: 9, y: 4, width: 4, height: 2, capacity: 6 },
+  ];
+  for (const spec of tableSpecs) {
+    const [table] = await tx
+      .insert(cafeTables)
+      .values({ floorId: spec.floor.id, venueId: venue.id, label: spec.label, shape: spec.shape, x: spec.x, y: spec.y, width: spec.width, height: spec.height })
+      .returning();
+    if (!table) throw new Error("seed table failed");
+    const positions = seatPositionsAround(spec, spec.capacity);
+    await tx.insert(seats).values(
+      positions.map((p, i) => ({
+        floorId: spec.floor.id,
+        tableId: table.id,
+        venueId: venue.id,
+        label: `${spec.label}-${String.fromCharCode(65 + i)}`,
+        x: p.x,
+        y: p.y,
+        rotation: p.rotation,
+      })),
+    );
+  }
+
+  await tx.insert(checkinPoints).values({
+    venueId: venue.id,
+    floorId: ground.id,
+    type: "entrance",
+    label: "Pintu depan",
+    secretKey: randomBytes(32).toString("hex"),
+  });
+
+  const [coffee, food] = await tx
+    .insert(menuCategories)
+    .values([
+      { venueId: venue.id, name: "Kopi", sortOrder: 0 },
+      { venueId: venue.id, name: "Makanan", sortOrder: 1 },
+    ])
+    .returning();
+  if (!coffee || !food) throw new Error("seed categories failed");
+  const items = await tx
+    .insert(menuItems)
+    .values([
+      { venueId: venue.id, categoryId: coffee.id, name: "Kopi Susu Gula Aren", price: "25000", sortOrder: 0 },
+      { venueId: venue.id, categoryId: coffee.id, name: "Americano", price: "22000", sortOrder: 1 },
+      { venueId: venue.id, categoryId: coffee.id, name: "Cappuccino", price: "28000", sortOrder: 2 },
+      { venueId: venue.id, categoryId: food.id, name: "Croissant", price: "20000", sortOrder: 0 },
+      { venueId: venue.id, categoryId: food.id, name: "Nasi Goreng Kampung", price: "35000", sortOrder: 1 },
+    ])
+    .returning();
+
+  const [sugar] = await tx
+    .insert(modifierGroups)
+    .values({ venueId: venue.id, name: "Level gula", minSelect: 1, maxSelect: 1 })
+    .returning();
+  if (!sugar) throw new Error("seed modifier failed");
+  await tx.insert(modifierOptions).values([
+    { groupId: sugar.id, name: "Normal" },
+    { groupId: sugar.id, name: "Less sugar" },
+    { groupId: sugar.id, name: "No sugar" },
+  ]);
+  await tx
+    .insert(menuItemModifierGroups)
+    .values(items.filter((i) => i.categoryId === coffee.id).map((i) => ({ menuItemId: i.id, modifierGroupId: sugar.id })));
+
+  await tx.insert(avatarItems).values([
+    { slot: "hair", name: "Rambut pendek", spriteKey: "hair/short", colorOptions: ["#2b1b12", "#6b4423", "#d4a373"] },
+    { slot: "hair", name: "Rambut panjang", spriteKey: "hair/long", colorOptions: ["#2b1b12", "#6b4423", "#d4a373"] },
+    { slot: "top", name: "Kaos", spriteKey: "top/tshirt", colorOptions: ["#ffffff", "#1f2937", "#2563eb"] },
+    { slot: "bottom", name: "Celana jeans", spriteKey: "bottom/jeans" },
+    { slot: "shoes", name: "Sneakers", spriteKey: "shoes/sneakers" },
+    { venueId: venue.id, slot: "top", name: "Apron Cafe A", spriteKey: "top/apron-cafe-a", rarity: "rare", unlockType: "visit_count", unlockValue: 5 },
+  ]);
+});
+
+console.log("seed: created cafe-a (open /vwo/cafe-a)");
+await close();
