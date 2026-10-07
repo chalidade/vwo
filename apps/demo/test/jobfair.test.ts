@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
-import { APPLY_COST, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript } from "../src/fair/content";
+import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
 import { DemoJobFair, type FairSaved, PLAYER_ID, promoterId } from "../src/jobfair-engine";
 
 function clock() {
@@ -146,8 +146,8 @@ describe("DemoJobFair", () => {
     expect(fair.canAffordApply()).toBe(false);
     expect(fair.buyCoins("koin-120", "QRIS")).toBe(120);
     expect(fair.canAffordApply()).toBe(true);
-    expect(fair.claimDaily()).toBe(true);
-    expect(fair.claimDaily()).toBe(false);
+    expect(fair.claimDaily()).toBe(20);
+    expect(fair.claimDaily()).toBe(0);
   });
 
   it("rates applicants and companies, and levels the player up", () => {
@@ -235,5 +235,69 @@ describe("DemoJobFair", () => {
       s.slides.forEach((sl, i) => expect(lines.filter((l) => l.slide === i && l.reveal > 0).map((l) => l.reveal).slice(0, sl.points.length)).toEqual(sl.points.map((_, k) => k + 1)));
       expect(lines.at(-1)!.text).toContain("Terima kasih");
     }
+  });
+
+  it("caps mini game coins per day, tracks missions, and rewards a daily streak", () => {
+    const c = clock();
+    const fair = new DemoJobFair(() => 0.5, c.now);
+    fair.join("Chalid", false, PLAYER_ID);
+    // Mini games pay up to the daily cap, then nothing until tomorrow.
+    let paid = 0;
+    for (let i = 0; i < 10; i++) paid += fair.rewardGame("Kuis Karier", 10);
+    expect(paid).toBe(GAME_DAILY_CAP);
+    expect(fair.gameCoinsLeft()).toBe(0);
+
+    // Missions: always a mini game mission, all four claimable once done.
+    const ms = fair.missions();
+    expect(ms).toHaveLength(4);
+    expect(ms[0]!.kind).toBe("game");
+    expect(new Set(ms.map((m) => m.id)).size).toBe(4);
+    expect(todaysMissions("2026-10-07")).toEqual(todaysMissions("2026-10-07"));
+    expect(fair.claimMission(ms[0]!.id)).toBe(true);
+    expect(fair.claimMission(ms[0]!.id)).toBe(false);
+    for (const m of ms.slice(1)) {
+      expect(fair.claimMission(m.id)).toBe(false);
+      fair.track(m.kind, m.target);
+      expect(fair.claimMission(m.id)).toBe(true);
+    }
+    const before = fair.player.coins;
+    expect(fair.claimMissionBonus()).toBe(true);
+    expect(fair.player.coins).toBe(before + MISSIONS_BONUS);
+    expect(fair.claimable()).toBe(0);
+
+    // Streak: each consecutive day pays more; missing a day starts over.
+    expect(fair.claimDaily()).toBe(DAILY_COINS);
+    c.advance(86400000);
+    expect(fair.missions().every((m) => !m.claimed)).toBe(true);
+    expect(fair.gameCoinsLeft()).toBe(GAME_DAILY_CAP);
+    expect(fair.claimDaily()).toBe(DAILY_COINS + 5);
+    c.advance(86400000);
+    expect(fair.claimDaily()).toBe(DAILY_COINS + 10);
+    c.advance(2 * 86400000);
+    expect(fair.claimDaily()).toBe(DAILY_COINS);
+    expect(fair.player.streak).toBe(1);
+  });
+
+  it("reads career articles and ticks off roadmap stages", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    fair.join("Chalid", false, PLAYER_ID);
+    for (const a of CAREER_ARTICLES) {
+      expect(a.roadmap.map((st) => st.level)).toEqual(["Pemula", "Menengah", "Mahir", "Ahli"]);
+      expect(a.sections.length).toBeGreaterThan(0);
+      // Every article points to at least one open job at the fair.
+      expect(DEMO_JOB_FAIR.booths.some((b) => b.jobs.some((j) => a.keywords.some((k) => j.title.toLowerCase().includes(k)))), a.id).toBe(true);
+    }
+    const xp0 = fair.player.xp;
+    expect(fair.readArticle("barista")).toBe(true);
+    expect(fair.readArticle("barista")).toBe(false);
+    expect(fair.player.xp).toBe(xp0 + 8);
+    const a = CAREER_ARTICLES[0]!;
+    const xp1 = fair.player.xp;
+    a.roadmap[0]!.steps.forEach((_, k) => fair.toggleStep(a.id, stepKey(0, k)));
+    expect(fair.player.xp).toBe(xp1 + 15);
+    // Unticking and ticking again does not pay twice.
+    fair.toggleStep(a.id, stepKey(0, 0));
+    fair.toggleStep(a.id, stepKey(0, 0));
+    expect(fair.player.xp).toBe(xp1 + 15);
   });
 });

@@ -48,6 +48,8 @@ import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from 
 import { FoodMenu } from "./fair/FoodMenu";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
+import { SofaGames } from "./fair/Games";
+import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
 import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
@@ -81,7 +83,8 @@ type Reach =
   | { kind: "lift" }
   | { kind: "seat"; seatId: string }
   | { kind: "promoter"; promoter: Promoter }
-  | { kind: "seated"; room: FairRoom };
+  | { kind: "seated"; room: FairRoom }
+  | { kind: "sofa" };
 
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
 
@@ -114,6 +117,8 @@ export function JobFair() {
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
+  const [games, setGames] = useState(false);
+  const [missions, setMissions] = useState(false);
   const [live, setLive] = useState<{ status: LiveStatus; peers: number }>({ status: "connecting", peers: 0 });
   /** How players on other devices look, by their visitor id here. */
   const remoteLooks = useRef(new Map<string, Look>());
@@ -126,7 +131,7 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -175,6 +180,7 @@ export function JobFair() {
       if (Math.abs(self.x - (sp.x + SPONSOR_W / 2)) < 0.9 && self.y > sp.y + SPONSOR_H && self.y < sp.y + SPONSOR_H + 1.2) return { kind: "sponsor", sponsor: sp };
     }
     if (self.seatId && room) return { kind: "seated", room };
+    if (self.seatId) return { kind: "sofa" };
     if (coinHere) {
       const c = fair.fair.coinStand;
       if (Math.abs(self.x - (c.x + COIN_STAND_SPOTS.front.x)) < 2 && self.y > c.y + 2.1 && self.y < c.y + 3.6) return { kind: "coins" };
@@ -359,6 +365,7 @@ export function JobFair() {
     else if (r.kind === "lift") setLift(true);
     else if (r.kind === "seat") sitDown(r.seatId);
     else if (r.kind === "seated") startActivity(r.room);
+    else if (r.kind === "sofa") setGames(true);
     else if (r.kind === "promoter") goToPromoter(r.promoter);
     else talkToVisitor(r.memberId);
   }
@@ -430,8 +437,10 @@ export function JobFair() {
   /** Seated in a room: open its activity again (the seminar, the test). */
   function seatedAction() {
     const me = savedSession && fair.visitors.get(savedSession.visitorId);
-    const r = me?.seatId ? fair.roomOf(me.floorId) : undefined;
+    if (!me?.seatId) return;
+    const r = fair.roomOf(me.floorId);
     if (r) startActivity(r);
+    else setGames(true);
   }
 
   /** Walk to a booth's desk, on whatever floor, and talk to the recruiter there. Called from menus
@@ -491,6 +500,11 @@ export function JobFair() {
     });
   }
 
+  function claimDaily() {
+    const n = fair.claimDaily();
+    if (n) setToast(`🎁 +${n} koin harian${(me.streak ?? 0) > 1 ? ` · 🔥 ${me.streak} hari beruntun` : ""}`);
+  }
+
   function openStall(id: string) {
     setStall(id);
     fair.ad(`stall:${id}`, "view");
@@ -501,7 +515,10 @@ export function JobFair() {
     if (!fair.sit(savedSession.visitorId, seatId)) return;
     const r = fair.roomOf(fair.visitors.get(savedSession.visitorId)!.floorId);
     if (r) startActivity(r);
-    else fair.say(savedSession.visitorId, "Santai dulu ☕", 2000);
+    else {
+      fair.track("sofa");
+      setGames(true);
+    }
   }
 
   /** What you do once seated: take the test, watch the seminar, or eat. */
@@ -664,6 +681,7 @@ export function JobFair() {
           label: `${EMOTE_ICON[e]} ${e === "wave" ? "Lambai" : "Semangat"}`,
           onPick: () => {
             fair.say(session.visitorId, e === "wave" ? "👋 Hai!" : "Semangat ya! 💪", 1800);
+            fair.track("greet");
             setTalk(null);
           },
         })),
@@ -859,6 +877,10 @@ export function JobFair() {
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => startActivity(reach.room)}>
               {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : "📝 Kerjakan psikotes"}
             </button>
+          ) : reach?.kind === "sofa" ? (
+            <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGames(true)}>
+              🎮 Main mini game
+            </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
               <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 lift di pojok kanan bawah
@@ -882,6 +904,10 @@ export function JobFair() {
                   ✔<span className="menu-label"> Verified</span>
                 </button>
               )}
+              <button type="button" className="menu-btn mission-btn" onClick={() => setMissions(true)} title="Misi harian">
+                🎯<span className="menu-label"> Misi</span>
+                {fair.claimable() + (fair.canClaimDaily() ? 1 : 0) > 0 && <span className="menu-dot">{fair.claimable() + (fair.canClaimDaily() ? 1 : 0)}</span>}
+              </button>
               <button type="button" className="menu-btn coin-btn" onClick={() => setWallet(true)} title="Dompet koin dan voucher">
                 🪙 {me.coins}
               </button>
@@ -936,6 +962,42 @@ export function JobFair() {
           />
         )}
 
+        {session && games && (
+          <SofaGames
+            left={fair.gameCoinsLeft()}
+            logos={fair.fair.booths.map((b) => ({ logo: b.logo, color: b.color }))}
+            onReward={(game, coins) => fair.rewardGame(game, coins)}
+            read={me.read ?? []}
+            onRead={(id) => fair.readArticle(id)}
+            roadmap={me.roadmap ?? {}}
+            onToggleStep={(id, key) => fair.toggleStep(id, key)}
+            jobsFor={(keys) =>
+              fair.fair.booths
+                .flatMap((b) => b.jobs.filter((j) => keys.some((k) => j.title.toLowerCase().includes(k))).map((j) => ({ boothId: b.id, company: b.company, title: j.title })))
+                .slice(0, 4)
+            }
+            onGoToBooth={(id) => {
+              const b = fair.booth(id);
+              setGames(false);
+              if (b) goToBooth(b);
+            }}
+            onClose={() => setGames(false)}
+          />
+        )}
+
+        {session && missions && (
+          <MissionsPanel
+            missions={fair.missions()}
+            bonusClaimed={fair.dailyState().bonus}
+            streak={me.streak ?? 0}
+            canClaimDaily={fair.canClaimDaily()}
+            onClaim={(id) => fair.claimMission(id)}
+            onBonus={() => fair.claimMissionBonus() && setToast("🏆 Semua misi selesai, bonus koin!")}
+            onDaily={claimDaily}
+            onClose={() => setMissions(false)}
+          />
+        )}
+
         {session && verify && (
           <VerifyPanel
             name={profile.name || session.name}
@@ -972,7 +1034,7 @@ export function JobFair() {
             atStand={reach?.kind === "coins"}
             canClaim={fair.canClaimDaily()}
             onBuy={(id, method) => fair.buyCoins(id, method)}
-            onClaim={() => fair.claimDaily() && setToast("🎁 +20 koin gratis harian")}
+            onClaim={claimDaily}
             onGoToStand={() => {
               setWallet(false);
               goToCoinStand();
@@ -1026,6 +1088,7 @@ export function JobFair() {
             speakerLook={(n) => staffLook(n, "#0e7490")}
             audience={avatars.filter((a) => a.floorId === floor.id).length}
             onFinish={(id) => {
+              fair.track("seminar");
               if (fair.attendSeminar(id)) setToast("🎓 E-sertifikat didapat, +30 XP");
             }}
             onClose={() => setSeminar(false)}
