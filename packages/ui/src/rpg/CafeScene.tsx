@@ -7,7 +7,7 @@
 // Coordinates in props are tiles (the same units as the database layout). The scene either
 // follows a point with a camera (the customer's world) or fits the whole floor (the admin view).
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { AvatarState, Facing, FloorView, SeatView, TableView } from "@vwo/shared";
+import type { AvatarState, Facing, FloorView, SeatView, SponsorView, TableView } from "@vwo/shared";
 import {
   Barista,
   ChairSprite,
@@ -33,7 +33,7 @@ export const TILE = 48;
 const EDGE = 14;
 
 function wallTiles(floor: FloorView) {
-  return floor.theme === "rooftop" ? 2.2 : 2.6;
+  return floor.theme === "rooftop" ? 2.2 : floor.theme === "hall" ? 3.6 : 2.6;
 }
 
 /** Which side of its table a chair stands on. Chairs without a table count as "n". */
@@ -111,6 +111,8 @@ export interface CafeSceneProps {
   onMenuClick?: () => void;
   onNpcClick?: (npcId: string) => void;
   extras?: SceneExtra[];
+  /** Sponsors shown on a hall's back wall. */
+  hallSponsors?: SponsorView[];
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -148,6 +150,7 @@ export function CafeScene({
   onMenuClick,
   onNpcClick,
   extras = [],
+  hallSponsors,
   className,
   style,
   children,
@@ -256,7 +259,8 @@ export function CafeScene({
       const cx = px(o.x + o.width / 2);
       switch (o.spriteKey) {
         case "rug":
-          ground.push({ key: o.id, z: 0, x: px(o.x), y: py(o.y), node: <RugSprite w={w} h={h} /> });
+        case "rug-plain":
+          ground.push({ key: o.id, z: 0, x: px(o.x), y: py(o.y), node: <RugSprite w={w} h={h} label={o.spriteKey === "rug" ? undefined : null} /> });
           break;
         case "plant":
           ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite /> });
@@ -427,7 +431,7 @@ export function CafeScene({
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
         ) : floor.theme === "hall" ? (
-          <HallWall w={worldW} h={wall} title={floor.name} />
+          <HallWall w={worldW} h={wall} title={floor.name} sponsors={hallSponsors} />
         ) : (
           <IndoorWall w={worldW} h={wall} windows={windows} />
         )}

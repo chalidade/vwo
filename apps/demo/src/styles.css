@@ -106,14 +106,6 @@ h1 { margin: 0; }
 .cc-go { margin-top: 6px; font-size: 16px; padding: 10px; }
 .cc-note { margin: 0; font-size: 12px; color: var(--muted); }
 
-/* ---- Touch controls ---- */
-.pad { position: absolute; z-index: 6; right: 14px; bottom: 76px; display: none; grid-template-areas: ". up a" "left down right"; grid-template-columns: repeat(3, 52px); gap: 6px; }
-.pad button { height: 48px; padding: 0; font-size: 18px; background: rgb(255 250 240 / 0.92); color: var(--text); touch-action: none; }
-.pad .pad-a { background: var(--accent); color: #fff; border-radius: 50%; }
-@media (pointer: coarse) {
-  .pad { display: grid; }
-  .hint { display: none; }
-}
 @media (max-width: 640px) {
   .hud-tr { width: 110px; }
   .hud-tl { max-width: calc(100% - 140px); }
@@ -121,15 +113,10 @@ h1 { margin: 0; }
   .demo-tag { display: none; }
   .hud-bl { top: 112px; bottom: auto; }
   .actions button { font-size: 15px; padding: 2px 6px; }
-  .hud-bottom { bottom: 136px; }
   nav.top { gap: 12px; font-size: 14px; }
 }
 
 /* ---- Job fair ---- */
-.mine { position: absolute; z-index: 7; left: 12px; bottom: 136px; width: min(320px, calc(100% - 24px)); max-height: 50%; overflow: auto; padding: 10px 12px; }
-.mine-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.mine ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.mine li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
 .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #e2e8f0; color: #334155; white-space: nowrap; }
 .status[data-status="Dilihat"] { background: #dbeafe; color: #1d4ed8; }
 .status[data-status="Diundang interview"] { background: #dcfce7; color: #15803d; }
@@ -137,7 +124,39 @@ h1 { margin: 0; }
 .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #3b2a20; vertical-align: -1px; }
 .small-btn { padding: 2px 8px; font-size: 12px; border-width: 2px; box-shadow: 0 2px 0 #3b2a20; }
 .small-btn:disabled { opacity: 0.4; cursor: default; }
-@media (max-width: 640px) {
-  .mine { top: 112px; bottom: auto; }
-}
 .home-sub { margin: 22px 0 0; font-size: 20px; }
+
+/* ---- Job seeker panel ---- */
+.sp { width: min(680px, 100%); }
+.sp-page { color: var(--text); }
+.sp-card { display: flex; gap: 14px; align-items: center; padding: 10px; border-radius: 10px; background: #fff; border: 2px solid #ead2bd; }
+.sp-avatar { flex: none; width: 76px; height: 92px; display: grid; place-items: center; border-radius: 10px; background: #fde68a; border: 2px solid #3b2a20; overflow: hidden; }
+.sp-name { font-weight: 900; font-size: 18px; }
+.sp-muted { color: var(--muted); font-size: 12px; }
+.sp-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13px; }
+.sp-field { display: contents; }
+.sp-field > span { align-self: center; }
+.sp-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.sp-reset { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #d6b896; }
+.sp-danger { background: #fff; color: #b91c1c; border-color: #b91c1c; box-shadow: 0 2px 0 #b91c1c; font-size: 12px; padding: 3px 10px; }
+.sp-empty, .sp-summary { margin: 0 0 10px; font-size: 14px; }
+.sp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sp-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: #fff; border: 2px solid #ead2bd; border-left: 6px solid var(--c); }
+.sp-logo { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--c); color: #fff; font-weight: 900; font-size: 12px; border: 2px solid #3b2a20; }
+.sp-main { display: flex; flex-direction: column; min-width: 0; font-size: 14px; }
+.sp-links { grid-column: 2 / -1; display: flex; gap: 6px; }
+.sp-links button { padding: 1px 8px; font-size: 12px; background: #fff; color: var(--text); border-width: 2px; box-shadow: 0 2px 0 #3b2a20; }
+.sp-stamps { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 45%), 1fr)); gap: 10px; }
+.sp-stamp { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; background: #fff; color: var(--text); border: 2px dashed #c9a27c; box-shadow: none; font-weight: 600; font-size: 13px; }
+.sp-stamp-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; border: 3px dashed #c9a27c; color: #c9a27c; font-weight: 900; font-size: 18px; }
+.sp-stamp[data-got] { border-style: solid; border-color: var(--c); }
+.sp-stamp[data-got] .sp-stamp-mark { border: 3px double var(--c); background: color-mix(in srgb, var(--c) 15%, #fff); color: var(--c); transform: rotate(-12deg); }
+.hint-touch { display: none; }
+@media (pointer: coarse) {
+  .hint-keys { display: none; }
+  .hint-touch { display: inline; }
+}
+@media (max-width: 480px) {
+  .sp-card { align-items: flex-start; }
+  .sp-avatar { width: 60px; height: 76px; }
+}

@@ -4,6 +4,26 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: sponsor, profil, riwayat lamaran, aula lebih luas
+
+**Konteks:** owner minta pad jalan di HP dihapus supaya layar lebih luas (jalan cukup dengan tap), tempat untuk sponsor, riwayat lamaran dan info user, detail perusahaan seperti website, peta yang lebih luas, dan data demo disimpan di localStorage.
+
+**Yang berubah**
+
+- Pad arah dan tombol A di HP dihapus dari cafe dan job fair. Jalan dengan tap lantai, interaksi dengan tap tombol aksi di bawah atau tap objeknya. Petunjuk di bawah layar menyesuaikan (keyboard di desktop, tap di layar sentuh).
+- Aula job fair diperluas dari 26×17 jadi 38×22 tile, dengan 8 stand (baru: Sehat Medika dan Pintar Edu, total 24 lowongan), lorong lebih lebar, dan lounge di kiri-kanan pintu masuk.
+- Sponsor: papan "Didukung oleh" di dinding aula, dan banner berdiri tiap sponsor (Platinum, Gold, Silver) di lorong antar stand. Tap banner atau berdiri di depannya untuk membuka kartu sponsor (tentang, promo, tombol ke website). Foto banner asli bisa dipasang lewat `imageUrl`.
+- Detail perusahaan: halaman "Profil perusahaan" di pop up lowongan berisi website, email HR, alamat kantor, tahun berdiri, jumlah karyawan, sosial media, dan benefit. Bisa dibuka dari pilihan "Info perusahaan" saat ngobrol dengan recruiter.
+- Tas pencari kerja (tombol 🎒 Profil dan 📋 Lamaran): tab Profil (data diri yang mengisi form lamaran otomatis, plus ringkasan jumlah lamaran, perusahaan, undangan interview, stand dikunjungi), tab Lamaran (semua lamaran dengan perusahaan, waktu, status, dan tombol ke lowongan atau profil perusahaan), dan tab Stempel (kartu stempel tiap stand yang sudah dikunjungi, tap untuk diantar ke stand).
+- Data demo disimpan di localStorage browser (`vwo:jobfair` untuk lamaran, kunjungan, stempel, dan statistik sponsor; `vwo:jobseeker` untuk profil). Setelah halaman dimuat ulang, lamaran dan stempel tetap ada. Ada tombol "Hapus data demo" di profil dan dashboard panitia.
+- Dashboard panitia: tabel sponsor (paket, berapa kali dilihat, website) dan tombol hapus data demo.
+- Website contoh memakai domain `.example` supaya tidak mengarah ke situs sungguhan.
+
+**Verifikasi**
+
+- Tes demo 13 (baru: sponsor bisa dicapai, lamaran dan stempel pemain bertahan setelah muat ulang, hapus data mengosongkan penyimpanan). Typecheck semua paket lulus.
+- Dicoba di browser (1280px dan 390px layar sentuh): aula baru, kartu sponsor, profil perusahaan, kirim lamaran, tab profil/lamaran/stempel, muat ulang halaman (lamaran tetap 1), dashboard panitia, dan cafe tanpa pad. Tidak ada error di console.
+
 ## 2026-10-07 · Room Job Fair
 
 **Konteks:** owner minta room lain bertema job fair: ada stand (kotak) tiap perusahaan, pengunjung bisa tanya-tanya, lihat banner lowongan, melamar kerja, dan jalan-jalan dari stand ke stand.

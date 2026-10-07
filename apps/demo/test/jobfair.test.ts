@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_JOB_FAIR, boothSpot, findPath, isBlocked } from "@vwo/shared";
-import { DemoJobFair } from "../src/jobfair-engine";
+import { DEMO_JOB_FAIR, SPONSOR_H, SPONSOR_W, boothSpot, findPath, isBlocked } from "@vwo/shared";
+import { DemoJobFair, type FairSaved, PLAYER_ID } from "../src/jobfair-engine";
 
 function clock() {
   let t = 1_000_000;
@@ -18,6 +18,33 @@ describe("DemoJobFair", () => {
         expect(findPath(fair.floor, fair.fair.spawn, to), `${b.id} ${spot}`).not.toBeNull();
       }
     }
+    for (const sp of DEMO_JOB_FAIR.sponsors) {
+      const front = { x: sp.x + SPONSOR_W / 2, y: sp.y + SPONSOR_H + 0.75 };
+      expect(findPath(fair.floor, fair.fair.spawn, front), sp.id).not.toBeNull();
+    }
+  });
+
+  it("keeps the player's applications and stamps across reloads", () => {
+    const c = clock();
+    let stored: FairSaved | null = null;
+    const storage = { load: () => stored, save: (d: FairSaved) => (stored = JSON.parse(JSON.stringify(d))), clear: () => (stored = null) };
+    const first = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    first.join("Chalid", false, PLAYER_ID);
+    first.visit(PLAYER_ID, "kopi-kita");
+    first.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: "kk-barista", email: "c@x.id" });
+    first.viewSponsor(PLAYER_ID, "telko-nusa");
+    first.flush();
+
+    const second = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    expect(second.applications.map((a) => [a.visitorId, a.jobTitle, a.status])).toEqual([[PLAYER_ID, "Barista Trainee", "Dilihat"]]);
+    expect([...(second.visitedBy.get(PLAYER_ID) ?? [])]).toEqual(["kopi-kita"]);
+    expect(second.sponsorViews.get("telko-nusa")).toBe(1);
+    second.join("Chalid", false, PLAYER_ID);
+    expect(second.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: "kk-barista" })).toBeNull();
+
+    second.reset();
+    expect(stored).toBeNull();
+    expect(new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage).applications).toHaveLength(0);
   });
 
   it("takes one application per job per visitor and lets the organiser decide", () => {

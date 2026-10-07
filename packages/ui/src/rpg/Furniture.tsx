@@ -304,14 +304,16 @@ export function SofaSprite({ w, h }: { w: number; h: number }) {
   );
 }
 
-export function RugSprite({ w, h }: { w: number; h: number }) {
+export function RugSprite({ w, h, label = "SELAMAT DATANG" }: { w: number; h: number; label?: string | null }) {
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block" }}>
       <rect x={2} y={2} width={w - 4} height={h - 4} rx={14} fill="#b4533a" stroke="#7c2d12" strokeWidth={3} />
       <rect x={12} y={12} width={w - 24} height={h - 24} rx={8} fill="none" stroke="#f6c453" strokeWidth={3} strokeDasharray="10 6" />
-      <text x={w / 2} y={h / 2 + 6} textAnchor="middle" fontSize={16} fontWeight={800} letterSpacing={3} fill="#fde68a" fontFamily="system-ui, sans-serif">
-        SELAMAT DATANG
-      </text>
+      {label && (
+        <text x={w / 2} y={h / 2 + 6} textAnchor="middle" fontSize={16} fontWeight={800} letterSpacing={3} fill="#fde68a" fontFamily="system-ui, sans-serif">
+          {label}
+        </text>
+      )}
     </svg>
   );
 }
