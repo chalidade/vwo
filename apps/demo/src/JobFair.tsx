@@ -1,5 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { type AvatarState, type CompanyBooth, EMOTES, type Emote, SPONSOR_H, SPONSOR_W, type SponsorView, boothSpot, fairFloorIndex, findPath, portalAt, slide } from "@vwo/shared";
+import {
+  type AvatarState,
+  COIN_STAND_SPOTS,
+  type CompanyBooth,
+  EMOTES,
+  type Emote,
+  type FairRoom,
+  SPONSOR_H,
+  SPONSOR_W,
+  type SponsorView,
+  boothSpot,
+  fairFloorId,
+  fairFloorIndex,
+  fairRoomFloorId,
+  findPath,
+  portalAt,
+  roomDoorFront,
+  slide,
+  stallSpot,
+} from "@vwo/shared";
 import {
   type ApplicationInput,
   ApplyForm,
@@ -11,13 +30,24 @@ import {
   SponsorCard,
   type NpcView,
   boothExtras,
+  coinStandExtras,
+  foodStallExtras,
   infoDeskExtras,
+  psikotesExtras,
+  roomDoorExtras,
+  seminarStageExtras,
   lookFor,
   sponsorExtras,
 } from "@vwo/ui";
 import { CharacterCreator, type Character } from "./CharacterCreator";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { PLAYER_ID, recruiterId } from "./jobfair-engine";
+import { PLAYER_ID, recruiterId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, SEMINARS, levelOf } from "./fair/content";
+import { FoodMenu } from "./fair/FoodMenu";
+import { LevelBar } from "./fair/Modal";
+import { PsychTest } from "./fair/PsychTest";
+import { SeminarView } from "./fair/Seminar";
+import { WalletPanel } from "./fair/Wallet";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./useCafe";
@@ -40,7 +70,12 @@ type Reach =
   | { kind: "banner"; booth: CompanyBooth }
   | { kind: "info" }
   | { kind: "sponsor"; sponsor: SponsorView }
-  | { kind: "person"; memberId: string; name: string };
+  | { kind: "person"; memberId: string; name: string }
+  | { kind: "coins" }
+  | { kind: "stall"; stallId: string; name: string }
+  | { kind: "door"; room: FairRoom }
+  | { kind: "seat"; seatId: string }
+  | { kind: "seated"; room: FairRoom };
 
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
 
@@ -61,31 +96,53 @@ export function JobFair() {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [toast, setToast] = useState<string | null>(null);
+  const [wallet, setWallet] = useState(false);
+  const [stall, setStall] = useState<string | null>(null);
+  const [psych, setPsych] = useState(false);
+  const [seminar, setSeminar] = useState(false);
   const hud = useHud();
   savedSession = session;
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ x: number; y: number }[] | null>(null);
   /** Where a clicked walk ends, possibly on another floor: the route then leads to the stairs first. */
-  const goal = useRef<{ floorId: string; x: number; y: number } | null>(null);
+  const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
   const floor = fair.floor(self?.floorId ?? fair.floors[0]!.id);
-  const level = fairFloorIndex(floor.id);
+  /** Set when the player is inside a room rather than on a hall floor. */
+  const room = fair.roomOf(floor.id);
+  const level = fair.levelOf(floor.id);
   const floorInfo = fair.fair.floors[level];
-  const booths = fair.fair.booths.filter((b) => b.floor === level);
-  const sponsors = fair.fair.sponsors.filter((sp) => sp.floor === level);
+  const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === level);
+  const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === level);
+  const doors = room ? [] : fair.fair.rooms.filter((r) => r.floor === level);
+  const coinHere = !room && fair.fair.coinStand.floor === level;
+  const me = fair.player;
+  const seeker = levelOf(me.xp);
+  const occupied = fair.occupiedSeats();
   const mine = session ? fair.applications.filter((a) => a.visitorId === session.visitorId) : [];
   const appliedIds = new Set(mine.map((a) => a.jobId));
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2800);
+    const id = setTimeout(() => setToast(null), 3200);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Level-ups and company ratings arrive from the engine; show them one at a time.
+  useEffect(() => {
+    if (toast) return;
+    const up = fair.levelUps.shift();
+    if (up) setToast(`🎉 Naik level! Lv ${up} · ${SEEKER_TITLES[up - 1]}`);
+    else {
+      const n = fair.notices.shift();
+      if (n) setToast(`⭐ ${n}`);
+    }
+  });
 
   // --- What is within reach: a recruiter across the desk, a hiring banner, the info desk, a person.
   const reach: Reach | null = (() => {
@@ -99,8 +156,30 @@ export function JobFair() {
     for (const sp of sponsors) {
       if (Math.abs(self.x - (sp.x + SPONSOR_W / 2)) < 0.9 && self.y > sp.y + SPONSOR_H && self.y < sp.y + SPONSOR_H + 1.2) return { kind: "sponsor", sponsor: sp };
     }
+    if (self.seatId && room) return { kind: "seated", room };
+    if (coinHere) {
+      const c = fair.fair.coinStand;
+      if (Math.abs(self.x - (c.x + COIN_STAND_SPOTS.front.x)) < 2 && self.y > c.y + 2.1 && self.y < c.y + 3.6) return { kind: "coins" };
+    }
+    for (const d of doors) {
+      const front = roomDoorFront(d);
+      if (Math.abs(self.x - front.x) < 1.3 && Math.abs(self.y - front.y) < 0.9) return { kind: "door", room: d };
+    }
+    if (room?.stalls) {
+      for (const [i, st] of room.stalls.entries()) {
+        const at = stallSpot(i, "order");
+        if (Math.abs(self.x - at.x) < 2.2 && Math.abs(self.y - at.y) < 0.9) return { kind: "stall", stallId: st.id, name: st.name };
+      }
+    }
+    if (room) {
+      const seat = floor.seats
+        .filter((st) => !occupied.has(st.id))
+        .map((st) => ({ st, d: Math.hypot(st.x - self.x, st.y - self.y) }))
+        .sort((a, b) => a.d - b.d)[0];
+      if (seat && seat.d < 0.9) return { kind: "seat", seatId: seat.st.id };
+    }
     const d = fair.fair.infoDesk;
-    if (level === 0 && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
+    if (!room && level === 0 && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
     const other = [...fair.visitors.values()]
       .filter((v) => v.memberId !== self.memberId && v.floorId === self.floorId)
       .map((v) => ({ v, d: Math.hypot(v.x - self.x, v.y - self.y) }))
@@ -138,6 +217,7 @@ export function JobFair() {
       if (ix || iy) {
         route.current = null;
         goal.current = null;
+        if (me.seatId) fair.stand(me.memberId);
       }
       else if (route.current) {
         const path = route.current;
@@ -147,8 +227,10 @@ export function JobFair() {
           next = path[0];
         }
         if (!next) {
+          const seatId = goal.current?.floorId === me.floorId ? goal.current.seatId : undefined;
           route.current = null;
           goal.current = null;
+          if (seatId) sitDown(seatId);
           return;
         }
         ix = next.x - me.x;
@@ -157,6 +239,7 @@ export function JobFair() {
       }
       const len = Math.hypot(ix, iy);
       if (!len) return;
+      if (me.seatId) fair.stand(me.memberId);
       const stepLen = (speed * dt) / 1000;
       const dx = (ix / len) * stepLen;
       const dy = (iy / len) * stepLen;
@@ -167,9 +250,21 @@ export function JobFair() {
       // floor; a route that only passes over them on its way across this floor stays here.
       const stairs = portalAt(f, to.x, to.y);
       if (stairs?.targetFloorId && (!goal.current || goal.current.floorId !== me.floorId)) {
-        const up = fairFloorIndex(stairs.targetFloorId) > fairFloorIndex(f.id);
+        const into = fair.roomOf(stairs.targetFloorId);
+        if (into && !fair.hasTicket(into.id)) {
+          // A premium room: stop at the door and ask to pay.
+          const back = roomDoorFront(into);
+          fair.move(me.memberId, back.x, back.y, "back");
+          route.current = null;
+          goal.current = null;
+          askTicket(into);
+          return;
+        }
+        const from = fair.roomOf(f.id);
         fair.changeFloor(me.memberId, stairs.targetFloorId, stairs.targetX ?? 1, stairs.targetY ?? 1);
-        setToast(`${up ? "Naik" : "Turun"} ke ${fair.floor(stairs.targetFloorId).name}`);
+        if (into) setToast(`Masuk ${into.name}`);
+        else if (from) setToast(`Keluar dari ${from.name}`);
+        else setToast(`${fairFloorIndex(stairs.targetFloorId) > fairFloorIndex(f.id) ? "Naik" : "Turun"} ke ${fair.floor(stairs.targetFloorId).name}`);
         route.current = null;
         if (goal.current) planRoute();
       }
@@ -226,6 +321,11 @@ export function JobFair() {
     else if (r.kind === "banner") setBoard({ boothId: r.booth.id });
     else if (r.kind === "info") talkToInfo();
     else if (r.kind === "sponsor") openSponsor(r.sponsor);
+    else if (r.kind === "coins") setWallet(true);
+    else if (r.kind === "stall") setStall(r.stallId);
+    else if (r.kind === "door") goToRoom(r.room);
+    else if (r.kind === "seat") sitDown(r.seatId);
+    else if (r.kind === "seated") startActivity(r.room);
     else talkToVisitor(r.memberId);
   }
 
@@ -239,7 +339,7 @@ export function JobFair() {
       route.current = findPath(f, me, g);
       return;
     }
-    const stairs = fair.stairsToward(f, g.floorId);
+    const stairs = fair.exitToward(f, g.floorId);
     route.current = stairs ? findPath(f, me, { x: stairs.x + stairs.width / 2, y: stairs.y + stairs.height / 2 }) : null;
   }
 
@@ -259,6 +359,83 @@ export function JobFair() {
     planRoute();
   };
 
+  /** Walk into a room through its door, from anywhere. */
+  function goToRoom(r: FairRoom) {
+    goal.current = { floorId: fairRoomFloorId(fair.fair, r.id), x: r.width / 2, y: r.height - 1.9 };
+    planRoute();
+  }
+
+  /** Walk to a spot on a hall floor, from anywhere. */
+  function goToSpot(floor: number, x: number, y: number) {
+    goal.current = { floorId: fairFloorId(fair.fair, floor), x, y };
+    planRoute();
+  }
+
+  const goToCoinStand = () => {
+    const c = fair.fair.coinStand;
+    goToSpot(c.floor, c.x + COIN_STAND_SPOTS.front.x, c.y + COIN_STAND_SPOTS.front.y);
+    setToast("Menuju Stand Koin di Lantai 1");
+  };
+
+  function sitDown(seatId: string) {
+    if (!savedSession) return;
+    if (!fair.sit(savedSession.visitorId, seatId)) return;
+    const r = fair.roomOf(fair.visitors.get(savedSession.visitorId)!.floorId);
+    if (r) startActivity(r);
+  }
+
+  /** What you do once seated: take the test, watch the seminar, or eat. */
+  function startActivity(r: FairRoom) {
+    if (r.kind === "psikotes") setPsych(true);
+    else if (r.kind === "seminar") setSeminar(true);
+    else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Nyam 😋" : "Lapar... pesan di stand dulu ah", 2000);
+  }
+
+  function askTicket(r: FairRoom) {
+    const { price, voucher } = fair.roomPrice(r.id);
+    const enough = me.coins >= price;
+    setTalk({
+      speaker: `${r.staff.name} · ${r.name}`,
+      pages: [
+        `${r.tagline}. Tiket masuk ${r.price} koin${voucher ? `, pakai voucher "${voucher.title}" jadi ${price} koin` : ""}. Saldo kamu ${me.coins} koin.`,
+      ],
+      choices: [
+        enough
+          ? {
+              label: price ? `Bayar ${price} 🪙 dan masuk` : "Pakai voucher dan masuk",
+              onPick: () => {
+                setTalk(null);
+                if (fair.buyTicket(r.id)) {
+                  setToast(`🎟️ Tiket ${r.name} dibeli`);
+                  goToRoom(r);
+                }
+              },
+            }
+          : { label: "Koin kurang, isi koin", onPick: () => { setTalk(null); setWallet(true); } },
+        { label: "Nanti saja", onPick: () => setTalk(null) },
+      ],
+    });
+  }
+
+  function rateCompany(b: CompanyBooth) {
+    const mineReview = session ? fair.myReview(session.visitorId, b.id) : null;
+    setTalk({
+      speaker: `${b.recruiter} · ${b.company}`,
+      pages: [mineReview ? `Kamu pernah memberi ${"★".repeat(mineReview.stars)}. Mau ubah ratingmu?` : "Bagaimana kesanmu tentang stand dan perusahaan kami?"],
+      choices: [
+        ...[5, 4, 3, 2, 1].map((n) => ({
+          label: `${"★".repeat(n)}${"☆".repeat(5 - n)}`,
+          onPick: () => {
+            if (!session) return;
+            fair.reviewCompany(session.visitorId, b.id, n);
+            setTalk({ speaker: `${b.recruiter} · ${b.company}`, pages: [n >= 4 ? "Terima kasih banyak! 🙏" : "Terima kasih, masukanmu kami catat."] });
+          },
+        })),
+        { label: "Batal", onPick: () => setTalk(null) },
+      ],
+    });
+  }
+
   /** "Lantai 2" for a floor id, for stair signs. */
   const shortName = (floorId: string) => fair.fair.floors[fairFloorIndex(floorId)]?.name ?? "Tangga";
 
@@ -274,6 +451,7 @@ export function JobFair() {
         { label: "Lihat lowongan", onPick: () => { setTalk(null); setBoard({ boothId: b.id }); } },
         { label: "Info perusahaan", onPick: () => { setTalk(null); setBoard({ boothId: b.id, about: true }); } },
         { label: open ? "Lamar kerja" : "Lamaranku", onPick: () => { setTalk(null); if (open) setApplying({ boothId: b.id }); else setPanel("applications"); } },
+        { label: "⭐ Beri rating", onPick: () => rateCompany(b) },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     });
@@ -285,7 +463,15 @@ export function JobFair() {
         { label: "Kembali", onPick: () => setTalk(main(["Ada yang bisa aku bantu lagi?"])) },
       ],
     });
-    setTalk(main([`Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`, `${b.about} Saat ini kami buka ${b.jobs.length} posisi.`]));
+    const rating = fair.companyRating(b.id);
+    const lv = levelOf(fair.companyXp(b.id)).level;
+    setTalk(
+      main([
+        `Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`,
+        `${b.about} Saat ini kami buka ${b.jobs.length} posisi.`,
+        `Pelamar memberi kami ★${rating.average.toFixed(1)} dari ${rating.count} ulasan (Lv ${lv} · ${COMPANY_TITLES[lv - 1]}).`,
+      ]),
+    );
   }
 
   function updateProfile(p: SeekerProfile) {
@@ -319,12 +505,21 @@ export function JobFair() {
     });
     const main: Talk = {
       speaker: `${staff} · Panitia`,
-      pages: ["Ada yang bisa dibantu? Pilih lantainya, nanti aku antar ke stand perusahaan mana saja."],
+      pages: ["Ada yang bisa dibantu? Pilih lantainya, ruangan, atau Stand Koin. Nanti aku antar."],
       choices: [
         ...fair.fair.floors.map((f, i) => ({
           label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand)`,
           onPick: () => setTalk(floorChoice(i)),
         })),
+        ...fair.fair.rooms.map((r) => ({
+          label: `${r.emoji} ${r.name} (${fair.fair.floors[r.floor]!.name}${r.price ? ` · ${r.price} koin` : ""})`,
+          onPick: () => {
+            setTalk(null);
+            goToRoom(r);
+            setToast(`Menuju ${r.name}`);
+          },
+        })),
+        { label: "🪙 Stand Koin", onPick: () => { setTalk(null); goToCoinStand(); } },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     };
@@ -362,10 +557,16 @@ export function JobFair() {
 
   const submit = (boothId: string, input: ApplicationInput) => {
     if (!session) return;
+    if (!fair.canAffordApply()) {
+      setApplying(null);
+      setToast(`Koin kurang: melamar butuh ${APPLY_COST} koin`);
+      setWallet(true);
+      return;
+    }
     const a = fair.apply(session.visitorId, { boothId, ...input });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
-    if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}`);
+    if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${APPLY_COST} 🪙)` : " (voucher)"}`);
   };
 
   const leave = () => {
@@ -376,16 +577,30 @@ export function JobFair() {
     setPanel(null);
   };
 
+  /** The seminar running now (sessions rotate every three minutes), for the stage screen. */
+  function currentSlide() {
+    const s = SEMINARS[Math.floor(Date.now() / 180000) % SEMINARS.length]!;
+    return { session: `Sedang berlangsung · ${s.speaker}`, title: s.title };
+  }
+
   // --- Scene.
   const extras = [
     ...booths.flatMap((b) =>
       boothExtras(b, {
         onBanner: () => setBoard({ boothId: b.id }),
         onDesk: session ? () => goToBooth(b) : undefined,
+        rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
+    ...(!room && level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
+    ...doors.flatMap((d) => roomDoorExtras(d, { locked: !fair.hasTicket(d.id), onClick: session ? () => goToRoom(d) : undefined })),
+    ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
+    ...(room?.kind === "foodcourt"
+      ? foodStallExtras(room, session ? (id) => { const i = room.stalls!.findIndex((x) => x.id === id); const at = stallSpot(i, "order"); walkTo(at.x, at.y); } : undefined)
+      : []),
+    ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
+    ...(room?.kind === "seminar" ? seminarStageExtras(room, currentSlide()) : []),
   ];
   const npcs: NpcView[] = fair.staff.map((s) => {
     const b = s.boothId ? fair.booth(s.boothId) : undefined;
@@ -396,7 +611,21 @@ export function JobFair() {
   const lookOf = (a: AvatarState) => (session && a.memberId === session.visitorId ? session.look : lookFor(`${a.displayName}:${a.memberId}`));
 
   const prompt =
-    reach?.kind === "recruiter"
+    reach?.kind === "coins"
+      ? "Beli koin"
+      : reach?.kind === "stall"
+        ? `Pesan di ${reach.name}`
+        : reach?.kind === "door"
+          ? `Masuk ${reach.room.name}${reach.room.price && !fair.hasTicket(reach.room.id) ? ` (${reach.room.price} 🪙)` : ""}`
+          : reach?.kind === "seat"
+            ? "Duduk"
+            : reach?.kind === "seated"
+              ? reach.room.kind === "psikotes"
+                ? "Mulai psikotes"
+                : reach.room.kind === "seminar"
+                  ? "Ikuti seminar"
+                  : "Makan"
+              : reach?.kind === "recruiter"
       ? `Ngobrol dengan ${reach.booth.recruiter} (${reach.booth.company})`
       : reach?.kind === "banner"
         ? `Lihat lowongan ${reach.booth.company}`
@@ -409,6 +638,7 @@ export function JobFair() {
             : null;
 
   const boardBooth = board ? fair.booth(board.boothId) : undefined;
+  const stallView = stall ? fair.fair.rooms.flatMap((r) => r.stalls ?? []).find((x) => x.id === stall) : undefined;
   const applyBooth = applying ? fair.booth(applying.boothId) : undefined;
   const totalJobs = fair.fair.booths.reduce((n, b) => n + b.jobs.length, 0);
 
@@ -418,8 +648,21 @@ export function JobFair() {
         className="game-scene"
         floor={floor}
         floorName={shortName}
-        hallTitle={fair.fair.name}
-        occupiedSeatIds={new Set()}
+        hallTitle={room ? undefined : fair.fair.name}
+        hallBanner={!room}
+        occupiedSeatIds={occupied}
+        highlightSeatId={reach?.kind === "seat" ? reach.seatId : null}
+        onSeatClick={
+          session
+            ? (seatId) => {
+                const st = floor.seats.find((x) => x.id === seatId);
+                const v = fair.visitors.get(session.visitorId);
+                if (!st || !v || busy.current) return;
+                goal.current = { floorId: v.floorId, x: st.x, y: st.y, seatId };
+                planRoute();
+              }
+            : undefined
+        }
         avatars={avatars}
         lookOf={lookOf}
         selfMemberId={session?.visitorId}
@@ -434,7 +677,13 @@ export function JobFair() {
           session
             ? (id) => {
                 const b = fair.fair.booths.find((x) => recruiterId(x.id) === id);
+                const st = room?.stalls?.findIndex((x) => stallStaffId(x.id) === id) ?? -1;
                 if (b) goToBooth(b);
+                else if (id === "coin-staff") goToCoinStand();
+                else if (st >= 0) {
+                  const at = stallSpot(st, "order");
+                  walkTo(at.x, at.y);
+                } else if (room && id === roomStaffId(room.id)) fair.say(id, room.tagline, 2600);
                 else {
                   const d = fair.fair.infoDesk;
                   walkTo(d.x + d.width / 2, d.y + d.height + 0.6);
@@ -447,9 +696,12 @@ export function JobFair() {
           <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
             🎪 {fair.fair.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
           </button>
-          <div className="hud-floor">
-            📍 {floorInfo?.name} · {floorInfo?.theme}
-          </div>
+          <div className="hud-floor">📍 {room ? `${room.emoji} ${room.name} · ${floorInfo?.name}` : `${floorInfo?.name} · ${floorInfo?.theme}`}</div>
+          {session && (
+            <button type="button" className="hud-level" onClick={() => setPanel("profile")} title="Level dan XP">
+              <LevelBar compact level={seeker.level} title={SEEKER_TITLES[seeker.level - 1]!} progress={seeker.progress} xp={me.xp} next={seeker.to} />
+            </button>
+          )}
           {hud.info && (
             <div className="hud-stats">
               <span>🏬 {fair.fair.floors.length} lantai</span>
@@ -474,9 +726,16 @@ export function JobFair() {
             {sponsors.map((sp) => (
               <rect key={sp.id} x={sp.x} y={sp.y} width={0.9} height={0.9} fill={sp.color} />
             ))}
-            {level === 0 && <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />}
+            {(floor.tables ?? []).map((t) => (
+              <rect key={t.id} x={t.x} y={t.y} width={t.width} height={t.height} rx={0.2} fill="#a8a29e" />
+            ))}
+            {doors.map((d) => (
+              <rect key={d.id} x={d.doorX} y={d.doorY} width={3.2} height={0.7} fill={d.color} />
+            ))}
+            {coinHere && <rect x={fair.fair.coinStand.x} y={fair.fair.coinStand.y} width={5.4} height={2.2} rx={0.2} fill="#ca8a04" opacity={0.7} />}
+            {!room && level === 0 && <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />}
             {(floor.objects ?? [])
-              .filter((o) => o.type === "stairs")
+              .filter((o) => o.type === "stairs" || (o.type === "door" && o.targetFloorId && room))
               .map((o) => (
                 <rect key={o.id} x={o.x} y={o.y} width={o.width} height={o.height} rx={0.2} fill="#facc15" />
               ))}
@@ -484,7 +743,7 @@ export function JobFair() {
               <circle key={a.memberId} cx={a.x} cy={a.y} r={a.memberId === session?.visitorId ? 0.55 : 0.32} fill={a.memberId === session?.visitorId ? "#f97316" : "#fff"} stroke="#2b1e19" strokeWidth={0.12} />
             ))}
           </svg>
-          <div className="minimap-legend">Denah {floorInfo?.name ?? "aula"}</div>
+          <div className="minimap-legend">Denah {room?.name ?? floorInfo?.name ?? "aula"}</div>
         </div>
         ) : (
           <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
@@ -502,9 +761,11 @@ export function JobFair() {
           ) : session ? (
             <div className="rpg-box hint">
               <span className="hint-keys">
-                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik meja stand untuk berjalan ke sana · klik banner untuk lihat lowongan
+                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> {room ? "duduk · klik kursi kosong untuk duduk · pintu keluar di bawah" : "bicara · klik meja stand untuk berjalan ke sana · klik banner untuk lihat lowongan"}
               </span>
-              <span className="hint-touch">Tap lantai untuk berjalan · tap meja stand untuk ke sana · tap banner untuk lihat lowongan</span>
+              <span className="hint-touch">
+                {room ? "Tap kursi kosong untuk duduk · tap pintu bawah untuk keluar" : "Tap lantai untuk berjalan · tap meja stand untuk ke sana · tap banner untuk lihat lowongan"}
+              </span>
             </div>
           ) : null}
         </div>
@@ -519,6 +780,9 @@ export function JobFair() {
               </button>
               <button type="button" className="menu-btn" onClick={() => setPanel("applications")} title="Lamaran yang sudah kamu kirim">
                 📋 Lamaran ({mine.length})
+              </button>
+              <button type="button" className="menu-btn coin-btn" onClick={() => setWallet(true)} title="Dompet koin dan voucher">
+                🪙 {me.coins}
               </button>
               <button type="button" className="leave" onClick={leave} title="Keluar dari job fair">
                 🚪 Keluar
@@ -535,6 +799,8 @@ export function JobFair() {
             applications={mine}
             booths={fair.fair.booths}
             floors={fair.fair.floors}
+            player={me}
+            companyRating={(id) => fair.companyRating(id)}
             visited={fair.visitedBy.get(session.visitorId) ?? new Set()}
             onSaveProfile={updateProfile}
             onOpenJob={(boothId, jobId) => {
@@ -567,6 +833,58 @@ export function JobFair() {
 
         {sponsor && <SponsorCard sponsor={sponsor} onClose={() => setSponsor(null)} />}
 
+        {session && wallet && (
+          <WalletPanel
+            player={me}
+            stand={fair.fair.coinStand}
+            atStand={reach?.kind === "coins"}
+            canClaim={fair.canClaimDaily()}
+            onBuy={(id, method) => fair.buyCoins(id, method)}
+            onClaim={() => fair.claimDaily() && setToast("🎁 +20 koin gratis harian")}
+            onGoToStand={() => {
+              setWallet(false);
+              goToCoinStand();
+            }}
+            onClose={() => setWallet(false)}
+          />
+        )}
+
+        {session && stallView && (
+          <FoodMenu
+            stall={stallView}
+            coins={me.coins}
+            onOrder={(itemId) => fair.buyFood(stallView.id, itemId)}
+            onTopUp={() => {
+              setStall(null);
+              setWallet(true);
+            }}
+            onClose={() => setStall(null)}
+          />
+        )}
+
+        {session && psych && (
+          <PsychTest
+            past={me.psych}
+            onDone={(res) => fair.recordPsych(res)}
+            onClose={() => {
+              setPsych(false);
+              const best = fair.bestPsych();
+              if (best != null) fair.say(roomStaffId("psikotes"), `Nilai terbaikmu ${best}. Semangat melamar!`, 3000);
+            }}
+          />
+        )}
+
+        {session && seminar && (
+          <SeminarView
+            attended={me.seminars}
+            name={profile.name || session.name}
+            onFinish={(id) => {
+              if (fair.attendSeminar(id)) setToast("🎓 E-sertifikat didapat, +30 XP");
+            }}
+            onClose={() => setSeminar(false)}
+          />
+        )}
+
         {boardBooth && (
           <JobBoard
             booth={boardBooth}
@@ -592,6 +910,7 @@ export function JobFair() {
             defaultName={session.name}
             defaults={profile}
             appliedJobIds={appliedIds}
+            cost={fair.freeApplies() ? "🎟️ voucher" : `${APPLY_COST} 🪙`}
             onClose={() => setApplying(null)}
             onSubmit={(input) => submit(applyBooth.id, input)}
           />

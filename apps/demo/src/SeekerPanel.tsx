@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { CompanyBooth, FairFloorInfo } from "@vwo/shared";
 import { type Look, Person } from "@vwo/ui";
-import type { FairApplication } from "./jobfair-engine";
+import { SEEKER_TITLES, SEMINARS, levelOf } from "./fair/content";
+import { LevelBar, Stars } from "./fair/Modal";
+import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
 
 export type SeekerTab = "profile" | "applications" | "stamps";
@@ -27,6 +29,8 @@ export function SeekerPanel({
   applications,
   booths,
   floors,
+  player,
+  companyRating,
   visited,
   onSaveProfile,
   onOpenJob,
@@ -41,6 +45,8 @@ export function SeekerPanel({
   applications: FairApplication[];
   booths: CompanyBooth[];
   floors: FairFloorInfo[];
+  player: PlayerState;
+  companyRating: (boothId: string) => { average: number; count: number };
   visited: Set<string>;
   onSaveProfile: (p: SeekerProfile) => void;
   onOpenJob: (boothId: string, jobId: string) => void;
@@ -55,6 +61,10 @@ export function SeekerPanel({
   const companies = new Set(applications.map((a) => a.boothId));
   const invited = applications.filter((a) => a.status === "Diundang interview").length;
   const boothOf = (id: string) => booths.find((b) => b.id === id);
+  const lv = levelOf(player.xp);
+  const best = player.psych.reduce<number | null>((m, r) => Math.max(m ?? 0, Math.round((r.score / r.total) * 100)), null);
+  const rated = applications.filter((a) => a.rating);
+  const avgRating = rated.length ? rated.reduce((n, a) => n + a.rating!, 0) / rated.length : null;
 
   return (
     <div className="mb-backdrop" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
@@ -92,6 +102,7 @@ export function SeekerPanel({
                   <div className="sp-muted">{profile.headline || "Lengkapi profilmu supaya form lamaran terisi otomatis."}</div>
                 </div>
               </div>
+              <LevelBar level={lv.level} title={SEEKER_TITLES[lv.level - 1]!} progress={lv.progress} xp={player.xp} next={lv.to} />
               <div className="sp-stats">
                 {(
                   [
@@ -99,6 +110,10 @@ export function SeekerPanel({
                     [companies.size, "perusahaan"],
                     [invited, "undangan interview"],
                     [visited.size, "stand dikunjungi"],
+                    [avgRating ? `★${avgRating.toFixed(1)}` : "–", "rating dari perusahaan"],
+                    [best != null ? best : "–", "nilai psikotes terbaik"],
+                    [`${player.seminars.length}/${SEMINARS.length}`, "sertifikat seminar"],
+                    [player.coins, "koin"],
                   ] as const
                 ).map(([n, label]) => (
                   <div key={label} className="sp-stat">
@@ -183,6 +198,13 @@ export function SeekerPanel({
                         <span className="status" data-status={a.status}>
                           {a.status}
                         </span>
+                        {a.rating ? (
+                          <span className="sp-rating">
+                            <Stars value={a.rating} /> {a.feedback}
+                          </span>
+                        ) : (
+                          <span className="sp-rating sp-muted">Menunggu penilaian perusahaan…</span>
+                        )}
                         <span className="sp-links">
                           <button type="button" onClick={() => onOpenJob(a.boothId, a.jobId)}>
                             Lowongan
@@ -219,6 +241,7 @@ export function SeekerPanel({
                           <button key={b.id} type="button" className="sp-stamp" data-got={got ? "" : undefined} style={{ ["--c" as string]: b.color }} onClick={() => onGoTo(b.id)} title={`Antar ke stand ${b.company}`}>
                             <span className="sp-stamp-mark">{got ? b.logo : "?"}</span>
                             <b>{b.company}</b>
+                            <Stars value={companyRating(b.id).average} />
                             <span className="sp-muted">{got ? (n ? `${n} lamaran` : "Sudah mampir") : "Belum dikunjungi"}</span>
                           </button>
                         );

@@ -2,8 +2,10 @@
 // info desk, bot job seekers walking from booth to booth, and the applications they send.
 import {
   type AvatarState,
+  COIN_STAND_SPOTS,
   type CompanyBooth,
   type Facing,
+  type FairRoom,
   type FloorView,
   DEMO_JOB_FAIR,
   type JobFairView,
@@ -12,9 +14,14 @@ import {
   boothSpot,
   buildJobFairFloors,
   fairFloorId,
+  fairFloorIndex,
+  fairRoomFloorId,
+  roomDoorFront,
+  stallSpot,
   facingFor,
   findPath,
 } from "@vwo/shared";
+import { APPLY_COST, DAILY_COINS, FOOD_VOUCHERS, SEMINARS, START_COINS, XP, type VoucherKind, levelOf } from "./fair/content";
 
 type Point = { x: number; y: number };
 
@@ -51,11 +58,65 @@ export interface FairApplication {
   message: string;
   status: ApplicationStatus;
   isBot: boolean;
+  /** The company's rating of the applicant, 1–5 stars, with a short note. */
+  rating?: number;
+  feedback?: string;
+  /** Best psikotes score the applicant had when applying, in percent. */
+  psych?: number;
+}
+
+/** A job seeker's review of a company. */
+export interface CompanyReview {
+  at: number;
+  by: string;
+  stars: number;
+  tag?: string;
+}
+
+export interface Voucher {
+  id: string;
+  kind: VoucherKind;
+  title: string;
+  room?: string;
+  coins?: number;
+  code?: string;
+  from: string;
+  at: number;
+  used: boolean;
+}
+
+export interface CoinTxn {
+  at: number;
+  amount: number;
+  reason: string;
+}
+
+export interface PsychResult {
+  at: number;
+  score: number;
+  total: number;
+  grade: string;
+  sections: Record<string, { right: number; total: number }>;
+}
+
+/** The player's game state: coins, vouchers, tickets, XP, and what they did in the rooms. */
+export interface PlayerState {
+  coins: number;
+  txns: CoinTxn[];
+  vouchers: Voucher[];
+  /** Rooms paid for. */
+  tickets: string[];
+  xp: number;
+  psych: PsychResult[];
+  seminars: string[];
+  /** Day (YYYY-MM-DD) the free daily coins were last claimed. */
+  dailyOn: string | null;
+  meals: number;
 }
 
 export interface FairEvent {
   at: number;
-  type: "arrive" | "visit" | "apply" | "leave" | "sponsor";
+  type: "arrive" | "visit" | "apply" | "leave" | "sponsor" | "rate" | "review" | "room" | "coins";
   name: string;
   company?: string;
   jobTitle?: string;
@@ -66,12 +127,15 @@ type Goal = Point & { floorId: string };
 
 /** What the demo keeps between visits (in localStorage in the browser). */
 export interface FairSaved {
-  version: 1;
+  version: 1 | 2;
   applications: FairApplication[];
   visits: Record<string, number>;
   sponsorViews: Record<string, number>;
   /** Stamp cards of real visitors (not bots), by their stable id. */
   visitedBy: Record<string, string[]>;
+  /** From version 2. */
+  player?: PlayerState;
+  reviews?: Record<string, CompanyReview[]>;
 }
 
 export interface FairStorage {
@@ -110,13 +174,21 @@ const ANSWERS = [
   (b: CompanyBooth) => `Seru! ${b.tagline}.`,
   () => "Ada, detailnya di banner sebelah ya.",
 ];
+const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
+  foodcourt: ["Nyam 😋", "Baksonya enak!", "Dapat voucher lamar gratis!", "Istirahat dulu ah", "Abis ini ke Lantai 3"],
+  psikotes: ["Hmm... 2, 4, 8, 16...", "Soal logikanya tricky", "Fokus, fokus...", "Semoga lulus 🙏", "✏️"],
+  seminar: ["Catat 📝", "Wah, insightful!", "Setuju!", "👏", "Metode STAR ya..."],
+};
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
 const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
 
 export class DemoJobFair {
   readonly fair: JobFairView;
-  /** One walkable floor per level of the hall, ground floor first. */
+  /** One walkable floor per level of the hall, ground floor first, then one per room. */
   readonly floors: FloorView[];
+  readonly player: PlayerState = freshPlayer();
+  /** Reviews by job seekers, per booth. */
+  readonly reviews = new Map<string, CompanyReview[]>();
   readonly visitors = new Map<string, FairVisitor>();
   readonly staff: FairStaff[];
   readonly applications: FairApplication[] = [];
@@ -146,6 +218,25 @@ export class DemoJobFair {
     this.staff = [
       ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
       { id: "fair-info", name: fair.infoDesk.staff, boothId: null, floorId: fairFloorId(fair, 0), x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
+      {
+        id: "coin-staff",
+        name: fair.coinStand.staff,
+        boothId: null,
+        floorId: fairFloorId(fair, fair.coinStand.floor),
+        x: fair.coinStand.x + COIN_STAND_SPOTS.staff.x,
+        y: fair.coinStand.y + COIN_STAND_SPOTS.staff.y,
+        facing: "front",
+      },
+      ...fair.rooms.flatMap((room): FairStaff[] => {
+        const floorId = fairRoomFloorId(fair, room.id);
+        const host = { id: roomStaffId(room.id), name: room.staff.name, boothId: null, floorId, facing: "front" as Facing };
+        if (room.kind === "foodcourt")
+          return [
+            { ...host, x: room.width - 2.2, y: room.height - 2.4 },
+            ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(i, "vendor"), facing: "front" as Facing })),
+          ];
+        return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
+      }),
     ];
     this.nextBotAt = this.now() + 400;
     this.nextCalloutAt = this.now() + 5000;
@@ -156,7 +247,9 @@ export class DemoJobFair {
 
   private restore() {
     const saved = this.storage?.load();
-    if (!saved || saved.version !== 1) return;
+    if (!saved || (saved.version !== 1 && saved.version !== 2)) return;
+    if (saved.player) Object.assign(this.player, freshPlayer(), saved.player);
+    for (const [k, list] of Object.entries(saved.reviews ?? {})) if (this.booth(k)) this.reviews.set(k, list);
     for (const a of saved.applications ?? []) {
       if (!this.booth(a.boothId)) continue;
       this.applications.push({ ...a, status: a.status === "Terkirim" ? "Dilihat" : a.status });
@@ -177,7 +270,9 @@ export class DemoJobFair {
     const real = new Set([...this.visitors.values()].filter((v) => !v.isBot).map((v) => v.memberId));
     real.add(PLAYER_ID);
     this.storage.save({
-      version: 1,
+      version: 2,
+      player: this.player,
+      reviews: Object.fromEntries([...this.reviews].map(([k, list]) => [k, list.slice(0, 30)])),
       applications: this.applications.slice(0, 80),
       visits: Object.fromEntries(this.visits),
       sponsorViews: Object.fromEntries(this.sponsorViews),
@@ -191,6 +286,8 @@ export class DemoJobFair {
     this.visits.clear();
     this.sponsorViews.clear();
     this.visitedBy.clear();
+    this.reviews.clear();
+    Object.assign(this.player, freshPlayer());
     this.events.length = 0;
     this.storage?.clear();
     this.dirty = false;
@@ -210,6 +307,20 @@ export class DemoJobFair {
     return fairFloorId(this.fair, item.floor);
   }
 
+  room(id: string) {
+    return this.fair.rooms.find((r) => r.id === id);
+  }
+
+  /** The room a floor id belongs to, if it is a room rather than a hall floor. */
+  roomOf(floorId: string): FairRoom | undefined {
+    return this.fair.rooms.find((r) => fairRoomFloorId(this.fair, r.id) === floorId);
+  }
+
+  /** The hall level a floor is on: its own index, or the level of the door that leads into a room. */
+  levelOf(floorId: string) {
+    return this.roomOf(floorId)?.floor ?? Math.max(0, fairFloorIndex(floorId));
+  }
+
   /** Take the stairs to another floor. */
   changeFloor(id: string, floorId: string, x: number, y: number) {
     const v = this.visitors.get(id);
@@ -217,6 +328,229 @@ export class DemoJobFair {
     v.floorId = floorId;
     v.x = x;
     v.y = y;
+    v.seatId = null;
+    const room = this.roomOf(floorId);
+    if (room && !v.isBot) {
+      this.log({ type: "room", name: v.displayName, company: room.name });
+      if (room.kind === "foodcourt") this.say(roomStaffId(room.id), `Selamat makan, ${v.displayName}! Tiap pesanan dapat voucher 🎟️`, 3000);
+      else if (room.kind === "psikotes") this.say(roomStaffId(room.id), "Silakan duduk di meja yang kosong, lalu mulai tesnya.", 3000);
+      else this.say(roomStaffId(room.id), `Selamat datang! Silakan duduk, seminar segera dimulai.`, 3000);
+    }
+    this.emit();
+  }
+
+  /** Sit down on a free chair of the visitor's floor. */
+  sit(id: string, seatId: string) {
+    const v = this.visitors.get(id);
+    const seat = v && this.floor(v.floorId).seats.find((s) => s.id === seatId);
+    if (!v || !seat || this.seatTaken(seatId, id)) return false;
+    v.seatId = seat.id;
+    v.x = seat.x;
+    v.y = seat.y;
+    this.emit();
+    return true;
+  }
+
+  stand(id: string) {
+    const v = this.visitors.get(id);
+    if (!v?.seatId) return;
+    v.seatId = null;
+    this.emit();
+  }
+
+  seatTaken(seatId: string, except?: string) {
+    for (const v of this.visitors.values()) if (v.seatId === seatId && v.memberId !== except) return true;
+    return false;
+  }
+
+  occupiedSeats() {
+    return new Set([...this.visitors.values()].map((v) => v.seatId).filter((x): x is string => !!x));
+  }
+
+  // --- Coins, vouchers and XP (the player only; bots don't pay).
+
+  private spend(amount: number, reason: string) {
+    if (this.player.coins < amount) return false;
+    this.player.coins -= amount;
+    this.player.txns.unshift({ at: this.now(), amount: -amount, reason });
+    this.player.txns.length = Math.min(this.player.txns.length, 50);
+    this.persist();
+    return true;
+  }
+
+  private earn(amount: number, reason: string) {
+    this.player.coins += amount;
+    this.player.txns.unshift({ at: this.now(), amount, reason });
+    this.player.txns.length = Math.min(this.player.txns.length, 50);
+    this.persist();
+  }
+
+  gainXp(amount: number) {
+    const before = levelOf(this.player.xp).level;
+    this.player.xp += amount;
+    this.persist();
+    const after = levelOf(this.player.xp).level;
+    if (after > before) this.levelUps.push(after);
+    this.emit();
+  }
+
+  /** Levels the player just reached, for the UI to celebrate. */
+  readonly levelUps: number[] = [];
+
+  /** Top up coins at the coin stand (a demo payment). */
+  buyCoins(packageId: string, method: string) {
+    const pkg = this.fair.coinStand.packages.find((p) => p.id === packageId);
+    if (!pkg) return null;
+    this.earn(pkg.coins + pkg.bonus, `Beli ${pkg.coins}${pkg.bonus ? ` + ${pkg.bonus} bonus` : ""} koin (${method}, ${pkg.price})`);
+    this.log({ type: "coins", name: this.visitors.get(PLAYER_ID)?.displayName ?? "Kamu", company: pkg.price });
+    this.say("coin-staff", `Pembayaran ${pkg.price} berhasil! +${pkg.coins + pkg.bonus} koin 🪙`, 3000);
+    this.emit();
+    return pkg.coins + pkg.bonus;
+  }
+
+  canClaimDaily() {
+    return this.player.dailyOn !== this.today();
+  }
+
+  claimDaily() {
+    if (!this.canClaimDaily()) return false;
+    this.player.dailyOn = this.today();
+    this.earn(DAILY_COINS, "Koin gratis harian");
+    this.emit();
+    return true;
+  }
+
+  private today() {
+    return new Date(this.now()).toISOString().slice(0, 10);
+  }
+
+  hasTicket(roomId: string) {
+    return this.room(roomId)?.price === 0 || this.player.tickets.includes(roomId);
+  }
+
+  /** What entering a room costs right now, and which voucher would be used. */
+  roomPrice(roomId: string) {
+    const room = this.room(roomId);
+    if (!room) return { price: 0, voucher: null as Voucher | null };
+    const free = this.player.vouchers.find((v) => !v.used && v.kind === "room-free" && v.room === roomId);
+    const half = this.player.vouchers.find((v) => !v.used && v.kind === "room-half" && v.room === roomId);
+    if (free) return { price: 0, voucher: free };
+    if (half) return { price: Math.ceil(room.price / 2), voucher: half };
+    return { price: room.price, voucher: null };
+  }
+
+  /** Buy a ticket for a premium room. False when there are not enough coins. */
+  buyTicket(roomId: string) {
+    const room = this.room(roomId);
+    if (!room) return false;
+    if (this.hasTicket(roomId)) return true;
+    const { price, voucher } = this.roomPrice(roomId);
+    if (price > 0 && !this.spend(price, `Tiket ${room.name}`)) return false;
+    if (voucher) voucher.used = true;
+    this.player.tickets.push(roomId);
+    this.persist();
+    this.emit();
+    return true;
+  }
+
+  /** Order at a food court stall: pay coins, get the food and a voucher. */
+  buyFood(stallId: string, itemId: string) {
+    const room = this.fair.rooms.find((r) => r.stalls?.some((s) => s.id === stallId));
+    const stall = room?.stalls?.find((s) => s.id === stallId);
+    const item = stall?.menu.find((m) => m.id === itemId);
+    if (!stall || !item) return null;
+    if (!this.spend(item.price, `${item.name} di ${stall.name}`)) return null;
+    const t = this.pick(FOOD_VOUCHERS);
+    const voucher: Voucher = { id: this.id("vc"), kind: t.kind, title: t.title, room: t.room, coins: t.coins, code: t.code, from: stall.name, at: this.now(), used: false };
+    this.player.vouchers.unshift(voucher);
+    this.player.meals++;
+    if (voucher.kind === "coins" && voucher.coins) {
+      voucher.used = true;
+      this.earn(voucher.coins, `Cashback dari ${stall.name}`);
+    }
+    this.say(stallStaffId(stall.id), `${item.emoji} ${item.name} siap! Ini voucher-mu 🎟️`, 2800);
+    this.gainXp(XP.food);
+    this.persist();
+    this.emit();
+    return { item, voucher };
+  }
+
+  /** Free applications left from vouchers. */
+  freeApplies() {
+    return this.player.vouchers.filter((v) => !v.used && v.kind === "free-apply").length;
+  }
+
+  canAffordApply() {
+    return this.freeApplies() > 0 || this.player.coins >= APPLY_COST;
+  }
+
+  recordPsych(result: Omit<PsychResult, "at">) {
+    this.player.psych.unshift({ ...result, at: this.now() });
+    this.player.psych.length = Math.min(this.player.psych.length, 10);
+    this.gainXp(Math.round((result.score / result.total) * XP.psychMax));
+    this.persist();
+  }
+
+  bestPsych() {
+    const best = this.player.psych.reduce<PsychResult | null>((b, r) => (!b || r.score / r.total > b.score / b.total ? r : b), null);
+    return best ? Math.round((best.score / best.total) * 100) : null;
+  }
+
+  attendSeminar(seminarId: string) {
+    if (this.player.seminars.includes(seminarId)) return false;
+    this.player.seminars.push(seminarId);
+    this.gainXp(XP.seminar);
+    this.persist();
+    return true;
+  }
+
+  // --- Ratings: companies rate applicants, job seekers review companies.
+
+  /** A seeker's review of a company. One per visitor per company; a new one replaces the old. */
+  reviewCompany(visitorId: string, boothId: string, stars: number, tag?: string) {
+    const v = this.visitors.get(visitorId);
+    const b = this.booth(boothId);
+    if (!v || !b) return;
+    const list = (this.reviews.get(boothId) ?? []).filter((r) => r.by !== visitorId);
+    const first = list.length === (this.reviews.get(boothId) ?? []).length;
+    list.unshift({ at: this.now(), by: visitorId, stars: Math.max(1, Math.min(5, Math.round(stars))), tag });
+    this.reviews.set(boothId, list.slice(0, 40));
+    this.log({ type: "review", name: v.displayName, company: b.company, jobTitle: "★".repeat(stars) });
+    if (!v.isBot && first) this.gainXp(XP.review);
+    this.persist();
+    this.emit();
+  }
+
+  myReview(visitorId: string, boothId: string) {
+    return this.reviews.get(boothId)?.find((r) => r.by === visitorId) ?? null;
+  }
+
+  /** A company's star rating: earlier reviews (seeded per booth) plus the ones written today. */
+  companyRating(boothId: string) {
+    const base = seededReviews(boothId);
+    const list = this.reviews.get(boothId) ?? [];
+    const count = base.count + list.length;
+    const sum = base.sum + list.reduce((n, r) => n + r.stars, 0);
+    return { count, average: count ? sum / count : 0 };
+  }
+
+  /** A company levels up with good reviews, applications and visits. */
+  companyXp(boothId: string) {
+    const r = this.companyRating(boothId);
+    const apps = this.applications.filter((a) => a.boothId === boothId).length;
+    return Math.round(r.count * r.average * 4 + apps * 8 + (this.visits.get(boothId) ?? 0) * 2);
+  }
+
+  /** The organiser (or the company) rates an applicant. */
+  rateApplicant(applicationId: string, stars: number, feedback?: string) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a) return;
+    const before = a.rating ?? 0;
+    a.rating = Math.max(1, Math.min(5, Math.round(stars)));
+    if (feedback) a.feedback = feedback;
+    this.log({ type: "rate", name: a.name, company: a.company, jobTitle: "★".repeat(a.rating) });
+    if (a.visitorId === PLAYER_ID && a.rating > before) this.gainXp((a.rating - before) * XP.ratedPerStar);
+    this.persist();
     this.emit();
   }
 
@@ -308,6 +642,12 @@ export class DemoJobFair {
     const job = b?.jobs.find((j) => j.id === input.jobId);
     if (!v || !b || !job) return null;
     if (this.applications.some((a) => a.visitorId === visitorId && a.jobId === job.id)) return null;
+    if (!v.isBot) {
+      // Real seekers pay for each application: a free-apply voucher first, otherwise coins.
+      const voucher = this.player.vouchers.find((x) => !x.used && x.kind === "free-apply");
+      if (voucher) voucher.used = true;
+      else if (!this.spend(APPLY_COST, `Lamar ${job.title} di ${b.company}`)) return null;
+    }
     const a: FairApplication = {
       id: this.id("app"),
       at: this.now(),
@@ -323,13 +663,25 @@ export class DemoJobFair {
       message: input.message ?? "",
       status: "Terkirim",
       isBot: v.isBot,
+      psych: v.isBot ? (this.rand() < 0.5 ? 50 + Math.round(this.rand() * 50) : undefined) : (this.bestPsych() ?? undefined),
     };
     this.applications.unshift(a);
     this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
     this.persist();
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
+    if (!v.isBot) this.gainXp(XP.apply);
     this.after(6000, () => {
       if (a.status === "Terkirim") a.status = "Dilihat";
+      this.persist();
+      this.emit();
+    });
+    // The company reads the application and rates the applicant a little later.
+    this.after(12000 + this.rand() * 6000, () => {
+      if (a.rating) return;
+      const stars = this.autoRating(a);
+      this.rateApplicant(a.id, stars, FEEDBACK[stars - 1]);
+      if (a.status === "Dilihat" || a.status === "Terkirim") a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
+      if (a.visitorId === PLAYER_ID) this.notices.push(`${a.company} memberi kamu ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`);
       this.persist();
       this.emit();
     });
@@ -344,6 +696,19 @@ export class DemoJobFair {
     a.status = status;
     this.persist();
     this.emit();
+  }
+
+  /** Messages for the player that the UI shows as toasts, oldest first. */
+  readonly notices: string[] = [];
+
+  /** How a company rates an application: a complete form, a CV and a good psikotes score help. */
+  private autoRating(a: FairApplication) {
+    let score = 2.4 + this.rand() * 1.4;
+    if (a.cvUrl) score += 0.6;
+    if (a.phone) score += 0.2;
+    if (a.message.length > 30) score += 0.4;
+    if (a.psych != null) score += (a.psych - 50) / 50;
+    return Math.max(1, Math.min(5, Math.round(score)));
   }
 
   /** Visitors standing in a booth's area right now. */
@@ -398,9 +763,47 @@ export class DemoJobFair {
       }
     }
 
+    if (now >= this.nextRoomAt) {
+      this.nextRoomAt = now + 2500 + this.rand() * 3000;
+      this.tickRooms();
+      changed = true;
+    }
+
     const step = (WALK_SPEED * Math.min(dtMs, 250)) / 1000;
     for (const bot of [...this.bots]) if (this.tickBot(bot, now, step)) changed = true;
     if (changed) this.emit();
+  }
+
+  private nextRoomAt = 0;
+  private speakerLine = 0;
+
+  /** Rooms fill and empty on their own: people sit down, eat, take tests, and leave. */
+  private tickRooms() {
+    for (const room of this.fair.rooms) {
+      const floor = this.floor(fairRoomFloorId(this.fair, room.id));
+      const inRoom = [...this.visitors.values()].filter((v) => v.floorId === floor.id && v.isBot);
+      const target = Math.round(floor.seats.length * (room.kind === "seminar" ? 0.5 : room.kind === "psikotes" ? 0.4 : 0.35));
+      if (inRoom.length < target && this.rand() < 0.7) {
+        const free = floor.seats.filter((st) => !this.seatTaken(st.id));
+        const seat = free.length ? this.pick(free) : null;
+        if (seat) {
+          const id = this.id("guest");
+          this.visitors.set(id, { memberId: id, visitId: id, displayName: this.pick(BOT_NAMES), memberType: "host", floorId: floor.id, x: seat.x, y: seat.y, seatId: seat.id, facing: "back", isBot: true, arrivedAt: this.now() });
+        }
+      } else if (inRoom.length && this.rand() < 0.25) {
+        const v = this.pick(inRoom);
+        this.visitors.delete(v.memberId);
+        this.bubbles.delete(v.memberId);
+      } else if (inRoom.length && this.rand() < 0.5) {
+        const v = this.pick(inRoom);
+        this.say(v.memberId, this.pick(ROOM_CHATTER[room.kind]), 2200);
+      }
+      if (room.kind === "seminar" && this.rand() < 0.6) {
+        const session = SEMINARS[Math.floor(this.now() / 180000) % SEMINARS.length]!;
+        const slide = session.slides[this.speakerLine++ % session.slides.length]!;
+        this.say(roomStaffId(room.id), slide.say, 3600);
+      }
+    }
   }
 
   private spawnBot() {
@@ -469,6 +872,7 @@ export class DemoJobFair {
         const applies = this.rand() < 0.4;
         bot.until = now + (applies ? 7600 : 4600) + this.rand() * 1500;
         const rid = recruiterId(booth.id);
+        if (this.rand() < 0.3) this.after(3000, () => this.visitors.has(v.memberId) && this.reviewCompany(v.memberId, booth.id, 3 + Math.round(this.rand() * 2)));
         this.say(v.memberId, this.pick(QUESTIONS)(booth, job.title), 2200);
         this.after(1700, () => this.visitors.has(v.memberId) && this.say(rid, this.pick(ANSWERS)(booth, job.title), 2600));
         if (applies) {
@@ -497,7 +901,7 @@ export class DemoJobFair {
   /** One step toward `goal`, taking the stairs when it is on another floor. False once arrived. */
   private walk(v: FairVisitor, route: { path: Point[] | null }, goal: Goal, step: number): boolean {
     const floor = this.floor(v.floorId);
-    const portal = v.floorId === goal.floorId ? null : this.stairsToward(floor, goal.floorId);
+    const portal = v.floorId === goal.floorId ? null : this.exitToward(floor, goal.floorId);
     const legEnd = portal ? { x: portal.x + portal.width / 2, y: portal.y + portal.height / 2 } : goal;
     if (!route.path) route.path = findPath(floor, v, legEnd) ?? [legEnd];
     let next = route.path[0];
@@ -523,13 +927,43 @@ export class DemoJobFair {
     return true;
   }
 
-  /** The flight of stairs on `floor` that leads one level closer to `floorId`. */
-  stairsToward(floor: FloorView, floorId: string) {
-    const from = this.floors.indexOf(floor);
-    const to = this.floors.findIndex((f) => f.id === floorId);
-    const next = this.floors[from + Math.sign(to - from)];
-    return (floor.objects ?? []).find((o) => o.type === "stairs" && o.targetFloorId === next?.id) ?? null;
+  /** The stairs or door on `floor` that lead one step closer to `floorId` (a hall floor or a room). */
+  exitToward(floor: FloorView, floorId: string) {
+    const objects = floor.objects ?? [];
+    if (this.roomOf(floor.id)) return objects.find((o) => o.type === "door" && o.targetFloorId) ?? null;
+    const here = fairFloorIndex(floor.id);
+    const room = this.roomOf(floorId);
+    const level = room ? room.floor : fairFloorIndex(floorId);
+    if (level === here) return room ? (objects.find((o) => o.type === "door" && o.targetFloorId === floorId) ?? null) : null;
+    const next = fairFloorId(this.fair, here + Math.sign(level - here));
+    return objects.find((o) => o.type === "stairs" && o.targetFloorId === next) ?? null;
   }
+
 }
 
 export const recruiterId = (boothId: string) => `rec-${boothId}`;
+
+export const roomStaffId = (roomId: string) => `room-${roomId}`;
+export const stallStaffId = (stallId: string) => `stall-${stallId}`;
+
+const FEEDBACK = [
+  "Belum sesuai kebutuhan kami saat ini.",
+  "Profilmu menarik, tapi pengalamannya belum cukup untuk posisi ini.",
+  "Lumayan! Lengkapi CV dan portofolio supaya lebih kuat.",
+  "Bagus, kami ingin ngobrol lebih lanjut.",
+  "Kandidat yang sangat kuat, kami tunggu di interview!",
+];
+
+function freshPlayer(): PlayerState {
+  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0 };
+}
+
+/** Reviews a company had before today, made up from its id so every visitor sees the same. */
+export function seededReviews(boothId: string) {
+  let h = 2166136261;
+  for (const ch of boothId) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const count = 6 + (h % 29);
+  const average = 3.5 + ((h >>> 8) % 14) / 10;
+  return { count, sum: Math.round(count * average) };
+}
+

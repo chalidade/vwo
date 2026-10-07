@@ -1,7 +1,8 @@
 // A job fair as another kind of room: company booths instead of tables. Visitors walk between
 // booths, ask the recruiter questions, read the hiring banners, and apply.
 // Coordinates are tiles, like the cafe floors.
-import type { FloorView, MapObjectView } from "./venue-view";
+import { seatPositionsAround } from "./layout";
+import type { FloorView, MapObjectView, SeatView, TableView } from "./venue-view";
 
 export interface JobPosting {
   id: string;
@@ -118,6 +119,136 @@ export interface JobFairView {
   booths: CompanyBooth[];
   sponsors: SponsorView[];
   decor: { floor: number; spriteKey: string; x: number; y: number; width: number; height: number; isWalkable?: boolean }[];
+  /** Rooms behind a door in the hall: psychometric tests, seminars, the food court. */
+  rooms: FairRoom[];
+  /** Where visitors buy coins. */
+  coinStand: CoinStandView;
+}
+
+export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
+
+/** A room entered through a door standing in the hall. Premium rooms cost coins to enter. */
+export interface FairRoom {
+  id: string;
+  kind: FairRoomKind;
+  name: string;
+  tagline: string;
+  emoji: string;
+  color: string;
+  /** The hall floor its door stands on, and the door's top-left corner. */
+  floor: number;
+  doorX: number;
+  doorY: number;
+  /** Entry price in coins; 0 is free. */
+  price: number;
+  width: number;
+  height: number;
+  /** Who runs the room: the proctor, the speaker, the food court host. */
+  staff: { name: string; role: string };
+  /** Food court stalls along the back wall. */
+  stalls?: FoodStall[];
+}
+
+export interface FoodStall {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  vendor: string;
+  menu: { id: string; name: string; emoji: string; price: number }[];
+}
+
+export interface CoinStandView {
+  floor: number;
+  x: number;
+  y: number;
+  staff: string;
+  packages: { id: string; coins: number; bonus: number; price: string }[];
+}
+
+/** A room door: a wall panel ROOM_DOOR_W wide with a doorway in the middle. */
+export const ROOM_DOOR_W = 3.2;
+export const ROOM_DOOR_H = 0.7;
+const DOOR_POST = 0.7;
+
+export const COIN_STAND_W = 5.4;
+export const COIN_STAND_H = 2.9;
+/** Where to stand to buy coins, and where the cashier stands, relative to the stand. */
+export const COIN_STAND_SPOTS = { staff: { x: 2.7, y: 1.0 }, front: { x: 2.7, y: 2.75 } };
+
+export const fairRoomFloorId = (fair: { slug: string }, roomId: string) => `${fair.slug}-room-${roomId}`;
+
+/** Where you stand after leaving a room: just in front of its door in the hall. */
+export function roomDoorFront(room: FairRoom) {
+  return { x: room.doorX + ROOM_DOOR_W / 2, y: room.doorY + ROOM_DOOR_H + 0.9 };
+}
+
+/** Where you stand after entering a room: just inside its exit at the bottom. */
+export function roomEntry(room: FairRoom) {
+  return { x: room.width / 2, y: room.height - 1.9 };
+}
+
+/** Stall geometry in the food court: four stalls side by side along the back wall. */
+export function stallRect(i: number) {
+  return { x: 1 + i * 6.3, y: 0.3, width: 5.4, height: 2.4 };
+}
+export function stallSpot(i: number, spot: "vendor" | "order") {
+  const s = stallRect(i);
+  return spot === "vendor" ? { x: s.x + s.width / 2, y: s.y + 0.95 } : { x: s.x + s.width / 2, y: s.y + s.height + 0.7 };
+}
+
+/** Psikotes: rows of single desks facing the proctor. Seminar: rows of desks facing the stage. */
+function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]; blocked: { x: number; y: number; width: number; height: number }[] } {
+  const tables: TableView[] = [];
+  const seats: SeatView[] = [];
+  const blocked: { x: number; y: number; width: number; height: number }[] = [];
+  const table = (label: string, shape: TableView["shape"], x: number, y: number, width: number, height: number) => {
+    const t: TableView = { id: `${room.id}-${label}`, label, shape, x, y, width, height, rotation: 0 };
+    tables.push(t);
+    return t;
+  };
+  const seat = (t: TableView, i: number, x: number, y: number) =>
+    seats.push({ id: `${t.id}-${String.fromCharCode(65 + i)}`, label: `${t.label}-${String.fromCharCode(65 + i)}`, tableId: t.id, x, y, isActive: true });
+  if (room.kind === "psikotes") {
+    blocked.push({ x: room.width / 2 - 2, y: 1.2, width: 4, height: 0.8 });
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 4; c++) {
+        const t = table(`P${r * 4 + c + 1}`, "square", 2.2 + c * 4.3, 4 + r * 2.7, 1.4, 0.8);
+        seat(t, 0, t.x + 0.7, t.y + 1.35);
+      }
+  } else if (room.kind === "seminar") {
+    blocked.push({ x: 4, y: 0.3, width: room.width - 8, height: 2.6 });
+    for (let r = 0; r < 4; r++)
+      for (const [side, x0] of [["L", 2], ["R", room.width / 2 + 1.4]] as const) {
+        const t = table(`${String.fromCharCode(65 + r)}${side}`, "rect", x0, 4.6 + r * 2.3, 7.2, 0.5);
+        for (let i = 0; i < 5; i++) seat(t, i, t.x + 0.75 + i * 1.42, t.y + 1.0);
+      }
+  } else {
+    (room.stalls ?? []).forEach((_, i) => {
+      const s = stallRect(i);
+      blocked.push({ x: s.x, y: s.y, width: s.width, height: 0.5 }, { x: s.x + 0.3, y: s.y + 1.45, width: s.width - 0.6, height: 0.7 });
+    });
+    for (let r = 0; r < 2; r++)
+      for (let c = 0; c < 4; c++) {
+        const t = table(`T${r * 4 + c + 1}`, "round", 2.6 + c * 6.3, 5.4 + r * 4.6, 1.8, 1.8);
+        seatPositionsAround(t, 4).forEach((p, i) => seat(t, i, p.x, p.y));
+      }
+  }
+  return { tables, seats, blocked };
+}
+
+/** A room as a walkable floor, with its exit door back to the hall. */
+export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
+  const id = fairRoomFloorId(fair, room.id);
+  const { tables, seats, blocked } = roomFurniture(room);
+  const back = roomDoorFront(room);
+  const objects: MapObjectView[] = [
+    { id: `${id}-exit`, type: "door", x: room.width / 2 - 1, y: room.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true, targetFloorId: fairFloorId(fair, room.floor), targetX: back.x, targetY: back.y },
+    ...blocked.map((b, i): MapObjectView => ({ id: `${id}-obj-${i}`, type: "blocked", ...b, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
+    { id: `${id}-plant-a`, type: "decor", x: 0.3, y: room.height - 1.3, width: 1, height: 1, spriteKey: "plant", isWalkable: false, targetFloorId: null, targetX: null, targetY: null },
+    { id: `${id}-plant-b`, type: "decor", x: room.width - 1.3, y: room.height - 1.3, width: 1, height: 1, spriteKey: "plant", isWalkable: false, targetFloorId: null, targetX: null, targetY: null },
+  ];
+  return { id, name: room.name, width: room.width, height: room.height, tables, seats, objects, theme: "hall" };
 }
 
 /** The two flights of stairs in the bottom-right corner of every floor (tiles). */
@@ -129,7 +260,10 @@ export const FAIR_STAIRS = {
 export const fairFloorId = (fair: { slug: string }, floor: number) => `${fair.slug}-f${floor + 1}`;
 
 /** The floor index of a floor id built by fairFloorId. */
-export const fairFloorIndex = (floorId: string) => Number(floorId.slice(floorId.lastIndexOf("-f") + 2)) - 1;
+export const fairFloorIndex = (floorId: string) => {
+  const m = /-f(\d+)$/.exec(floorId);
+  return m ? Number(m[1]) - 1 : -1;
+};
 
 /** Where someone lands after taking the stairs: just in front of the flight that leads back. */
 function landing(stairs: { x: number; y: number; width: number; height: number }) {
@@ -144,6 +278,22 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     objects.push({ ...o, id: `${id}-obj-${objects.length}`, targetFloorId: target ? fairFloorId(fair, target.floor) : null, targetX: target?.x ?? null, targetY: target?.y ?? null });
   for (const b of fair.booths) if (b.floor === floor) for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
   for (const sp of fair.sponsors) if (sp.floor === floor) add({ type: "blocked", x: sp.x, y: sp.y, width: SPONSOR_W, height: SPONSOR_H, spriteKey: "invisible", isWalkable: false });
+  for (const room of fair.rooms) {
+    if (room.floor !== floor) continue;
+    add({ type: "blocked", x: room.doorX, y: room.doorY, width: DOOR_POST, height: ROOM_DOOR_H, spriteKey: "invisible", isWalkable: false });
+    add({ type: "blocked", x: room.doorX + ROOM_DOOR_W - DOOR_POST, y: room.doorY, width: DOOR_POST, height: ROOM_DOOR_H, spriteKey: "invisible", isWalkable: false });
+    const inside = roomEntry(room);
+    add({ type: "door", x: room.doorX + DOOR_POST, y: room.doorY, width: ROOM_DOOR_W - DOOR_POST * 2, height: ROOM_DOOR_H, spriteKey: `room:${room.id}`, isWalkable: true }, undefined);
+    const o = objects[objects.length - 1]!;
+    o.targetFloorId = fairRoomFloorId(fair, room.id);
+    o.targetX = inside.x;
+    o.targetY = inside.y;
+  }
+  if (fair.coinStand.floor === floor) {
+    const c = fair.coinStand;
+    add({ type: "blocked", x: c.x, y: c.y, width: COIN_STAND_W, height: 0.5, spriteKey: "invisible", isWalkable: false });
+    add({ type: "blocked", x: c.x + 0.4, y: c.y + 1.45, width: COIN_STAND_W - 0.8, height: 0.7, spriteKey: "invisible", isWalkable: false });
+  }
   if (floor === 0) {
     const d = fair.infoDesk;
     add({ type: "blocked", x: d.x, y: d.y, width: d.width, height: d.height, spriteKey: "invisible", isWalkable: false });
@@ -156,8 +306,9 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   return { id, name: info ? `${info.name} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats: [], objects, theme: "hall" };
 }
 
+/** Every hall floor, then every room. */
 export function buildJobFairFloors(fair: JobFairView): FloorView[] {
-  return fair.floors.map((_, i) => buildJobFairFloor(fair, i));
+  return [...fair.floors.map((_, i) => buildJobFairFloor(fair, i)), ...fair.rooms.map((room) => buildFairRoom(fair, room))];
 }
 
 const job = (id: string, title: string, type: JobPosting["type"], location: string, salary: string | undefined, requirements: string[]): JobPosting => ({
@@ -269,22 +420,18 @@ export const DEMO_JOB_FAIR: JobFairView = {
     },
   ],
   decor: [
-    // Ground floor: a lounge on each side of the entrance.
+    // Ground floor: the coin stand on the left of the entrance, a lounge on the right.
     { floor: 0, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
     { floor: 0, spriteKey: "plant-big", x: 36.6, y: 5.6, width: 1.2, height: 1 },
     { floor: 0, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
     { floor: 0, spriteKey: "plant", x: 36.7, y: 13.8, width: 1, height: 1 },
-    { floor: 0, spriteKey: "rug-plain", x: 2, y: 16.2, width: 6, height: 3.6, isWalkable: true },
-    { floor: 0, spriteKey: "sofa", x: 2.3, y: 16.6, width: 1, height: 2.4 },
-    { floor: 0, spriteKey: "sofa", x: 6.7, y: 16.6, width: 1, height: 2.4 },
-    { floor: 0, spriteKey: "plant", x: 4.5, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "rug-plain", x: 23.6, y: 16.2, width: 6, height: 3.6, isWalkable: true },
     { floor: 0, spriteKey: "sofa", x: 23.9, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "sofa", x: 28.3, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "plant", x: 26.1, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "lamp", x: 13.4, y: 20.4, width: 0.8, height: 0.8 },
     { floor: 0, spriteKey: "lamp", x: 22.4, y: 20.4, width: 0.8, height: 0.8 },
-    // Upper floors: one big lounge in the middle.
+    // Upper floors: one big lounge in the middle, room doors on the left.
     ...[1, 2].flatMap((floor) => [
       { floor, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant-big", x: 36.6, y: 5.6, width: 1.2, height: 1 },
@@ -294,11 +441,114 @@ export const DEMO_JOB_FAIR: JobFairView = {
       { floor, spriteKey: "sofa", x: 13.3, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "sofa", x: 23.7, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "plant", x: 18.5, y: 16.4, width: 1, height: 1 },
-      { floor, spriteKey: "lamp", x: 3, y: 20.4, width: 0.8, height: 0.8 },
-      { floor, spriteKey: "lamp", x: 9, y: 20.4, width: 0.8, height: 0.8 },
+      { floor, spriteKey: "lamp", x: 27.6, y: 20.4, width: 0.8, height: 0.8 },
     ]),
   ],
 
+  coinStand: {
+    floor: 0,
+    x: 2.4,
+    y: 16,
+    staff: "Mbak Koin",
+    packages: [
+      { id: "koin-50", coins: 50, bonus: 0, price: "Rp10.000" },
+      { id: "koin-120", coins: 100, bonus: 20, price: "Rp20.000" },
+      { id: "koin-300", coins: 250, bonus: 50, price: "Rp45.000" },
+    ],
+  },
+  rooms: [
+    {
+      id: "foodcourt",
+      kind: "foodcourt",
+      name: "Food Court",
+      tagline: "Makan, kumpulkan voucher",
+      emoji: "🍜",
+      color: "#ea580c",
+      floor: 1,
+      doorX: 3,
+      doorY: 16.4,
+      price: 0,
+      width: 26,
+      height: 16,
+      staff: { name: "Bang Ucok", role: "Pengelola food court" },
+      stalls: [
+        {
+          id: "bakso",
+          name: "Bakso Mas Bro",
+          emoji: "🍲",
+          color: "#dc2626",
+          vendor: "Mas Bro",
+          menu: [
+            { id: "bakso-urat", name: "Bakso urat", emoji: "🍲", price: 12 },
+            { id: "mie-ayam", name: "Mie ayam", emoji: "🍜", price: 10 },
+          ],
+        },
+        {
+          id: "nasgor",
+          name: "Nasi Goreng Gila",
+          emoji: "🍛",
+          color: "#ca8a04",
+          vendor: "Pak Gila",
+          menu: [
+            { id: "nasgor-gila", name: "Nasi goreng gila", emoji: "🍛", price: 12 },
+            { id: "nasi-uduk", name: "Nasi uduk", emoji: "🍚", price: 8 },
+          ],
+        },
+        {
+          id: "kopi",
+          name: "Es Kopi Kita",
+          emoji: "🧋",
+          color: "#7c2d12",
+          vendor: "Kak Tara",
+          menu: [
+            { id: "es-kopi-susu", name: "Es kopi susu", emoji: "🧋", price: 6 },
+            { id: "es-teh", name: "Es teh manis", emoji: "🥤", price: 4 },
+          ],
+        },
+        {
+          id: "martabak",
+          name: "Martabak Manis 88",
+          emoji: "🥞",
+          color: "#16a34a",
+          vendor: "Koh Ahong",
+          menu: [
+            { id: "martabak-coklat", name: "Martabak cokelat keju", emoji: "🥞", price: 10 },
+            { id: "pisang-goreng", name: "Pisang goreng", emoji: "🍌", price: 5 },
+          ],
+        },
+      ],
+    },
+    {
+      id: "psikotes",
+      kind: "psikotes",
+      name: "Ruang Psikotes",
+      tagline: "Latihan psikotes, hasilnya dilihat recruiter",
+      emoji: "🧠",
+      color: "#7c3aed",
+      floor: 2,
+      doorX: 2.4,
+      doorY: 16.4,
+      price: 20,
+      width: 20,
+      height: 13,
+      staff: { name: "Bu Psikolog Rina", role: "Pengawas psikotes" },
+    },
+    {
+      id: "seminar",
+      kind: "seminar",
+      name: "Ruang Seminar",
+      tagline: "Seminar karier bersertifikat",
+      emoji: "🎤",
+      color: "#0e7490",
+      floor: 2,
+      doorX: 7.4,
+      doorY: 16.4,
+      price: 15,
+      width: 24,
+      height: 15,
+      staff: { name: "Pak Arif", role: "Pembicara" },
+    },
+  ],
   booths: [
     {
       id: "nusantara-tech",

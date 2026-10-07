@@ -10,7 +10,22 @@ const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, s
 const T = 48;
 
 /** The back wall of an exhibition hall: panels, the event banner, bunting and spotlights. */
-export function HallWall({ w, h, title, subtitle = "Temukan karier impianmu · Gratis untuk semua pencari kerja", sponsors = [] }: { w: number; h: number; title: string; subtitle?: string; sponsors?: SponsorView[] }) {
+export function HallWall({
+  w,
+  h,
+  title,
+  subtitle = "Temukan karier impianmu · Gratis untuk semua pencari kerja",
+  sponsors = [],
+  banner = true,
+}: {
+  w: number;
+  h: number;
+  title: string;
+  subtitle?: string;
+  sponsors?: SponsorView[];
+  /** False for rooms that hang their own screen or board on the wall. */
+  banner?: boolean;
+}) {
   const bw = Math.min(520, w * 0.5);
   const flags = Math.ceil(w / 26);
   const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
@@ -39,18 +54,20 @@ export function HallWall({ w, h, title, subtitle = "Temukan karier impianmu · G
           return <path key={i} d={`M${x - 7} ${y}h14l-7 13Z`} fill={colors[i % colors.length]} stroke={INK} strokeWidth={1} />;
         })}
         {/* The event banner. */}
-        <g transform={`translate(${(w - bw) / 2}, 32)`}>
-          <rect x={0} y={0} width={bw} height={72} rx={8} fill="#1e3a8a" {...ink} />
-          <rect x={6} y={6} width={bw - 12} height={60} rx={5} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" />
-          <text x={bw / 2} y={36} textAnchor="middle" fontSize={26} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
-            {title.toUpperCase()}
-          </text>
-          <text x={bw / 2} y={56} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
-            {subtitle}
-          </text>
-        </g>
+        {banner && (
+          <g transform={`translate(${(w - bw) / 2}, 32)`}>
+            <rect x={0} y={0} width={bw} height={72} rx={8} fill="#1e3a8a" {...ink} />
+            <rect x={6} y={6} width={bw - 12} height={60} rx={5} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" />
+            <text x={bw / 2} y={36} textAnchor="middle" fontSize={26} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
+              {title.toUpperCase()}
+            </text>
+            <text x={bw / 2} y={56} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
+              {subtitle}
+            </text>
+          </g>
+        )}
       </svg>
-      {sponsors.length > 0 && (
+      {banner && sponsors.length > 0 && (
         <>
           <SponsorStrip sponsors={sponsors.slice(0, Math.ceil(sponsors.length / 2))} style={{ right: (w + bw) / 2 + 16, top: 40 }} />
           <SponsorStrip sponsors={sponsors.slice(Math.ceil(sponsors.length / 2))} style={{ left: (w + bw) / 2 + 16, top: 40 }} />
@@ -153,7 +170,13 @@ function Logo({ booth, r }: { booth: CompanyBooth; r: number }) {
   );
 }
 
-function BoothPanel({ booth }: { booth: CompanyBooth }) {
+export interface BoothRating {
+  average: number;
+  count: number;
+  level: number;
+}
+
+function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
   const w = BOOTH_W * T;
   const h = 2.2 * T;
   return (
@@ -172,9 +195,18 @@ function BoothPanel({ booth }: { booth: CompanyBooth }) {
       <text x={44} y={23} fontSize={16} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif">
         {booth.company}
       </text>
-      <text x={w - 12} y={22} textAnchor="end" fontSize={10} fontWeight={700} fill="#fff" opacity={0.85} fontFamily="system-ui, sans-serif">
-        {booth.industry}
-      </text>
+      {rating ? (
+        <g transform={`translate(${w - 8}, 17)`}>
+          <rect x={-92} y={-11} width={92} height={22} rx={11} fill="#fff" {...ink} strokeWidth={1.4} />
+          <text x={-46} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={INK} fontFamily="system-ui, sans-serif">
+            <tspan fill="#eab308">★</tspan> {rating.average.toFixed(1)} · Lv {rating.level}
+          </text>
+        </g>
+      ) : (
+        <text x={w - 12} y={22} textAnchor="end" fontSize={10} fontWeight={700} fill="#fff" opacity={0.85} fontFamily="system-ui, sans-serif">
+          {booth.industry}
+        </text>
+      )}
       {/* Posters. */}
       <g transform={`translate(18, 42)`}>
         <rect width={104} height={50} rx={4} fill="#fff" {...ink} strokeWidth={1.4} />
@@ -243,10 +275,7 @@ function RollUp({ booth }: { booth: CompanyBooth }) {
 }
 
 /** Everything that draws one booth, in scene coordinates. */
-export function boothExtras(
-  booth: CompanyBooth,
-  opts: { onBanner?: () => void; onDesk?: () => void; visitors?: number } = {},
-): SceneExtra[] {
+export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
   const { x, y } = booth;
   return [
     {
@@ -257,7 +286,7 @@ export function boothExtras(
       ground: true,
       node: <div className="jb-carpet" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
     },
-    { key: `${booth.id}-panel`, x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} /> },
+    { key: `${booth.id}-panel`, x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} rating={opts.rating} /> },
     {
       key: `${booth.id}-desk`,
       x: x + 1.2 - 4 / T,
@@ -293,7 +322,7 @@ export function infoDeskExtras(desk: { x: number; y: number; width: number; heig
       title: onClick ? "Meja informasi" : undefined,
       node: (
         <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
-<rect x={0} y={0} width={w} height={20} rx={4} fill="#f1f5f9" {...ink} />
+          <rect x={0} y={0} width={w} height={20} rx={4} fill="#f1f5f9" {...ink} />
           <rect x={20} y={4} width={26} height={11} rx={1} fill="#fff" {...ink} strokeWidth={1.2} />
           <rect x={w - 60} y={3} width={14} height={12} rx={2} fill="#fca5a5" {...ink} strokeWidth={1.2} />
           <rect x={2} y={20} width={w - 4} height={h - 20} fill="#1e3a8a" {...ink} />
@@ -381,12 +410,15 @@ export function JobBoard({
   /** Open on the company page instead of the first vacancy. */
   startAbout?: boolean;
 }) {
-  const pages: BoardPage[] = [
-    ...(booth.bannerImages ?? []).map((b) => ({ kind: "image" as const, ...b })),
-    ...booth.jobs.map((job) => ({ kind: "job" as const, job })),
-    { kind: "about" },
-  ];
-  const [page, setPage] = useState(() => (startAbout ? pages.length - 1 : Math.max(0, pages.findIndex((p) => p.kind === "job" && p.job.id === startJobId))));
+  const pages: BoardPage[] = [...(booth.bannerImages ?? []).map((b) => ({ kind: "image" as const, ...b })), ...booth.jobs.map((job) => ({ kind: "job" as const, job })), { kind: "about" }];
+  const [page, setPage] = useState(() =>
+    startAbout
+      ? pages.length - 1
+      : Math.max(
+          0,
+          pages.findIndex((p) => p.kind === "job" && p.job.id === startJobId),
+        ),
+  );
   const go = (d: number) => setPage((p) => Math.min(pages.length - 1, Math.max(0, p + d)));
   useEscape(onClose, (e) => {
     if (e.code === "ArrowLeft" || e.code === "KeyA") go(-1);
@@ -540,11 +572,14 @@ export function ApplyForm({
   defaultName = "",
   defaults = {},
   appliedJobIds = new Set(),
+  cost,
   onSubmit,
   onClose,
 }: {
   booth: CompanyBooth;
   jobId?: string;
+  /** What sending costs, shown on the button, e.g. "5 🪙" or "voucher". */
+  cost?: string;
   defaultName?: string;
   /** Prefill from the visitor's profile. */
   defaults?: Partial<Omit<ApplicationInput, "jobId">>;
@@ -608,7 +643,7 @@ export function ApplyForm({
           </button>
           {open.length > 0 && (
             <button type="submit" className="jb-submit">
-              Kirim lamaran
+              Kirim lamaran{cost ? ` · ${cost}` : ""}
             </button>
           )}
         </div>
