@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CompanyBooth } from "@vwo/shared";
+import type { CompanyBooth, FairFloorInfo } from "@vwo/shared";
 import { type Look, Person } from "@vwo/ui";
 import type { FairApplication } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
@@ -26,6 +26,7 @@ export function SeekerPanel({
   profile,
   applications,
   booths,
+  floors,
   visited,
   onSaveProfile,
   onOpenJob,
@@ -39,6 +40,7 @@ export function SeekerPanel({
   profile: SeekerProfile;
   applications: FairApplication[];
   booths: CompanyBooth[];
+  floors: FairFloorInfo[];
   visited: Set<string>;
   onSaveProfile: (p: SeekerProfile) => void;
   onOpenJob: (boothId: string, jobId: string) => void;
@@ -174,7 +176,8 @@ export function SeekerPanel({
                         <span className="sp-main">
                           <b>{a.jobTitle}</b>
                           <span className="sp-muted">
-                            {a.company} · {when(a.at)}
+                            {a.company}
+                            {b ? ` · ${floors[b.floor]?.name ?? ""}` : ""} · {when(a.at)}
                           </span>
                         </span>
                         <span className="status" data-status={a.status}>
@@ -200,19 +203,30 @@ export function SeekerPanel({
               <p className="sp-summary">
                 {visited.size === booths.length ? "Semua stand sudah kamu kunjungi! 🏆" : `Kunjungi semua stand untuk melengkapi kartu stempel (${visited.size}/${booths.length}).`}
               </p>
-              <div className="sp-stamps">
-                {booths.map((b) => {
-                  const got = visited.has(b.id);
-                  const n = applications.filter((a) => a.boothId === b.id).length;
-                  return (
-                    <button key={b.id} type="button" className="sp-stamp" data-got={got ? "" : undefined} style={{ ["--c" as string]: b.color }} onClick={() => onGoTo(b.id)} title={`Antar ke stand ${b.company}`}>
-                      <span className="sp-stamp-mark">{got ? b.logo : "?"}</span>
-                      <b>{b.company}</b>
-                      <span className="sp-muted">{got ? (n ? `${n} lamaran` : "Sudah mampir") : "Belum dikunjungi"}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {floors.map((f, i) => {
+                const here = booths.filter((b) => b.floor === i);
+                const got = here.filter((b) => visited.has(b.id)).length;
+                return (
+                  <section key={f.name} className="sp-floor">
+                    <h4 className="sp-floor-title">
+                      {f.name} · {f.theme} <span className="sp-muted">{got}/{here.length}</span>
+                    </h4>
+                    <div className="sp-stamps">
+                      {here.map((b) => {
+                        const got = visited.has(b.id);
+                        const n = applications.filter((a) => a.boothId === b.id).length;
+                        return (
+                          <button key={b.id} type="button" className="sp-stamp" data-got={got ? "" : undefined} style={{ ["--c" as string]: b.color }} onClick={() => onGoTo(b.id)} title={`Antar ke stand ${b.company}`}>
+                            <span className="sp-stamp-mark">{got ? b.logo : "?"}</span>
+                            <b>{b.company}</b>
+                            <span className="sp-muted">{got ? (n ? `${n} lamaran` : "Sudah mampir") : "Belum dikunjungi"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
             </>
           )}
         </div>

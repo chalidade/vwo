@@ -10,7 +10,7 @@ const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, s
 const T = 48;
 
 /** The back wall of an exhibition hall: panels, the event banner, bunting and spotlights. */
-export function HallWall({ w, h, title, sponsors = [] }: { w: number; h: number; title: string; sponsors?: SponsorView[] }) {
+export function HallWall({ w, h, title, subtitle = "Temukan karier impianmu · Gratis untuk semua pencari kerja", sponsors = [] }: { w: number; h: number; title: string; subtitle?: string; sponsors?: SponsorView[] }) {
   const bw = Math.min(520, w * 0.5);
   const flags = Math.ceil(w / 26);
   const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
@@ -46,7 +46,7 @@ export function HallWall({ w, h, title, sponsors = [] }: { w: number; h: number;
             {title.toUpperCase()}
           </text>
           <text x={bw / 2} y={56} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
-            Temukan karier impianmu · Gratis untuk semua pencari kerja
+            {subtitle}
           </text>
         </g>
       </svg>

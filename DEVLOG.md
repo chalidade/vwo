@@ -4,6 +4,28 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair 3 lantai
+
+**Konteks:** owner minta job fair dibuat 3 lantai, tiap lantai ada lowongan.
+
+**Yang berubah**
+
+- Aula job fair sekarang punya 3 lantai, masing-masing 6 stand: Lantai 1 Teknologi & Keuangan, Lantai 2 Kreatif, Kuliner & Ritel, Lantai 3 Industri, Energi & Kesehatan. Total 18 perusahaan (10 perusahaan fiktif baru) dan 54 lowongan.
+- Tangga naik dan turun ada di pojok kanan bawah tiap lantai, dengan papan "▲ Lantai 2" / "▼ Lantai 1". Jalan ke tangga untuk pindah lantai.
+- Sponsor dibagi per lantai, plus sponsor baru Asuransi Aman di Lantai 3. Banner aula menampilkan nama lantai.
+- Panitia di meja info (Lantai 1) bisa mengantar ke stand di lantai mana pun: pilih lantai, lalu pilih stand. Karakter berjalan sendiri lewat tangga sampai ke stand. Tap stempel di tas pencari kerja juga mengantar lintas lantai.
+- HUD menampilkan lantai saat ini, denah mini mengikuti lantai yang sedang dikunjungi, dan kartu stempel dikelompokkan per lantai. Daftar lamaran menyebut lantai stand-nya.
+- Bot pengunjung berkeliling ke stand di beberapa lantai secara berurutan (naik dulu, lalu turun dan pulang lewat pintu).
+- Halaman panitia punya tab per lantai (dengan jumlah orang di tiap lantai) dan kolom lantai di tabel stand.
+- Perbaikan: memilih stand dari menu panitia atau kartu stempel sekarang benar-benar membuat karakter berjalan (sebelumnya terhenti karena menu masih dianggap terbuka).
+
+**Verifikasi**
+
+- Tes baru: tiap stand, sponsor, dan tangga di ketiga lantai bisa dicapai; titik mendarat setelah naik/turun tidak memicu tangga lagi; bot mencapai stand di Lantai 3. Tes demo 13 dan shared 9 lulus, typecheck bersih.
+- Dicoba di browser desktop dan 390px layar sentuh: diantar dari Lantai 1 ke stand di Lantai 2 dan Lantai 3, tab lantai di halaman panitia.
+
+---
+
 ## 2026-10-07 · HUD bisa disembunyikan di HP, profil tidak terpotong
 
 **Konteks:** owner mengirim screenshot HP: kotak info job fair menutupi tombol Profil/Lamaran, dan tab di panel profil terpotong.
