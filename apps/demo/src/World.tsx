@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { type AvatarState, type Emote, type Facing, EMOTES, findPath, portalAt, slide } from "@vwo/shared";
-import { CafeScene, type DialogChoice, DialogBox, type Look, counterFront, lookFor } from "@vwo/ui";
+import { type AvatarState, type Emote, type Facing, DEMO_MENU, EMOTES, findPath, menuPages, portalAt, slide } from "@vwo/shared";
+import { CafeScene, type DialogChoice, DialogBox, type Look, MenuBook, counterFront, lookFor } from "@vwo/ui";
+import { WAITER_LOOK } from "./staff";
 import { CharacterCreator, type Character } from "./CharacterCreator";
 import { cafe, onFrame, useCafe } from "./useCafe";
 
@@ -30,6 +31,8 @@ const KEY_DIRS: Record<string, [number, number]> = {
   ArrowRight: [1, 0], KeyD: [1, 0],
 };
 
+const MENU_PAGES = menuPages(DEMO_MENU);
+
 let savedSession: Session | null = null; // survives switching to the admin view and back
 
 function facingOf(dx: number, dy: number, prev: Facing): Facing {
@@ -44,12 +47,13 @@ export function World() {
   const [viewFloorId, setViewFloorId] = useState(cafe.floors[0]!.id);
   const [talk, setTalk] = useState<Talk | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   savedSession = session;
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ path: { x: number; y: number }[]; seatId: string | null } | null>(null);
-  const talkRef = useRef(talk);
-  talkRef.current = talk;
+  const talkRef = useRef<Talk | boolean | null>(talk);
+  talkRef.current = talk ?? (menuOpen || null);
 
   const self = session ? cafe.members.get(session.memberId) : undefined;
   const floor = cafe.floor(self?.floorId ?? viewFloorId);
@@ -167,6 +171,7 @@ export function World() {
         `Halo, ${c.name}! Selamat datang di Cafe A.`,
         companions ? `Kamu datang bersama ${companions} orang. Mereka akan mengikutimu dan ikut duduk di meja yang sama.` : "Silakan cari tempat duduk yang kosong.",
         "Jalan dengan WASD atau panah (Shift untuk lari), atau klik lantai. Dekati kursi lalu tekan E untuk duduk.",
+        "Mau pesan? Klik papan menu di dinding atau tombol Menu. Pelayan akan mengantar pesanan ke mejamu.",
       ],
     });
   };
@@ -211,15 +216,14 @@ export function World() {
   const talkToBarista = () =>
     setTalk({
       speaker: "Barista",
-      pages: ["Mau pesan apa hari ini? ☕"],
+      pages: ["Mau pesan apa hari ini? ☕ Pilih dari menu, nanti pelayan kami antar ke mejamu."],
       choices: [
         {
           label: "Lihat menu",
-          onPick: () =>
-            setTalk({
-              speaker: "Barista",
-              pages: ["Kopi Susu 25k · Americano 22k · Matcha Latte 30k · Croissant 20k.", "Pesan dan bayar langsung dari aplikasi segera hadir. Pesananmu nanti masuk ke layar kasir ini."],
-            }),
+          onPick: () => {
+            setTalk(null);
+            setMenuOpen(true);
+          },
         },
         { label: "Nanti saja", onPick: () => setTalk(null) },
       ],
@@ -278,7 +282,15 @@ export function World() {
     setTalk(null);
   };
 
+  const order = (name: string) => {
+    if (!session) return;
+    const o = cafe.placeOrder(session.visitId, [name], 3500);
+    setToast(o ? `${name} masuk ke kasir, diantar ke meja ${o.tableLabel}` : "Duduk dulu supaya pelayan tahu mejamu.");
+  };
+
   const counts = cafe.snapshot();
+  const bubbles = Object.fromEntries([...cafe.bubbles].map(([id, b]) => [id, b.text]));
+  const npcs = cafe.staff.map((w) => ({ ...w, look: WAITER_LOOK }));
   const avatars: AvatarState[] = [...cafe.members.values()];
   const emotes = Object.fromEntries([...cafe.emotes].map(([id, e]) => [id, EMOTE_ICON[e.emote]]));
   const occupied = new Set(cafe.seatOwner.keys());
@@ -310,6 +322,10 @@ export function World() {
         lookOf={lookOf}
         selfMemberId={session?.memberId}
         emotes={emotes}
+        npcs={npcs}
+        bubbles={bubbles}
+        servedSeatIds={cafe.served}
+        onMenuClick={() => setMenuOpen(true)}
         follow={self ? { x: self.x, y: self.y } : null}
         showFreeSeats={!!session}
         highlightSeatId={reach?.kind === "seat" ? reach.seatId : null}
@@ -385,6 +401,9 @@ export function World() {
                   {EMOTE_ICON[e]}
                 </button>
               ))}
+              <button type="button" className="menu-btn" onClick={() => setMenuOpen(true)} title="Lihat menu">
+                📖 Menu
+              </button>
               <button type="button" className="leave" onClick={leave} title="Check-out">
                 🚪 Keluar
               </button>
@@ -419,6 +438,16 @@ export function World() {
               A
             </button>
           </div>
+        )}
+
+        {menuOpen && (
+          <MenuBook
+            title="Cafe A"
+            pages={MENU_PAGES}
+            onClose={() => setMenuOpen(false)}
+            onOrder={self?.seatId ? (item) => order(item.name) : undefined}
+            note={!session ? undefined : self?.seatId ? "Pesanan masuk ke kasir, lalu pelayan mengantar ke mejamu." : "Duduk dulu untuk memesan: pelayan mengantar ke meja."}
+          />
         )}
 
         {!session && (

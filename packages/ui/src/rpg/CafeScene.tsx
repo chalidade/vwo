@@ -15,6 +15,7 @@ import {
   CounterSprite,
   IndoorWall,
   LampSprite,
+  MenuBoard,
   PlantSprite,
   RooftopEdge,
   RugSprite,
@@ -54,6 +55,19 @@ export function counterFront(floor: FloorView) {
   return c ? { x: c.x + c.width / 2, y: c.y + c.height + 0.6 } : null;
 }
 
+/** Staff and other characters that are not customers (no seat, not counted inside). */
+export interface NpcView {
+  id: string;
+  name: string;
+  floorId: string;
+  x: number;
+  y: number;
+  facing: Facing;
+  look: Look;
+  /** Carrying a tray with an order. */
+  carrying?: boolean;
+}
+
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
 
 export interface CafeSceneProps {
@@ -62,6 +76,11 @@ export interface CafeSceneProps {
   floorName?: (floorId: string) => string;
   occupiedSeatIds: Set<string>;
   avatars?: AvatarState[];
+  npcs?: NpcView[];
+  /** Speech bubbles by member id, NPC id, or "barista". */
+  bubbles?: Record<string, string>;
+  /** Seats whose order has been served: they get a cup on the table. Defaults to every occupied seat. */
+  servedSeatIds?: Set<string>;
   lookOf?: (avatar: AvatarState) => Look;
   selfMemberId?: string | null;
   emotes?: Record<string, string>;
@@ -74,6 +93,7 @@ export interface CafeSceneProps {
   onTileClick?: (x: number, y: number) => void;
   onAvatarClick?: (memberId: string) => void;
   onBaristaClick?: () => void;
+  onMenuClick?: () => void;
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -95,6 +115,9 @@ export function CafeScene({
   floorName = () => "Tangga",
   occupiedSeatIds,
   avatars = [],
+  npcs = [],
+  bubbles = {},
+  servedSeatIds,
   lookOf = (a) => lookFor(`${a.displayName}:${a.memberId}`),
   selfMemberId,
   emotes = {},
@@ -105,6 +128,7 @@ export function CafeScene({
   onTileClick,
   onAvatarClick,
   onBaristaClick,
+  onMenuClick,
   className,
   style,
   children,
@@ -160,12 +184,12 @@ export function CafeScene({
   const motion = useRef(new Map<string, { x: number; y: number; at: number }>());
   const now = performance.now();
   const walking = new Set<string>();
-  for (const a of avatars) {
-    const m = motion.current.get(a.memberId);
+  for (const a of [...avatars.map((v) => ({ id: v.memberId, x: v.x, y: v.y })), ...npcs]) {
+    const m = motion.current.get(a.id);
     if (!m || Math.abs(m.x - a.x) > 0.001 || Math.abs(m.y - a.y) > 0.001) {
-      motion.current.set(a.memberId, { x: a.x, y: a.y, at: m ? now : 0 });
-      if (m) walking.add(a.memberId);
-    } else if (now - m.at < 180) walking.add(a.memberId);
+      motion.current.set(a.id, { x: a.x, y: a.y, at: m ? now : 0 });
+      if (m) walking.add(a.id);
+    } else if (now - m.at < 180) walking.add(a.id);
   }
   // Re-render once more after people stop, so their legs stop too.
   const [, settle] = useState(0);
@@ -190,7 +214,12 @@ export function CafeScene({
         z: py(o.y) - 1,
         x: px(o.x + o.width * 0.3) - 22,
         y: py(o.y - 0.12) - 58,
-        node: <Barista />,
+        node: (
+          <div className="rpg-sprite">
+            <Barista />
+            {bubbles.barista && <div className="rpg-say">{bubbles.barista}</div>}
+          </div>
+        ),
         onClick: onBaristaClick,
         title: "Barista",
       });
@@ -237,7 +266,7 @@ export function CafeScene({
   for (const t of floor.tables) {
     const inset = t.shape === "bar" ? 0.22 : 0.38;
     const cups = floor.seats
-      .filter((s) => s.tableId === t.id && occupiedSeatIds.has(s.id))
+      .filter((s) => s.tableId === t.id && (servedSeatIds ?? occupiedSeatIds).has(s.id) && occupiedSeatIds.has(s.id))
       .map((s) => ({
         x: (Math.min(Math.max(s.x, t.x + inset), t.x + t.width - inset) - t.x) * TILE,
         y: (Math.min(Math.max(s.y, t.y + inset), t.y + t.height - inset) - t.y) * TILE,
@@ -303,7 +332,32 @@ export function CafeScene({
               {a.displayName}
             </div>
           )}
-          {emote && <div className="rpg-emote">{emote}</div>}
+          {bubbles[a.memberId] ? <div className="rpg-say">{bubbles[a.memberId]}</div> : emote && <div className="rpg-emote">{emote}</div>}
+        </div>
+      ),
+    });
+  }
+
+  // --- Staff walking the floor.
+  for (const n of npcs) {
+    if (n.floorId !== floor.id) continue;
+    ents.push({
+      key: n.id,
+      z: py(n.y),
+      x: px(n.x) - 22,
+      y: py(n.y) - 58,
+      title: n.name,
+      node: (
+        <div className="rpg-sprite" data-dir={DIR[n.facing]} data-walking={walking.has(n.id) ? "" : undefined}>
+          <div className="rpg-shadow" />
+          <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
+            <Person look={n.look} />
+          </div>
+          {n.carrying && n.facing !== "back" && <div className="rpg-tray" />}
+          <div className="rpg-name" data-staff="">
+            {n.name}
+          </div>
+          {bubbles[n.id] && <div className="rpg-say">{bubbles[n.id]}</div>}
         </div>
       ),
     });
@@ -312,10 +366,8 @@ export function CafeScene({
   ents.sort((a, b) => a.z - b.z);
 
   const doors = (floor.objects ?? []).filter((o) => o.type === "door");
-  const menuAt = (() => {
-    const c = floor.objects?.find((o) => o.type === "counter");
-    return c ? px(c.x + c.width / 2) : null;
-  })();
+  const counter = floor.theme !== "rooftop" ? floor.objects?.find((o) => o.type === "counter") : undefined;
+  const board = counter ? { w: 176, h: Math.round(wall * 0.5), x: px(counter.x + counter.width / 2) - 88, y: Math.round(wall * 0.1) } : null;
   const windows: number[] = [];
   if (floor.theme !== "rooftop") {
     const tall = (floor.objects ?? []).filter((o) => o.y < 1.5 && o.spriteKey !== "rug" && o.type !== "spawn_point");
@@ -347,7 +399,19 @@ export function CafeScene({
         style={{ width: worldW, height: worldH, transform: `translate3d(${-camX * scale}px, ${-camY * scale}px, 0) scale(${scale})` }}
         aria-hidden
       >
-        {floor.theme === "rooftop" ? <RooftopEdge w={worldW} h={wall} /> : <IndoorWall w={worldW} h={wall} menuAt={menuAt} windows={windows} />}
+        {floor.theme === "rooftop" ? <RooftopEdge w={worldW} h={wall} /> : <IndoorWall w={worldW} h={wall} windows={windows} />}
+        {board && (
+          <div
+            className={`rpg-ent${onMenuClick ? " rpg-board" : ""}`}
+            data-hit={onMenuClick ? "" : undefined}
+            title={onMenuClick ? "Lihat menu" : undefined}
+            onPointerDown={onMenuClick ? (ev) => ev.stopPropagation() : undefined}
+            onClick={onMenuClick}
+            style={{ transform: `translate(${board.x}px, ${board.y}px)`, zIndex: 5 }}
+          >
+            <MenuBoard w={board.w} h={board.h} />
+          </div>
+        )}
         <div
           className={floor.theme === "rooftop" ? "rpg-floor-deck" : "rpg-floor-wood"}
           style={{ position: "absolute", left: ox, top: oy, width: floor.width * TILE, height: floor.height * TILE }}

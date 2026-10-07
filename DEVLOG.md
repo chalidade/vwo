@@ -4,6 +4,27 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Pop up menu, pelayan, dan obrolan pelanggan
+
+**Konteks:** owner minta papan menu dirapikan, menu muncul sebagai pop up berisi semua menu (bisa beberapa halaman dan nanti bisa diganti gambar), serta interaksi antar pelanggan dan pegawai supaya cafe terasa hidup. Referensi tampilan menu: foto menu cafe yang dikirim owner (kategori dengan pita judul, foto minuman, harga).
+
+**Yang berubah**
+
+- Papan menu di dinding digambar ulang. Teks kecil yang tadinya keluar dari papan diganti judul "MENU" dengan gambar kapur. Papan bisa diklik untuk membuka menu.
+- Pop up menu `MenuBook` (`packages/ui`): tab per halaman, pita judul kategori, kartu item dengan gambar minuman, harga, dan tombol "+ Pesan". Bisa dibalik dengan ◀ ▶ atau panah keyboard, dan ditutup dengan Esc. Kategori panjang dipecah jadi beberapa halaman (8 item per halaman).
+- Menu bisa diganti gambar dengan dua cara: `MenuView.imagePages` menampilkan foto menu cetak sebagai halaman sendiri, dan `imageUrl` per item menggantikan gambar minuman yang digambar.
+- Menu contoh (`DEMO_MENU` di `packages/shared`): 31 item dalam 5 kategori (Kopi Dingin, Kopi Panas, Black Coffee Segar, Non-Kopi, Makanan). Seed database memakai data yang sama.
+- Pelayan (Rina) mengambil pesanan yang sudah siap di kasir, mengantar ke meja sambil membawa nampan, lalu kembali. Cangkir baru muncul di meja setelah pesanan diantar. Pelayan ikut naik ke rooftop.
+- Bot pelanggan sekarang memesan dulu di kasir ("Halo Andi! Mau pesan apa?"), baru mencari kursi. Setelah duduk mereka mengobrol dengan teman semeja lewat balon kata, berterima kasih ke pelayan, dan sesekali memberi emote. Barista sesekali menyapa ruangan dan mengumumkan pesanan yang siap.
+- Pemain bisa memesan dari menu saat sudah duduk. Pesanan masuk ke kasir dan diantar pelayan ke mejanya.
+- Live view admin punya tabel "Pesanan di kasir" (dibuat, siap diantar, diantar, sudah di meja, batal).
+- Kursi meja panjang kini berjajar di sisi panjang ditambah satu di tiap ujung, tidak lagi menempel di sudut meja.
+
+**Verifikasi**
+
+- Tes: shared 9, demo 9 (termasuk bot memesan lalu diantar, cangkir hanya muncul di kursi yang terisi, dan pesanan hanya diterima dari rombongan yang sudah duduk), db 9, realtime 3. Typecheck dan build web lulus, seed membuat 31 item menu.
+- Dicoba di browser (1280px dan 390px): pop up menu, pindah halaman, memesan, pelayan mengantar, obrolan bot, dan live view admin. Tidak ada error di console.
+
 ## 2026-10-07 · Tampilan RPG ala Pokémon
 
 **Konteks:** owner merasa tampilan denah belum terasa seperti game, dan minta dibuat seperti RPG Pokémon dengan referensi kota RPG di chalidade.github.io/tools.

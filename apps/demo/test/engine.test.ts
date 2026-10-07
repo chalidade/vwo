@@ -91,3 +91,36 @@ describe("DemoCafe walking", () => {
     expect(host.y).toBeLessThan(t.y); // stepped back from the top chair, not into the table
   });
 });
+
+describe("DemoCafe orders and staff", () => {
+  it("bots order at the counter and the waiter brings it to their table", () => {
+    let t = 0;
+    const cafe = new DemoCafe(Math.random, () => t);
+    let served = 0;
+    for (let i = 0; i < 3000; i++) {
+      t += 100;
+      cafe.tick(100);
+      served = cafe.orders.filter((o) => o.status === "served").length;
+      // A cup only ever sits in front of someone who is seated.
+      for (const seatId of cafe.served) expect(cafe.seatOwner.has(seatId)).toBe(true);
+    }
+    expect(cafe.orders.length).toBeGreaterThan(0);
+    expect(served).toBeGreaterThan(0);
+  });
+
+  it("only takes orders from a seated group", () => {
+    let t = 0;
+    const cafe = new DemoCafe(() => 0.5, () => t);
+    const v = cafe.checkIn("Me");
+    expect(cafe.placeOrder(v.visitId, ["Latte"])).toBeNull();
+    cafe.claimSeats(v.visitId, [{ memberId: v.memberId, seatId: "M-03-A" }]);
+    const order = cafe.placeOrder(v.visitId, ["Latte"], 1000)!;
+    expect(order.tableLabel).toBe("M-03");
+    for (let i = 0; i < 300 && order.status !== "served"; i++) {
+      t += 100;
+      cafe.tick(100, { maxPeople: 0 });
+    }
+    expect(order.status).toBe("served");
+    expect(cafe.served.has("M-03-A")).toBe(true);
+  });
+});
