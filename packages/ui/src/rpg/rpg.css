@@ -427,3 +427,235 @@
     animation: none;
   }
 }
+
+/* ---- Speech bubbles, staff and trays ---- */
+.rpg-say {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 170px;
+  padding: 4px 8px;
+  font: 600 12px/1.3 system-ui, sans-serif;
+  color: var(--rpg-ink);
+  background: #fff;
+  border: 2.5px solid var(--rpg-ink);
+  border-radius: 10px;
+  text-align: center;
+  animation: rpg-pop 0.2s ease-out;
+  pointer-events: none;
+  z-index: 2;
+}
+.rpg-say::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  margin-left: -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--rpg-ink);
+}
+.rpg-name[data-staff] {
+  background: #2f6f5e;
+}
+.rpg-tray {
+  position: absolute;
+  left: 4px;
+  top: 30px;
+  width: 36px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  border: 2px solid var(--rpg-ink);
+  z-index: 1;
+}
+.rpg-tray::after {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: -12px;
+  width: 11px;
+  height: 12px;
+  border-radius: 2px 2px 4px 4px;
+  background: linear-gradient(#f4ead9 40%, #7a4a2a 40%);
+  border: 2px solid var(--rpg-ink);
+}
+.rpg-board {
+  cursor: pointer;
+}
+.rpg-board:hover {
+  filter: brightness(1.12);
+}
+
+/* ---- Menu book ---- */
+.mb-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgb(20 12 8 / 0.55);
+}
+.mb {
+  width: min(760px, 100%);
+  max-height: calc(100% - 8px);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 12px;
+  background: #fbf3e6;
+}
+.mb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mb-title {
+  font-weight: 800;
+  font-size: 18px;
+}
+.mb-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 2.5px solid var(--rpg-box-line);
+  background: #fff;
+  color: var(--rpg-ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+.mb-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 0 6px;
+  scrollbar-width: thin;
+}
+.mb-tabs button {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--rpg-box-line);
+  background: #fff;
+  color: var(--rpg-ink);
+  font: 700 12px/1.4 system-ui, sans-serif;
+  cursor: pointer;
+}
+.mb-tabs button[data-active] {
+  background: #23345c;
+  color: #fff;
+}
+.mb-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: linear-gradient(#f3d9cc, #f7e7dc);
+  border: 2px solid #e7c9a3;
+}
+.mb-ribbon {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 26px 4px 12px;
+  font: 700 16px/1.3 Georgia, "Times New Roman", serif;
+  color: #fff;
+  background: #23345c;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%);
+}
+.mb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 40%), 1fr));
+  gap: 10px;
+}
+.mb-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.7);
+  border: 2px solid #ead2bd;
+  text-align: center;
+  color: var(--rpg-ink);
+}
+.mb-art {
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+.mb-art img {
+  max-height: 72px;
+  max-width: 100%;
+  border-radius: 6px;
+}
+.mb-name {
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.2;
+}
+.mb-desc {
+  font-size: 11px;
+  color: #7a6a5c;
+}
+.mb-foot {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mb-price {
+  font-weight: 800;
+  color: #b45309;
+}
+.mb-order {
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 2px solid var(--rpg-box-line);
+  background: var(--rpg-accent);
+  color: #fff;
+  font: 700 12px/1.4 system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--rpg-box-line);
+}
+.mb-image {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+.mb-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 10px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.mb-nav button {
+  padding: 3px 12px;
+  border-radius: 8px;
+  border: 2.5px solid var(--rpg-box-line);
+  background: #fff;
+  color: var(--rpg-ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+.mb-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mb-note {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #7a6a5c;
+}

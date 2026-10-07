@@ -84,7 +84,7 @@ h1 { margin: 0; }
 .hud-bl { left: 12px; bottom: 76px; }
 .actions { display: flex; gap: 4px; padding: 6px; }
 .actions button { background: #fff; color: var(--text); padding: 4px 8px; font-size: 18px; box-shadow: 0 2px 0 #3b2a20; border-width: 2px; }
-.actions button.leave { font-size: 13px; }
+.actions button.leave, .actions button.menu-btn { font-size: 13px; }
 .group-code { margin-top: 6px; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; }
 .title-screen { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: 12px; background: rgb(20 12 8 / 0.45); overflow: auto; }
 

@@ -329,17 +329,37 @@ export function LampSprite() {
   );
 }
 
-/** The back wall of an indoor floor: wallpaper, wainscot, windows, a chalk menu, lamps. */
+/** The chalk menu board hung above the counter. Opens the menu book when clicked. */
+export function MenuBoard({ w, h }: { w: number; h: number }) {
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", overflow: "visible" }}>
+      <path d={`M${w * 0.25} -10L${w * 0.5} -22L${w * 0.75} -10`} fill="none" stroke={INK} strokeWidth={1.6} />
+      <rect x={0} y={0} width={w} height={h} rx={7} fill="#8a5a3b" {...ink} />
+      <rect x={7} y={7} width={w - 14} height={h - 14} rx={4} fill="#2d3b33" />
+      <text x={w / 2} y={h * 0.42} textAnchor="middle" fontSize={h * 0.26} fontWeight={800} fill="#fef3c7" fontFamily="Georgia, serif" letterSpacing={3}>
+        MENU
+      </text>
+      <path d={`M${w * 0.22} ${h * 0.5}H${w * 0.78}`} stroke="#fef3c7" strokeWidth={1.5} strokeDasharray="4 4" opacity={0.6} />
+      {/* Chalk doodles: a cup and a croissant. */}
+      <g fill="none" stroke="#e5e7eb" strokeWidth={1.6} strokeLinecap="round" opacity={0.85}>
+        <path d={`M${w * 0.12} ${h * 0.3}h14l-2 12h-10Z M${w * 0.12 + 14} ${h * 0.34}q5 0 3 5`} />
+        <path d={`M${w * 0.8} ${h * 0.4}q8-10 16 0q-8 4-16 0Z`} />
+      </g>
+      <text x={w / 2} y={h * 0.74} textAnchor="middle" fontSize={11} fill="#cbd5e1" fontFamily="system-ui, sans-serif">
+        Kopi · Non-kopi · Makanan
+      </text>
+    </svg>
+  );
+}
+
+/** The back wall of an indoor floor: wallpaper, wainscot, windows, lamps. */
 export function IndoorWall({
   w,
   h,
-  menuAt,
   windows,
 }: {
   w: number;
   h: number;
-  /** Centre x (px) of the chalk menu above the counter, if there is one. */
-  menuAt: number | null;
   windows: number[];
 }) {
   return (
@@ -358,19 +378,6 @@ export function IndoorWall({
             <rect x={-8} y={h * 0.5 + 2} width={104} height={8} rx={3} fill="#8a5a3b" {...ink} strokeWidth={1.6} />
           </g>
         ))}
-        {menuAt !== null && (
-          <g transform={`translate(${menuAt - 90}, ${h * 0.08})`}>
-            <rect x={0} y={0} width={180} height={h * 0.5} rx={6} fill="#2d3b33" stroke="#8a5a3b" strokeWidth={6} />
-            <text x={90} y={22} textAnchor="middle" fontSize={15} fontWeight={800} fill="#fef3c7" fontFamily="system-ui, sans-serif" letterSpacing={2}>
-              MENU
-            </text>
-            {["Kopi Susu ........ 25k", "Americano ........ 22k", "Matcha Latte ..... 30k", "Croissant ........ 20k"].map((line, i) => (
-              <text key={line} x={14} y={40 + i * 13} fontSize={10.5} fill="#e5e7eb" fontFamily="ui-monospace, monospace">
-                {line}
-              </text>
-            ))}
-          </g>
-        )}
         {/* Pendant lamps along the ceiling. */}
         {Array.from({ length: Math.floor(w / 240) }, (_, i) => {
           const x = 120 + i * 240;

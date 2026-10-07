@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { CafeScene } from "@vwo/ui";
+import { WAITER_LOOK } from "./staff";
 import { useCafe } from "./useCafe";
+
+const ORDER_STATUS = { new: "Dibuat", ready: "Siap diantar", delivering: "Diantar", served: "Sudah di meja", cancelled: "Batal" } as const;
 
 const EVENT_TEXT = {
   check_in: "datang",
@@ -54,6 +57,9 @@ export function AdminLive() {
           floorName={(id) => cafe.floor(id).name}
           occupiedSeatIds={occupied}
           avatars={members}
+          npcs={cafe.staff.map((w) => ({ ...w, look: WAITER_LOOK }))}
+          bubbles={Object.fromEntries([...cafe.bubbles].map(([id, b]) => [id, b.text]))}
+          servedSeatIds={cafe.served}
           showFreeSeats
         />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>
@@ -71,6 +77,23 @@ export function AdminLive() {
             </tbody>
           </table>
         </div>
+      </div>
+      <div className="card">
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>Pesanan di kasir</h2>
+        {cafe.orders.length === 0 && <p className="muted">Belum ada pesanan.</p>}
+        <table className="list">
+          <tbody>
+            {cafe.orders.slice(0, 12).map((o) => (
+              <tr key={o.id}>
+                <td className="muted">{new Date(o.at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</td>
+                <td>{o.name}</td>
+                <td>Meja {o.tableLabel}</td>
+                <td>{o.items.join(", ")}</td>
+                <td>{ORDER_STATUS[o.status]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <div className="card">
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Siapa di dalam</h2>

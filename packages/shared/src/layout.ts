@@ -35,6 +35,23 @@ export function seatPositionsAround(table: TableRect, capacity: number, gap = 0.
     }));
   }
 
+  if (table.shape === "rect" && capacity >= 3) {
+    // Long tables: one chair at each end, the rest split along the two long sides.
+    const horizontal = table.width >= table.height;
+    const ends = capacity >= 4 ? 2 : 0;
+    const sideA = Math.ceil((capacity - ends) / 2);
+    const sideB = capacity - ends - sideA;
+    const along = (n: number, i: number) => (horizontal ? table.x + (table.width * (i + 0.5)) / n : table.y + (table.height * (i + 0.5)) / n);
+    const out: Point[] = [];
+    for (let i = 0; i < sideA; i++)
+      out.push(horizontal ? { x: round(along(sideA, i)), y: round(table.y - gap), rotation: 0 } : { x: round(table.x + table.width + gap), y: round(along(sideA, i)), rotation: 90 });
+    if (ends) out.push(horizontal ? { x: round(table.x + table.width + gap), y: round(cy), rotation: 90 } : { x: round(cx), y: round(table.y + table.height + gap), rotation: 180 });
+    for (let i = sideB - 1; i >= 0; i--)
+      out.push(horizontal ? { x: round(along(sideB, i)), y: round(table.y + table.height + gap), rotation: 180 } : { x: round(table.x - gap), y: round(along(sideB, i)), rotation: 270 });
+    if (ends) out.push(horizontal ? { x: round(table.x - gap), y: round(cy), rotation: 270 } : { x: round(cx), y: round(table.y - gap), rotation: 0 });
+    return out;
+  }
+
   const rx = table.width / 2 + gap;
   const ry = table.height / 2 + gap;
   return Array.from({ length: capacity }, (_, i) => {

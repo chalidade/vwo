@@ -1,7 +1,7 @@
 // Seeds a demo venue reachable at /vwo/cafe-a: two floors joined by stairs, tables with
 // auto-placed seats, an entrance QR, a small menu, default avatar items and demo users.
 import { randomBytes } from "node:crypto";
-import { DEMO_VENUE, type ObjectSpec, seatLabel, seatPositionsAround } from "@vwo/shared";
+import { DEMO_MENU, DEMO_VENUE, type ObjectSpec, seatLabel, seatPositionsAround } from "@vwo/shared";
 import { eq } from "drizzle-orm";
 import { createDb } from "./client";
 import {
@@ -120,23 +120,24 @@ await db.transaction(async (tx) => {
     secretKey: randomBytes(32).toString("hex"),
   });
 
-  const [coffee, food] = await tx
+  const categories = await tx
     .insert(menuCategories)
-    .values([
-      { venueId: venue.id, name: "Kopi", sortOrder: 0 },
-      { venueId: venue.id, name: "Makanan", sortOrder: 1 },
-    ])
+    .values(DEMO_MENU.categories.map((c, i) => ({ venueId: venue.id, name: c.name, sortOrder: i })))
     .returning();
-  if (!coffee || !food) throw new Error("seed categories failed");
   const items = await tx
     .insert(menuItems)
-    .values([
-      { venueId: venue.id, categoryId: coffee.id, name: "Kopi Susu Gula Aren", price: "25000", sortOrder: 0 },
-      { venueId: venue.id, categoryId: coffee.id, name: "Americano", price: "22000", sortOrder: 1 },
-      { venueId: venue.id, categoryId: coffee.id, name: "Cappuccino", price: "28000", sortOrder: 2 },
-      { venueId: venue.id, categoryId: food.id, name: "Croissant", price: "20000", sortOrder: 0 },
-      { venueId: venue.id, categoryId: food.id, name: "Nasi Goreng Kampung", price: "35000", sortOrder: 1 },
-    ])
+    .values(
+      DEMO_MENU.categories.flatMap((c, ci) =>
+        c.items.map((it, i) => ({
+          venueId: venue.id,
+          categoryId: categories[ci]!.id,
+          name: it.name,
+          description: it.description ?? null,
+          price: String(it.price),
+          sortOrder: i,
+        })),
+      ),
+    )
     .returning();
 
   const [sugar] = await tx
@@ -149,9 +150,10 @@ await db.transaction(async (tx) => {
     { groupId: sugar.id, name: "Less sugar" },
     { groupId: sugar.id, name: "No sugar" },
   ]);
+  const drinkCategories = new Set(categories.filter((c) => c.name !== "Makanan").map((c) => c.id));
   await tx
     .insert(menuItemModifierGroups)
-    .values(items.filter((i) => i.categoryId === coffee.id).map((i) => ({ menuItemId: i.id, modifierGroupId: sugar.id })));
+    .values(items.filter((i) => drinkCategories.has(i.categoryId)).map((i) => ({ menuItemId: i.id, modifierGroupId: sugar.id })));
 
   await tx.insert(avatarItems).values([
     { slot: "hair", name: "Rambut pendek", spriteKey: "hair/short", colorOptions: ["#2b1b12", "#6b4423", "#d4a373"] },
