@@ -23,7 +23,23 @@ import {
   facingFor,
   findPath,
 } from "@vwo/shared";
-import { APPLY_COST, DAILY_COINS, FOOD_VOUCHERS, SEMINARS, START_COINS, VERIFY_COST, XP, type VoucherKind, levelOf } from "./fair/content";
+import {
+  APPLY_COST,
+  CAREER_ARTICLES,
+  DAILY_COINS,
+  FOOD_VOUCHERS,
+  GAME_DAILY_CAP,
+  MISSIONS_BONUS,
+  type MissionKind,
+  SEMINARS,
+  START_COINS,
+  VERIFY_COST,
+  XP,
+  type VoucherKind,
+  levelOf,
+  streakBonus,
+  todaysMissions,
+} from "./fair/content";
 
 type Point = { x: number; y: number };
 
@@ -146,6 +162,22 @@ export interface PlayerState {
   meals: number;
   /** Bought the blue verified check. */
   verified?: boolean;
+  /** Days in a row the free daily coins were claimed. */
+  streak?: number;
+  /** Career articles read to the end in the sofa's reading corner. */
+  read?: string[];
+  /** Roadmap steps ticked off, per article. */
+  roadmap?: Record<string, string[]>;
+  /** Today's missions and mini game earnings; reset when the day changes. */
+  daily?: DailyState;
+}
+
+export interface DailyState {
+  day: string;
+  counts: Partial<Record<MissionKind, number>>;
+  claimed: string[];
+  bonus: boolean;
+  gameCoins: number;
 }
 
 export interface FairEvent {
@@ -469,12 +501,110 @@ export class DemoJobFair {
     return this.player.dailyOn !== this.today();
   }
 
+  /** Free daily coins, with a bonus for claiming several days in a row. Returns the coins given. */
   claimDaily() {
-    if (!this.canClaimDaily()) return false;
+    if (!this.canClaimDaily()) return 0;
+    const yesterday = new Date(this.now() - 86400000).toISOString().slice(0, 10);
+    this.player.streak = this.player.dailyOn === yesterday ? (this.player.streak ?? 0) + 1 : 1;
     this.player.dailyOn = this.today();
-    this.earn(DAILY_COINS, "Koin gratis harian");
+    const bonus = streakBonus(this.player.streak);
+    this.earn(DAILY_COINS + bonus, bonus ? `Koin gratis harian + bonus ${this.player.streak} hari beruntun` : "Koin gratis harian");
+    this.emit();
+    return DAILY_COINS + bonus;
+  }
+
+  // --- Daily missions and sofa mini games.
+
+  /** Today's progress, started fresh on a new day. */
+  dailyState(): DailyState {
+    const day = this.today();
+    if (this.player.daily?.day !== day) this.player.daily = { day, counts: {}, claimed: [], bonus: false, gameCoins: 0 };
+    return this.player.daily;
+  }
+
+  /** Count something the player did towards today's missions. */
+  track(kind: MissionKind, n = 1) {
+    const s = this.dailyState();
+    s.counts[kind] = (s.counts[kind] ?? 0) + n;
+    this.persist();
+    this.emit();
+  }
+
+  missions() {
+    const s = this.dailyState();
+    return todaysMissions(s.day).map((m) => ({ ...m, progress: Math.min(s.counts[m.kind] ?? 0, m.target), claimed: s.claimed.includes(m.id) }));
+  }
+
+  /** Missions done but not yet claimed, plus the all-done bonus. */
+  claimable() {
+    const list = this.missions();
+    return list.filter((m) => m.progress >= m.target && !m.claimed).length + (list.every((m) => m.claimed) && !this.dailyState().bonus ? 1 : 0);
+  }
+
+  claimMission(id: string) {
+    const m = this.missions().find((x) => x.id === id);
+    if (!m || m.claimed || m.progress < m.target) return false;
+    this.dailyState().claimed.push(m.id);
+    this.earn(m.coins, `Misi: ${m.title}`);
+    this.gainXp(m.xp);
+    return true;
+  }
+
+  claimMissionBonus() {
+    const s = this.dailyState();
+    if (s.bonus || !this.missions().every((m) => m.claimed)) return false;
+    s.bonus = true;
+    this.earn(MISSIONS_BONUS, "Bonus semua misi harian");
     this.emit();
     return true;
+  }
+
+  /** Pay a mini game's reward, up to what is left of today's cap. Returns the coins given. */
+  rewardGame(game: string, coins: number) {
+    const s = this.dailyState();
+    const give = Math.max(0, Math.min(Math.floor(coins), GAME_DAILY_CAP - s.gameCoins));
+    s.gameCoins += give;
+    if (give) this.earn(give, `Mini game: ${game}`);
+    this.track("game");
+    return give;
+  }
+
+  /** Finished reading a career article: XP the first time, and it counts towards today's missions. */
+  readArticle(id: string) {
+    const read = (this.player.read ??= []);
+    const first = !read.includes(id);
+    if (first) {
+      read.push(id);
+      this.gainXp(XP.read);
+    }
+    this.track("read");
+    return first;
+  }
+
+  /** Tick or untick a step on a profession's roadmap. Finishing a whole stage gives XP once. */
+  toggleStep(articleId: string, key: string) {
+    const map = (this.player.roadmap ??= {});
+    const done = (map[articleId] ??= []);
+    const i = done.indexOf(key);
+    if (i >= 0) done.splice(i, 1);
+    else {
+      done.push(key);
+      const stage = key.split(".")[0]!;
+      const a = CAREER_ARTICLES.find((x) => x.id === articleId);
+      const total = a?.roadmap[Number(stage)]?.steps.length ?? 0;
+      const stageKey = `stage:${stage}`;
+      if (total && done.filter((k) => k.startsWith(`${stage}.`)).length === total && !done.includes(stageKey)) {
+        done.push(stageKey);
+        this.gainXp(XP.roadmapStage);
+        this.notices.push(`Tahap ${a!.roadmap[Number(stage)]!.level} roadmap ${a!.role} selesai, +${XP.roadmapStage} XP`);
+      }
+    }
+    this.persist();
+    this.emit();
+  }
+
+  gameCoinsLeft() {
+    return GAME_DAILY_CAP - this.dailyState().gameCoins;
   }
 
   private today() {
@@ -529,6 +659,7 @@ export class DemoJobFair {
       this.earn(bonus.coins, `Cashback dari ${stall.name}`);
     }
     this.ad(`stall:${stall.id}`, "sold", deal.price);
+    this.track("promo");
     this.say(stallStaffId(stall.id), `Terima kasih! Tunjukkan kode ${code} di outlet kami 🎟️`, 3000);
     this.gainXp(XP.food);
     this.persist();
@@ -542,6 +673,7 @@ export class DemoJobFair {
     if (!p?.code || this.hasPromo(id)) return false;
     this.player.vouchers.unshift({ id: this.id("vc"), kind: "sponsor", title: `${p.brand}: ${p.headline}`, code: p.code, from: p.brand, at: this.now(), used: false });
     this.ad(`promo:${p.id}`, "click");
+    this.track("promo");
     return true;
   }
 
@@ -588,6 +720,7 @@ export class DemoJobFair {
   }
 
   recordPsych(result: Omit<PsychResult, "at">) {
+    this.track("psych");
     this.player.psych.unshift({ ...result, at: this.now() });
     this.player.psych.length = Math.min(this.player.psych.length, 10);
     this.gainXp(Math.round((result.score / result.total) * XP.psychMax));
@@ -750,6 +883,7 @@ export class DemoJobFair {
     this.persist();
     this.visits.set(boothId, (this.visits.get(boothId) ?? 0) + 1);
     this.log({ type: "visit", name: v.displayName, company: b.company });
+    if (visitorId === PLAYER_ID) this.track("visit");
     this.emit();
   }
 
@@ -795,6 +929,7 @@ export class DemoJobFair {
       verified: !!v.verified,
     };
     this.applications.unshift(a);
+    if (visitorId === PLAYER_ID) this.track("apply");
     this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
     this.persist();
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
@@ -1082,7 +1217,7 @@ const FEEDBACK = [
 ];
 
 function freshPlayer(): PlayerState {
-  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false };
+  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false, streak: 0, daily: undefined, read: [], roadmap: {} };
 }
 
 /** Reviews a company had before today, made up from its id so every visitor sees the same. */

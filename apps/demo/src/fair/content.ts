@@ -148,9 +148,242 @@ export function levelOf(xp: number) {
 }
 
 /** XP rewards. */
-export const XP = { visit: 5, apply: 10, ratedPerStar: 10, review: 5, seminar: 30, psychMax: 50, food: 2 } as const;
+export const XP = { visit: 5, apply: 10, ratedPerStar: 10, review: 5, seminar: 30, psychMax: 50, food: 2, read: 8, roadmapStage: 15 } as const;
 export const APPLY_COST = 5;
 /** Price of the blue verified check, in coins. */
 export const VERIFY_COST = 60;
 export const START_COINS = 50;
 export const DAILY_COINS = 20;
+
+// --- Keeping job seekers around: sofa mini games and daily missions.
+
+/** Coins the mini games can pay out per day, so they stay a bonus rather than a coin farm. */
+export const GAME_DAILY_CAP = 30;
+
+export interface QuizQuestion {
+  q: string;
+  options: string[];
+  answer: number;
+  /** Why, shown after answering. */
+  why: string;
+}
+
+/** Career trivia for the sofa quiz; five are drawn per round. */
+export const CAREER_QUIZ: QuizQuestion[] = [
+  { q: "Metode menjawab pertanyaan perilaku saat interview?", options: ["SWOT", "STAR", "SMART", "PDCA"], answer: 1, why: "Situation, Task, Action, Result." },
+  { q: "Berapa detik rata-rata recruiter membaca CV pertama kali?", options: ["6 detik", "1 menit", "3 menit", "30 detik"], answer: 0, why: "Taruh hal terpenting di bagian atas CV." },
+  { q: "Format file CV yang paling aman dikirim?", options: ["DOCX", "JPG", "PDF", "PNG"], answer: 2, why: "PDF tampil sama di semua perangkat." },
+  { q: "ATS di proses rekrutmen adalah...", options: ["Tes psikologi", "Sistem penyaring CV otomatis", "Jenis kontrak kerja", "Asuransi karyawan"], answer: 1, why: "Applicant Tracking System membaca kata kunci CV." },
+  { q: "Kapan sebaiknya follow up setelah interview?", options: ["Satu jam kemudian", "Sekitar satu minggu", "Tiga bulan", "Tidak perlu"], answer: 1, why: "Satu minggu cukup sopan dan tidak terkesan memaksa." },
+  { q: "Ditanya \"Apa kelemahanmu?\", jawaban terbaik...", options: ["Tidak punya kelemahan", "Perfeksionis, titik", "Jujur plus usaha memperbaikinya", "Menghindar"], answer: 2, why: "Recruiter menilai kesadaran diri dan usaha berkembang." },
+  { q: "Apa kepanjangan KPI?", options: ["Kerja Paling Ideal", "Key Performance Indicator", "Kinerja Pegawai Indonesia", "Key Project Index"], answer: 1, why: "Ukuran pencapaian kinerja." },
+  { q: "Probation umumnya berlangsung berapa lama?", options: ["1 minggu", "3 bulan", "2 tahun", "5 tahun"], answer: 1, why: "Masa percobaan biasanya hingga 3 bulan." },
+  { q: "Pakaian yang aman untuk interview kantor?", options: ["Kaos band", "Rapi semi formal", "Baju olahraga", "Piyama"], answer: 1, why: "Rapi menunjukkan kamu serius." },
+  { q: "Tulisan pengalaman CV yang lebih kuat?", options: ["Bertanggung jawab atas media sosial", "Menaikkan followers 40% dalam 3 bulan", "Mengurus Instagram", "Membantu tim"], answer: 1, why: "Hasil dengan angka lebih meyakinkan." },
+  { q: "Apa itu portofolio?", options: ["Kumpulan hasil karya", "Surat lamaran", "Slip gaji", "Kartu nama"], answer: 0, why: "Bukti nyata kemampuanmu." },
+  { q: "Pertanyaan balik yang bagus di akhir interview?", options: ["Kapan saya boleh cuti?", "Seperti apa hari pertama di posisi ini?", "Gaji bos berapa?", "Tidak ada"], answer: 1, why: "Menunjukkan minat pada pekerjaannya." },
+  { q: "Soft skill paling dicari di era AI?", options: ["Mengetik cepat", "Berpikir kritis", "Menghafal", "Menggambar"], answer: 1, why: "Mesin bisa menghitung, manusia menilai." },
+  { q: "Surat lamaran sebaiknya...", options: ["Sama untuk semua perusahaan", "Disesuaikan tiap lowongan", "Ditulis tangan", "Lebih dari 3 halaman"], answer: 1, why: "Personal terasa lebih tulus." },
+  { q: "LinkedIn paling baik dipakai untuk...", options: ["Membangun jaringan profesional", "Main game", "Belanja", "Streaming film"], answer: 0, why: "Banyak recruiter mencari kandidat di sana." },
+];
+
+export type MissionKind = "visit" | "apply" | "game" | "seminar" | "psych" | "greet" | "promo" | "sofa" | "read";
+
+export interface Mission {
+  id: string;
+  kind: MissionKind;
+  title: string;
+  target: number;
+  coins: number;
+  xp: number;
+}
+
+export const MISSION_POOL: Mission[] = [
+  { id: "visit3", kind: "visit", title: "Kunjungi 3 stand perusahaan", target: 3, coins: 6, xp: 15 },
+  { id: "apply1", kind: "apply", title: "Kirim 1 lamaran", target: 1, coins: 6, xp: 15 },
+  { id: "game2", kind: "game", title: "Main 2 mini game di sofa", target: 2, coins: 5, xp: 10 },
+  { id: "seminar1", kind: "seminar", title: "Tonton 1 seminar sampai selesai", target: 1, coins: 8, xp: 20 },
+  { id: "psych1", kind: "psych", title: "Kerjakan psikotes", target: 1, coins: 8, xp: 20 },
+  { id: "greet2", kind: "greet", title: "Sapa 2 pengunjung lain", target: 2, coins: 4, xp: 10 },
+  { id: "promo1", kind: "promo", title: "Simpan 1 promo atau beli voucher", target: 1, coins: 4, xp: 10 },
+  { id: "sofa1", kind: "sofa", title: "Istirahat di sofa lounge", target: 1, coins: 3, xp: 5 },
+  { id: "read1", kind: "read", title: "Baca 1 artikel profesi di sofa", target: 1, coins: 4, xp: 10 },
+];
+
+/** Bonus for finishing every mission of the day. */
+export const MISSIONS_BONUS = 10;
+
+/** Four missions for a day, the same for everyone: always a mini game, three others picked by date. */
+export function todaysMissions(day: string): Mission[] {
+  let h = 17;
+  for (const ch of day) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  // A seeded shuffle of the other missions; Math.imul keeps the arithmetic exact in 32 bits.
+  const rest = MISSION_POOL.filter((m) => m.kind !== "game");
+  for (let i = rest.length - 1; i > 0; i--) {
+    h = (Math.imul(h, 1103515245) + 12345) >>> 0;
+    const j = (h >>> 8) % (i + 1);
+    [rest[i], rest[j]] = [rest[j]!, rest[i]!];
+  }
+  const picked = rest.slice(0, 3);
+  return [MISSION_POOL.find((m) => m.kind === "game")!, ...picked];
+}
+
+/** Extra coins for claiming the free daily coins several days in a row. */
+export const streakBonus = (days: number) => Math.min(Math.max(days - 1, 0), 5) * 5;
+
+export interface CareerArticle {
+  id: string;
+  emoji: string;
+  title: string;
+  /** Profession the article is about. */
+  role: string;
+  minutes: number;
+  sections: { heading: string; text: string }[];
+  skills: string[];
+  /** Rough entry-level monthly pay in Indonesia; an estimate, not a promise. */
+  pay: string;
+  /** Matched against job titles at the fair to suggest open positions. */
+  keywords: string[];
+  /** From beginner to expert, stage by stage. */
+  roadmap: RoadmapStage[];
+}
+
+export interface RoadmapStage {
+  level: "Pemula" | "Menengah" | "Mahir" | "Ahli";
+  /** Rough time to get through the stage. */
+  time: string;
+  steps: string[];
+}
+
+/** Stable key for a roadmap step, for saving which ones are done. */
+export const stepKey = (stage: number, step: number) => `${stage}.${step}`;
+
+/** Short reads about professions, for the sofa's reading corner. */
+export const CAREER_ARTICLES: CareerArticle[] = [
+  {
+    id: "data-analyst",
+    emoji: "📊",
+    title: "Sehari Jadi Data Analyst",
+    role: "Data Analyst",
+    minutes: 3,
+    sections: [
+      { heading: "Apa yang dikerjakan", text: "Data analyst mengubah data mentah jadi jawaban: kenapa penjualan turun, produk mana yang laku, kapan pelanggan paling aktif. Hasilnya berupa dashboard, laporan, dan rekomendasi untuk tim lain." },
+      { heading: "Rutinitas", text: "Pagi mengecek dashboard dan angka harian. Siang menulis query SQL, membersihkan data, dan membuat grafik. Sore mempresentasikan temuan ke tim bisnis dengan bahasa yang mudah dipahami." },
+      { heading: "Cara mulai", text: "Pelajari Excel lanjutan dan SQL dasar, lalu satu alat visualisasi. Buat 2–3 proyek portofolio dari data publik, misalnya analisis harga pangan atau data transportasi kotamu." },
+    ],
+    skills: ["SQL", "Excel", "Visualisasi data", "Berpikir kritis", "Komunikasi"],
+    pay: "Rp6–10 juta",
+    keywords: ["data", "analyst", "analis"],
+    roadmap: [
+      { level: "Pemula", time: "0–3 bulan", steps: ["Kuasai Excel: pivot table, VLOOKUP/XLOOKUP, grafik", "Belajar SQL dasar: SELECT, JOIN, GROUP BY", "Pahami statistik dasar: rata-rata, median, persentase"] },
+      { level: "Menengah", time: "3–9 bulan", steps: ["Buat dashboard dengan Looker Studio, Power BI, atau Tableau", "Selesaikan 3 proyek portofolio dari data publik", "Mulai Python untuk data (pandas)"] },
+      { level: "Mahir", time: "1–3 tahun", steps: ["Pegang laporan rutin untuk satu tim bisnis", "Rancang eksperimen A/B dan baca hasilnya", "Mentori analis baru"] },
+      { level: "Ahli", time: "3+ tahun", steps: ["Tentukan metrik utama perusahaan bersama manajemen", "Bangun budaya keputusan berbasis data", "Naik ke Lead Analyst atau Analytics Manager"] },
+    ],
+  },
+  {
+    id: "uiux",
+    emoji: "🎨",
+    title: "UI/UX Designer: Mendesain untuk Manusia",
+    role: "UI/UX Designer",
+    minutes: 3,
+    sections: [
+      { heading: "UI dan UX itu beda", text: "UX memastikan aplikasi mudah dan nyaman dipakai, mulai dari riset pengguna sampai alur. UI mengurus tampilan: warna, tipografi, tombol, dan ikon. Banyak desainer mengerjakan keduanya." },
+      { heading: "Proses kerja", text: "Wawancara pengguna, membuat wireframe, menguji prototipe, lalu memperbaiki. Desain yang bagus jarang jadi dalam sekali coba; iterasi adalah bagian dari pekerjaan." },
+      { heading: "Portofolio", text: "Recruiter ingin melihat cara berpikir, bukan hanya gambar cantik. Tulis studi kasus: masalahnya apa, apa yang kamu coba, dan hasilnya bagaimana." },
+    ],
+    skills: ["Figma", "Riset pengguna", "Wireframing", "Empati", "Presentasi"],
+    pay: "Rp5–9 juta",
+    keywords: ["ui/ux", "designer", "desain", "artist"],
+    roadmap: [
+      { level: "Pemula", time: "0–3 bulan", steps: ["Pelajari dasar desain: tipografi, warna, layout", "Kuasai Figma: frame, komponen, auto layout", "Tiru ulang 3 aplikasi populer untuk latihan"] },
+      { level: "Menengah", time: "3–9 bulan", steps: ["Lakukan wawancara pengguna dan usability test", "Tulis 2–3 studi kasus untuk portofolio", "Pelajari design system dan aksesibilitas"] },
+      { level: "Mahir", time: "1–3 tahun", steps: ["Pimpin desain satu fitur dari riset sampai rilis", "Ukur dampak desain dengan data", "Bekerja erat dengan PM dan developer"] },
+      { level: "Ahli", time: "3+ tahun", steps: ["Bangun dan rawat design system perusahaan", "Tentukan arah pengalaman produk", "Naik ke Lead atau Head of Design"] },
+    ],
+  },
+  {
+    id: "developer",
+    emoji: "💻",
+    title: "Jalan Menjadi Software Engineer",
+    role: "Software Engineer",
+    minutes: 4,
+    sections: [
+      { heading: "Banyak jalur", text: "Frontend membangun tampilan web, backend mengurus server dan database, mobile membuat aplikasi HP, QA memastikan semuanya berjalan benar. Pilih satu jalur dulu supaya fokus." },
+      { heading: "Kerja tim", text: "Kode ditulis bersama: ada code review, diskusi desain, dan rapat singkat harian. Kemampuan menjelaskan dan menerima masukan sama pentingnya dengan menulis kode." },
+      { heading: "Bekal interview", text: "Siapkan proyek nyata di GitHub, latihan soal logika dasar, dan pahami kenapa kamu memilih teknologi tertentu. Jujur saat tidak tahu, lalu jelaskan cara kamu akan mencarinya." },
+    ],
+    skills: ["Satu bahasa pemrograman", "Git", "Problem solving", "Kerja tim", "Belajar mandiri"],
+    pay: "Rp7–12 juta",
+    keywords: ["developer", "engineer", "qa", "tester"],
+    roadmap: [
+      { level: "Pemula", time: "0–6 bulan", steps: ["Pilih satu jalur: web, mobile, atau backend", "Kuasai satu bahasa: JavaScript, Kotlin, atau Go", "Pakai Git dan GitHub setiap hari"] },
+      { level: "Menengah", time: "6–12 bulan", steps: ["Bangun 2 aplikasi utuh yang bisa dicoba orang", "Belajar database, API, dan testing", "Ikut kontribusi open source atau proyek tim"] },
+      { level: "Mahir", time: "1–4 tahun", steps: ["Rancang fitur besar dan review kode teman", "Pahami performa, keamanan, dan monitoring", "Tulis dokumentasi dan bagikan ilmu ke tim"] },
+      { level: "Ahli", time: "4+ tahun", steps: ["Rancang arsitektur sistem yang skalabel", "Bimbing banyak engineer", "Naik ke Staff Engineer atau Engineering Manager"] },
+    ],
+  },
+  {
+    id: "digital-marketing",
+    emoji: "📣",
+    title: "Digital Marketer: Bukan Sekadar Posting",
+    role: "Digital Marketing",
+    minutes: 3,
+    sections: [
+      { heading: "Pekerjaannya", text: "Merencanakan konten, menjalankan iklan online, dan mengukur hasilnya. Setiap kampanye punya target: pengikut, klik, atau penjualan." },
+      { heading: "Angka adalah teman", text: "Marketer yang dicari bisa membaca data: biaya per klik, tingkat konversi, dan konten mana yang paling efektif. Kreatif dan analitis harus jalan bersama." },
+      { heading: "Mulai dari mana", text: "Kelola akun media sosial UMKM keluarga atau temanmu, catat hasilnya, dan jadikan studi kasus. Itu portofolio yang kuat untuk fresh graduate." },
+    ],
+    skills: ["Copywriting", "Media sosial", "Iklan digital", "Analitik", "Kreativitas"],
+    pay: "Rp5–8 juta",
+    keywords: ["marketing", "content", "social media"],
+    roadmap: [
+      { level: "Pemula", time: "0–3 bulan", steps: ["Pelajari dasar pemasaran: target pasar dan positioning", "Latihan copywriting untuk caption dan iklan", "Kelola satu akun media sosial secara konsisten"] },
+      { level: "Menengah", time: "3–9 bulan", steps: ["Jalankan iklan berbayar dengan budget kecil", "Pelajari analitik: CTR, konversi, biaya per hasil", "Ambil sertifikasi gratis iklan digital"] },
+      { level: "Mahir", time: "1–3 tahun", steps: ["Pegang kampanye satu brand dari ide sampai laporan", "Optimasi funnel dari kenal sampai beli", "Kelola budget dan tim kreatif kecil"] },
+      { level: "Ahli", time: "3+ tahun", steps: ["Susun strategi pemasaran tahunan", "Bangun brand yang dikenal", "Naik ke Marketing Manager atau Head of Growth"] },
+    ],
+  },
+  {
+    id: "barista",
+    emoji: "☕",
+    title: "Barista: Karier di Balik Bar Kopi",
+    role: "Barista",
+    minutes: 2,
+    sections: [
+      { heading: "Lebih dari meracik kopi", text: "Barista menjaga kualitas rasa, kebersihan bar, dan pengalaman pelanggan. Dalam jam sibuk, kecepatan dan ketenangan diuji bersamaan." },
+      { heading: "Jenjang karier", text: "Dari barista trainee ke head barista, lalu store manager atau trainer. Banyak pemilik coffee shop juga memulai dari balik bar." },
+      { heading: "Tips melamar", text: "Ceritakan pengalaman melayani orang, walau dari organisasi atau usaha kecil. Sikap ramah dan mau belajar sering lebih dinilai daripada sertifikat." },
+    ],
+    skills: ["Pelayanan", "Ketelitian", "Kerja cepat", "Kebersihan", "Kerja tim"],
+    pay: "Rp3,5–5,5 juta",
+    keywords: ["barista", "store", "kasir", "cook"],
+    roadmap: [
+      { level: "Pemula", time: "0–3 bulan", steps: ["Pahami jenis biji kopi dan metode seduh", "Latihan espresso dan steam susu", "Jaga kebersihan dan standar bar"] },
+      { level: "Menengah", time: "3–12 bulan", steps: ["Kuasai latte art dasar", "Layani jam sibuk dengan cepat dan tenang", "Hafal resep dan kalibrasi grinder"] },
+      { level: "Mahir", time: "1–3 tahun", steps: ["Jadi head barista dan latih barista baru", "Atur stok, jadwal, dan kualitas", "Ikut kompetisi atau sertifikasi kopi"] },
+      { level: "Ahli", time: "3+ tahun", steps: ["Kembangkan menu dan sumber biji kopi", "Kelola satu atau beberapa outlet", "Buka usaha kopi sendiri atau jadi trainer"] },
+    ],
+  },
+  {
+    id: "management-trainee",
+    emoji: "🚀",
+    title: "Management Trainee: Jalur Cepat Jadi Pemimpin",
+    role: "Management Trainee",
+    minutes: 3,
+    sections: [
+      { heading: "Apa itu MT", text: "Program 1–2 tahun untuk lulusan baru yang disiapkan jadi calon manajer. Peserta berpindah dari satu divisi ke divisi lain untuk mengenal bisnis secara utuh." },
+      { heading: "Seleksi ketat", text: "Biasanya ada tes online, psikotes, diskusi kelompok, dan interview dengan pimpinan. Latihan psikotes dan diskusi kelompok sangat membantu." },
+      { heading: "Yang dicari", text: "Kepemimpinan di organisasi, kemampuan belajar cepat, dan ketahanan menghadapi tekanan. Siapkan cerita konkret dengan metode STAR." },
+    ],
+    skills: ["Kepemimpinan", "Analisis", "Komunikasi", "Adaptasi", "Ketahanan"],
+    pay: "Rp7–11 juta",
+    keywords: ["management trainee", "manager", "officer"],
+    roadmap: [
+      { level: "Pemula", time: "Saat kuliah", steps: ["Aktif dan pegang peran di organisasi", "Latihan psikotes dan diskusi kelompok", "Siapkan 5 cerita STAR tentang kepemimpinan"] },
+      { level: "Menengah", time: "Tahun 1 MT", steps: ["Rotasi di beberapa divisi dan catat pelajarannya", "Selesaikan proyek MT dengan hasil terukur", "Bangun jaringan dengan mentor dan atasan"] },
+      { level: "Mahir", time: "Tahun 2–4", steps: ["Pimpin tim kecil sebagai supervisor", "Kelola target dan anggaran unit", "Ambil pelatihan kepemimpinan"] },
+      { level: "Ahli", time: "5+ tahun", steps: ["Jadi manajer yang mengembangkan orang lain", "Ikut menyusun strategi perusahaan", "Naik ke posisi senior manager atau direktur"] },
+    ],
+  },
+];

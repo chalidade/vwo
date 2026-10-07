@@ -4,6 +4,28 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: mini game di sofa, pojok baca, roadmap profesi, misi harian
+
+**Konteks:** owner bertanya bagaimana supaya pelamar tidak bosan dan betah lama di aplikasi. Usulannya: mini game di sofa untuk dapat koin gratis, bacaan tentang profesi, dan roadmap untuk jadi ahli di profesi tertentu.
+
+**Yang berubah**
+- **Sofa lounge:** begitu duduk di sofa, terbuka jendela "Santai di sofa" dengan dua tab. Saat masih duduk ada tombol kecil "Main mini game" untuk membukanya lagi.
+- **Mini game (tab Main game):**
+  - Kuis Karier: 5 soal acak dari 15, 2 koin per jawaban benar, dan tiap jawaban ada penjelasannya.
+  - Tangkap Koin: 20 detik, tap koin dan hindari bom.
+  - Cocokkan Logo: 6 pasang logo perusahaan peserta.
+  - Koin dari mini game dibatasi 30 per hari supaya tetap jadi bonus, bukan ladang koin. Setelah batas tercapai, game tetap bisa dimainkan.
+- **Pojok baca (tab Pojok baca):** 6 artikel singkat tentang profesi: Data Analyst, UI/UX Designer, Software Engineer, Digital Marketing, Barista, dan Management Trainee. Isinya pekerjaan sehari-hari, cara mulai, skill penting, dan perkiraan gaji awal. Tiap artikel menampilkan lowongan terkait di job fair, dengan tombol "Datangi stand" yang langsung mengantar ke standnya. Selesai membaca dapat +8 XP (pertama kali).
+- **Roadmap jadi ahli:** tiap profesi punya 4 tahap (Pemula, Menengah, Mahir, Ahli) dengan perkiraan waktu dan 3 langkah per tahap. Langkah bisa dicentang dan progresnya tersimpan. Tiap tahap yang selesai memberi +15 XP sekali.
+- **Misi harian (tombol 🎯 di menu, ada angka merah bila ada yang bisa diklaim):** 4 misi per hari yang sama untuk semua orang, selalu termasuk mini game. Contohnya kunjungi 3 stand, kirim lamaran, tonton seminar, kerjakan psikotes, sapa pengunjung, simpan promo, atau baca artikel. Tiap misi memberi koin dan XP, dan menyelesaikan semua memberi bonus 10 koin.
+- **Beruntun harian:** koin gratis harian bertambah 5 untuk tiap hari berturut-turut, maksimal +25. Kalau absen sehari, hitungan mulai lagi dari 1.
+
+**Perbaikan:** pemilih misi harian bisa macet karena perkalian angka besar di JavaScript kehilangan presisi. Sekarang memakai `Math.imul`. Tab di jendela modal juga tidak lagi terpotong di HP.
+
+**Cek:** typecheck, 23 test demo lolos (termasuk test baru untuk batas koin game, misi, beruntun, artikel, dan roadmap). Diuji di Chromium ukuran HP; screenshot ada di `screenshots/jobfair-games/`.
+
+---
+
 ## 2026-10-07 · Job fair: seminar share screen, sertifikat psikotes, stand VIP, centang biru, food court promo, NPC iklan
 
 **Konteks:** owner melaporkan duduk di ruang seminar dan psikotes tidak memicu apa pun. Owner juga minta seminar berupa fasilitator yang share screen dan menjelaskan, sertifikat psikotes bila lulus, stand VIP yang lebih meriah tapi tetap profesional, menu beli centang biru, food court sebagai tempat cafe dan rumah makan promosi lalu jual voucher, serta NPC sales atau promotor yang bisa dijual sebagai media iklan.
