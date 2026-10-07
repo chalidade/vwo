@@ -3,7 +3,7 @@ import { type AvatarState, type Emote, DEMO_MENU, EMOTES, findPath, menuPages, p
 import { CafeScene, type DialogChoice, DialogBox, type Look, MenuBook, counterFront, lookFor } from "@vwo/ui";
 import { WAITER_LOOK } from "./staff";
 import { CharacterCreator, type Character } from "./CharacterCreator";
-import { KEY_DIRS, RUN, WALK, facingOf } from "./controls";
+import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { cafe, onFrame, useCafe } from "./useCafe";
 
 interface Session {
@@ -33,6 +33,7 @@ export function World() {
   const [viewFloorId, setViewFloorId] = useState(cafe.floors[0]!.id);
   const [talk, setTalk] = useState<Talk | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const hud = useHud();
   const [menuOpen, setMenuOpen] = useState(false);
   savedSession = session;
 
@@ -319,12 +320,16 @@ export function World() {
         onBaristaClick={session ? talkToBarista : undefined}
       >
         {/* Place plate. */}
-        <div className="hud hud-tl rpg-box">
-          <div className="hud-title">☕ Cafe A · {floor.name}</div>
-          <div className="hud-stats">
-            <span>👥 {counts.peopleInside} orang</span>
-            <span>🪑 {counts.seatsFree}/{counts.seatsTotal} kosong</span>
-          </div>
+        <div className="hud hud-tl rpg-box" data-collapsed={hud.info ? undefined : ""} onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
+            ☕ Cafe A · {floor.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
+          </button>
+          {hud.info && (
+            <div className="hud-stats">
+              <span>👥 {counts.peopleInside} orang</span>
+              <span>🪑 {counts.seatsFree}/{counts.seatsTotal} kosong</span>
+            </div>
+          )}
           {!session && (
             <div className="hud-floors">
               {cafe.floors.map((f) => (
@@ -337,8 +342,9 @@ export function World() {
         </div>
 
         {/* Minimap. */}
-        <div className="hud hud-tr rpg-box" aria-hidden>
-          <svg viewBox={`-0.5 -0.5 ${floor.width + 1} ${floor.height + 1}`} className="minimap">
+        {hud.map ? (
+        <div className="hud hud-tr rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Sembunyikan denah" role="button">
+          <svg aria-hidden viewBox={`-0.5 -0.5 ${floor.width + 1} ${floor.height + 1}`} className="minimap">
             <rect x={0} y={0} width={floor.width} height={floor.height} rx={0.6} fill={floor.theme === "rooftop" ? "#b98d5f" : "#d9b383"} />
             {(floor.objects ?? [])
               .filter((o) => o.type === "counter" || o.type === "stairs")
@@ -359,6 +365,11 @@ export function World() {
           </svg>
           <div className="minimap-legend">{freeHere} kursi kosong di sini</div>
         </div>
+        ) : (
+          <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
+            🗺️
+          </button>
+        )}
 
         {/* Bottom: dialog, what's in reach, or how to play. */}
         <div className="hud-bottom">

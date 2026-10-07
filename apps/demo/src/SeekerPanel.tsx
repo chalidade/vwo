@@ -88,21 +88,22 @@ export function SeekerPanel({
                 <div>
                   <div className="sp-name">{profile.name || "Tanpa nama"}</div>
                   <div className="sp-muted">{profile.headline || "Lengkapi profilmu supaya form lamaran terisi otomatis."}</div>
-                  <div className="sp-stats">
-                    <span>
-                      <b>{applications.length}</b> lamaran
-                    </span>
-                    <span>
-                      <b>{companies.size}</b> perusahaan
-                    </span>
-                    <span>
-                      <b>{invited}</b> undangan interview
-                    </span>
-                    <span>
-                      <b>{visited.size}</b> stand dikunjungi
-                    </span>
-                  </div>
                 </div>
+              </div>
+              <div className="sp-stats">
+                {(
+                  [
+                    [applications.length, "lamaran"],
+                    [companies.size, "perusahaan"],
+                    [invited, "undangan interview"],
+                    [visited.size, "stand dikunjungi"],
+                  ] as const
+                ).map(([n, label]) => (
+                  <div key={label} className="sp-stat">
+                    <b>{n}</b>
+                    <span>{label}</span>
+                  </div>
+                ))}
               </div>
               <form
                 className="jb-fields"

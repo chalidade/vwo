@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · HUD bisa disembunyikan di HP, profil tidak terpotong
+
+**Konteks:** owner mengirim screenshot HP: kotak info job fair menutupi tombol Profil/Lamaran, dan tab di panel profil terpotong.
+
+**Yang berubah**
+
+- Kotak info (nama tempat dan statistik) bisa dilipat dengan tap judulnya (▾/▴), dan denah mini bisa disembunyikan jadi tombol 🗺️. Di layar sempit keduanya mulai terlipat. Pilihan disimpan di browser (`vwo:hud`). Berlaku di cafe dan job fair.
+- Tombol aksi (Profil, Lamaran, Keluar, emote) di HP pindah ke bawah, tepat di atas petunjuk, jadi tidak lagi bertumpuk dengan kotak info.
+- Tab, judul, dan navigasi di semua pop up (menu, lowongan, form, profil) tidak lagi menyusut, jadi teksnya tidak terpotong. Tab di panel profil turun ke baris berikutnya kalau tidak muat.
+- Statistik profil jadi kotak-kotak angka (lamaran, perusahaan, undangan interview, stand dikunjungi), 2 kolom di HP.
+
+**Verifikasi**
+
+- Dicoba di 390px dan 340px layar sentuh (dengan teks diperbesar) dan di desktop. Tes demo 13 lulus.
+
 ## 2026-10-07 · Job fair: sponsor, profil, riwayat lamaran, aula lebih luas
 
 **Konteks:** owner minta pad jalan di HP dihapus supaya layar lebih luas (jalan cukup dengan tap), tempat untuk sponsor, riwayat lamaran dan info user, detail perusahaan seperti website, peta yang lebih luas, dan data demo disimpan di localStorage.
