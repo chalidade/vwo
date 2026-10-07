@@ -10,7 +10,8 @@ import {
   SPONSOR_H,
   SPONSOR_W,
   boothSpot,
-  buildJobFairFloor,
+  buildJobFairFloors,
+  fairFloorId,
   facingFor,
   findPath,
 } from "@vwo/shared";
@@ -27,6 +28,7 @@ export interface FairStaff {
   id: string;
   name: string;
   boothId: string | null;
+  floorId: string;
   x: number;
   y: number;
   facing: Facing;
@@ -60,6 +62,7 @@ export interface FairEvent {
 }
 
 type Stop = { boothId: string; spot: "talk" | "banner" } | { sponsorId: string };
+type Goal = Point & { floorId: string };
 
 /** What the demo keeps between visits (in localStorage in the browser). */
 export interface FairSaved {
@@ -84,7 +87,7 @@ interface Bot {
   id: string;
   plan: Stop[];
   phase: "walking" | "talking" | "reading" | "leaving";
-  target: Point | null;
+  target: Goal | null;
   path: Point[] | null;
   until: number;
 }
@@ -112,7 +115,8 @@ const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo t
 
 export class DemoJobFair {
   readonly fair: JobFairView;
-  readonly floor: FloorView;
+  /** One walkable floor per level of the hall, ground floor first. */
+  readonly floors: FloorView[];
   readonly visitors = new Map<string, FairVisitor>();
   readonly staff: FairStaff[];
   readonly applications: FairApplication[] = [];
@@ -138,10 +142,10 @@ export class DemoJobFair {
     private readonly storage: FairStorage | null = null,
   ) {
     this.fair = fair;
-    this.floor = buildJobFairFloor(fair);
+    this.floors = buildJobFairFloors(fair);
     this.staff = [
-      ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
-      { id: "fair-info", name: fair.infoDesk.staff, boothId: null, x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
+      ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
+      { id: "fair-info", name: fair.infoDesk.staff, boothId: null, floorId: fairFloorId(fair, 0), x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
     ];
     this.nextBotAt = this.now() + 400;
     this.nextCalloutAt = this.now() + 5000;
@@ -197,6 +201,25 @@ export class DemoJobFair {
     return this.fair.booths.find((b) => b.id === id);
   }
 
+  /** A floor by id; unknown ids fall back to the ground floor. */
+  floor(id: string): FloorView {
+    return this.floors.find((f) => f.id === id) ?? this.floors[0]!;
+  }
+
+  floorIdOf(item: { floor: number }) {
+    return fairFloorId(this.fair, item.floor);
+  }
+
+  /** Take the stairs to another floor. */
+  changeFloor(id: string, floorId: string, x: number, y: number) {
+    const v = this.visitors.get(id);
+    if (!v) return;
+    v.floorId = floorId;
+    v.x = x;
+    v.y = y;
+    this.emit();
+  }
+
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -226,10 +249,10 @@ export class DemoJobFair {
   join(name: string, isBot = false, id = this.id(isBot ? "bot" : "visitor")) {
     this.leave(id);
     const { x, y } = this.fair.spawn;
-    const v: FairVisitor = { memberId: id, visitId: id, displayName: name, memberType: "host", floorId: this.floor.id, x, y, facing: "back", isBot, arrivedAt: this.now() };
+    const v: FairVisitor = { memberId: id, visitId: id, displayName: name, memberType: "host", floorId: this.floors[0]!.id, x, y, facing: "back", isBot, arrivedAt: this.now() };
     this.visitors.set(id, v);
     this.log({ type: "arrive", name });
-    if (!isBot) this.say("fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan hari ini.`, 3200);
+    if (!isBot) this.say("fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${this.fair.floors.length} lantai.`, 3200);
     this.emit();
     return v;
   }
@@ -328,7 +351,8 @@ export class DemoJobFair {
     const b = this.booth(boothId);
     if (!b) return 0;
     let n = 0;
-    for (const v of this.visitors.values()) if (v.x >= b.x && v.x <= b.x + 6 && v.y >= b.y && v.y <= b.y + 4.2) n++;
+    const floorId = this.floorIdOf(b);
+    for (const v of this.visitors.values()) if (v.floorId === floorId && v.x >= b.x && v.x <= b.x + 6 && v.y >= b.y && v.y <= b.y + 4.2) n++;
     return n;
   }
 
@@ -381,9 +405,22 @@ export class DemoJobFair {
 
   private spawnBot() {
     const v = this.join(this.pick(BOT_NAMES), true);
-    const booths = [...this.fair.booths].sort(() => this.rand() - 0.5).slice(0, 2 + Math.floor(this.rand() * 3));
+    // Shuffle, keep a few, then visit them floor by floor going up.
+    const booths = [...this.fair.booths]
+      .sort(() => this.rand() - 0.5)
+      .slice(0, 2 + Math.floor(this.rand() * 3))
+      .sort((a, b) => a.floor - b.floor);
     const plan: Stop[] = booths.map((b) => ({ boothId: b.id, spot: this.rand() < 0.65 ? "talk" : "banner" }) as Stop);
-    if (this.fair.sponsors.length && this.rand() < 0.4) plan.splice(Math.floor(this.rand() * plan.length), 0, { sponsorId: this.pick(this.fair.sponsors).id });
+    if (this.rand() < 0.4) {
+      // A sponsor on a floor the bot is visiting anyway.
+      const floors = new Set(booths.map((b) => b.floor));
+      const sponsors = this.fair.sponsors.filter((sp) => floors.has(sp.floor));
+      if (sponsors.length) {
+        const sp = this.pick(sponsors);
+        const at = booths.findIndex((b) => b.floor === sp.floor);
+        plan.splice(at + Math.floor(this.rand() * 2), 0, { sponsorId: sp.id });
+      }
+    }
     this.bots.push({ id: v.memberId, plan, phase: "walking", target: null, path: null, until: 0 });
   }
 
@@ -397,13 +434,13 @@ export class DemoJobFair {
     if (bot.phase === "walking") {
       if (!stop) {
         bot.phase = "leaving";
-        bot.target = { x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
+        bot.target = { floorId: this.floors[0]!.id, x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
         bot.path = null;
         return true;
       }
       if ("sponsorId" in stop) {
         const sp = this.fair.sponsors.find((x) => x.id === stop.sponsorId)!;
-        if (!bot.target) bot.target = { x: sp.x + SPONSOR_W / 2 + (this.rand() - 0.5) * 0.6, y: sp.y + SPONSOR_H + 0.75 };
+        if (!bot.target) bot.target = { floorId: this.floorIdOf(sp), x: sp.x + SPONSOR_W / 2 + (this.rand() - 0.5) * 0.6, y: sp.y + SPONSOR_H + 0.75 };
         if (this.walk(v, bot, bot.target, step)) return true;
         v.facing = "back";
         bot.target = null;
@@ -416,7 +453,11 @@ export class DemoJobFair {
       const booth = this.booth(stop.boothId)!;
       if (!bot.target) {
         const base = boothSpot(booth, stop.spot);
-        bot.target = stop.spot === "talk" ? { x: base.x + (this.rand() - 0.5) * 2.2, y: base.y + this.rand() * 0.3 } : { x: base.x + (this.rand() - 0.5) * 0.3, y: base.y + this.rand() * 0.2 };
+        const floorId = this.floorIdOf(booth);
+        bot.target =
+          stop.spot === "talk"
+            ? { floorId, x: base.x + (this.rand() - 0.5) * 2.2, y: base.y + this.rand() * 0.3 }
+            : { floorId, x: base.x + (this.rand() - 0.5) * 0.3, y: base.y + this.rand() * 0.2 };
       }
       if (this.walk(v, bot, bot.target, step)) return true;
       v.facing = "back";
@@ -453,8 +494,12 @@ export class DemoJobFair {
     return true;
   }
 
-  private walk(v: FairVisitor, route: { path: Point[] | null }, goal: Point, step: number): boolean {
-    if (!route.path) route.path = findPath(this.floor, v, goal) ?? [goal];
+  /** One step toward `goal`, taking the stairs when it is on another floor. False once arrived. */
+  private walk(v: FairVisitor, route: { path: Point[] | null }, goal: Goal, step: number): boolean {
+    const floor = this.floor(v.floorId);
+    const portal = v.floorId === goal.floorId ? null : this.stairsToward(floor, goal.floorId);
+    const legEnd = portal ? { x: portal.x + portal.width / 2, y: portal.y + portal.height / 2 } : goal;
+    if (!route.path) route.path = findPath(floor, v, legEnd) ?? [legEnd];
     let next = route.path[0];
     while (next && Math.hypot(next.x - v.x, next.y - v.y) < 0.05) {
       route.path.shift();
@@ -462,7 +507,11 @@ export class DemoJobFair {
     }
     if (!next) {
       route.path = null;
-      return false;
+      if (!portal) return false;
+      v.floorId = portal.targetFloorId!;
+      v.x = portal.targetX ?? 1;
+      v.y = portal.targetY ?? 1;
+      return true;
     }
     const dx = next.x - v.x;
     const dy = next.y - v.y;
@@ -472,6 +521,14 @@ export class DemoJobFair {
     v.x += (dx / dist) * d;
     v.y += (dy / dist) * d;
     return true;
+  }
+
+  /** The flight of stairs on `floor` that leads one level closer to `floorId`. */
+  stairsToward(floor: FloorView, floorId: string) {
+    const from = this.floors.indexOf(floor);
+    const to = this.floors.findIndex((f) => f.id === floorId);
+    const next = this.floors[from + Math.sign(to - from)];
+    return (floor.objects ?? []).find((o) => o.type === "stairs" && o.targetFloorId === next?.id) ?? null;
   }
 }
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CafeScene, boothExtras, infoDeskExtras, lookFor, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "./jobfair-engine";
 import { staffLook } from "./JobFair";
@@ -10,6 +11,9 @@ const time = (at: number) => new Date(at).toLocaleTimeString("id-ID", { hour: "2
 export function JobFairAdmin() {
   useFair();
   const booths = fair.fair.booths;
+  const [level, setLevel] = useState(0);
+  const floor = fair.floors[level] ?? fair.floors[0]!;
+  const visitors = [...fair.visitors.values()];
   const decide = (id: string, status: ApplicationStatus) => fair.setStatus(id, status);
 
   return (
@@ -41,16 +45,29 @@ export function JobFairAdmin() {
           <div className="stat">{fair.applications.length}</div>
         </div>
       </div>
+      <div className="floor-tabs" role="tablist">
+        {fair.fair.floors.map((f, i) => (
+          <button key={f.name} type="button" role="tab" aria-selected={i === level} data-active={i === level ? "" : undefined} onClick={() => setLevel(i)}>
+            {f.name} · {f.theme} <span className="muted">({visitors.filter((v) => v.floorId === fair.floors[i]!.id).length} orang)</span>
+          </button>
+        ))}
+      </div>
       <div className="layout2">
         <CafeScene
           className="admin-scene"
-          floor={fair.floor}
+          floor={floor}
+          floorName={(id) => fair.fair.floors[fair.floors.findIndex((f) => f.id === id)]?.name ?? "Tangga"}
+          hallTitle={fair.fair.name}
           occupiedSeatIds={new Set()}
           avatars={[...fair.visitors.values()]}
           lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
-          npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: fair.floor.id, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
+          npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
           bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-          extras={[...booths.flatMap((b) => boothExtras(b)), ...infoDeskExtras(fair.fair.infoDesk), ...fair.fair.sponsors.map((sp) => sponsorExtras(sp))]}
+          extras={[
+            ...booths.filter((b) => b.floor === level).flatMap((b) => boothExtras(b)),
+            ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
+            ...fair.fair.sponsors.filter((sp) => sp.floor === level).map((sp) => sponsorExtras(sp)),
+          ]}
           hallSponsors={fair.fair.sponsors}
         />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>
@@ -75,6 +92,7 @@ export function JobFairAdmin() {
           <thead>
             <tr>
               <th>Perusahaan</th>
+              <th>Lantai</th>
               <th>Recruiter</th>
               <th>Di stand sekarang</th>
               <th>Kunjungan</th>
@@ -82,11 +100,12 @@ export function JobFairAdmin() {
             </tr>
           </thead>
           <tbody>
-            {booths.map((b) => (
+            {[...booths].sort((a, b) => a.floor - b.floor).map((b) => (
               <tr key={b.id}>
                 <td>
                   <span className="dot" style={{ background: b.color }} /> {b.company}
                 </td>
+                <td>{fair.fair.floors[b.floor]?.name}</td>
                 <td>{b.recruiter}</td>
                 <td>{fair.peopleAt(b.id)}</td>
                 <td>{fair.visits.get(b.id) ?? 0}</td>

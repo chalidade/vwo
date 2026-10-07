@@ -113,6 +113,8 @@ export interface CafeSceneProps {
   extras?: SceneExtra[];
   /** Sponsors shown on a hall's back wall. */
   hallSponsors?: SponsorView[];
+  /** Big title on the hall banner; the floor's name then goes underneath. */
+  hallTitle?: string;
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -151,6 +153,7 @@ export function CafeScene({
   onNpcClick,
   extras = [],
   hallSponsors,
+  hallTitle,
   className,
   style,
   children,
@@ -246,7 +249,7 @@ export function CafeScene({
         title: "Barista",
       });
     } else if (o.type === "stairs" || o.type === "elevator") {
-      const up = floor.theme !== "rooftop";
+      const up = o.spriteKey === "stairs-up" ? true : o.spriteKey === "stairs-down" ? false : floor.theme !== "rooftop";
       ground.push({
         key: o.id,
         z: 1,
@@ -431,7 +434,7 @@ export function CafeScene({
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
         ) : floor.theme === "hall" ? (
-          <HallWall w={worldW} h={wall} title={floor.name} sponsors={hallSponsors} />
+          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallTitle ? floor.name : undefined} sponsors={hallSponsors} />
         ) : (
           <IndoorWall w={worldW} h={wall} windows={windows} />
         )}
