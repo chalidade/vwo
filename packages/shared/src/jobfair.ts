@@ -12,7 +12,21 @@ export interface JobPosting {
   /** Monthly range in millions of rupiah, e.g. "8–12 jt". */
   salary?: string;
   requirements: string[];
+  /** What the job is about, written by the company in its portal. */
+  description?: string;
+  /** Closed vacancies stay in the company's list but no longer take applications. */
+  closed?: boolean;
+  /** Last day to apply, YYYY-MM-DD. */
+  deadline?: string;
+  /** How many people the company wants to hire. */
+  quota?: number;
 }
+
+/** Vacancies still taking applications. */
+export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.closed);
+
+/** Looks a company can pick for its booth in the company portal. */
+export type BoothTheme = "classic" | "modern" | "wood" | "pastel" | "neon";
 
 export interface BoothFaq {
   q: string;
@@ -48,6 +62,16 @@ export interface CompanyBooth {
   employees?: string;
   socials?: { label: string; url: string }[];
   benefits?: string[];
+  /** HR phone or WhatsApp number for applicants. */
+  phone?: string;
+  /** Set by the company in its portal. */
+  theme?: BoothTheme;
+  /** Decorations placed in the booth, by id (see the company portal catalogue). */
+  accessories?: string[];
+  /** Custom text for the VIP LED ticker. */
+  ticker?: string;
+  /** Lines the recruiter calls out to people walking by. */
+  callouts?: string[];
 }
 
 /** A sponsor of the event: its logo on the hall wall and a standing banner on the floor. */

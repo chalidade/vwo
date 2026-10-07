@@ -4,6 +4,7 @@ import {
   type AvatarState,
   COIN_STAND_SPOTS,
   type CompanyBooth,
+  type JobPosting,
   type Facing,
   type FairRoom,
   type FairStop,
@@ -19,6 +20,7 @@ import {
   LIFT_FRONT,
   fairRoomFloorId,
   fairStops,
+  openJobs,
   stallSpot,
   facingFor,
   findPath,
@@ -40,6 +42,8 @@ import {
   streakBonus,
   todaysMissions,
 } from "./fair/content";
+import { ACCESSORY_PRODUCTS, BOT_REPLIES, productOf } from "./fair/company";
+import { FLOOR_SLOTS } from "@vwo/ui";
 
 type Point = { x: number; y: number };
 
@@ -76,7 +80,54 @@ export interface FairStaff {
   facing: Facing;
 }
 
-export type ApplicationStatus = "Terkirim" | "Dilihat" | "Diundang interview" | "Belum cocok";
+export type ApplicationStatus = "Terkirim" | "Dilihat" | "Shortlist" | "Diundang interview" | "Diterima" | "Belum cocok";
+
+/** An interview the company scheduled from its portal. */
+export interface Interview {
+  at: number;
+  mode: string;
+  /** Where, or the call link. */
+  place?: string;
+  note?: string;
+}
+
+/** A chat message between the company and the applicant about one application. */
+export interface AppMessage {
+  at: number;
+  from: "company" | "seeker";
+  text: string;
+}
+
+export interface CallLog {
+  at: number;
+  kind: "video" | "voice";
+  answered: boolean;
+  seconds: number;
+}
+
+/** What a company changed and bought in its portal. */
+export interface CompanyState {
+  /** Booth fields the company edited, applied over the event's data. */
+  edits: Partial<CompanyBooth>;
+  /** Paid products (VIP, decorations). */
+  owned: string[];
+  invoices: CompanyInvoice[];
+}
+
+export interface CompanyInvoice {
+  id: string;
+  no: string;
+  at: number;
+  items: { id: string; name: string; price: number }[];
+  total: number;
+  status: "Belum dibayar" | "Lunas" | "Dibatalkan";
+  method?: string;
+  paidAt?: number;
+}
+
+/** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
+const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts"] as const;
+export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
   id: string;
@@ -100,6 +151,18 @@ export interface FairApplication {
   psych?: number;
   /** The applicant had the blue check when applying. */
   verified?: boolean;
+  /** From the applicant's profile when they applied. */
+  headline?: string;
+  education?: string;
+  skills?: string;
+  city?: string;
+  /** The company's private notes. */
+  notes?: string;
+  interview?: Interview;
+  messages?: AppMessage[];
+  calls?: CallLog[];
+  /** Last change, so two open tabs keep the newest copy. */
+  updatedAt?: number;
 }
 
 /** A job seeker's review of a company. */
@@ -203,6 +266,8 @@ export interface FairSaved {
   player?: PlayerState;
   reviews?: Record<string, CompanyReview[]>;
   ads?: Record<string, AdStat>;
+  /** What each company changed and bought in the company portal, by booth id. */
+  company?: Record<string, CompanyState>;
 }
 
 export interface FairStorage {
@@ -261,6 +326,10 @@ export class DemoJobFair {
   readonly visitors = new Map<string, FairVisitor>();
   readonly staff: FairStaff[];
   readonly applications: FairApplication[] = [];
+  /** Company portal data per booth. */
+  readonly company = new Map<string, CompanyState>();
+  /** The event's booths as published, before any company edits. */
+  private readonly original: Map<string, CompanyBooth>;
   readonly events: FairEvent[] = [];
   /** Visits counted per booth (a visitor stopping at its desk or banner). */
   readonly visits = new Map<string, number>();
@@ -283,7 +352,9 @@ export class DemoJobFair {
     fair: JobFairView = DEMO_JOB_FAIR,
     private readonly storage: FairStorage | null = null,
   ) {
-    this.fair = fair;
+    // Companies edit their own booths, so work on a copy rather than the shared event data.
+    this.original = new Map(fair.booths.map((b) => [b.id, structuredClone(b)]));
+    this.fair = { ...fair, booths: fair.booths.map((b) => structuredClone(b)) };
     this.floors = buildJobFairFloors(fair);
     this.stops = fairStops(fair);
     this.staff = [
@@ -330,6 +401,37 @@ export class DemoJobFair {
     for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
     for (const [k, a] of Object.entries(saved.ads ?? {})) this.ads.set(k, a);
     for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
+    this.loadCompany(saved.company);
+  }
+
+  /** Put every booth back to the event's data, then apply what each company saved. */
+  private loadCompany(saved: Record<string, CompanyState> | undefined) {
+    this.company.clear();
+    for (const b of this.fair.booths) {
+      Object.assign(b, structuredClone(this.original.get(b.id)!));
+      const st = saved?.[b.id];
+      if (st) {
+        this.company.set(b.id, st);
+        Object.assign(b, st.edits);
+        if (st.owned.includes("vip")) b.tier = "premium";
+      }
+      const rec = this.staff.find((x) => x.id === recruiterId(b.id));
+      if (rec) rec.name = b.recruiter;
+    }
+  }
+
+  /** Another tab saved: take its company edits and any newer applications. */
+  mergeSaved(saved: FairSaved | null) {
+    if (!saved) return;
+    this.loadCompany(saved.company);
+    for (const a of saved.applications ?? []) {
+      if (!this.booth(a.boothId)) continue;
+      const mine = this.applications.find((x) => x.id === a.id);
+      if (!mine) this.applications.push(a);
+      else if ((a.updatedAt ?? 0) > (mine.updatedAt ?? 0)) Object.assign(mine, a);
+    }
+    this.applications.sort((x, y) => y.at - x.at);
+    this.emit();
   }
 
   private persist() {
@@ -350,6 +452,7 @@ export class DemoJobFair {
       visits: Object.fromEntries(this.visits),
       sponsorViews: Object.fromEntries(this.sponsorViews),
       ads: Object.fromEntries(this.ads),
+      company: Object.fromEntries(this.company),
       visitedBy: Object.fromEntries([...this.visitedBy].filter(([id]) => real.has(id)).map(([id, set]) => [id, [...set]])),
     });
   }
@@ -357,6 +460,7 @@ export class DemoJobFair {
   /** Forget everything saved: applications, stamps and counters. */
   reset() {
     this.applications.length = 0;
+    this.loadCompany(undefined);
     this.visits.clear();
     this.sponsorViews.clear();
     this.ads.clear();
@@ -898,11 +1002,14 @@ export class DemoJobFair {
     this.emit();
   }
 
-  apply(visitorId: string, input: { boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string }) {
+  apply(
+    visitorId: string,
+    input: { boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string },
+  ) {
     const v = this.visitors.get(visitorId);
     const b = this.booth(input.boothId);
     const job = b?.jobs.find((j) => j.id === input.jobId);
-    if (!v || !b || !job) return null;
+    if (!v || !b || !job || job.closed) return null;
     if (this.applications.some((a) => a.visitorId === visitorId && a.jobId === job.id)) return null;
     if (!v.isBot) {
       // Real seekers pay for each application: a free-apply voucher first, otherwise coins.
@@ -927,6 +1034,11 @@ export class DemoJobFair {
       isBot: v.isBot,
       psych: v.isBot ? (this.rand() < 0.5 ? 50 + Math.round(this.rand() * 50) : undefined) : (this.bestPsych() ?? undefined),
       verified: !!v.verified,
+      headline: input.headline,
+      education: input.education,
+      skills: input.skills,
+      city: input.city,
+      updatedAt: this.now(),
     };
     this.applications.unshift(a);
     if (visitorId === PLAYER_ID) this.track("apply");
@@ -935,7 +1047,10 @@ export class DemoJobFair {
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
     if (!v.isBot) this.gainXp(XP.apply);
     this.after(6000, () => {
-      if (a.status === "Terkirim") a.status = "Dilihat";
+      if (a.status === "Terkirim") {
+        a.status = "Dilihat";
+        a.updatedAt = this.now();
+      }
       this.persist();
       this.emit();
     });
@@ -944,7 +1059,9 @@ export class DemoJobFair {
       if (a.rating) return;
       const stars = this.autoRating(a);
       this.rateApplicant(a.id, stars, FEEDBACK[stars - 1]);
-      if (a.status === "Dilihat" || a.status === "Terkirim") a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
+      // Bot companies decide by themselves; a company that has opened its portal decides by hand.
+      if (!this.company.has(a.boothId) && (a.status === "Dilihat" || a.status === "Terkirim")) a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
+      a.updatedAt = this.now();
       if (a.visitorId === PLAYER_ID) this.notices.push(`${a.company} memberi kamu ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`);
       this.persist();
       this.emit();
@@ -956,10 +1073,190 @@ export class DemoJobFair {
   /** The recruiter's decision, from the admin view. */
   setStatus(applicationId: string, status: ApplicationStatus) {
     const a = this.applications.find((x) => x.id === applicationId);
-    if (!a) return;
+    if (!a || a.status === status) return;
     a.status = status;
+    a.updatedAt = this.now();
+    if (a.visitorId === PLAYER_ID && status !== "Dilihat") this.notices.push(`📋 ${a.company}: lamaran ${a.jobTitle} kamu sekarang "${status}"`);
     this.persist();
     this.emit();
+  }
+
+  // ---- Company portal -------------------------------------------------------------------
+
+  private companyOf(boothId: string) {
+    let st = this.company.get(boothId);
+    if (!st) {
+      st = { edits: {}, owned: [], invoices: [] };
+      this.company.set(boothId, st);
+    }
+    return st;
+  }
+
+  /** The company changes its booth: profile, theme, FAQ, vacancies, decorations. */
+  editBooth(boothId: string, patch: BoothEdit) {
+    const b = this.booth(boothId);
+    if (!b) return;
+    const clean: BoothEdit = {};
+    for (const k of EDITABLE) if (k in patch) (clean as Record<string, unknown>)[k] = structuredClone(patch[k]);
+    if (clean.company !== undefined && !clean.company.trim()) delete clean.company;
+    if (clean.logo !== undefined) clean.logo = clean.logo.trim().slice(0, 3) || b.logo;
+    Object.assign(b, clean);
+    Object.assign(this.companyOf(boothId).edits, clean);
+    const rec = this.staff.find((x) => x.id === recruiterId(boothId));
+    if (rec) rec.name = b.recruiter;
+    this.persist();
+    this.emit();
+  }
+
+  /** Add a vacancy or replace the one with the same id. */
+  saveJob(boothId: string, job: JobPosting) {
+    const b = this.booth(boothId);
+    if (!b || !job.title.trim()) return;
+    const jobs = b.jobs.some((j) => j.id === job.id) ? b.jobs.map((j) => (j.id === job.id ? job : j)) : [...b.jobs, job];
+    this.editBooth(boothId, { jobs });
+  }
+
+  /** Remove a vacancy. One that already has applicants is closed instead, so they keep their history. */
+  deleteJob(boothId: string, jobId: string): "deleted" | "closed" | null {
+    const b = this.booth(boothId);
+    const job = b?.jobs.find((j) => j.id === jobId);
+    if (!b || !job) return null;
+    if (this.applications.some((a) => a.jobId === jobId && a.boothId === boothId)) {
+      this.saveJob(boothId, { ...job, closed: true });
+      return "closed";
+    }
+    this.editBooth(boothId, { jobs: b.jobs.filter((j) => j.id !== jobId) });
+    return "deleted";
+  }
+
+  newJobId(boothId: string) {
+    return `${boothId}-job-${this.now().toString(36)}${Math.floor(this.rand() * 1000)}`;
+  }
+
+  /** Free products, and those the company paid for. */
+  owns(boothId: string, productId: string) {
+    const p = productOf(productId);
+    if (!p) return false;
+    if (productId === "vip") return this.booth(boothId)?.tier === "premium";
+    return p.price === 0 || !!this.company.get(boothId)?.owned.includes(productId);
+  }
+
+  /** Switch a decoration on or off. Floor decorations are limited to the booth's free spots. */
+  toggleAccessory(boothId: string, id: string): boolean {
+    const b = this.booth(boothId);
+    const prod = ACCESSORY_PRODUCTS.find((p) => p.id === id);
+    if (!b || !prod || !this.owns(boothId, id)) return false;
+    const on = new Set(b.accessories ?? []);
+    if (on.has(id)) on.delete(id);
+    else {
+      const floorUsed = ACCESSORY_PRODUCTS.filter((p) => p.slot === "floor" && on.has(p.id)).length;
+      if (prod.slot === "floor" && floorUsed >= FLOOR_SLOTS) return false;
+      on.add(id);
+    }
+    this.editBooth(boothId, { accessories: ACCESSORY_PRODUCTS.filter((p) => on.has(p.id)).map((p) => p.id) });
+    return true;
+  }
+
+  /** A bill for products the company does not have yet. */
+  createInvoice(boothId: string, productIds: string[]) {
+    const items = [...new Set(productIds)]
+      .map((id) => productOf(id))
+      .filter((p): p is NonNullable<typeof p> => !!p && p.price > 0 && !this.owns(boothId, p.id))
+      .map((p) => ({ id: p.id, name: p.name, price: p.price }));
+    if (!items.length || !this.booth(boothId)) return null;
+    const st = this.companyOf(boothId);
+    const d = new Date(this.now());
+    const inv: CompanyInvoice = {
+      id: this.id("inv"),
+      no: `INV/${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}/${boothId.toUpperCase().slice(0, 4)}/${String(st.invoices.length + 1).padStart(3, "0")}`,
+      at: this.now(),
+      items,
+      total: items.reduce((n, i) => n + i.price, 0),
+      status: "Belum dibayar",
+    };
+    st.invoices.unshift(inv);
+    this.persist();
+    this.emit();
+    return inv;
+  }
+
+  /** Demo payment: marks the bill paid and switches on what it bought. */
+  payInvoice(boothId: string, invoiceId: string, method: string) {
+    const st = this.company.get(boothId);
+    const inv = st?.invoices.find((i) => i.id === invoiceId);
+    const b = this.booth(boothId);
+    if (!st || !inv || !b || inv.status !== "Belum dibayar") return false;
+    inv.status = "Lunas";
+    inv.method = method;
+    inv.paidAt = this.now();
+    for (const it of inv.items) if (!st.owned.includes(it.id)) st.owned.push(it.id);
+    if (inv.items.some((i) => i.id === "vip")) b.tier = "premium";
+    for (const it of inv.items) if (it.id !== "vip" && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
+    this.persist();
+    this.emit();
+    return true;
+  }
+
+  cancelInvoice(boothId: string, invoiceId: string) {
+    const inv = this.company.get(boothId)?.invoices.find((i) => i.id === invoiceId);
+    if (!inv || inv.status !== "Belum dibayar") return;
+    inv.status = "Dibatalkan";
+    this.persist();
+    this.emit();
+  }
+
+  private touch(a: FairApplication) {
+    a.updatedAt = this.now();
+    this.persist();
+    this.emit();
+  }
+
+  /** The company's private note on an applicant. */
+  noteApplicant(applicationId: string, notes: string) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a) return;
+    a.notes = notes.slice(0, 1000);
+    this.touch(a);
+  }
+
+  /** Invite an applicant to an interview, and tell them in the chat. */
+  scheduleInterview(applicationId: string, iv: Interview) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a) return;
+    a.interview = iv;
+    this.setStatus(a.id, "Diundang interview");
+    const when = new Date(iv.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`);
+  }
+
+  /** A chat message from the company. Bots answer a moment later. */
+  messageApplicant(applicationId: string, text: string) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a || !text.trim()) return;
+    (a.messages ??= []).push({ at: this.now(), from: "company", text: text.trim().slice(0, 600) });
+    if (a.visitorId === PLAYER_ID) this.notices.push(`💬 ${a.company}: ${text.trim().slice(0, 80)}`);
+    if (a.isBot)
+      this.after(2500 + this.rand() * 2500, () => {
+        (a.messages ??= []).push({ at: this.now(), from: "seeker", text: this.pick(BOT_REPLIES) });
+        this.touch(a);
+      });
+    this.touch(a);
+  }
+
+  /** The job seeker answers the company's chat. */
+  replyToCompany(applicationId: string, text: string) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a || !text.trim()) return;
+    (a.messages ??= []).push({ at: this.now(), from: "seeker", text: text.trim().slice(0, 600) });
+    this.touch(a);
+  }
+
+  logCall(applicationId: string, log: CallLog) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a) return;
+    (a.calls ??= []).unshift(log);
+    if (!log.answered && a.visitorId === PLAYER_ID) this.notices.push(`📞 Panggilan tak terjawab dari ${a.company}`);
+    this.touch(a);
   }
 
   /** Messages for the player that the UI shows as toasts, oldest first. */
@@ -1023,7 +1320,10 @@ export class DemoJobFair {
       const quiet = this.fair.booths.filter((b) => this.peopleAt(b.id) === 0 && !this.bubbles.has(recruiterId(b.id)));
       if (quiet.length) {
         const b = this.pick(quiet);
-        this.say(recruiterId(b.id), this.pick(CALLOUTS)(this.pick(b.jobs).title), 3200);
+        const open = openJobs(b);
+        const own = (b.callouts ?? []).filter((c) => c.trim());
+        if (own.length && (this.rand() < 0.6 || !open.length)) this.say(recruiterId(b.id), this.pick(own), 3200);
+        else if (open.length) this.say(recruiterId(b.id), this.pick(CALLOUTS)(this.pick(open).title), 3200);
       }
     }
 
@@ -1139,8 +1439,9 @@ export class DemoJobFair {
       v.facing = "back";
       bot.target = null;
       this.visit(v.memberId, booth.id);
-      const job = this.pick(booth.jobs);
-      if (stop.spot === "talk") {
+      const open = openJobs(booth);
+      const job = open.length ? this.pick(open) : null;
+      if (stop.spot === "talk" && job) {
         bot.phase = "talking";
         const applies = this.rand() < 0.4;
         bot.until = now + (applies ? 7600 : 4600) + this.rand() * 1500;
@@ -1150,7 +1451,27 @@ export class DemoJobFair {
         this.after(1700, () => this.visitors.has(v.memberId) && this.say(rid, this.pick(ANSWERS)(booth, job.title), 2600));
         if (applies) {
           this.after(4300, () => this.visitors.has(v.memberId) && this.say(v.memberId, `Saya mau melamar ${job.title}!`, 2200));
-          this.after(5600, () => this.visitors.has(v.memberId) && this.apply(v.memberId, { boothId: booth.id, jobId: job.id, email: `${v.displayName.toLowerCase()}@contoh.id` }));
+          const skills = job.requirements
+            .flatMap((r) => r.split(/[,/]| dan /))
+            .map((w) => w.trim())
+            .filter((w) => w && this.rand() < 0.55)
+            .slice(0, 4)
+            .join(", ");
+          this.after(
+            5600,
+            () =>
+              this.visitors.has(v.memberId) &&
+              this.apply(v.memberId, {
+                boothId: booth.id,
+                jobId: job.id,
+                email: `${v.displayName.toLowerCase()}@contoh.id`,
+                phone: this.rand() < 0.7 ? `08${Math.floor(1e9 + this.rand() * 9e9)}` : "",
+                cvUrl: this.rand() < 0.6 ? `https://cv.example/${v.displayName.toLowerCase()}` : "",
+                skills,
+                headline: this.pick(["Fresh graduate", "Mahasiswa tingkat akhir", "Pengalaman 2 tahun", "Career switcher"]),
+                message: this.rand() < 0.5 ? `Saya tertarik dengan posisi ${job.title} dan sudah belajar ${skills || "banyak hal"}.` : "",
+              }),
+          );
         }
       } else {
         bot.phase = "reading";

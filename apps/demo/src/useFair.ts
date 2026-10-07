@@ -35,6 +35,10 @@ const local: FairStorage = {
 export const fair = new DemoJobFair(Math.random, () => Date.now(), DEMO_JOB_FAIR, local);
 onFrame((dt) => fair.tick(dt));
 window.addEventListener("pagehide", () => fair.flush());
+// Another tab (say the company portal) saved: pick up its booth edits and application changes.
+window.addEventListener("storage", (e) => {
+  if (e.key === KEY) fair.mergeSaved(local.load());
+});
 
 /** Re-render whenever the job fair changes. */
 export function useFair() {

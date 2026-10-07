@@ -2,7 +2,8 @@
 // The job fair room: the hall's back wall, company booths (back panel, desk, roll-up banner),
 // the organisers' info desk, and the popups for reading vacancies and applying.
 import { type CSSProperties, type FormEvent, useEffect, useId, useState } from "react";
-import { BOOTH_H, BOOTH_W, type CompanyBooth, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView } from "@vwo/shared";
+import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, openJobs } from "@vwo/shared";
+import { boothAccessoryExtras } from "./BoothDecor";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -178,19 +179,35 @@ export interface BoothRating {
 
 const GOLD = "#eab308";
 
+/** Wall, base strip and post colours for each booth theme. */
+export const BOOTH_THEMES: Record<BoothTheme, { name: string; wall: string; base: string; post: string; dark?: boolean }> = {
+  classic: { name: "Klasik", wall: "#f8fafc", base: "#e2e8f0", post: "#cbd5e1" },
+  modern: { name: "Modern gelap", wall: "#1f2937", base: "#111827", post: "#0f172a", dark: true },
+  wood: { name: "Kayu natural", wall: "#fdf6e3", base: "#c08a52", post: "#92400e" },
+  pastel: { name: "Pastel", wall: "#fdf2f8", base: "#fbcfe8", post: "#f9a8d4" },
+  neon: { name: "Neon", wall: "#0b1020", base: "#1e1b4b", post: "#312e81", dark: true },
+};
+
 function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
   const w = BOOTH_W * T;
   const h = 2.2 * T;
   const premium = booth.tier === "premium";
-  const post = premium ? GOLD : "#cbd5e1";
+  const themeId = booth.theme ?? "classic";
+  const theme = BOOTH_THEMES[themeId] ?? BOOTH_THEMES.classic;
+  const post = premium ? GOLD : theme.post;
+  const classicVip = premium && themeId === "classic";
+  const open = openJobs(booth);
   return (
     <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
       {/* Side posts. */}
       <rect x={0} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
       <rect x={w - 8} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
       {/* The wall itself. */}
-      <rect x={6} y={10} width={w - 12} height={h - 12} fill={premium ? "#fffbeb" : "#f8fafc"} {...ink} strokeWidth={1.8} />
-      <rect x={6} y={h - 26} width={w - 12} height={24} fill={premium ? "#fde68a" : "#e2e8f0"} />
+      <rect x={6} y={10} width={w - 12} height={h - 12} fill={classicVip ? "#fffbeb" : theme.wall} {...ink} strokeWidth={1.8} />
+      {themeId === "wood" &&
+        [26, 42, 58, 74].map((py) => <path key={py} d={`M8 ${py}H${w - 8}`} stroke="#d6b88a" strokeWidth={1.2} />)}
+      <rect x={6} y={h - 26} width={w - 12} height={24} fill={classicVip ? "#fde68a" : theme.base} />
+      {themeId === "neon" && <rect x={10} y={14} width={w - 20} height={h - 20} rx={4} fill="none" stroke={booth.color} strokeWidth={3} className="jb-neon-edge" />}
       {premium && (
         <>
           {/* Spotlights on the posts, shining on the wall. */}
@@ -225,7 +242,7 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
           <foreignObject x={52} y={40} width={w - 64} height={13}>
             <div className="jb-led">
               <span>
-                ★ {booth.company.toUpperCase()} · {booth.jobs.length} LOWONGAN DIBUKA · {booth.tagline.toUpperCase()} · INTERVIEW LANGSUNG DI STAND ★
+                ★ {booth.ticker?.trim() ? booth.ticker.toUpperCase() : `${booth.company.toUpperCase()} · ${open.length} LOWONGAN DIBUKA · ${booth.tagline.toUpperCase()} · INTERVIEW LANGSUNG DI STAND`} ★
               </span>
             </div>
           </foreignObject>
@@ -268,10 +285,10 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
       <g transform={`translate(134, ${premium ? 56 : 42})`}>
         <rect width={96} height={50} rx={4} fill="#fef3c7" {...ink} strokeWidth={1.4} />
         <text x={48} y={22} textAnchor="middle" fontSize={13} fontWeight={900} fill={INK} fontFamily="system-ui, sans-serif">
-          KAMI
+          {open.length ? "KAMI" : "TERIMA"}
         </text>
         <text x={48} y={39} textAnchor="middle" fontSize={13} fontWeight={900} fill={booth.color} fontFamily="system-ui, sans-serif">
-          MEREKRUT!
+          {open.length ? "MEREKRUT!" : "KASIH!"}
         </text>
       </g>
       {/* A small screen. */}
@@ -314,7 +331,7 @@ function RollUp({ booth }: { booth: CompanyBooth }) {
   return (
     <div className="jb-rollup" style={{ width: w, height: h, ["--c" as string]: booth.color }}>
       <div className="jb-rollup-head">LOWONGAN</div>
-      {booth.jobs.slice(0, 3).map((j) => (
+      {openJobs(booth).slice(0, 3).map((j) => (
         <div key={j.id} className="jb-rollup-job">
           {j.title}
         </div>
@@ -334,7 +351,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       y: y + 0.5,
       z: 0,
       ground: true,
-      node: <div className="jb-carpet" data-premium={booth.tier === "premium" ? "" : undefined} style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
+      node: <div className="jb-carpet" data-premium={booth.tier === "premium" ? "" : undefined} data-theme={booth.theme ?? "classic"} style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
     },
     ...(booth.tier === "premium"
       ? [
@@ -372,6 +389,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       onClick: opts.onBanner,
       title: opts.onBanner ? `Lowongan ${booth.company}` : undefined,
     },
+    ...boothAccessoryExtras(booth),
   ];
 }
 
@@ -436,7 +454,10 @@ function JobCard({ job, booth, applied, onApply }: { job: JobPosting; booth: Com
       <div className="jb-facts">
         <span>📍 {job.location}</span>
         {job.salary && <span>💰 {job.salary}</span>}
+        {job.deadline && <span>⏳ s.d. {new Date(`${job.deadline}T00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>}
+        {job.quota ? <span>👥 {job.quota} orang</span> : null}
       </div>
+      {job.description && <p className="jb-about">{job.description}</p>}
       <div className="jb-req-title">Kualifikasi</div>
       <ul className="jb-req">
         {job.requirements.map((r) => (
@@ -477,7 +498,7 @@ export function JobBoard({
   /** Open on the company page instead of the first vacancy. */
   startAbout?: boolean;
 }) {
-  const pages: BoardPage[] = [...(booth.bannerImages ?? []).map((b) => ({ kind: "image" as const, ...b })), ...booth.jobs.map((job) => ({ kind: "job" as const, job })), { kind: "about" }];
+  const pages: BoardPage[] = [...(booth.bannerImages ?? []).map((b) => ({ kind: "image" as const, ...b })), ...openJobs(booth).map((job) => ({ kind: "job" as const, job })), { kind: "about" }];
   const [page, setPage] = useState(() =>
     startAbout
       ? pages.length - 1
@@ -552,6 +573,14 @@ export function JobBoard({
                     </dd>
                   </>
                 )}
+                {booth.phone && (
+                  <>
+                    <dt>📞 HR</dt>
+                    <dd>
+                      <a href={`tel:${booth.phone}`}>{booth.phone}</a>
+                    </dd>
+                  </>
+                )}
                 {booth.address && (
                   <>
                     <dt>📍 Kantor</dt>
@@ -598,7 +627,7 @@ export function JobBoard({
               )}
               <div className="jb-req-title">Posisi yang dibuka</div>
               <ul className="jb-req">
-                {booth.jobs.map((j) => (
+                {openJobs(booth).map((j) => (
                   <li key={j.id}>
                     {j.title} · {j.type}
                   </li>
@@ -654,7 +683,7 @@ export function ApplyForm({
   onSubmit: (a: ApplicationInput) => void;
   onClose: () => void;
 }) {
-  const open = booth.jobs.filter((j) => !appliedJobIds.has(j.id));
+  const open = openJobs(booth).filter((j) => !appliedJobIds.has(j.id));
   const [form, setForm] = useState<ApplicationInput>({
     jobId: jobId && !appliedJobIds.has(jobId) ? jobId : (open[0]?.id ?? ""),
     name: defaults.name || defaultName,

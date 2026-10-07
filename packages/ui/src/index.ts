@@ -5,3 +5,4 @@ export { Person, lookFor, PLAYER_LOOK, type Look, type HairStyle, type Outfit, t
 export { BARISTA_LOOK } from "./rpg/Furniture";
 export * from "./rpg/JobFair";
 export * from "./rpg/FairRooms";
+export * from "./rpg/BoothDecor";
