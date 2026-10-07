@@ -125,6 +125,31 @@ export interface JobFairView {
   rooms: FairRoom[];
   /** Where visitors buy coins. */
   coinStand: CoinStandView;
+  /** Sales people and event promoters walking the floors: paid ad placements. */
+  promoters: Promoter[];
+}
+
+/** A promoter NPC who pitches a brand's offer when tapped. Sold to advertisers as ad space. */
+export interface Promoter {
+  id: string;
+  /** The promoter's own name. */
+  name: string;
+  brand: string;
+  emoji: string;
+  color: string;
+  /** Building level, 0-based, like FairStop.level. */
+  level: number;
+  x: number;
+  y: number;
+  headline: string;
+  offer: string;
+  /** Button text and where it goes (fictional, on the reserved .example domain). */
+  cta: string;
+  url: string;
+  /** Promo code saved to the wallet, if the offer has one. */
+  code?: string;
+  /** What they call out to passers-by. */
+  callouts: string[];
 }
 
 export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
@@ -149,13 +174,37 @@ export interface FairRoom {
   stalls?: FoodStall[];
 }
 
+/** A food court stall: a real cafe or restaurant promoting its outlet and selling vouchers for it. */
 export interface FoodStall {
   id: string;
   name: string;
   emoji: string;
   color: string;
+  /** The owner or staff at the stall. */
   vendor: string;
-  menu: { id: string; name: string; emoji: string; price: number }[];
+  /** The pitch, one line. */
+  promo: string;
+  about: string;
+  /** Where the real outlet is, and when it is open. */
+  address: string;
+  hours: string;
+  /** Fictional site on the reserved .example domain. */
+  website: string;
+  rating: number;
+  /** Signature dishes and their price at the outlet. */
+  menu: { id: string; name: string; emoji: string; price: string }[];
+  /** Vouchers for the outlet, bought here with coins. */
+  deals: FoodDeal[];
+}
+
+export interface FoodDeal {
+  id: string;
+  title: string;
+  /** What it is worth at the outlet, e.g. "Rp50.000". */
+  worth: string;
+  /** Price in coins. */
+  price: number;
+  terms: string;
 }
 
 export interface CoinStandView {
@@ -453,6 +502,87 @@ export const DEMO_JOB_FAIR: JobFairView = {
     ]),
   ],
 
+  promoters: [
+    {
+      id: "promo-telko",
+      name: "Rani",
+      brand: "Telko Nusa",
+      emoji: "📶",
+      color: "#e11d48",
+      level: 0,
+      x: 10.5,
+      y: 19.4,
+      headline: "Kuota 30 GB cuma Rp25 ribu",
+      offer: "Khusus pengunjung job fair: paket internet 30 GB 30 hari, plus gratis 5 GB untuk video call interview.",
+      cta: "Aktifkan paket",
+      url: "https://telkonusa.example/jobfair",
+      code: "NUSA30",
+      callouts: ["Kuota murah buat interview online! 📶", "Mampir sebentar, ada promo kuota!", "Video call interview lancar jaya!"],
+    },
+    {
+      id: "promo-kursus",
+      name: "Bima",
+      brand: "Kelas Koding Kita",
+      emoji: "💻",
+      color: "#2563eb",
+      level: 0,
+      x: 12,
+      y: 7.4,
+      headline: "Bootcamp coding, bayar setelah kerja",
+      offer: "Belajar web developer 12 minggu dengan mentor industri. Daftar hari ini dapat potongan 40% dan kelas persiapan interview gratis.",
+      cta: "Lihat kelas",
+      url: "https://kelaskoding.example",
+      code: "JOBFAIR40",
+      callouts: ["Mau jadi programmer? Tanya aku! 💻", "Diskon 40% bootcamp hari ini!", "Belajar dulu, bayar setelah kerja"],
+    },
+    {
+      id: "promo-bank",
+      name: "Sinta",
+      brand: "Tabungan Gajian",
+      emoji: "🏦",
+      color: "#0f766e",
+      level: 1,
+      x: 27,
+      y: 7.4,
+      headline: "Buka rekening gaji online, gratis admin",
+      offer: "Rekening untuk karyawan baru: gratis biaya admin 12 bulan, kartu debit langsung jadi, bonus saldo Rp50.000.",
+      cta: "Buka rekening",
+      url: "https://tabungangajian.example",
+      callouts: ["Gaji pertama? Simpan di sini! 🏦", "Gratis admin setahun!", "Buka rekening cuma 5 menit"],
+    },
+    {
+      id: "promo-kos",
+      name: "Yudi",
+      brand: "KosDekat",
+      emoji: "🏠",
+      color: "#9333ea",
+      level: 2,
+      x: 12,
+      y: 7.4,
+      headline: "Kos dekat kantor barumu",
+      offer: "Cari kos dan apartemen dekat kantor, bisa bayar bulanan. Diskon sewa bulan pertama 20% untuk pencari kerja.",
+      cta: "Cari kos",
+      url: "https://kosdekat.example",
+      code: "KERJABARU",
+      callouts: ["Udah dapat kerja? Cari kos di sini 🏠", "Diskon sewa bulan pertama!", "Kos dekat kantor, hemat ongkos"],
+    },
+    {
+      id: "promo-minuman",
+      name: "Lala",
+      brand: "Segar Botol",
+      emoji: "🥤",
+      color: "#f59e0b",
+      level: 3,
+      x: 34.5,
+      y: 8,
+      headline: "Sampling gratis minuman isotonik",
+      offer: "Coba rasa baru Segar Botol Lemon. Tunjukkan kode di minimarket mana pun untuk beli 2 gratis 1.",
+      cta: "Lokasi minimarket",
+      url: "https://segarbotol.example",
+      code: "SEGAR21",
+      callouts: ["Gratis cobain! 🥤", "Haus? Ada promo beli 2 gratis 1!", "Rasa lemon baru, segar banget"],
+    },
+  ],
   coinStand: {
     floor: 0,
     x: 2.4,
@@ -469,7 +599,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       id: "foodcourt",
       kind: "foodcourt",
       name: "Food Court",
-      tagline: "Makan, kumpulkan voucher",
+      tagline: "Promo cafe dan tempat makan, beli voucher pakai koin",
       emoji: "🍜",
       color: "#ea580c",
       level: 3,
@@ -484,9 +614,19 @@ export const DEMO_JOB_FAIR: JobFairView = {
           emoji: "🍲",
           color: "#dc2626",
           vendor: "Mas Bro",
+          promo: "Bakso urat jumbo, kuahnya bikin nagih",
+          about: "Warung bakso keluarga sejak 2009, sekarang 3 cabang. Daging sapi pilihan, tanpa pengawet.",
+          address: "Jl. Melati No. 12, dekat Stasiun Kota",
+          hours: "10.00–22.00 setiap hari",
+          website: "https://baksomasbro.example",
+          rating: 4.7,
           menu: [
-            { id: "bakso-urat", name: "Bakso urat", emoji: "🍲", price: 12 },
-            { id: "mie-ayam", name: "Mie ayam", emoji: "🍜", price: 10 },
+            { id: "bakso-urat", name: "Bakso urat jumbo", emoji: "🍲", price: "Rp25.000" },
+            { id: "mie-ayam", name: "Mie ayam bakso", emoji: "🍜", price: "Rp20.000" },
+          ],
+          deals: [
+            { id: "bakso-25", title: "Voucher makan Rp25.000", worth: "Rp25.000", price: 10, terms: "Berlaku di semua cabang, 30 hari." },
+            { id: "bakso-b1g1", title: "Beli 1 gratis 1 bakso urat", worth: "Rp25.000", price: 14, terms: "Makan di tempat, Senin–Jumat." },
           ],
         },
         {
@@ -495,9 +635,19 @@ export const DEMO_JOB_FAIR: JobFairView = {
           emoji: "🍛",
           color: "#ca8a04",
           vendor: "Pak Gila",
+          promo: "Nasi goreng porsi kuli, buka sampai subuh",
+          about: "Kedai nasi goreng kaki lima yang naik kelas jadi resto. Favorit anak kos dan pekerja shift malam.",
+          address: "Ruko Sentosa Blok B-7, Jl. Pahlawan",
+          hours: "17.00–03.00",
+          website: "https://nasgorgila.example",
+          rating: 4.5,
           menu: [
-            { id: "nasgor-gila", name: "Nasi goreng gila", emoji: "🍛", price: 12 },
-            { id: "nasi-uduk", name: "Nasi uduk", emoji: "🍚", price: 8 },
+            { id: "nasgor-gila", name: "Nasi goreng gila", emoji: "🍛", price: "Rp22.000" },
+            { id: "nasi-uduk", name: "Nasi uduk komplit", emoji: "🍚", price: "Rp18.000" },
+          ],
+          deals: [
+            { id: "nasgor-20", title: "Voucher makan Rp20.000", worth: "Rp20.000", price: 8, terms: "Minimal belanja Rp30.000, 30 hari." },
+            { id: "nasgor-paket", title: "Paket berdua hemat 30%", worth: "Rp15.000", price: 6, terms: "2 nasi goreng + 2 es teh." },
           ],
         },
         {
@@ -506,9 +656,19 @@ export const DEMO_JOB_FAIR: JobFairView = {
           emoji: "🧋",
           color: "#7c2d12",
           vendor: "Kak Tara",
+          promo: "Kopi susu gula aren, cocok buat nugas",
+          about: "Coffee shop lokal dengan Wi-Fi kencang dan colokan di tiap meja. Biji kopi dari petani Jawa Barat.",
+          address: "Jl. Kenanga No. 3, seberang kampus",
+          hours: "07.00–23.00",
+          website: "https://eskopikita.example",
+          rating: 4.8,
           menu: [
-            { id: "es-kopi-susu", name: "Es kopi susu", emoji: "🧋", price: 6 },
-            { id: "es-teh", name: "Es teh manis", emoji: "🥤", price: 4 },
+            { id: "es-kopi-susu", name: "Es kopi susu aren", emoji: "🧋", price: "Rp18.000" },
+            { id: "croissant", name: "Croissant butter", emoji: "🥐", price: "Rp15.000" },
+          ],
+          deals: [
+            { id: "kopi-free", title: "Gratis 1 es kopi susu", worth: "Rp18.000", price: 7, terms: "Tukar di kasir, 14 hari." },
+            { id: "kopi-50", title: "Kartu kopi 5x minum", worth: "Rp90.000", price: 30, terms: "Hemat 40%, berlaku 60 hari." },
           ],
         },
         {
@@ -517,9 +677,19 @@ export const DEMO_JOB_FAIR: JobFairView = {
           emoji: "🥞",
           color: "#16a34a",
           vendor: "Koh Ahong",
+          promo: "Martabak tebal, topping melimpah",
+          about: "Resep turun-temurun sejak 1988. Terkenal dengan martabak cokelat keju dan red velvet.",
+          address: "Jl. Sudirman No. 88 (depan pasar)",
+          hours: "16.00–23.00",
+          website: "https://martabak88.example",
+          rating: 4.6,
           menu: [
-            { id: "martabak-coklat", name: "Martabak cokelat keju", emoji: "🥞", price: 10 },
-            { id: "pisang-goreng", name: "Pisang goreng", emoji: "🍌", price: 5 },
+            { id: "martabak-coklat", name: "Martabak cokelat keju", emoji: "🥞", price: "Rp45.000" },
+            { id: "martabak-telur", name: "Martabak telur spesial", emoji: "🍳", price: "Rp40.000" },
+          ],
+          deals: [
+            { id: "martabak-30", title: "Diskon Rp30.000 martabak", worth: "Rp30.000", price: 12, terms: "Untuk martabak ukuran besar." },
+            { id: "martabak-topping", title: "Gratis 2 topping", worth: "Rp16.000", price: 5, terms: "Berlaku tiap hari, 30 hari." },
           ],
         },
       ],

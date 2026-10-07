@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { PsychResult } from "../jobfair-engine";
-import { PSYCH_MINUTES, PSYCH_TEST, psychGrade } from "./content";
+import { PSYCH_MINUTES, PSYCH_PASS, PSYCH_TEST, psychGrade } from "./content";
+import { Certificate, certNo } from "./Seminar";
 import { Modal } from "./Modal";
 
 /** The psikotes at a desk: an intro, timed multiple-choice questions, then the result. */
-export function PsychTest({ past, onDone, onClose }: { past: PsychResult[]; onDone: (r: Omit<PsychResult, "at">) => void; onClose: () => void }) {
+export function PsychTest({ name, past, onDone, onClose }: { name: string; past: PsychResult[]; onDone: (r: Omit<PsychResult, "at">) => void; onClose: () => void }) {
   const [phase, setPhase] = useState<"intro" | "test" | "done">("intro");
   const [answers, setAnswers] = useState<(number | null)[]>(() => PSYCH_TEST.map(() => null));
   const [i, setI] = useState(0);
@@ -76,6 +77,9 @@ export function PsychTest({ past, onDone, onClose }: { past: PsychResult[]; onDo
           <p>
             Tes latihan berisi <b>{PSYCH_TEST.length} soal</b> (deret angka, logika, verbal, spasial) dengan waktu <b>{PSYCH_MINUTES} menit</b>.
           </p>
+          <p>
+            Lulus dengan nilai minimal <b>{Math.round(PSYCH_PASS * 100)}%</b> dapat <b>sertifikat psikotes</b>.
+          </p>
           <p>Nilai terbaikmu ikut terkirim bersama lamaran, jadi recruiter bisa melihatnya. Nilai bagus juga menambah XP.</p>
           {past.length > 0 && (
             <p className="sp-muted">
@@ -112,8 +116,26 @@ export function PsychTest({ past, onDone, onClose }: { past: PsychResult[]; onDo
           </div>
         </div>
       )}
+      {phase === "done" && result && result.score / result.total >= PSYCH_PASS && (
+        <Certificate
+          kind="PSIKOTES"
+          name={name}
+          line={
+            <>
+              telah <b>LULUS</b> psikotes latihan dengan nilai <b>{Math.round((result.score / result.total) * 100)}</b> ({result.grade})
+            </>
+          }
+          by="Bu Psikolog Rina · Pengawas psikotes"
+          code={`PSI-${certNo(name + result.score + Date.now())}`}
+        />
+      )}
       {phase === "done" && result && (
         <div className="fx-result">
+          {result.score / result.total < PSYCH_PASS && (
+            <p className="fx-fail">
+              Belum lulus. Butuh nilai {Math.round(PSYCH_PASS * 100)}% untuk dapat sertifikat, coba lagi ya 💪
+            </p>
+          )}
           <div className="fx-score">
             {result.score}
             <span>/{result.total}</span>
@@ -133,9 +155,24 @@ export function PsychTest({ past, onDone, onClose }: { past: PsychResult[]; onDo
             ))}
           </ul>
           <p className="sp-muted">Hasil tersimpan di profilmu dan dikirim bersama lamaran berikutnya.</p>
-          <button type="button" className="mb-order jb-apply" onClick={onClose}>
-            Selesai
-          </button>
+          <div className="fx-cert-actions">
+            <button
+              type="button"
+              className="mb-order"
+              onClick={() => {
+                setAnswers(PSYCH_TEST.map(() => null));
+                setI(0);
+                setLeft(PSYCH_MINUTES * 60);
+                setResult(null);
+                setPhase("test");
+              }}
+            >
+              Ulangi tes
+            </button>
+            <button type="button" className="mb-order jb-apply" onClick={onClose}>
+              Selesai
+            </button>
+          </div>
         </div>
       )}
     </Modal>

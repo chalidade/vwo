@@ -25,6 +25,8 @@ export interface LiveSelf {
   facing: Facing;
   seatId: string | null;
   say: string | null;
+  /** Bought the blue check. A demo badge: on a public broker anyone could claim it. */
+  verified?: boolean;
 }
 
 interface Wire extends LiveSelf {
@@ -61,6 +63,7 @@ export function parseWire(raw: string, knownFloor: (id: string) => boolean): (Re
     facing: m.facing as Facing,
     seatId: typeof m.seatId === "string" && /^[\w-]{1,80}$/.test(m.seatId) ? m.seatId : null,
     say: typeof m.say === "string" ? m.say.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 60) : null,
+    verified: m.verified === true,
     look: look as unknown as Look,
   };
 }

@@ -23,7 +23,7 @@ import {
   facingFor,
   findPath,
 } from "@vwo/shared";
-import { APPLY_COST, DAILY_COINS, FOOD_VOUCHERS, SEMINARS, START_COINS, XP, type VoucherKind, levelOf } from "./fair/content";
+import { APPLY_COST, DAILY_COINS, FOOD_VOUCHERS, SEMINARS, START_COINS, VERIFY_COST, XP, type VoucherKind, levelOf } from "./fair/content";
 
 type Point = { x: number; y: number };
 
@@ -32,6 +32,8 @@ export interface FairVisitor extends AvatarState {
   arrivedAt: number;
   /** A real person on another device, mirrored from the live channel. */
   remote?: boolean;
+  /** Shows the blue check by their name. */
+  verified?: boolean;
 }
 
 /** What another device says about its player, already checked by the live channel. */
@@ -44,6 +46,7 @@ export interface RemotePlayer {
   facing: Facing;
   seatId: string | null;
   say: string | null;
+  verified?: boolean;
 }
 
 /** A recruiter behind a booth desk, or the organisers' staff at the info desk. */
@@ -79,6 +82,8 @@ export interface FairApplication {
   feedback?: string;
   /** Best psikotes score the applicant had when applying, in percent. */
   psych?: number;
+  /** The applicant had the blue check when applying. */
+  verified?: boolean;
 }
 
 /** A job seeker's review of a company. */
@@ -96,9 +101,20 @@ export interface Voucher {
   room?: string;
   coins?: number;
   code?: string;
+  /** Merchant vouchers: value at the outlet, conditions, and where to redeem. */
+  worth?: string;
+  terms?: string;
+  outlet?: string;
   from: string;
   at: number;
   used: boolean;
+}
+
+export interface AdStat {
+  views: number;
+  clicks: number;
+  sold: number;
+  coins: number;
 }
 
 export interface CoinTxn {
@@ -128,6 +144,8 @@ export interface PlayerState {
   /** Day (YYYY-MM-DD) the free daily coins were last claimed. */
   dailyOn: string | null;
   meals: number;
+  /** Bought the blue verified check. */
+  verified?: boolean;
 }
 
 export interface FairEvent {
@@ -152,6 +170,7 @@ export interface FairSaved {
   /** From version 2. */
   player?: PlayerState;
   reviews?: Record<string, CompanyReview[]>;
+  ads?: Record<string, AdStat>;
 }
 
 export interface FairStorage {
@@ -224,6 +243,7 @@ export class DemoJobFair {
   private later: { at: number; fn: () => void }[] = [];
   private nextBotAt: number;
   private nextCalloutAt: number;
+  private nextPromoAt = 0;
 
   constructor(
     private readonly rand: () => number = Math.random,
@@ -256,6 +276,7 @@ export class DemoJobFair {
           ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
+      ...fair.promoters.map((p) => ({ id: promoterId(p.id), name: `📣 ${p.brand}`, boothId: null, floorId: this.stops.find((st) => st.level === p.level)!.floorId, x: p.x, y: p.y, facing: "front" as Facing })),
     ];
     this.nextBotAt = this.now() + 400;
     this.nextCalloutAt = this.now() + 5000;
@@ -275,6 +296,7 @@ export class DemoJobFair {
     }
     for (const [k, n] of Object.entries(saved.visits ?? {})) this.visits.set(k, n);
     for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
+    for (const [k, a] of Object.entries(saved.ads ?? {})) this.ads.set(k, a);
     for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
   }
 
@@ -295,6 +317,7 @@ export class DemoJobFair {
       applications: this.applications.slice(0, 80),
       visits: Object.fromEntries(this.visits),
       sponsorViews: Object.fromEntries(this.sponsorViews),
+      ads: Object.fromEntries(this.ads),
       visitedBy: Object.fromEntries([...this.visitedBy].filter(([id]) => real.has(id)).map(([id, set]) => [id, [...set]])),
     });
   }
@@ -304,9 +327,12 @@ export class DemoJobFair {
     this.applications.length = 0;
     this.visits.clear();
     this.sponsorViews.clear();
+    this.ads.clear();
     this.visitedBy.clear();
     this.reviews.clear();
     Object.assign(this.player, freshPlayer());
+    const me = this.visitors.get(PLAYER_ID);
+    if (me) me.verified = false;
     this.events.length = 0;
     this.storage?.clear();
     this.dirty = false;
@@ -484,26 +510,72 @@ export class DemoJobFair {
     return true;
   }
 
-  /** Order at a food court stall: pay coins, get the food and a voucher. */
-  buyFood(stallId: string, itemId: string) {
+  /** Buy a voucher for a food court business's real outlet. Every purchase also comes with a
+   *  small job fair bonus (a free application, a room discount, cashback). */
+  buyDeal(stallId: string, dealId: string) {
     const room = this.fair.rooms.find((r) => r.stalls?.some((s) => s.id === stallId));
     const stall = room?.stalls?.find((s) => s.id === stallId);
-    const item = stall?.menu.find((m) => m.id === itemId);
-    if (!stall || !item) return null;
-    if (!this.spend(item.price, `${item.name} di ${stall.name}`)) return null;
-    const t = this.pick(FOOD_VOUCHERS);
-    const voucher: Voucher = { id: this.id("vc"), kind: t.kind, title: t.title, room: t.room, coins: t.coins, code: t.code, from: stall.name, at: this.now(), used: false };
-    this.player.vouchers.unshift(voucher);
+    const deal = stall?.deals.find((d) => d.id === dealId);
+    if (!stall || !deal) return null;
+    if (!this.spend(deal.price, `Voucher ${stall.name}: ${deal.title}`)) return null;
+    const code = `${stall.id.slice(0, 4).toUpperCase()}-${String(Math.floor(this.rand() * 9000) + 1000)}${String.fromCharCode(65 + (this.seq % 26))}`;
+    const voucher: Voucher = { id: this.id("vc"), kind: "merchant", title: deal.title, code, worth: deal.worth, terms: deal.terms, outlet: `${stall.name} · ${stall.address}`, from: stall.name, at: this.now(), used: false };
+    const t = this.pick(FOOD_VOUCHERS.filter((v) => v.kind !== "sponsor"));
+    const bonus: Voucher = { id: this.id("vc"), kind: t.kind, title: t.title, room: t.room, coins: t.coins, code: t.code, from: `Bonus ${stall.name}`, at: this.now(), used: false };
+    this.player.vouchers.unshift(bonus, voucher);
     this.player.meals++;
-    if (voucher.kind === "coins" && voucher.coins) {
-      voucher.used = true;
-      this.earn(voucher.coins, `Cashback dari ${stall.name}`);
+    if (bonus.kind === "coins" && bonus.coins) {
+      bonus.used = true;
+      this.earn(bonus.coins, `Cashback dari ${stall.name}`);
     }
-    this.say(stallStaffId(stall.id), `${item.emoji} ${item.name} siap! Ini voucher-mu 🎟️`, 2800);
+    this.ad(`stall:${stall.id}`, "sold", deal.price);
+    this.say(stallStaffId(stall.id), `Terima kasih! Tunjukkan kode ${code} di outlet kami 🎟️`, 3000);
     this.gainXp(XP.food);
     this.persist();
     this.emit();
-    return { item, voucher };
+    return { deal, voucher, bonus };
+  }
+
+  /** Keep a promoter's promo code in the wallet. */
+  savePromo(id: string) {
+    const p = this.fair.promoters.find((x) => x.id === id);
+    if (!p?.code || this.hasPromo(id)) return false;
+    this.player.vouchers.unshift({ id: this.id("vc"), kind: "sponsor", title: `${p.brand}: ${p.headline}`, code: p.code, from: p.brand, at: this.now(), used: false });
+    this.ad(`promo:${p.id}`, "click");
+    return true;
+  }
+
+  hasPromo(id: string) {
+    const p = this.fair.promoters.find((x) => x.id === id);
+    return !!p && this.player.vouchers.some((v) => v.kind === "sponsor" && v.code === p.code && v.from === p.brand);
+  }
+
+  /** Reach of paid placements (food court stalls, promoter NPCs): views, clicks, sales. */
+  readonly ads = new Map<string, AdStat>();
+
+  ad(key: string, what: "view" | "click" | "sold", coins = 0) {
+    const a = this.ads.get(key) ?? { views: 0, clicks: 0, sold: 0, coins: 0 };
+    if (what === "view") a.views++;
+    else if (what === "click") a.clicks++;
+    else {
+      a.sold++;
+      a.coins += coins;
+    }
+    this.ads.set(key, a);
+    this.persist();
+    this.emit();
+  }
+
+  /** Buy the blue verified check with coins. */
+  buyVerified() {
+    if (this.player.verified) return true;
+    if (!this.spend(VERIFY_COST, "Centang biru (verified)")) return false;
+    this.player.verified = true;
+    const v = this.visitors.get(PLAYER_ID);
+    if (v) v.verified = true;
+    this.persist();
+    this.emit();
+    return true;
   }
 
   /** Free applications left from vouchers. */
@@ -623,7 +695,7 @@ export class DemoJobFair {
       this.visitors.set(id, v);
       this.log({ type: "arrive", name: `${p.name} (online)` });
     }
-    Object.assign(v, { displayName: `🌐 ${p.name}`, floorId: floor.id, x: p.x, y: p.y, facing: p.facing, seatId });
+    Object.assign(v, { displayName: `🌐 ${p.name}`, floorId: floor.id, x: p.x, y: p.y, facing: p.facing, seatId, verified: !!p.verified });
     const bubble = this.bubbles.get(id);
     if (p.say && bubble?.text !== p.say) this.say(id, p.say, 3000);
     else this.emit();
@@ -637,6 +709,9 @@ export class DemoJobFair {
     this.leave(id);
     const { x, y } = this.fair.spawn;
     const v: FairVisitor = { memberId: id, visitId: id, displayName: name, memberType: "host", floorId: this.floors[0]!.id, x, y, facing: "back", isBot, arrivedAt: this.now() };
+    if (id === PLAYER_ID) v.verified = !!this.player.verified;
+    // A few bots are verified too, so the badge is something people recognise.
+    else if (isBot && this.rand() < 0.25) v.verified = true;
     this.visitors.set(id, v);
     this.log({ type: "arrive", name });
     if (!isBot) this.say("fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${this.fair.floors.length} lantai.`, 3200);
@@ -717,6 +792,7 @@ export class DemoJobFair {
       status: "Terkirim",
       isBot: v.isBot,
       psych: v.isBot ? (this.rand() < 0.5 ? 50 + Math.round(this.rand() * 50) : undefined) : (this.bestPsych() ?? undefined),
+      verified: !!v.verified,
     };
     this.applications.unshift(a);
     this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
@@ -813,6 +889,15 @@ export class DemoJobFair {
       if (quiet.length) {
         const b = this.pick(quiet);
         this.say(recruiterId(b.id), this.pick(CALLOUTS)(this.pick(b.jobs).title), 3200);
+      }
+    }
+
+    if (now >= this.nextPromoAt) {
+      this.nextPromoAt = now + 6000 + this.rand() * 6000;
+      const quiet = this.fair.promoters.filter((p) => !this.bubbles.has(promoterId(p.id)));
+      if (quiet.length) {
+        const p = this.pick(quiet);
+        this.say(promoterId(p.id), this.pick(p.callouts), 3200);
       }
     }
 
@@ -986,6 +1071,7 @@ export const recruiterId = (boothId: string) => `rec-${boothId}`;
 
 export const roomStaffId = (roomId: string) => `room-${roomId}`;
 export const stallStaffId = (stallId: string) => `stall-${stallId}`;
+export const promoterId = (id: string) => `npc-${id}`;
 
 const FEEDBACK = [
   "Belum sesuai kebutuhan kami saat ini.",
@@ -996,7 +1082,7 @@ const FEEDBACK = [
 ];
 
 function freshPlayer(): PlayerState {
-  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0 };
+  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false };
 }
 
 /** Reviews a company had before today, made up from its id so every visitor sees the same. */

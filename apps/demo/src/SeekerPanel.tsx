@@ -37,6 +37,7 @@ export function SeekerPanel({
   onOpenCompany,
   onGoTo,
   onReset,
+  onVerify,
   onClose,
 }: {
   tab?: SeekerTab;
@@ -53,6 +54,7 @@ export function SeekerPanel({
   onOpenCompany: (boothId: string) => void;
   onGoTo: (boothId: string) => void;
   onReset: () => void;
+  onVerify: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<SeekerTab>(startTab);
@@ -98,10 +100,21 @@ export function SeekerPanel({
                   </div>
                 </div>
                 <div>
-                  <div className="sp-name">{profile.name || "Tanpa nama"}</div>
+                  <div className="sp-name">
+                    {profile.name || "Tanpa nama"}
+                    {player.verified && <span className="rpg-check vf-check">✔</span>}
+                  </div>
                   <div className="sp-muted">{profile.headline || "Lengkapi profilmu supaya form lamaran terisi otomatis."}</div>
                 </div>
               </div>
+              {!player.verified && (
+                <div className="sp-verify">
+                  <span>Dapatkan centang biru supaya profilmu lebih dipercaya.</span>
+                  <button type="button" className="mb-order vf-buy" onClick={onVerify}>
+                    ✔ Verified
+                  </button>
+                </div>
+              )}
               <LevelBar level={lv.level} title={SEEKER_TITLES[lv.level - 1]!} progress={lv.progress} xp={player.xp} next={lv.to} />
               <div className="sp-stats">
                 {(

@@ -118,21 +118,22 @@ export function WalletPanel({
       )}
       {tab === "vouchers" &&
         (player.vouchers.length === 0 ? (
-          <p className="sp-empty">Belum ada voucher. Makan di Food Court (Lantai 4, naik lift) untuk dapat voucher.</p>
+          <p className="sp-empty">Belum ada voucher. Beli voucher cafe dan tempat makan di Food Court (Lantai 4, naik lift), tiap pembelian juga dapat bonus job fair.</p>
         ) : (
           <ul className="fx-vouchers">
             {player.vouchers.map((v) => (
               <li key={v.id} data-used={v.used ? "" : undefined}>
-                <span className="fx-ticket">🎟️</span>
+                <span className="fx-ticket">{v.kind === "merchant" ? "🍽️" : "🎟️"}</span>
                 <span>
                   <b>{v.title}</b>
                   <span className="sp-muted">
                     {" "}
-                    · dari {v.from}
-                    {v.code ? ` · kode ${v.code}` : ""}
+                    · {v.outlet ?? `dari ${v.from}`}
+                    {v.worth ? ` · senilai ${v.worth}` : ""}
                   </span>
+                  {v.code && <span className="fx-code">{v.code}</span>}
                 </span>
-                <span className="fx-state">{v.used ? "Terpakai" : v.kind === "sponsor" ? "Tunjukkan kode" : "Aktif"}</span>
+                <span className="fx-state">{v.used ? "Terpakai" : v.kind === "sponsor" || v.kind === "merchant" ? "Tunjukkan kode" : "Aktif"}</span>
               </li>
             ))}
           </ul>

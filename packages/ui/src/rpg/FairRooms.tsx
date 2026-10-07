@@ -1,7 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, stallRect } from "@vwo/shared";
+import { COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -156,7 +156,7 @@ export function coinStandExtras(stand: CoinStandView, onClick?: () => void): Sce
   ];
 }
 
-/** Food court stalls along the back wall: a sign, a counter, and the menu. */
+/** Food court stalls along the back wall: a business promoting its outlet, with vouchers for sale. */
 export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => void): SceneExtra[] {
   return (room.stalls ?? []).flatMap((st, i): SceneExtra[] => {
     const r = stallRect(i);
@@ -177,11 +177,15 @@ export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => v
             <text x={w / 2} y={21} textAnchor="middle" fontSize={14} fontWeight={900} fill="#fff" fontFamily={font}>
               {st.emoji} {st.name}
             </text>
-            {st.menu.map((m, k) => (
-              <text key={m.id} x={18} y={62 + k * 15} fontSize={11} fontWeight={700} fill={INK} fontFamily={font}>
-                {m.emoji} {m.name} · {m.price}🪙
+            <foreignObject x={12} y={44} width={w - 24} height={30}>
+              <div className="fr-promo">{st.promo}</div>
+            </foreignObject>
+            <g transform={`translate(${w / 2}, 82)`}>
+              <rect x={-62} y={-9} width={124} height={18} rx={9} fill="#facc15" {...ink} strokeWidth={1.4} className="fr-deal" />
+              <text x={0} y={4} textAnchor="middle" fontSize={10.5} fontWeight={900} fill={INK} fontFamily={font}>
+                🎟️ VOUCHER mulai {Math.min(...st.deals.map((d) => d.price))}🪙
               </text>
-            ))}
+            </g>
           </svg>
         ),
       },
@@ -191,7 +195,7 @@ export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => v
         y: r.y + 1.15,
         z: r.y + 2.15,
         onClick: onStall ? () => onStall(st.id) : undefined,
-        title: onStall ? `Pesan di ${st.name}` : undefined,
+        title: onStall ? `Promo ${st.name}` : undefined,
         node: (
           <svg width={(r.width - 0.6) * T} height={T} style={{ display: "block", overflow: "visible" }}>
             <rect x={0} y={0} width={(r.width - 0.6) * T} height={18} rx={4} fill="#f5f5f4" {...ink} />
@@ -272,6 +276,33 @@ export function psikotesExtras(room: FairRoom): SceneExtra[] {
             PENGAWAS
           </text>
         </svg>
+      ),
+    },
+  ];
+}
+
+/** A promoter's pull-up banner and a small sampling table, next to where they stand. */
+export function promoterExtras(p: Promoter, onClick?: () => void): SceneExtra[] {
+  const w = 1.4 * T;
+  const h = 2.3 * T;
+  return [
+    {
+      key: `${p.id}-banner`,
+      x: p.x + 0.55,
+      y: p.y - 2.2,
+      z: p.y - 0.1,
+      onClick,
+      title: onClick ? `Promo ${p.brand}` : undefined,
+      node: (
+        <div className="fr-promoter" style={{ width: w, height: h, ["--c" as string]: p.color }}>
+          <span className="fr-promoter-head">
+            <span className="fr-promoter-tag">PROMO</span>
+            <span className="fr-promoter-emoji">{p.emoji}</span>
+            <b>{p.brand}</b>
+          </span>
+          <span className="fr-promoter-line">{p.headline}</span>
+          <span className="fr-promoter-foot" />
+        </div>
       ),
     },
   ];

@@ -375,6 +375,11 @@ export function CafeScene({
           {(self || !npc) && (
             <div className="rpg-name" data-self={self ? "" : undefined} data-npc={npc ? "" : undefined}>
               {a.displayName}
+              {a.verified && (
+                <span className="rpg-check" title="Terverifikasi">
+                  ✔
+                </span>
+              )}
             </div>
           )}
           {bubbles[a.memberId] ? <div className="rpg-say">{bubbles[a.memberId]}</div> : emote && <div className="rpg-emote">{emote}</div>}
