@@ -69,6 +69,12 @@ h1 { margin: 0; }
 .hud { position: absolute; z-index: 5; }
 .hud-tl { top: 12px; left: 12px; padding: 8px 12px; }
 .hud-title { font-weight: 800; font-size: 15px; }
+.hud-toggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 0; background: none; color: inherit; border: 0; border-radius: 0; box-shadow: none; text-align: left; }
+.hud-toggle:active { transform: none; box-shadow: none; }
+.hud-caret { margin-left: auto; font-size: 12px; opacity: 0.7; }
+.hud-tl[data-collapsed] { padding: 6px 10px; }
+.hud-tr { cursor: pointer; }
+.hud-tr-btn { top: 12px; right: 12px; width: 44px; height: 44px; padding: 0; font-size: 20px; background: var(--surface); box-shadow: none; }
 .hud-stats { display: flex; gap: 12px; font-size: 13px; margin-top: 2px; }
 .hud-floors { display: flex; gap: 6px; margin-top: 6px; }
 .hud-floors button { padding: 2px 8px; font-size: 12px; background: #fff; color: var(--text); box-shadow: 0 2px 0 #3b2a20; }
@@ -111,7 +117,7 @@ h1 { margin: 0; }
   .hud-tl { max-width: calc(100% - 140px); }
   .hud-stats { flex-direction: column; gap: 0; }
   .demo-tag { display: none; }
-  .hud-bl { top: 112px; bottom: auto; }
+  .hud-bl { bottom: 84px; }
   .actions button { font-size: 15px; padding: 2px 6px; }
   nav.top { gap: 12px; font-size: 14px; }
 }
@@ -128,12 +134,16 @@ h1 { margin: 0; }
 
 /* ---- Job seeker panel ---- */
 .sp { width: min(680px, 100%); }
+.sp .mb-tabs { flex-wrap: wrap; overflow: visible; }
 .sp-page { color: var(--text); }
 .sp-card { display: flex; gap: 14px; align-items: center; padding: 10px; border-radius: 10px; background: #fff; border: 2px solid #ead2bd; }
 .sp-avatar { flex: none; width: 76px; height: 92px; display: grid; place-items: center; border-radius: 10px; background: #fde68a; border: 2px solid #3b2a20; overflow: hidden; }
 .sp-name { font-weight: 900; font-size: 18px; }
 .sp-muted { color: var(--muted); font-size: 12px; }
-.sp-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13px; }
+.sp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.sp-stat { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 10px; background: #fff; border: 2px solid #ead2bd; text-align: center; }
+.sp-stat b { font-size: 20px; line-height: 1.1; }
+.sp-stat span { font-size: 11px; color: var(--muted); line-height: 1.2; }
 .sp-field { display: contents; }
 .sp-field > span { align-self: center; }
 .sp-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
@@ -157,6 +167,7 @@ h1 { margin: 0; }
   .hint-touch { display: inline; }
 }
 @media (max-width: 480px) {
+  .sp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sp-card { align-items: flex-start; }
   .sp-avatar { width: 60px; height: 76px; }
 }

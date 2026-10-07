@@ -16,7 +16,7 @@ import {
   sponsorExtras,
 } from "@vwo/ui";
 import { CharacterCreator, type Character } from "./CharacterCreator";
-import { KEY_DIRS, RUN, WALK, facingOf } from "./controls";
+import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { PLAYER_ID, recruiterId } from "./jobfair-engine";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
@@ -61,6 +61,7 @@ export function JobFair() {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [toast, setToast] = useState<string | null>(null);
+  const hud = useHud();
   savedSession = session;
 
   const keys = useRef(new Set<string>());
@@ -381,18 +382,23 @@ export function JobFair() {
             : undefined
         }
       >
-        <div className="hud hud-tl rpg-box">
-          <div className="hud-title">🎪 {fair.fair.name}</div>
-          <div className="hud-stats">
-            <span>🏢 {fair.fair.booths.length} perusahaan</span>
-            <span>⭐ {fair.fair.sponsors.length} sponsor</span>
-            <span>💼 {totalJobs} lowongan</span>
-            <span>👥 {fair.visitors.size} pengunjung</span>
-          </div>
+        <div className="hud hud-tl rpg-box" data-collapsed={hud.info ? undefined : ""} onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
+            🎪 {fair.fair.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
+          </button>
+          {hud.info && (
+            <div className="hud-stats">
+              <span>🏢 {fair.fair.booths.length} perusahaan</span>
+              <span>⭐ {fair.fair.sponsors.length} sponsor</span>
+              <span>💼 {totalJobs} lowongan</span>
+              <span>👥 {fair.visitors.size} pengunjung</span>
+            </div>
+          )}
         </div>
 
-        <div className="hud hud-tr rpg-box" aria-hidden>
-          <svg viewBox={`-0.5 -0.5 ${fair.floor.width + 1} ${fair.floor.height + 1}`} className="minimap">
+        {hud.map ? (
+        <div className="hud hud-tr rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Sembunyikan denah" role="button">
+          <svg aria-hidden viewBox={`-0.5 -0.5 ${fair.floor.width + 1} ${fair.floor.height + 1}`} className="minimap">
             <rect x={0} y={0} width={fair.floor.width} height={fair.floor.height} rx={0.6} fill="#cfd6df" />
             {fair.fair.booths.map((b) => (
               <g key={b.id}>
@@ -410,6 +416,11 @@ export function JobFair() {
           </svg>
           <div className="minimap-legend">Denah aula</div>
         </div>
+        ) : (
+          <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
+            🗺️
+          </button>
+        )}
 
         <div className="hud-bottom">
           {talk ? (
