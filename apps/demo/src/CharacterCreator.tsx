@@ -49,7 +49,18 @@ function cycle<T>(list: readonly T[], current: T, step: number): T {
 }
 
 /** Pokémon-style "who are you?" screen: name, a few looks, and who came along. Then check in. */
-export function CharacterCreator({ onCheckIn }: { onCheckIn: (c: Character, companions: number) => void }) {
+export function CharacterCreator({
+  onCheckIn,
+  withCompanions = true,
+  cta = "Check-in ▶",
+  note = "Di cafe sungguhan, check-in lewat scan QR di pintu masuk.",
+}: {
+  onCheckIn: (c: Character, companions: number) => void;
+  /** Ask who came along (a cafe visit) or not (a job fair). */
+  withCompanions?: boolean;
+  cta?: string;
+  note?: string;
+}) {
   const saved = loadCharacter();
   const [name, setName] = useState(saved?.name ?? "");
   const [look, setLook] = useState<Look>(saved?.look ?? PLAYER_LOOK);
@@ -135,6 +146,7 @@ export function CharacterCreator({ onCheckIn }: { onCheckIn: (c: Character, comp
             }}
           />
         </Row>
+        {withCompanions && (
         <Row label="Datang bersama">
           <Picker
             value={companions === 0 ? "Sendiri" : `${companions} orang (NPC)`}
@@ -142,10 +154,11 @@ export function CharacterCreator({ onCheckIn }: { onCheckIn: (c: Character, comp
             onNext={() => setCompanions((n) => Math.min(5, n + 1))}
           />
         </Row>
+        )}
         <button type="submit" className="cc-go">
-          Check-in ▶
+          {cta}
         </button>
-        <p className="cc-note">Di cafe sungguhan, check-in lewat scan QR di pintu masuk.</p>
+        <p className="cc-note">{note}</p>
       </div>
     </form>
   );

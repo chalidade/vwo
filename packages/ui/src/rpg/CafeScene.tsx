@@ -25,6 +25,7 @@ import {
   StoolSprite,
   TableSprite,
 } from "./Furniture";
+import { HallWall } from "./JobFair";
 import { type Look, Person, lookFor } from "./Person";
 
 /** Pixels per tile. */
@@ -53,6 +54,20 @@ export function seatFacing(seat: SeatView, table: TableView | undefined): Facing
 export function counterFront(floor: FloorView) {
   const c = floor.objects?.find((o) => o.type === "counter");
   return c ? { x: c.x + c.width / 2, y: c.y + c.height + 0.6 } : null;
+}
+
+/** Anything else a room wants drawn (booths, desks). Tiles for the top-left corner; `z` is the
+ *  tile row where the thing touches the floor, so people in front of it are drawn over it. */
+export interface SceneExtra {
+  key: string;
+  x: number;
+  y: number;
+  z: number;
+  node: ReactNode;
+  /** Drawn flat on the floor, under everything that stands. */
+  ground?: boolean;
+  onClick?: () => void;
+  title?: string;
 }
 
 /** Staff and other characters that are not customers (no seat, not counted inside). */
@@ -94,6 +109,8 @@ export interface CafeSceneProps {
   onAvatarClick?: (memberId: string) => void;
   onBaristaClick?: () => void;
   onMenuClick?: () => void;
+  onNpcClick?: (npcId: string) => void;
+  extras?: SceneExtra[];
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -129,6 +146,8 @@ export function CafeScene({
   onAvatarClick,
   onBaristaClick,
   onMenuClick,
+  onNpcClick,
+  extras = [],
   className,
   style,
   children,
@@ -257,9 +276,14 @@ export function CafeScene({
         default:
           ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite /> });
       }
-    } else if (o.type === "wall" || o.type === "blocked") {
+    } else if ((o.type === "wall" || o.type === "blocked") && o.spriteKey !== "invisible") {
       ents.push({ key: o.id, z: py(o.y + o.height), x: px(o.x), y: py(o.y), node: <div className="rpg-wall-edge" style={{ width: w, height: h, borderRadius: 4 }} /> });
     }
+  }
+
+  for (const e of extras) {
+    const ent = { ...e, x: px(e.x), y: py(e.y), z: e.ground ? 0 : py(e.z) };
+    (e.ground ? ground : ents).push(ent);
   }
 
   // --- Tables, with a cup in front of everyone sitting at them.
@@ -347,8 +371,9 @@ export function CafeScene({
       x: px(n.x) - 22,
       y: py(n.y) - 58,
       title: n.name,
+      onClick: onNpcClick ? () => onNpcClick(n.id) : undefined,
       node: (
-        <div className="rpg-sprite" data-dir={DIR[n.facing]} data-walking={walking.has(n.id) ? "" : undefined}>
+        <div className="rpg-sprite" data-dir={DIR[n.facing]} data-walking={walking.has(n.id) ? "" : undefined} data-clickable={onNpcClick ? "" : undefined}>
           <div className="rpg-shadow" />
           <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
             <Person look={n.look} />
@@ -366,10 +391,10 @@ export function CafeScene({
   ents.sort((a, b) => a.z - b.z);
 
   const doors = (floor.objects ?? []).filter((o) => o.type === "door");
-  const counter = floor.theme !== "rooftop" ? floor.objects?.find((o) => o.type === "counter") : undefined;
+  const counter = floor.theme === "indoor" || !floor.theme ? floor.objects?.find((o) => o.type === "counter") : undefined;
   const board = counter ? { w: 176, h: Math.round(wall * 0.5), x: px(counter.x + counter.width / 2) - 88, y: Math.round(wall * 0.1) } : null;
   const windows: number[] = [];
-  if (floor.theme !== "rooftop") {
+  if (floor.theme !== "rooftop" && floor.theme !== "hall") {
     const tall = (floor.objects ?? []).filter((o) => o.y < 1.5 && o.spriteKey !== "rug" && o.type !== "spawn_point");
     for (let x = 2.5; x < floor.width - 1; x += 3.6) {
       if (!tall.some((o) => x > o.x - 1.2 && x < o.x + o.width + 1.2)) windows.push(px(x));
@@ -399,7 +424,13 @@ export function CafeScene({
         style={{ width: worldW, height: worldH, transform: `translate3d(${-camX * scale}px, ${-camY * scale}px, 0) scale(${scale})` }}
         aria-hidden
       >
-        {floor.theme === "rooftop" ? <RooftopEdge w={worldW} h={wall} /> : <IndoorWall w={worldW} h={wall} windows={windows} />}
+        {floor.theme === "rooftop" ? (
+          <RooftopEdge w={worldW} h={wall} />
+        ) : floor.theme === "hall" ? (
+          <HallWall w={worldW} h={wall} title={floor.name} />
+        ) : (
+          <IndoorWall w={worldW} h={wall} windows={windows} />
+        )}
         {board && (
           <div
             className={`rpg-ent${onMenuClick ? " rpg-board" : ""}`}
@@ -413,7 +444,7 @@ export function CafeScene({
           </div>
         )}
         <div
-          className={floor.theme === "rooftop" ? "rpg-floor-deck" : "rpg-floor-wood"}
+          className={floor.theme === "rooftop" ? "rpg-floor-deck" : floor.theme === "hall" ? "rpg-floor-hall" : "rpg-floor-wood"}
           style={{ position: "absolute", left: ox, top: oy, width: floor.width * TILE, height: floor.height * TILE }}
         />
         <div style={{ position: "absolute", left: ox, top: oy, width: floor.width * TILE, height: 14, background: "linear-gradient(rgb(0 0 0 / 0.28), transparent)" }} />

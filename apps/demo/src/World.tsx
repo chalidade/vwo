@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { type AvatarState, type Emote, type Facing, DEMO_MENU, EMOTES, findPath, menuPages, portalAt, slide } from "@vwo/shared";
+import { type AvatarState, type Emote, DEMO_MENU, EMOTES, findPath, menuPages, portalAt, slide } from "@vwo/shared";
 import { CafeScene, type DialogChoice, DialogBox, type Look, MenuBook, counterFront, lookFor } from "@vwo/ui";
 import { WAITER_LOOK } from "./staff";
 import { CharacterCreator, type Character } from "./CharacterCreator";
+import { KEY_DIRS, RUN, TouchPad, WALK, facingOf } from "./controls";
 import { cafe, onFrame, useCafe } from "./useCafe";
 
 interface Session {
@@ -19,27 +20,12 @@ interface Talk {
   choices?: DialogChoice[];
 }
 
-const WALK = 3.2; // tiles per second
-const RUN = 5.2;
 const REACH = 1.1;
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
 const EMOTE_NAME: Record<Emote, string> = { wave: "Lambai", cheers: "Cheers", laugh: "Tertawa", heart: "Suka" };
-const KEY_DIRS: Record<string, [number, number]> = {
-  ArrowUp: [0, -1], KeyW: [0, -1],
-  ArrowDown: [0, 1], KeyS: [0, 1],
-  ArrowLeft: [-1, 0], KeyA: [-1, 0],
-  ArrowRight: [1, 0], KeyD: [1, 0],
-};
-
 const MENU_PAGES = menuPages(DEMO_MENU);
 
 let savedSession: Session | null = null; // survives switching to the admin view and back
-
-function facingOf(dx: number, dy: number, prev: Facing): Facing {
-  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return prev;
-  if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? "back" : "front";
-  return dx < 0 ? "left" : "right";
-}
 
 export function World() {
   useCafe();
@@ -309,8 +295,6 @@ export function World() {
             ? `Sapa ${reach.name}`
             : null;
 
-  const press = (code: string, on: boolean) => (on ? keys.current.add(code) : keys.current.delete(code));
-
   return (
     <div className="game">
       <CafeScene
@@ -412,33 +396,7 @@ export function World() {
           </div>
         )}
 
-        {session && (
-          <div className="pad" onPointerDown={(e) => e.stopPropagation()}>
-            {(
-              [
-                ["KeyW", "▲", "up"],
-                ["KeyA", "◀", "left"],
-                ["KeyS", "▼", "down"],
-                ["KeyD", "▶", "right"],
-              ] as const
-            ).map(([code, label, area]) => (
-              <button
-                key={code}
-                type="button"
-                style={{ gridArea: area }}
-                onPointerDown={() => press(code, true)}
-                onPointerUp={() => press(code, false)}
-                onPointerLeave={() => press(code, false)}
-                onPointerCancel={() => press(code, false)}
-              >
-                {label}
-              </button>
-            ))}
-            <button type="button" className="pad-a" style={{ gridArea: "a" }} onClick={interact}>
-              A
-            </button>
-          </div>
-        )}
+        {session && <TouchPad keys={keys} onA={interact} />}
 
         {menuOpen && (
           <MenuBook

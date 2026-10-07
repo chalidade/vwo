@@ -40,7 +40,7 @@ export interface MapObjectView {
 }
 
 /** How a floor is drawn: an indoor room with walls, or an open rooftop deck. */
-export type FloorTheme = "indoor" | "rooftop";
+export type FloorTheme = "indoor" | "rooftop" | "hall";
 
 export interface FloorView {
   id: string;
