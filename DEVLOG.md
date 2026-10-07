@@ -4,6 +4,26 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: lift, lantai penuh untuk food court, seminar, psikotes, layar HP bersih, install aplikasi
+
+**Konteks:** owner minta layar HP tidak tertutup informasi (petunjuk tap, notifikasi pindah lantai, nav hitam di atas), penunjuk arah atau lift untuk pindah lantai, food court, seminar, dan psikotes masing-masing satu lantai penuh lewat lift, dan opsi install sebagai aplikasi.
+
+**Yang berubah**
+
+- **Lift** di pojok kanan bawah tiap lantai menggantikan tangga. Berdiri di depan lift lalu "🛗 Naik lift" membuka tombol lantai 1 sampai 6, lengkap dengan isi tiap lantai dan harga tiket. Papan direktori di samping pintu lift juga menampilkan semua lantai.
+- **Penunjuk arah:** tanda "🛗 LIFT ➜" di lantai tiap lantai menunjuk ke lift. Baris lantai di HUD (📍 Lantai 3 … 🛗) bisa di-tap untuk memilih lantai dari mana saja; karakter berjalan sendiri ke lift lalu naik. Denah menandai lift dengan warna kuning.
+- **Lantai penuh:** Lantai 4 Food Court (4 stand, 15 meja), Lantai 5 Ruang Seminar (70 kursi), Lantai 6 Ruang Psikotes (28 meja). Pintu ruangan di aula dihapus. Lantai berbayar menanyakan tiket sebelum lift berangkat.
+- **Layar HP lebih bersih:** nav hitam tidak tampil saat di dalam cafe atau job fair (tombol "← Beranda" ada di layar pembuatan karakter), petunjuk "tap lantai untuk berjalan" dihapus di HP, notifikasi jadi baris kecil di atas tombol bawah dan hilang lebih cepat, dan nama lantai panjang dipotong satu baris.
+- **Install sebagai aplikasi (PWA):** manifest, ikon, dan service worker. Tombol "📲 Install aplikasi" ada di beranda dan layar pembuatan karakter. Di Chrome/Edge muncul dialog install; di iPhone muncul langkah Bagikan → Tambah ke Layar Utama. Setelah terpasang, VWO terbuka layar penuh dan halaman yang pernah dibuka tetap bisa dibuka offline.
+- Bot pengunjung juga naik lift antar lantai. Halaman panitia punya tab untuk keenam lantai.
+
+**Verifikasi**
+
+- Tes diperbarui: tiap lantai punya satu lift dan tidak ada tangga, semua stand, sponsor, kursi, dan stand makanan bisa dicapai dari lift, urutan lantai 1–6 benar. Tes demo 16 dan shared 9 lulus, typecheck bersih.
+- Dicoba di browser 390px layar sentuh dan desktop: tap baris lantai lalu pilih Food Court, berjalan ke lift dan sampai di Lantai 4; pilih Seminar, bayar tiket, sampai di Lantai 5; tanda lift di lantai membawa ke lift; naik ke Psikotes; tombol install dan Beranda; halaman panitia Lantai 4.
+
+---
+
 ## 2026-10-07 · Job fair: koin, level, rating, food court, psikotes, seminar
 
 **Konteks:** owner minta: rating pelamar dari perusahaan dan rating perusahaan dari pelamar dengan level seperti game, koin untuk melamar dan masuk tempat premium, stand untuk beli koin, food court untuk dapat voucher, ruang psikotes dan ruang seminar yang masuknya memotong koin lalu duduk di kursi.

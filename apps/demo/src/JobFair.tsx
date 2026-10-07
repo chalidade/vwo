@@ -11,11 +11,8 @@ import {
   type SponsorView,
   boothSpot,
   fairFloorId,
-  fairFloorIndex,
-  fairRoomFloorId,
+  LIFT_FRONT,
   findPath,
-  portalAt,
-  roomDoorFront,
   slide,
   stallSpot,
 } from "@vwo/shared";
@@ -33,17 +30,20 @@ import {
   coinStandExtras,
   foodStallExtras,
   infoDeskExtras,
+  liftExtras,
+  liftSignExtras,
   psikotesExtras,
-  roomDoorExtras,
   seminarStageExtras,
   lookFor,
   sponsorExtras,
 } from "@vwo/ui";
+import { InstallButton } from "./install";
 import { CharacterCreator, type Character } from "./CharacterCreator";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { PLAYER_ID, recruiterId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, SEMINARS, levelOf } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
+import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
@@ -73,7 +73,7 @@ type Reach =
   | { kind: "person"; memberId: string; name: string }
   | { kind: "coins" }
   | { kind: "stall"; stallId: string; name: string }
-  | { kind: "door"; room: FairRoom }
+  | { kind: "lift" }
   | { kind: "seat"; seatId: string }
   | { kind: "seated"; room: FairRoom };
 
@@ -83,6 +83,11 @@ const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh:
 export function staffLook(name: string, color: string): Look {
   return { ...lookFor(`staff:${name}`), outfit: "jacket", shirt: color, hat: undefined };
 }
+
+/** Floor arrows pointing to the lift, laid in the aisles of each kind of floor. */
+const GROUND_SIGNS = [{ x: 11.5, y: 15.2 }, { x: 19, y: 6.7 }, { x: 27.5, y: 14.8 }];
+const HALL_SIGNS = [{ x: 5, y: 15.2 }, { x: 19, y: 6.7 }, { x: 27.5, y: 14.8 }];
+const ROOM_SIGNS = [{ x: 8, y: 19.6 }, { x: 20, y: 19.6 }];
 
 let savedSession: Session | null = null; // survives switching to the organiser view and back
 
@@ -100,26 +105,26 @@ export function JobFair() {
   const [stall, setStall] = useState<string | null>(null);
   const [psych, setPsych] = useState(false);
   const [seminar, setSeminar] = useState(false);
+  const [lift, setLift] = useState(false);
   const hud = useHud();
   savedSession = session;
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ x: number; y: number }[] | null>(null);
-  /** Where a clicked walk ends, possibly on another floor: the route then leads to the stairs first. */
+  /** Where a clicked walk ends, possibly on another floor: the route then leads to the lift first. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
   const floor = fair.floor(self?.floorId ?? fair.floors[0]!.id);
-  /** Set when the player is inside a room rather than on a hall floor. */
+  /** Set when the player is on a room floor (food court, seminar, psikotes) rather than a hall. */
   const room = fair.roomOf(floor.id);
   const level = fair.levelOf(floor.id);
-  const floorInfo = fair.fair.floors[level];
+  const stop = fair.stopOf(floor.id);
   const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === level);
   const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === level);
-  const doors = room ? [] : fair.fair.rooms.filter((r) => r.floor === level);
   const coinHere = !room && fair.fair.coinStand.floor === level;
   const me = fair.player;
   const seeker = levelOf(me.xp);
@@ -129,7 +134,7 @@ export function JobFair() {
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 3200);
+    const id = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(id);
   }, [toast]);
 
@@ -161,10 +166,7 @@ export function JobFair() {
       const c = fair.fair.coinStand;
       if (Math.abs(self.x - (c.x + COIN_STAND_SPOTS.front.x)) < 2 && self.y > c.y + 2.1 && self.y < c.y + 3.6) return { kind: "coins" };
     }
-    for (const d of doors) {
-      const front = roomDoorFront(d);
-      if (Math.abs(self.x - front.x) < 1.3 && Math.abs(self.y - front.y) < 0.9) return { kind: "door", room: d };
-    }
+    if (Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
     if (room?.stalls) {
       for (const [i, st] of room.stalls.entries()) {
         const at = stallSpot(i, "order");
@@ -227,8 +229,14 @@ export function JobFair() {
           next = path[0];
         }
         if (!next) {
-          const seatId = goal.current?.floorId === me.floorId ? goal.current.seatId : undefined;
           route.current = null;
+          // At the lift with somewhere else to be: ride up or down, then walk on.
+          if (goal.current && goal.current.floorId !== me.floorId) {
+            if (rideTo(goal.current.floorId)) planRoute();
+            else goal.current = null;
+            return;
+          }
+          const seatId = goal.current?.seatId;
           goal.current = null;
           if (seatId) sitDown(seatId);
           return;
@@ -246,28 +254,6 @@ export function JobFair() {
       const f = fair.floor(me.floorId);
       const to = route.current ? { x: me.x + dx, y: me.y + dy } : slide(f, me.x, me.y, dx, dy);
       fair.move(me.memberId, to.x, to.y, facingOf(dx, dy, me.facing));
-      // Stairs take you up or down when you walk onto them yourself or are headed for another
-      // floor; a route that only passes over them on its way across this floor stays here.
-      const stairs = portalAt(f, to.x, to.y);
-      if (stairs?.targetFloorId && (!goal.current || goal.current.floorId !== me.floorId)) {
-        const into = fair.roomOf(stairs.targetFloorId);
-        if (into && !fair.hasTicket(into.id)) {
-          // A premium room: stop at the door and ask to pay.
-          const back = roomDoorFront(into);
-          fair.move(me.memberId, back.x, back.y, "back");
-          route.current = null;
-          goal.current = null;
-          askTicket(into);
-          return;
-        }
-        const from = fair.roomOf(f.id);
-        fair.changeFloor(me.memberId, stairs.targetFloorId, stairs.targetX ?? 1, stairs.targetY ?? 1);
-        if (into) setToast(`Masuk ${into.name}`);
-        else if (from) setToast(`Keluar dari ${from.name}`);
-        else setToast(`${fairFloorIndex(stairs.targetFloorId) > fairFloorIndex(f.id) ? "Naik" : "Turun"} ke ${fair.floor(stairs.targetFloorId).name}`);
-        route.current = null;
-        if (goal.current) planRoute();
-      }
     });
   }, [session]);
 
@@ -307,7 +293,8 @@ export function JobFair() {
       pages: [
         `Halo, ${c.name}! Selamat datang di ${fair.fair.name}.`,
         `Ada ${fair.fair.booths.length} perusahaan dengan ${fair.fair.booths.reduce((n, b) => n + b.jobs.length, 0)} lowongan di ${fair.fair.floors.length} lantai: ${fair.fair.floors.map((f) => `${f.name} ${f.theme}`).join(", ")}.`,
-        "Tangga naik dan turun ada di pojok kanan bawah tiap lantai. Kalau bingung, tanya aku saja, nanti aku antar ke stand mana pun.",
+        `Lift ada di pojok kanan bawah tiap lantai, ikuti tanda 🛗 di lantai. ${fair.stops.filter((st) => st.roomId).map((st) => `${st.name} ${st.label}`).join(", ")}.`,
+        "Kalau bingung, tanya aku saja, nanti aku antar ke stand mana pun.",
         "Berdiri di depan meja stand untuk ngobrol dengan recruiter, atau dekati banner di samping meja untuk lihat lowongan. Tekan E untuk bicara.",
       ],
     });
@@ -323,13 +310,13 @@ export function JobFair() {
     else if (r.kind === "sponsor") openSponsor(r.sponsor);
     else if (r.kind === "coins") setWallet(true);
     else if (r.kind === "stall") setStall(r.stallId);
-    else if (r.kind === "door") goToRoom(r.room);
+    else if (r.kind === "lift") setLift(true);
     else if (r.kind === "seat") sitDown(r.seatId);
     else if (r.kind === "seated") startActivity(r.room);
     else talkToVisitor(r.memberId);
   }
 
-  /** Route toward the goal: straight there on this floor, or to the stairs that lead toward its floor. */
+  /** Route toward the goal: straight there on this floor, or to the lift when it is on another floor. */
   function planRoute() {
     const me = savedSession && fair.visitors.get(savedSession.visitorId);
     const g = goal.current;
@@ -339,15 +326,42 @@ export function JobFair() {
       route.current = findPath(f, me, g);
       return;
     }
-    const stairs = fair.exitToward(f, g.floorId);
-    route.current = stairs ? findPath(f, me, { x: stairs.x + stairs.width / 2, y: stairs.y + stairs.height / 2 }) : null;
+    route.current = findPath(f, me, LIFT_FRONT) ?? [LIFT_FRONT];
+  }
+
+  /** Take the lift to a floor; a premium floor asks for a ticket first. False when not riding. */
+  function rideTo(floorId: string) {
+    const s = savedSession;
+    if (!s) return false;
+    const into = fair.roomOf(floorId);
+    if (into && !fair.hasTicket(into.id)) {
+      askTicket(into);
+      return false;
+    }
+    fair.ride(s.visitorId, floorId);
+    const st = fair.stopOf(floorId);
+    setToast(`🛗 ${st.name} · ${st.label}`);
+    return true;
+  }
+
+  /** Pick a floor in the lift: ride now when standing at it, otherwise walk there first. */
+  function pickFloor(floorId: string) {
+    setLift(false);
+    const me = savedSession && fair.visitors.get(savedSession.visitorId);
+    if (!me || floorId === me.floorId) return;
+    const into = fair.roomOf(floorId);
+    if (into && !fair.hasTicket(into.id)) {
+      askTicket(into, () => pickFloor(floorId));
+      return;
+    }
+    goal.current = { floorId, ...LIFT_FRONT };
+    planRoute();
   }
 
   const walkTo = (x: number, y: number) => {
     const me = session && fair.visitors.get(session.visitorId);
     if (!me || busy.current) return;
-    const stairs = portalAt(fair.floor(me.floorId), x, y);
-    goal.current = stairs?.targetFloorId ? { floorId: stairs.targetFloorId, x: stairs.targetX ?? 1, y: stairs.targetY ?? 1 } : { floorId: me.floorId, x, y };
+    goal.current = { floorId: me.floorId, x, y };
     planRoute();
   };
 
@@ -359,10 +373,10 @@ export function JobFair() {
     planRoute();
   };
 
-  /** Walk into a room through its door, from anywhere. */
+  /** Go to a room's floor by lift, from anywhere. */
   function goToRoom(r: FairRoom) {
-    goal.current = { floorId: fairRoomFloorId(fair.fair, r.id), x: r.width / 2, y: r.height - 1.9 };
-    planRoute();
+    const st = fair.stops.find((x) => x.roomId === r.id);
+    if (st) pickFloor(st.floorId);
   }
 
   /** Walk to a spot on a hall floor, from anywhere. */
@@ -370,6 +384,12 @@ export function JobFair() {
     goal.current = { floorId: fairFloorId(fair.fair, floor), x, y };
     planRoute();
   }
+
+  /** Walk to the lift and open its panel there. */
+  const goToLift = () => {
+    if (reachRef.current?.kind === "lift") setLift(true);
+    else walkTo(LIFT_FRONT.x, LIFT_FRONT.y);
+  };
 
   const goToCoinStand = () => {
     const c = fair.fair.coinStand;
@@ -391,7 +411,7 @@ export function JobFair() {
     else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Nyam 😋" : "Lapar... pesan di stand dulu ah", 2000);
   }
 
-  function askTicket(r: FairRoom) {
+  function askTicket(r: FairRoom, then: () => void = () => goToRoom(r)) {
     const { price, voucher } = fair.roomPrice(r.id);
     const enough = me.coins >= price;
     setTalk({
@@ -407,7 +427,7 @@ export function JobFair() {
                 setTalk(null);
                 if (fair.buyTicket(r.id)) {
                   setToast(`🎟️ Tiket ${r.name} dibeli`);
-                  goToRoom(r);
+                  then();
                 }
               },
             }
@@ -436,8 +456,8 @@ export function JobFair() {
     });
   }
 
-  /** "Lantai 2" for a floor id, for stair signs. */
-  const shortName = (floorId: string) => fair.fair.floors[fairFloorIndex(floorId)]?.name ?? "Tangga";
+  /** "Lantai 2" for a floor id. */
+  const shortName = (floorId: string) => fair.stopOf(floorId).name;
 
   function talkToRecruiter(b: CompanyBooth) {
     const me = session && fair.visitors.get(session.visitorId);
@@ -505,14 +525,14 @@ export function JobFair() {
     });
     const main: Talk = {
       speaker: `${staff} · Panitia`,
-      pages: ["Ada yang bisa dibantu? Pilih lantainya, ruangan, atau Stand Koin. Nanti aku antar."],
+      pages: ["Ada yang bisa dibantu? Pilih lantainya, food court, seminar, psikotes, atau Stand Koin. Nanti aku antar."],
       choices: [
         ...fair.fair.floors.map((f, i) => ({
           label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand)`,
           onPick: () => setTalk(floorChoice(i)),
         })),
         ...fair.fair.rooms.map((r) => ({
-          label: `${r.emoji} ${r.name} (${fair.fair.floors[r.floor]!.name}${r.price ? ` · ${r.price} koin` : ""})`,
+          label: `${r.emoji} ${r.name} (Lantai ${r.level + 1}${r.price ? ` · ${r.price} koin` : ""})`,
           onPick: () => {
             setTalk(null);
             goToRoom(r);
@@ -594,7 +614,8 @@ export function JobFair() {
     ),
     ...(!room && level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
-    ...doors.flatMap((d) => roomDoorExtras(d, { locked: !fair.hasTicket(d.id), onClick: session ? () => goToRoom(d) : undefined })),
+    ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
+    ...liftSignExtras(room ? ROOM_SIGNS : level === 0 ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
     ...(room?.kind === "foodcourt"
       ? foodStallExtras(room, session ? (id) => { const i = room.stalls!.findIndex((x) => x.id === id); const at = stallSpot(i, "order"); walkTo(at.x, at.y); } : undefined)
@@ -615,8 +636,8 @@ export function JobFair() {
       ? "Beli koin"
       : reach?.kind === "stall"
         ? `Pesan di ${reach.name}`
-        : reach?.kind === "door"
-          ? `Masuk ${reach.room.name}${reach.room.price && !fair.hasTicket(reach.room.id) ? ` (${reach.room.price} 🪙)` : ""}`
+        : reach?.kind === "lift"
+          ? "🛗 Naik lift"
           : reach?.kind === "seat"
             ? "Duduk"
             : reach?.kind === "seated"
@@ -696,7 +717,10 @@ export function JobFair() {
           <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
             🎪 {fair.fair.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
           </button>
-          <div className="hud-floor">📍 {room ? `${room.emoji} ${room.name} · ${floorInfo?.name}` : `${floorInfo?.name} · ${floorInfo?.theme}`}</div>
+          <button type="button" className="hud-floor" onClick={() => session && setLift(true)} title="Pindah lantai lewat lift">
+            <span>📍 {stop.name} · {stop.emoji} {stop.label}</span>
+            {session && <span className="hud-lift">🛗</span>}
+          </button>
           {session && (
             <button type="button" className="hud-level" onClick={() => setPanel("profile")} title="Level dan XP">
               <LevelBar compact level={seeker.level} title={SEEKER_TITLES[seeker.level - 1]!} progress={seeker.progress} xp={me.xp} next={seeker.to} />
@@ -704,7 +728,7 @@ export function JobFair() {
           )}
           {hud.info && (
             <div className="hud-stats">
-              <span>🏬 {fair.fair.floors.length} lantai</span>
+              <span>🏬 {fair.stops.length} lantai</span>
               <span>🏢 {fair.fair.booths.length} perusahaan</span>
               <span>⭐ {fair.fair.sponsors.length} sponsor</span>
               <span>💼 {totalJobs} lowongan</span>
@@ -729,13 +753,10 @@ export function JobFair() {
             {(floor.tables ?? []).map((t) => (
               <rect key={t.id} x={t.x} y={t.y} width={t.width} height={t.height} rx={0.2} fill="#a8a29e" />
             ))}
-            {doors.map((d) => (
-              <rect key={d.id} x={d.doorX} y={d.doorY} width={3.2} height={0.7} fill={d.color} />
-            ))}
             {coinHere && <rect x={fair.fair.coinStand.x} y={fair.fair.coinStand.y} width={5.4} height={2.2} rx={0.2} fill="#ca8a04" opacity={0.7} />}
             {!room && level === 0 && <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />}
             {(floor.objects ?? [])
-              .filter((o) => o.type === "stairs" || (o.type === "door" && o.targetFloorId && room))
+              .filter((o) => o.type === "elevator")
               .map((o) => (
                 <rect key={o.id} x={o.x} y={o.y} width={o.width} height={o.height} rx={0.2} fill="#facc15" />
               ))}
@@ -743,7 +764,7 @@ export function JobFair() {
               <circle key={a.memberId} cx={a.x} cy={a.y} r={a.memberId === session?.visitorId ? 0.55 : 0.32} fill={a.memberId === session?.visitorId ? "#f97316" : "#fff"} stroke="#2b1e19" strokeWidth={0.12} />
             ))}
           </svg>
-          <div className="minimap-legend">Denah {room?.name ?? floorInfo?.name ?? "aula"}</div>
+          <div className="minimap-legend">Denah {stop.name} · 🟨 lift</div>
         </div>
         ) : (
           <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
@@ -759,13 +780,8 @@ export function JobFair() {
               <span className="rpg-kbd">E</span> {prompt}
             </button>
           ) : session ? (
-            <div className="rpg-box hint">
-              <span className="hint-keys">
-                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> {room ? "duduk · klik kursi kosong untuk duduk · pintu keluar di bawah" : "bicara · klik meja stand untuk berjalan ke sana · klik banner untuk lihat lowongan"}
-              </span>
-              <span className="hint-touch">
-                {room ? "Tap kursi kosong untuk duduk · tap pintu bawah untuk keluar" : "Tap lantai untuk berjalan · tap meja stand untuk ke sana · tap banner untuk lihat lowongan"}
-              </span>
+            <div className="rpg-box hint hint-keys">
+              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> {room ? "duduk" : "bicara"} · 🛗 lift di pojok kanan bawah
             </div>
           ) : null}
         </div>
@@ -849,6 +865,17 @@ export function JobFair() {
           />
         )}
 
+        {session && lift && (
+          <LiftPanel
+            stops={fair.stops}
+            here={floor.id}
+            atLift={reach?.kind === "lift"}
+            ticket={(roomId) => (fair.hasTicket(roomId) ? null : fair.room(roomId)?.price ?? null)}
+            onPick={pickFloor}
+            onClose={() => setLift(false)}
+          />
+        )}
+
         {session && stallView && (
           <FoodMenu
             stall={stallView}
@@ -918,6 +945,8 @@ export function JobFair() {
 
         {!session && (
           <div className="title-screen" onPointerDown={(e) => e.stopPropagation()}>
+            <a className="home-link rpg-box" href="#/">← Beranda</a>
+            <InstallButton className="title-install rpg-box" />
             <CharacterCreator onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Di acara sungguhan, pengunjung registrasi lewat scan QR di pintu masuk." />
           </div>
         )}

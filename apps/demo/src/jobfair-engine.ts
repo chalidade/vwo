@@ -6,6 +6,7 @@ import {
   type CompanyBooth,
   type Facing,
   type FairRoom,
+  type FairStop,
   type FloorView,
   DEMO_JOB_FAIR,
   type JobFairView,
@@ -15,8 +16,9 @@ import {
   buildJobFairFloors,
   fairFloorId,
   fairFloorIndex,
+  LIFT_FRONT,
   fairRoomFloorId,
-  roomDoorFront,
+  fairStops,
   stallSpot,
   facingFor,
   findPath,
@@ -184,8 +186,10 @@ const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo t
 
 export class DemoJobFair {
   readonly fair: JobFairView;
-  /** One walkable floor per level of the hall, ground floor first, then one per room. */
+  /** One walkable floor per hall level, ground floor first, then one per room floor. */
   readonly floors: FloorView[];
+  /** Every floor the lift stops at, bottom first. */
+  readonly stops: FairStop[];
   readonly player: PlayerState = freshPlayer();
   /** Reviews by job seekers, per booth. */
   readonly reviews = new Map<string, CompanyReview[]>();
@@ -215,6 +219,7 @@ export class DemoJobFair {
   ) {
     this.fair = fair;
     this.floors = buildJobFairFloors(fair);
+    this.stops = fairStops(fair);
     this.staff = [
       ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
       { id: "fair-info", name: fair.infoDesk.staff, boothId: null, floorId: fairFloorId(fair, 0), x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
@@ -232,7 +237,7 @@ export class DemoJobFair {
         const host = { id: roomStaffId(room.id), name: room.staff.name, boothId: null, floorId, facing: "front" as Facing };
         if (room.kind === "foodcourt")
           return [
-            { ...host, x: room.width - 2.2, y: room.height - 2.4 },
+            { ...host, x: 3, y: room.height - 2.4 },
             ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(i, "vendor"), facing: "front" as Facing })),
           ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
@@ -316,12 +321,24 @@ export class DemoJobFair {
     return this.fair.rooms.find((r) => fairRoomFloorId(this.fair, r.id) === floorId);
   }
 
-  /** The hall level a floor is on: its own index, or the level of the door that leads into a room. */
+  /** The building level of a floor: a hall's index, or the level a room floor sits on. */
   levelOf(floorId: string) {
-    return this.roomOf(floorId)?.floor ?? Math.max(0, fairFloorIndex(floorId));
+    return this.roomOf(floorId)?.level ?? Math.max(0, fairFloorIndex(floorId));
   }
 
-  /** Take the stairs to another floor. */
+  /** The lift stop for a floor id. */
+  stopOf(floorId: string): FairStop {
+    return this.stops.find((s) => s.floorId === floorId) ?? this.stops[0]!;
+  }
+
+  /** Ride the lift: step out in front of the lift doors on the chosen floor. */
+  ride(id: string, floorId: string) {
+    this.changeFloor(id, floorId, LIFT_FRONT.x, LIFT_FRONT.y);
+    const v = this.visitors.get(id);
+    if (v) v.facing = "front";
+  }
+
+  /** Move someone to another floor. */
   changeFloor(id: string, floorId: string, x: number, y: number) {
     const v = this.visitors.get(id);
     if (!v) return;
@@ -898,11 +915,11 @@ export class DemoJobFair {
     return true;
   }
 
-  /** One step toward `goal`, taking the stairs when it is on another floor. False once arrived. */
+  /** One step toward `goal`, riding the lift when it is on another floor. False once arrived. */
   private walk(v: FairVisitor, route: { path: Point[] | null }, goal: Goal, step: number): boolean {
     const floor = this.floor(v.floorId);
-    const portal = v.floorId === goal.floorId ? null : this.exitToward(floor, goal.floorId);
-    const legEnd = portal ? { x: portal.x + portal.width / 2, y: portal.y + portal.height / 2 } : goal;
+    const viaLift = v.floorId !== goal.floorId;
+    const legEnd = viaLift ? LIFT_FRONT : goal;
     if (!route.path) route.path = findPath(floor, v, legEnd) ?? [legEnd];
     let next = route.path[0];
     while (next && Math.hypot(next.x - v.x, next.y - v.y) < 0.05) {
@@ -911,10 +928,10 @@ export class DemoJobFair {
     }
     if (!next) {
       route.path = null;
-      if (!portal) return false;
-      v.floorId = portal.targetFloorId!;
-      v.x = portal.targetX ?? 1;
-      v.y = portal.targetY ?? 1;
+      if (!viaLift) return false;
+      v.floorId = goal.floorId;
+      v.x = LIFT_FRONT.x;
+      v.y = LIFT_FRONT.y;
       return true;
     }
     const dx = next.x - v.x;
@@ -926,19 +943,6 @@ export class DemoJobFair {
     v.y += (dy / dist) * d;
     return true;
   }
-
-  /** The stairs or door on `floor` that lead one step closer to `floorId` (a hall floor or a room). */
-  exitToward(floor: FloorView, floorId: string) {
-    const objects = floor.objects ?? [];
-    if (this.roomOf(floor.id)) return objects.find((o) => o.type === "door" && o.targetFloorId) ?? null;
-    const here = fairFloorIndex(floor.id);
-    const room = this.roomOf(floorId);
-    const level = room ? room.floor : fairFloorIndex(floorId);
-    if (level === here) return room ? (objects.find((o) => o.type === "door" && o.targetFloorId === floorId) ?? null) : null;
-    const next = fairFloorId(this.fair, here + Math.sign(level - here));
-    return objects.find((o) => o.type === "stairs" && o.targetFloorId === next) ?? null;
-  }
-
 }
 
 export const recruiterId = (boothId: string) => `rec-${boothId}`;

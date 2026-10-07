@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, psikotesExtras, roomDoorExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
+import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, liftExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "./jobfair-engine";
 import { staffLook } from "./JobFair";
 import { COMPANY_TITLES, levelOf } from "./fair/content";
@@ -23,8 +23,10 @@ const time = (at: number) => new Date(at).toLocaleTimeString("id-ID", { hour: "2
 export function JobFairAdmin() {
   useFair();
   const booths = fair.fair.booths;
-  const [level, setLevel] = useState(0);
-  const floor = fair.floors[level] ?? fair.floors[0]!;
+  const [tab, setTab] = useState(0);
+  const stop = fair.stops[tab] ?? fair.stops[0]!;
+  const floor = fair.floor(stop.floorId);
+  const level = fair.levelOf(floor.id);
   const room = fair.roomOf(floor.id);
   const visitors = [...fair.visitors.values()];
   const decide = (id: string, status: ApplicationStatus) => fair.setStatus(id, status);
@@ -59,9 +61,9 @@ export function JobFairAdmin() {
         </div>
       </div>
       <div className="floor-tabs" role="tablist">
-        {fair.floors.map((f, i) => (
-          <button key={f.id} type="button" role="tab" aria-selected={i === level} data-active={i === level ? "" : undefined} onClick={() => setLevel(i)}>
-            {fair.roomOf(f.id)?.emoji} {f.name} <span className="muted">({visitors.filter((v) => v.floorId === f.id).length} orang)</span>
+        {fair.stops.map((st, i) => (
+          <button key={st.floorId} type="button" role="tab" aria-selected={i === tab} data-active={i === tab ? "" : undefined} onClick={() => setTab(i)}>
+            {st.name} · {st.emoji} {st.label} <span className="muted">({visitors.filter((v) => v.floorId === st.floorId).length} orang)</span>
           </button>
         ))}
       </div>
@@ -69,7 +71,7 @@ export function JobFairAdmin() {
         <CafeScene
           className="admin-scene"
           floor={floor}
-          floorName={(id) => fair.fair.floors[fair.floors.findIndex((f) => f.id === id)]?.name ?? "Tangga"}
+          floorName={(id) => fair.stopOf(id).name}
           hallTitle={room ? undefined : fair.fair.name}
           hallBanner={!room}
           occupiedSeatIds={fair.occupiedSeats()}
@@ -77,8 +79,9 @@ export function JobFairAdmin() {
           lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
           npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
           bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-          extras={
-            room
+          extras={[
+            ...liftExtras(stop.name, fair.stops),
+            ...(room
               ? room.kind === "foodcourt"
                 ? foodStallExtras(room)
                 : room.kind === "psikotes"
@@ -88,10 +91,9 @@ export function JobFairAdmin() {
                   ...booths.filter((b) => b.floor === level).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
                   ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
                   ...fair.fair.sponsors.filter((sp) => sp.floor === level).map((sp) => sponsorExtras(sp)),
-                  ...fair.fair.rooms.filter((r) => r.floor === level).flatMap((r) => roomDoorExtras(r)),
                   ...(fair.fair.coinStand.floor === level ? coinStandExtras(fair.fair.coinStand) : []),
-                ]
-          }
+                ]),
+          ]}
           hallSponsors={fair.fair.sponsors}
         />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>

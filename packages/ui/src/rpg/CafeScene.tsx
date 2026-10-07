@@ -251,6 +251,8 @@ export function CafeScene({
         onClick: onBaristaClick,
         title: "Barista",
       });
+    } else if (o.spriteKey === "lift") {
+      // Drawn by the page as an extra, with its floor directory.
     } else if (o.type === "stairs" || o.type === "elevator") {
       const up = o.spriteKey === "stairs-up" ? true : o.spriteKey === "stairs-down" ? false : floor.theme !== "rooftop";
       ground.push({
@@ -467,7 +469,15 @@ export function CafeScene({
         ))}
 
         {ground.map((e) => (
-          <div key={e.key} className="rpg-ent" style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: e.z }}>
+          <div
+            key={e.key}
+            className="rpg-ent"
+            data-hit={e.onClick ? "" : undefined}
+            title={e.title}
+            onPointerDown={e.onClick ? (ev) => ev.stopPropagation() : undefined}
+            onClick={e.onClick}
+            style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: e.z, cursor: e.onClick ? "pointer" : undefined }}
+          >
             {e.node}
           </div>
         ))}
