@@ -16,6 +16,8 @@ export interface AvatarState {
   /** Member this NPC follows, for companions. */
   followsMemberId?: string | null;
   seatId?: string | null;
+  /** Has the blue verified check. */
+  verified?: boolean;
 }
 
 export interface ClientToServerEvents {

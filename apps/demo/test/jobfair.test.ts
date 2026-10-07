@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
-import { APPLY_COST, START_COINS, levelOf } from "../src/fair/content";
-import { DemoJobFair, type FairSaved, PLAYER_ID } from "../src/jobfair-engine";
+import { APPLY_COST, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript } from "../src/fair/content";
+import { DemoJobFair, type FairSaved, PLAYER_ID, promoterId } from "../src/jobfair-engine";
 
 function clock() {
   let t = 1_000_000;
@@ -129,13 +129,16 @@ describe("DemoJobFair", () => {
     expect(fair.buyTicket("psikotes")).toBe(true);
     expect(fair.player.coins).toBe(START_COINS - APPLY_COST - 20);
 
-    // Food: pay coins, get a voucher (rand 0.5 picks the half-price psikotes voucher).
-    const meal = fair.buyFood("kopi", "es-teh")!;
-    expect(meal.voucher.title).toBeTruthy();
-    expect(fair.player.vouchers).toHaveLength(1);
+    // Food court: buy a voucher for a business's outlet, with a job fair bonus.
+    const deal = fair.buyDeal("kopi", "kopi-free")!;
+    expect(deal.voucher.kind).toBe("merchant");
+    expect(deal.voucher.code).toMatch(/^KOPI-\d{4}[A-Z]$/);
+    expect(deal.bonus.title).toBeTruthy();
+    expect(fair.player.vouchers).toHaveLength(2);
+    expect(fair.ads.get("stall:kopi")).toMatchObject({ sold: 1, coins: 7 });
 
     // Run out of coins: applying is refused until topping up.
-    for (let i = 0; i < 100 && fair.player.coins >= APPLY_COST; i++) fair.buyFood("kopi", "es-teh");
+    for (let i = 0; i < 100 && fair.player.coins >= APPLY_COST; i++) fair.buyDeal("nasgor", "nasgor-paket");
     const jobs = DEMO_JOB_FAIR.booths.flatMap((b) => b.jobs.map((j) => ({ boothId: b.id, jobId: j.id })));
     let sent = 0;
     for (const j of jobs.slice(1, 40)) if (fair.apply(PLAYER_ID, j)) sent++;
@@ -184,5 +187,53 @@ describe("DemoJobFair", () => {
     expect(fair.sit(other.memberId, seat.id)).toBe(false);
     fair.stand(PLAYER_ID);
     expect(fair.sit(other.memberId, seat.id)).toBe(true);
+  });
+
+  it("places promoters where people can walk up to them, and counts their reach", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    expect(fair.fair.promoters.length).toBeGreaterThanOrEqual(4);
+    for (const p of fair.fair.promoters) {
+      const npc = fair.staff.find((s) => s.id === promoterId(p.id))!;
+      const f = fair.floor(npc.floorId);
+      expect(p.url).toMatch(/^https:\/\/[a-z0-9-]+\.example(\/|$)/);
+      expect(isBlocked(f, p.x, p.y + 1.1), p.id).toBe(false);
+      expect(findPath(f, LIFT_FRONT, { x: p.x, y: p.y + 1.1 }), p.id).not.toBeNull();
+    }
+    fair.join("Chalid", false, PLAYER_ID);
+    const p = fair.fair.promoters.find((x) => x.code)!;
+    fair.ad(`promo:${p.id}`, "view");
+    expect(fair.savePromo(p.id)).toBe(true);
+    expect(fair.savePromo(p.id)).toBe(false);
+    expect(fair.hasPromo(p.id)).toBe(true);
+    expect(fair.ads.get(`promo:${p.id}`)).toMatchObject({ views: 1, clicks: 1 });
+    for (const st of fair.fair.rooms.flatMap((r) => r.stalls ?? [])) {
+      expect(st.website).toMatch(/\.example$/);
+      expect(st.deals.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("sells the blue check once and shows it on applications", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const me = fair.join("Chalid", false, PLAYER_ID);
+    expect(me.verified).toBe(false);
+    expect(fair.buyVerified()).toBe(false);
+    fair.buyCoins("koin-120", "QRIS");
+    const before = fair.player.coins;
+    expect(fair.buyVerified()).toBe(true);
+    expect(fair.player.coins).toBe(before - VERIFY_COST);
+    expect(me.verified).toBe(true);
+    expect(fair.buyVerified()).toBe(true);
+    expect(fair.player.coins).toBe(before - VERIFY_COST);
+    expect(fair.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: "kk-barista" })?.verified).toBe(true);
+    fair.reset();
+    expect(me.verified).toBe(false);
+  });
+
+  it("scripts every seminar slide point by point", () => {
+    for (const s of SEMINARS) {
+      const lines = seminarScript(s);
+      s.slides.forEach((sl, i) => expect(lines.filter((l) => l.slide === i && l.reveal > 0).map((l) => l.reveal).slice(0, sl.points.length)).toEqual(sl.points.map((_, k) => k + 1)));
+      expect(lines.at(-1)!.text).toContain("Terima kasih");
+    }
   });
 });

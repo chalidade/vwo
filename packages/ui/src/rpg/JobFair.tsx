@@ -195,26 +195,49 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
         <>
           {/* Spotlights on the posts, shining on the wall. */}
           {[14, w - 14].map((cx) => (
-            <g key={cx}>
-              <path d={`M${cx} 40L${cx + (cx < w / 2 ? 46 : -46)} ${h - 4}H${cx + (cx < w / 2 ? 10 : -10)}Z`} fill="#fde047" opacity={0.35} className="jb-spot" />
-              <circle cx={cx} cy={38} r={7} fill="#1f2937" {...ink} strokeWidth={1.4} />
-              <circle cx={cx} cy={39} r={3.5} fill="#fde047" />
+            <g key={cx} transform={`translate(${cx}, 38)`}>
+              <g className="jb-sweep" data-side={cx < w / 2 ? "l" : "r"}>
+                <path d={`M0 2L${cx < w / 2 ? 52 : -52} ${h - 42}H${cx < w / 2 ? 12 : -12}Z`} fill="url(#jb-beam)" className="jb-spot" />
+              </g>
+              <circle r={7} fill="#1f2937" {...ink} strokeWidth={1.4} />
+              <circle cy={1} r={3.5} fill="#fef9c3" />
             </g>
           ))}
+          <defs>
+            <linearGradient id="jb-beam" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#fef9c3" stopOpacity={0.75} />
+              <stop offset="1" stopColor="#fde047" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <rect x={-9} y={-5} width={w + 18} height={44} rx={7} fill={GOLD} {...ink} />
+          {/* Chasing marquee bulbs along the gold frame. */}
+          {Array.from({ length: 22 }, (_, i) => (
+            <circle key={i} cx={-3 + (i * (w + 6)) / 21} cy={36} r={2.3} className="jb-bulb" data-odd={i % 2 ? "" : undefined} />
+          ))}
         </>
       )}
       {/* Fascia with the company name. */}
       <rect x={-4} y={0} width={w + 8} height={34} rx={4} fill={booth.color} {...ink} />
       {premium && (
-        <g transform={`translate(${w / 2}, 42)`}>
-          <g className="jb-crown">
-            <rect x={-46} y={-9} width={92} height={18} rx={9} fill={GOLD} {...ink} strokeWidth={1.6} />
-            <text x={0} y={4} textAnchor="middle" fontSize={10.5} fontWeight={900} fill="#422006" letterSpacing={1} fontFamily="system-ui, sans-serif">
-              👑 PREMIUM
-            </text>
+        <>
+          {/* A running LED ticker under the name. */}
+          <rect x={50} y={40} width={w - 60} height={13} rx={2} fill="#0b0f19" {...ink} strokeWidth={1.2} />
+          <foreignObject x={52} y={40} width={w - 64} height={13}>
+            <div className="jb-led">
+              <span>
+                ★ {booth.company.toUpperCase()} · {booth.jobs.length} LOWONGAN DIBUKA · {booth.tagline.toUpperCase()} · INTERVIEW LANGSUNG DI STAND ★
+              </span>
+            </div>
+          </foreignObject>
+          <g transform="translate(30, 46.5)">
+            <g className="jb-crown">
+              <rect x={-21} y={-9} width={42} height={18} rx={9} fill="#111827" stroke={GOLD} strokeWidth={2} />
+              <text x={0} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={GOLD} letterSpacing={2} fontFamily="system-ui, sans-serif">
+                VIP
+              </text>
+            </g>
           </g>
-        </g>
+        </>
       )}
       <g transform="translate(24, 17)">
         <Logo booth={booth} r={13} />
@@ -235,14 +258,14 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
         </text>
       )}
       {/* Posters. */}
-      <g transform={`translate(18, ${premium ? 52 : 42})`}>
+      <g transform={`translate(18, ${premium ? 56 : 42})`}>
         <rect width={104} height={50} rx={4} fill="#fff" {...ink} strokeWidth={1.4} />
         <rect width={104} height={12} rx={3} fill={booth.color} opacity={0.85} />
         <foreignObject x={4} y={13} width={96} height={36}>
           <div className="jb-poster">{booth.tagline}</div>
         </foreignObject>
       </g>
-      <g transform={`translate(134, ${premium ? 52 : 42})`}>
+      <g transform={`translate(134, ${premium ? 56 : 42})`}>
         <rect width={96} height={50} rx={4} fill="#fef3c7" {...ink} strokeWidth={1.4} />
         <text x={48} y={22} textAnchor="middle" fontSize={13} fontWeight={900} fill={INK} fontFamily="system-ui, sans-serif">
           KAMI
@@ -252,7 +275,7 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
         </text>
       </g>
       {/* A small screen. */}
-      <g transform={`translate(${w - 50}, 46)`}>
+      <g transform={`translate(${w - 50}, ${premium ? 58 : 46})`}>
         <rect width={34} height={24} rx={3} fill="#1f2937" {...ink} strokeWidth={1.4} />
         <rect x={3} y={3} width={28} height={18} rx={2} fill={booth.color} opacity={0.7} />
         <path d="M13 8l8 4-8 4Z" fill="#fff" />
@@ -313,6 +336,23 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       ground: true,
       node: <div className="jb-carpet" data-premium={booth.tier === "premium" ? "" : undefined} style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
     },
+    ...(booth.tier === "premium"
+      ? [
+          {
+            key: `${booth.id}-pool`,
+            x: x + 0.1,
+            y: y + 0.5,
+            z: 0.5,
+            ground: true,
+            node: (
+              <div className="jb-pools" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T }}>
+                <span />
+                <span />
+              </div>
+            ),
+          },
+        ]
+      : []),
     { key: `${booth.id}-panel`, x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} rating={opts.rating} /> },
     {
       key: `${booth.id}-desk`,

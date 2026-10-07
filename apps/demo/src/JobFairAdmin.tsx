@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, liftExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
+import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, liftExtras, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "./jobfair-engine";
 import { staffLook } from "./JobFair";
 import { COMPANY_TITLES, levelOf } from "./fair/content";
@@ -77,10 +77,11 @@ export function JobFairAdmin() {
           occupiedSeatIds={fair.occupiedSeats()}
           avatars={[...fair.visitors.values()]}
           lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
-          npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || "#1e3a8a") }))}
+          npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || fair.fair.promoters.find((p) => s.id.endsWith(p.id))?.color || "#1e3a8a") }))}
           bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
           extras={[
             ...liftExtras(stop.name, fair.stops),
+            ...fair.fair.promoters.filter((p) => p.level === stop.level).flatMap((p) => promoterExtras(p)),
             ...(room
               ? room.kind === "foodcourt"
                 ? foodStallExtras(room)
@@ -131,7 +132,7 @@ export function JobFairAdmin() {
             {[...booths].sort((a, b) => a.floor - b.floor).map((b) => (
               <tr key={b.id}>
                 <td>
-                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span title="Stand premium">👑</span>}
+                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span title="Stand VIP">👑</span>}
                 </td>
                 <td>{fair.fair.floors[b.floor]?.name}</td>
                 <td>{b.recruiter}</td>
@@ -178,6 +179,45 @@ export function JobFairAdmin() {
         </table>
       </div>
       <div className="card">
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>Media iklan</h2>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Slot berbayar: NPC promotor (dilihat = pengunjung mendengar promonya, klik = buka situs atau simpan kode) dan tenant food court (voucher terjual).
+        </p>
+        <table className="list">
+          <thead>
+            <tr>
+              <th>Pengiklan</th>
+              <th>Slot</th>
+              <th>Dilihat</th>
+              <th>Klik</th>
+              <th>Voucher terjual</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ...fair.fair.promoters.map((p) => ({ key: `promo:${p.id}`, name: `${p.emoji} ${p.brand}`, color: p.color, slot: `NPC promotor · ${fair.stops.find((st) => st.level === p.level)?.name ?? ""}` })),
+              ...fair.fair.rooms.flatMap((r) => r.stalls ?? []).map((st) => ({ key: `stall:${st.id}`, name: `${st.emoji} ${st.name}`, color: st.color, slot: "Tenant food court" })),
+            ].map((row) => {
+              const a = fair.ads.get(row.key);
+              return (
+                <tr key={row.key}>
+                  <td>
+                    <span className="dot" style={{ background: row.color }} /> {row.name}
+                  </td>
+                  <td className="muted small">{row.slot}</td>
+                  <td>{a?.views ?? 0}</td>
+                  <td>
+                    {a?.clicks ?? 0}
+                    {a?.views ? <span className="muted small"> ({Math.round(((a.clicks ?? 0) / a.views) * 100)}%)</span> : null}
+                  </td>
+                  <td>{row.key.startsWith("stall:") ? `${a?.sold ?? 0} · ${a?.coins ?? 0} 🪙` : "–"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="card">
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Lamaran masuk</h2>
         {fair.applications.length === 0 && <p className="muted">Belum ada lamaran.</p>}
         <div style={{ overflowX: "auto" }}>
@@ -187,7 +227,7 @@ export function JobFairAdmin() {
                 <tr key={a.id}>
                   <td className="muted">{time(a.at)}</td>
                   <td>
-                    {a.name} {a.isBot && <span className="muted">· bot</span>}
+                    {a.name}{a.verified && <span className="rpg-check" title="Verified">✔</span>} {a.isBot && <span className="muted">· bot</span>}
                     {a.email && (
                       <>
                         <br />

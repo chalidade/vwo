@@ -4,6 +4,24 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: seminar share screen, sertifikat psikotes, stand VIP, centang biru, food court promo, NPC iklan
+
+**Konteks:** owner melaporkan duduk di ruang seminar dan psikotes tidak memicu apa pun. Owner juga minta seminar berupa fasilitator yang share screen dan menjelaskan, sertifikat psikotes bila lulus, stand VIP yang lebih meriah tapi tetap profesional, menu beli centang biru, food court sebagai tempat cafe dan rumah makan promosi lalu jual voucher, serta NPC sales atau promotor yang bisa dijual sebagai media iklan.
+
+**Yang berubah**
+- **Duduk:** tap di dekat kursi (tidak harus tepat di kursinya) sekarang berjalan ke kursi itu lalu duduk. Penyebabnya, di HP kursinya kecil sehingga tap sering jatuh ke lantai dan hanya membuat karakter berjalan. Saat sudah duduk di ruang seminar atau psikotes, muncul tombol kecil "Tonton seminar" atau "Kerjakan psikotes", dan tap karakter sendiri juga membuka lagi aktivitasnya.
+- **Seminar:** tampil seperti video call. Ada label LIVE, layar presentasi dari fasilitator, kamera kecil pembicara, subtitle yang menjelaskan tiap poin, poin slide yang muncul satu per satu, reaksi penonton, serta tombol jeda, lewati, CC, dan jadwal. Sesi yang tampil sama dengan yang ada di panggung. Selesai menonton dapat sertifikat bernomor.
+- **Psikotes:** nilai minimal 70% dapat Sertifikat Psikotes bernomor. Bila belum lulus ada tombol "Ulangi tes".
+- **Stand VIP** (6 stand): label VIP, running LED berisi nama perusahaan dan jumlah lowongan, lampu bohlam berkedip bergantian di bingkai emas, lampu sorot yang menyapu kiri-kanan, dan sorotan cahaya di karpet. Semua animasi mati bila perangkat memilih reduce motion.
+- **Centang biru:** tombol ✔ Verified di menu bawah dan di Profil, harganya 60 koin (koin demo). Centangnya tampil di samping nama, ikut terkirim ke pemain di device lain, dan muncul di daftar lamaran admin. Sebagian bot juga terverifikasi. Catatan: di server publik siapa pun bisa mengaku verified, jadi acara sungguhan perlu memeriksanya di server sendiri.
+- **Food court:** keempat stand sekarang usaha fiktif yang mempromosikan outletnya. Isinya promo, deskripsi, alamat, jam buka, situs `.example`, rating, menu andalan dengan harga rupiah, dan voucher yang dibeli pakai koin. Voucher berisi kode unik untuk ditukar di outlet dan tersimpan di dompet. Setiap pembelian juga dapat bonus job fair (lamar gratis, diskon ruangan, atau cashback).
+- **NPC promotor:** 5 promotor fiktif (Telko Nusa, Kelas Koding Kita, Tabungan Gajian, KosDekat, Segar Botol) berdiri di Lantai 1–4 dengan roll-up banner dan sesekali berteriak promo. Tap promotornya, karakter berjalan ke sana, lalu muncul kartu iklan berlabel IKLAN dengan penawaran, kode promo yang bisa disimpan, dan tombol ke situs `.example`.
+- **Admin:** tabel baru "Media iklan" berisi jumlah dilihat, klik (beserta CTR), dan voucher terjual untuk tiap promotor dan tenant food court.
+
+**Cek:** typecheck semua paket, 21 test demo dan 9 test shared lolos. Diuji di Chromium ukuran HP: tap di dekat kursi seminar membuka share screen, tombol "Tonton seminar" muncul setelah ditutup, psikotes 12/12 memberi sertifikat, voucher Es Kopi Kita terbeli dengan kode, kartu iklan Telko Nusa terbuka, dan centang biru tampil di nama. Screenshot ada di `screenshots/jobfair-ads/`.
+
+---
+
 ## 2026-10-07 · Job fair: menu di bawah, tap untuk ngobrol, sofa, stand premium, multiplayer real time
 
 **Konteks:** owner minta menu pengguna di paling bawah, tombol seperti "Tanya panitia" dihapus dan diganti otomatis saat orangnya di-tap, bisa duduk di sofa, tanaman bergerak halus, sebagian stand terlihat premium, dan bisa bertemu pengguna lain dari device berbeda secara real time di web yang sama.

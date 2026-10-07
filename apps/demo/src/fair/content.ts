@@ -81,7 +81,37 @@ export const SEMINARS: SeminarSession[] = [
   },
 ];
 
-export type VoucherKind = "free-apply" | "room-free" | "room-half" | "coins" | "sponsor";
+/** Sessions take turns on the stage, three minutes each, so everyone in the room sees the same one. */
+export function liveSeminar(now = Date.now()) {
+  return SEMINARS[Math.floor(now / 180000) % SEMINARS.length]!;
+}
+
+/** What the speaker says over a slide, line by line: an opening, one line per point, then the takeaway.
+ *  `reveal` is how many of the slide's points are on screen while that line plays. */
+export function seminarScript(s: SeminarSession) {
+  const lines: { slide: number; reveal: number; text: string }[] = [];
+  s.slides.forEach((sl, i) => {
+    lines.push({
+      slide: i,
+      reveal: 0,
+      text: i === 0 ? `Halo semuanya, saya ${s.speaker}, ${s.role}. Hari ini kita bahas "${s.title}". Kita mulai dari: ${sl.title.toLowerCase()}.` : `Lanjut ke bagian berikutnya: ${sl.title.toLowerCase()}.`,
+    });
+    sl.points.forEach((pt, k) => lines.push({ slide: i, reveal: k + 1, text: k === 0 ? `Pertama, ${lowerFirst(pt)}.` : k === sl.points.length - 1 ? `Terakhir, ${lowerFirst(pt)}.` : `Lalu, ${lowerFirst(pt)}.` }));
+    lines.push({ slide: i, reveal: sl.points.length, text: sl.say });
+  });
+  lines.push({ slide: s.slides.length - 1, reveal: s.slides[s.slides.length - 1]!.points.length, text: "Sekian dari saya. Terima kasih sudah hadir, semoga sukses di job fair ini! 👏" });
+  return lines;
+}
+
+const lowerFirst = (t: string) => (/^[A-Z][a-z]/.test(t) ? t[0]!.toLowerCase() + t.slice(1) : t).replace(/[.]$/, "");
+
+/** How long a subtitle line stays up, in milliseconds. */
+export const lineMs = (text: string) => Math.min(9000, 2200 + text.length * 55);
+
+/** Score needed to pass the psikotes and get its certificate. */
+export const PSYCH_PASS = 0.7;
+
+export type VoucherKind = "free-apply" | "room-free" | "room-half" | "coins" | "sponsor" | "merchant";
 
 export interface VoucherTemplate {
   kind: VoucherKind;
@@ -120,5 +150,7 @@ export function levelOf(xp: number) {
 /** XP rewards. */
 export const XP = { visit: 5, apply: 10, ratedPerStar: 10, review: 5, seminar: 30, psychMax: 50, food: 2 } as const;
 export const APPLY_COST = 5;
+/** Price of the blue verified check, in coins. */
+export const VERIFY_COST = 60;
 export const START_COINS = 50;
 export const DAILY_COINS = 20;
