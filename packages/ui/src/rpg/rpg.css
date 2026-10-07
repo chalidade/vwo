@@ -981,6 +981,8 @@
 }
 
 /* Job fair rooms. */
+.fr-sign { display: flex; align-items: center; gap: 4px; width: 96px; height: 34px; padding: 0 8px; box-sizing: border-box; border-radius: 8px; background: rgb(250 204 21 / 0.55); border: 2px dashed #a16207; font: 900 12px system-ui, sans-serif; color: #422006; cursor: pointer; }
+.fr-sign b { display: inline-block; font-size: 18px; line-height: 1; margin-left: auto; }
 .fr-mat { border-radius: 6px; background: color-mix(in srgb, var(--c) 30%, #fff); border: 2px dashed color-mix(in srgb, var(--c) 70%, #000); opacity: 0.85; }
 .fr-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; background: #f8fafc; border: 4px solid #1f2937; border-radius: 6px; box-shadow: 0 6px 0 rgb(0 0 0 / 0.25); text-align: center; padding: 8px 16px; box-sizing: border-box; font-family: system-ui, sans-serif; }
 .fr-screen-session { font-size: 12px; font-weight: 800; color: #0e7490; text-transform: uppercase; letter-spacing: 0.06em; }

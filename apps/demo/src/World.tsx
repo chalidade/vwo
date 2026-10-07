@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { type AvatarState, type Emote, DEMO_MENU, EMOTES, findPath, menuPages, portalAt, slide } from "@vwo/shared";
 import { CafeScene, type DialogChoice, DialogBox, type Look, MenuBook, counterFront, lookFor } from "@vwo/ui";
 import { WAITER_LOOK } from "./staff";
+import { InstallButton } from "./install";
 import { CharacterCreator, type Character } from "./CharacterCreator";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { cafe, onFrame, useCafe } from "./useCafe";
@@ -384,7 +385,6 @@ export function World() {
               <span className="hint-keys">
                 <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">Shift</span> lari · <span className="rpg-kbd">E</span> duduk / bicara · klik lantai untuk berjalan
               </span>
-              <span className="hint-touch">Tap lantai untuk berjalan · tap kursi untuk duduk · tap orang untuk menyapa</span>
             </div>
           ) : null}
         </div>
@@ -422,6 +422,8 @@ export function World() {
 
         {!session && (
           <div className="title-screen" onPointerDown={(e) => e.stopPropagation()}>
+            <a className="home-link rpg-box" href="#/">← Beranda</a>
+            <InstallButton className="title-install rpg-box" />
             <CharacterCreator onCheckIn={checkIn} />
           </div>
         )}

@@ -1,7 +1,7 @@
 "use client";
-// Drawings for the job fair's extra places: room doors in the hall, the coin stand, food court
+// Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { COIN_STAND_H, COIN_STAND_W, type CoinStandView, type FairRoom, ROOM_DOOR_H, ROOM_DOOR_W, stallRect } from "@vwo/shared";
+import { COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, stallRect } from "@vwo/shared";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -9,59 +9,90 @@ const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, s
 const T = 48;
 const font = "system-ui, sans-serif";
 
-/** A wall panel with a doorway, standing in the hall, with the room's sign on top. */
-function RoomDoor({ room, locked }: { room: FairRoom; locked: boolean }) {
-  const w = ROOM_DOOR_W * T;
-  const h = 2.5 * T;
-  const post = 0.7 * T;
+/** The lift: a steel wall piece with two doors, the floor display, and the directory beside it. */
+function LiftWall({ here, stops }: { here: string; stops: FairStop[] }) {
+  const w = FAIR_LIFT.width * T;
+  const h = 3 * T;
+  const door = 1.25 * T;
+  const dx = w / 2 - door - 2;
   return (
     <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
-      <rect x={0} y={22} width={w} height={h - 22} rx={3} fill="#e2e8f0" {...ink} />
-      <rect x={0} y={h - 14} width={w} height={14} fill="#94a3b8" opacity={0.6} />
-      {/* The doorway, open into a lit room. */}
-      <rect x={post} y={40} width={w - post * 2} height={h - 40} fill="#fef9c3" {...ink} strokeWidth={1.8} />
-      <rect x={post} y={40} width={w - post * 2} height={10} fill={room.color} opacity={0.35} />
-      {/* Sign. */}
-      <rect x={-6} y={0} width={w + 12} height={34} rx={6} fill={room.color} {...ink} />
-      <text x={w / 2} y={22} textAnchor="middle" fontSize={13} fontWeight={900} fill="#fff" fontFamily={font}>
-        {room.emoji} {room.name.toUpperCase()}
+      <rect x={0} y={18} width={w} height={h - 18} rx={3} fill="#cbd5e1" {...ink} />
+      <rect x={0} y={h - 12} width={w} height={12} fill="#64748b" opacity={0.6} />
+      {/* Sign and floor display. */}
+      <rect x={-6} y={0} width={w + 12} height={30} rx={6} fill="#0f172a" {...ink} />
+      <text x={w / 2} y={20} textAnchor="middle" fontSize={14} fontWeight={900} fill="#facc15" fontFamily={font}>
+        🛗 LIFT · {here}
       </text>
-      {/* Price tag. */}
-      <g transform={`translate(${w - 6}, 52)`}>
-        <rect x={-30} y={-10} width={36} height={20} rx={5} fill={room.price ? "#facc15" : "#86efac"} {...ink} strokeWidth={1.6} />
-        <text x={-12} y={4} textAnchor="middle" fontSize={10.5} fontWeight={900} fill={INK} fontFamily={font}>
-          {room.price ? `${room.price}🪙` : "GRATIS"}
-        </text>
+      {/* Two sets of doors. */}
+      {[dx, w / 2 + 2].map((x0, k) => (
+        <g key={k}>
+          <rect x={x0 + 8} y={40} width={door - 16} height={h - 52} fill="#e2e8f0" {...ink} strokeWidth={1.8} />
+          <path d={`M${x0 + door / 2} 40V${h - 12}`} stroke={INK} strokeWidth={1.6} />
+          <rect x={x0 + door / 2 - 14} y={44} width={28} height={10} rx={3} fill="#0f172a" />
+        </g>
+      ))}
+      {/* Call buttons. */}
+      <rect x={w / 2 - 7} y={70} width={14} height={26} rx={4} fill="#f8fafc" {...ink} strokeWidth={1.4} />
+      <path d="M0 -4l4 5h-8Z" transform={`translate(${w / 2}, 78)`} fill="#16a34a" />
+      <path d="M0 4l4 -5h-8Z" transform={`translate(${w / 2}, 89)`} fill="#16a34a" />
+      {/* Directory: every floor and what is there. */}
+      <g transform={`translate(-102, 26)`}>
+        <rect width={92} height={stops.length * 15 + 10} rx={5} fill="#fff" {...ink} strokeWidth={1.6} />
+        {stops.map((st, i) => (
+          <text key={st.floorId} x={6} y={17 + i * 15} fontSize={9.5} fontWeight={st.name === here ? 900 : 700} fill={st.name === here ? "#b45309" : INK} fontFamily={font}>
+            {st.level + 1} · {st.emoji} {st.label.length > 12 ? `${st.label.slice(0, 11)}…` : st.label}
+          </text>
+        ))}
       </g>
-      {room.price > 0 && (
-        <text x={14} y={64} fontSize={14} fontFamily={font}>
-          {locked ? "🔒" : "🎟️"}
-        </text>
-      )}
     </svg>
   );
 }
 
-export function roomDoorExtras(room: FairRoom, opts: { locked?: boolean; onClick?: () => void } = {}): SceneExtra[] {
+/** The lift in the corner of a floor, with a mat in front where you wait for it. */
+export function liftExtras(here: string, stops: FairStop[], onClick?: () => void): SceneExtra[] {
   return [
     {
-      key: `door-${room.id}`,
-      x: room.doorX,
-      y: room.doorY + ROOM_DOOR_H - 2.5,
-      z: room.doorY + ROOM_DOOR_H,
-      onClick: opts.onClick,
-      title: `${room.name}${room.price ? ` · ${room.price} koin` : ""}`,
-      node: <RoomDoor room={room} locked={opts.locked ?? false} />,
+      key: "lift",
+      x: FAIR_LIFT.x,
+      y: FAIR_LIFT.y + FAIR_LIFT.height - 3,
+      z: FAIR_LIFT.y + FAIR_LIFT.height,
+      onClick,
+      title: onClick ? "Naik lift" : undefined,
+      node: <LiftWall here={here} stops={stops} />,
     },
     {
-      key: `door-${room.id}-mat`,
-      x: room.doorX + 0.6,
-      y: room.doorY + ROOM_DOOR_H,
+      key: "lift-mat",
+      x: FAIR_LIFT.x + 0.6,
+      y: FAIR_LIFT.y + FAIR_LIFT.height + 0.1,
       z: 0,
       ground: true,
-      node: <div className="fr-mat" style={{ width: (ROOM_DOOR_W - 1.2) * T, height: 0.7 * T, ["--c" as string]: room.color }} />,
+      node: <div className="fr-mat" style={{ width: (FAIR_LIFT.width - 1.2) * T, height: 1.1 * T, ["--c" as string]: "#facc15" }} />,
     },
   ];
+}
+
+/** Arrows painted on the floor that point the way to the lift. */
+export function liftSignExtras(spots: { x: number; y: number }[], onClick?: () => void): SceneExtra[] {
+  const to = { x: FAIR_LIFT.x + FAIR_LIFT.width / 2, y: FAIR_LIFT.y + FAIR_LIFT.height + 0.6 };
+  return spots.map((p, i) => {
+    const deg = (Math.atan2(to.y - p.y, to.x - p.x) * 180) / Math.PI;
+    return {
+      key: `lift-sign-${i}`,
+      x: p.x - 1,
+      y: p.y - 0.35,
+      z: 0,
+      ground: true,
+      onClick,
+      title: onClick ? "Ke lift" : undefined,
+      node: (
+        <div className="fr-sign">
+          <span>🛗 LIFT</span>
+          <b style={{ transform: `rotate(${deg}deg)` }}>➜</b>
+        </div>
+      ),
+    };
+  });
 }
 
 /** The coin stand: a gold counter with a price list. */

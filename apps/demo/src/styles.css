@@ -86,13 +86,13 @@ h1 { margin: 0; }
 .hud-bottom > * { pointer-events: auto; }
 .prompt { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
 .hint { padding: 6px 12px; font-size: 13px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.toast { position: absolute; z-index: 7; top: 70px; left: 50%; transform: translateX(-50%); padding: 6px 14px; font-weight: 700; }
+.toast { position: absolute; z-index: 7; bottom: 136px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 4px 12px; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .hud-bl { left: 12px; bottom: 76px; }
 .actions { display: flex; gap: 4px; padding: 6px; }
 .actions button { background: #fff; color: var(--text); padding: 4px 8px; font-size: 18px; box-shadow: 0 2px 0 #3b2a20; border-width: 2px; }
 .actions button.leave, .actions button.menu-btn { font-size: 13px; }
 .group-code { margin-top: 6px; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; }
-.title-screen { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: 12px; background: rgb(20 12 8 / 0.45); overflow: auto; }
+.title-screen { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: 64px 12px 12px; background: rgb(20 12 8 / 0.45); overflow: auto; }
 
 /* ---- Character creator ---- */
 .cc { display: flex; gap: 20px; padding: 18px 20px; max-width: 640px; width: 100%; flex-wrap: wrap; }
@@ -161,11 +161,12 @@ h1 { margin: 0; }
 .sp-stamp-mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; border: 3px dashed #c9a27c; color: #c9a27c; font-weight: 900; font-size: 18px; }
 .sp-stamp[data-got] { border-style: solid; border-color: var(--c); }
 .sp-stamp[data-got] .sp-stamp-mark { border: 3px double var(--c); background: color-mix(in srgb, var(--c) 15%, #fff); color: var(--c); transform: rotate(-12deg); }
+/* Phones walk by tapping and need no instructions on screen. */
 .hint-touch { display: none; }
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 640px) {
   .hint-keys { display: none; }
-  .hint-touch { display: inline; }
 }
+.home-link { position: absolute; top: 12px; left: 12px; z-index: 1; padding: 6px 12px; font-weight: 800; text-decoration: none; color: var(--text); }
 @media (max-width: 480px) {
   .sp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sp-card { align-items: flex-start; }
@@ -257,4 +258,26 @@ h1 { margin: 0; }
 @media (max-width: 480px) {
   .fx-packages { grid-template-columns: minmax(0, 1fr); }
   .fx-package { flex-direction: row; justify-content: space-between; padding: 8px 12px; }
+}
+
+/* Lift. */
+.fx-lift { width: min(420px, 100%); }
+.fx-floors { display: grid; gap: 8px; }
+.fx-floor { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; text-align: left; background: #fff; color: var(--text); border-width: 2px; box-shadow: 0 2px 0 #3b2a20; font-weight: 700; }
+.fx-floor-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #0f172a; color: #facc15; font-size: 16px; }
+.fx-floor-tag { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.fx-floor[data-here] { background: #fef3c7; opacity: 1; cursor: default; }
+button.hud-floor { display: flex; min-width: 0; align-items: center; gap: 4px; width: 100%; padding: 0; background: none; border: 0; box-shadow: none; color: inherit; text-align: left; cursor: pointer; }
+button.hud-floor:active { transform: none; box-shadow: none; }
+.hud-lift { margin-left: auto; padding: 0 5px; border-radius: 6px; background: #0f172a; font-size: 12px; }
+
+/* Install as an app. */
+.install-btn { font-weight: 800; }
+.home-install { float: right; margin-left: 12px; font-size: 14px; padding: 6px 12px; }
+.title-install { position: absolute; top: 12px; right: 12px; z-index: 1; padding: 6px 12px; font-size: 14px; color: var(--text); background: var(--surface, #fff8ec); }
+.install-help { width: min(420px, 100%); color: var(--text); }
+.install-help ol { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 6px; }
+@media (max-width: 640px) {
+  .hud-tl .hud-title { font-size: 13px; }
+  button.hud-floor > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }

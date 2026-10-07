@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { DEMO_VENUE } from "@vwo/shared";
 import { AdminLive } from "./AdminLive";
 import { JobFair } from "./JobFair";
+import { InstallButton } from "./install";
 import { JobFairAdmin } from "./JobFairAdmin";
 import { World } from "./World";
 
@@ -18,8 +19,11 @@ function useHash() {
 export function App() {
   const hash = useHash();
   const route = hash.replace(/^#\/?/, "");
+  // In a room the game takes the whole screen; the way back home is on the title screen.
+  const game = route === DEMO_VENUE.slug || route === "jobfair";
   return (
-    <div className={route === DEMO_VENUE.slug || route === "jobfair" ? "app app-game" : "app"}>
+    <div className={game ? "app app-game" : "app"}>
+      {!game && (
       <nav className="top">
         <a href="#/" className="brand">☕ VWO</a>
         <a href={`#/${DEMO_VENUE.slug}`} className={route === DEMO_VENUE.slug ? "active" : ""}>Masuk {DEMO_VENUE.name}</a>
@@ -30,6 +34,7 @@ export function App() {
           Demo · pengunjung lain bot
         </span>
       </nav>
+      )}
       {route === DEMO_VENUE.slug ? (
         <World />
       ) : route === "admin" ? (
@@ -50,6 +55,7 @@ function Home() {
     <main className="home">
       <div className="rpg-box home-card">
         <h1>VWO Virtual Cafe</h1>
+        <InstallButton className="home-install" />
         <p>Cermin virtual dari cafe sungguhan. Buat karaktermu, check-in, jalan keliling cafe, dan duduk di kursi yang benar-benar kosong.</p>
         <div className="home-actions">
           <a className="btn" href={`#/${DEMO_VENUE.slug}`}>

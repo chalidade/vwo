@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, portalAt, stallSpot } from "@vwo/shared";
+import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, START_COINS, levelOf } from "../src/fair/content";
 import { DemoJobFair, type FairSaved, PLAYER_ID } from "../src/jobfair-engine";
 
@@ -9,29 +9,21 @@ function clock() {
 }
 
 describe("DemoJobFair", () => {
-  it("can walk from the entrance to every booth, sponsor and staircase on all three floors", () => {
+  it("can walk from the entrance or the lift to every booth, sponsor, seat and stall on all six floors", () => {
     const fair = new DemoJobFair(() => 0.5);
     const halls = fair.floors.slice(0, DEMO_JOB_FAIR.floors.length);
     expect(halls).toHaveLength(3);
+    expect(fair.stops.map((s) => s.name)).toEqual(["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6"]);
+    expect(fair.stops.slice(3).map((s) => s.roomId)).toEqual(["foodcourt", "seminar", "psikotes"]);
     expect(isBlocked(fair.floors[0]!, fair.fair.spawn.x, fair.fair.spawn.y)).toBe(false);
-    // Where someone stands on each floor: the entrance downstairs, the landing upstairs.
-    const starts = halls.map((f, i) => {
-      if (i === 0) return fair.fair.spawn;
-      const down = f.objects!.find((o) => o.type === "stairs" && o.targetFloorId === fair.floors[i - 1]!.id)!;
-      return { x: down.x + down.width / 2, y: down.y + down.height + 0.8 };
-    });
-    halls.forEach((f, i) => {
-      expect(isBlocked(f, starts[i]!.x, starts[i]!.y), f.id).toBe(false);
-      const stairs = f.objects!.filter((o) => o.type === "stairs");
-      expect(stairs, f.id).toHaveLength(i === 0 || i === 2 ? 1 : 2);
-      for (const o of stairs) {
-        expect(findPath(f, starts[i]!, { x: o.x + o.width / 2, y: o.y + o.height / 2 }), o.id).not.toBeNull();
-        // Landing on the other floor is clear of its stairs, so nobody bounces straight back.
-        const there = fair.floor(o.targetFloorId!);
-        expect(isBlocked(there, o.targetX!, o.targetY!), o.id).toBe(false);
-        expect(portalAt(there, o.targetX!, o.targetY!), o.id).toBeNull();
-      }
-    });
+    // Every floor has the lift in the same corner, reachable from where you step out of it.
+    for (const f of fair.floors) {
+      expect(f.objects!.filter((o) => o.type === "elevator"), f.id).toHaveLength(1);
+      expect(f.objects!.some((o) => o.type === "stairs"), f.id).toBe(false);
+      expect(isBlocked(f, LIFT_FRONT.x, LIFT_FRONT.y), f.id).toBe(false);
+    }
+    expect(findPath(halls[0]!, fair.fair.spawn, LIFT_FRONT)).not.toBeNull();
+    const starts = halls.map((_, i) => (i === 0 ? fair.fair.spawn : LIFT_FRONT));
     for (const level of [0, 1, 2]) expect(DEMO_JOB_FAIR.booths.filter((b) => b.floor === level).length).toBeGreaterThanOrEqual(4);
     for (const b of DEMO_JOB_FAIR.booths) {
       const f = fair.floors[b.floor]!;
@@ -46,22 +38,11 @@ describe("DemoJobFair", () => {
       const front = { x: sp.x + SPONSOR_W / 2, y: sp.y + SPONSOR_H + 0.75 };
       expect(findPath(fair.floors[sp.floor]!, starts[sp.floor]!, front), sp.id).not.toBeNull();
     }
-    // Room doors, the coin stand, and inside each room: every seat and stall from the entrance.
+    // Each room floor: every seat and stall from the lift.
     for (const room of DEMO_JOB_FAIR.rooms) {
-      const hall = halls[room.floor]!;
-      const door = hall.objects!.find((o) => o.type === "door" && o.targetFloorId === fairRoomFloorId(DEMO_JOB_FAIR, room.id))!;
-      expect(door, room.id).toBeTruthy();
-      expect(findPath(hall, starts[room.floor]!, { x: door.x + door.width / 2, y: door.y + door.height / 2 }), room.id).not.toBeNull();
-      const inside = fair.floor(door.targetFloorId!);
-      const entry = { x: door.targetX!, y: door.targetY! };
-      expect(isBlocked(inside, entry.x, entry.y), room.id).toBe(false);
-      expect(portalAt(inside, entry.x, entry.y), room.id).toBeNull();
-      for (const seat of inside.seats) expect(findPath(inside, entry, seat), seat.id).not.toBeNull();
-      (room.stalls ?? []).forEach((_, i) => expect(findPath(inside, entry, stallSpot(i, "order")), `${room.id} stall ${i}`).not.toBeNull());
-      const exit = portalAt(inside, inside.width / 2, inside.height - 0.5)!;
-      expect(exit.targetFloorId).toBe(hall.id);
-      expect(portalAt(hall, exit.targetX!, exit.targetY!), room.id).toBeNull();
-      expect(isBlocked(hall, exit.targetX!, exit.targetY!), room.id).toBe(false);
+      const inside = fair.floor(fairRoomFloorId(DEMO_JOB_FAIR, room.id));
+      for (const seat of inside.seats) expect(findPath(inside, LIFT_FRONT, seat), seat.id).not.toBeNull();
+      (room.stalls ?? []).forEach((_, i) => expect(findPath(inside, LIFT_FRONT, stallSpot(i, "order")), `${room.id} stall ${i}`).not.toBeNull());
     }
     const c = DEMO_JOB_FAIR.coinStand;
     expect(findPath(halls[c.floor]!, starts[c.floor]!, { x: c.x + COIN_STAND_SPOTS.front.x, y: c.y + COIN_STAND_SPOTS.front.y })).not.toBeNull();
@@ -123,7 +104,7 @@ describe("DemoJobFair", () => {
     expect([...fair.visits.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(10);
     expect(fair.applications.length).toBeGreaterThan(0);
     expect(fair.events.some((e) => e.type === "leave")).toBe(true);
-    // Bots take the stairs: booths on the top floor get visitors too.
+    // Bots ride the lift: booths on the top floor get visitors too.
     const top = DEMO_JOB_FAIR.booths.filter((b) => b.floor === 2);
     expect(top.reduce((n, b) => n + (fair.visits.get(b.id) ?? 0), 0)).toBeGreaterThan(0);
   });

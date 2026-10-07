@@ -99,7 +99,7 @@ export function boothSpot(b: { x: number; y: number }, spot: keyof typeof BOOTH_
   return { x: b.x + BOOTH_SPOTS[spot].x, y: b.y + BOOTH_SPOTS[spot].y };
 }
 
-/** One level of the hall. Every floor has the same size; stairs connect neighbouring floors. */
+/** One level of the hall with company booths. Every floor has the same size; a lift connects them all. */
 export interface FairFloorInfo {
   name: string;
   /** What kind of companies are on this floor, e.g. "Teknologi & Keuangan". */
@@ -119,7 +119,7 @@ export interface JobFairView {
   booths: CompanyBooth[];
   sponsors: SponsorView[];
   decor: { floor: number; spriteKey: string; x: number; y: number; width: number; height: number; isWalkable?: boolean }[];
-  /** Rooms behind a door in the hall: psychometric tests, seminars, the food court. */
+  /** Whole floors above the halls: the food court, seminars, psychometric tests. */
   rooms: FairRoom[];
   /** Where visitors buy coins. */
   coinStand: CoinStandView;
@@ -127,7 +127,7 @@ export interface JobFairView {
 
 export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
 
-/** A room entered through a door standing in the hall. Premium rooms cost coins to enter. */
+/** A whole floor of its own, reached by lift. Premium floors cost coins to enter. */
 export interface FairRoom {
   id: string;
   kind: FairRoomKind;
@@ -135,10 +135,8 @@ export interface FairRoom {
   tagline: string;
   emoji: string;
   color: string;
-  /** The hall floor its door stands on, and the door's top-left corner. */
-  floor: number;
-  doorX: number;
-  doorY: number;
+  /** Building level, 0-based: level 3 is "Lantai 4". Halls take the levels below. */
+  level: number;
   /** Entry price in coins; 0 is free. */
   price: number;
   width: number;
@@ -166,11 +164,6 @@ export interface CoinStandView {
   packages: { id: string; coins: number; bonus: number; price: string }[];
 }
 
-/** A room door: a wall panel ROOM_DOOR_W wide with a doorway in the middle. */
-export const ROOM_DOOR_W = 3.2;
-export const ROOM_DOOR_H = 0.7;
-const DOOR_POST = 0.7;
-
 export const COIN_STAND_W = 5.4;
 export const COIN_STAND_H = 2.9;
 /** Where to stand to buy coins, and where the cashier stands, relative to the stand. */
@@ -178,19 +171,34 @@ export const COIN_STAND_SPOTS = { staff: { x: 2.7, y: 1.0 }, front: { x: 2.7, y:
 
 export const fairRoomFloorId = (fair: { slug: string }, roomId: string) => `${fair.slug}-room-${roomId}`;
 
-/** Where you stand after leaving a room: just in front of its door in the hall. */
-export function roomDoorFront(room: FairRoom) {
-  return { x: room.doorX + ROOM_DOOR_W / 2, y: room.doorY + ROOM_DOOR_H + 0.9 };
+/** The lift lobby in the bottom-right corner of every floor: a wall with the lift doors. */
+export const FAIR_LIFT = { x: 32.2, y: 16.6, width: 4.4, height: 1 };
+/** Where you wait for the lift, and where you step out of it. */
+export const LIFT_FRONT = { x: 34.4, y: 18.5 };
+
+/** One stop of the lift: a hall floor with booths, or a floor that is a room. */
+export interface FairStop {
+  level: number;
+  floorId: string;
+  /** "Lantai 4" */
+  name: string;
+  /** What is there: the hall's theme or the room's name. */
+  label: string;
+  emoji: string;
+  roomId?: string;
 }
 
-/** Where you stand after entering a room: just inside its exit at the bottom. */
-export function roomEntry(room: FairRoom) {
-  return { x: room.width / 2, y: room.height - 1.9 };
+/** Every floor the lift stops at, bottom first. */
+export function fairStops(fair: JobFairView): FairStop[] {
+  return [
+    ...fair.floors.map((f, i) => ({ level: i, floorId: fairFloorId(fair, i), name: f.name, label: f.theme, emoji: "💼" })),
+    ...fair.rooms.map((r) => ({ level: r.level, floorId: fairRoomFloorId(fair, r.id), name: `Lantai ${r.level + 1}`, label: r.name, emoji: r.emoji, roomId: r.id })),
+  ].sort((a, b) => a.level - b.level);
 }
 
-/** Stall geometry in the food court: four stalls side by side along the back wall. */
+/** Stall geometry in the food court: four stalls spread along the back wall. */
 export function stallRect(i: number) {
-  return { x: 1 + i * 6.3, y: 0.3, width: 5.4, height: 2.4 };
+  return { x: 2.2 + i * 9.2, y: 0.3, width: 5.4, height: 2.4 };
 }
 export function stallSpot(i: number, spot: "vendor" | "order") {
   const s = stallRect(i);
@@ -211,51 +219,52 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
     seats.push({ id: `${t.id}-${String.fromCharCode(65 + i)}`, label: `${t.label}-${String.fromCharCode(65 + i)}`, tableId: t.id, x, y, isActive: true });
   if (room.kind === "psikotes") {
     blocked.push({ x: room.width / 2 - 2, y: 1.2, width: 4, height: 0.8 });
-    for (let r = 0; r < 3; r++)
-      for (let c = 0; c < 4; c++) {
-        const t = table(`P${r * 4 + c + 1}`, "square", 2.2 + c * 4.3, 4 + r * 2.7, 1.4, 0.8);
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 7; c++) {
+        const t = table(`P${r * 7 + c + 1}`, "square", 3.6 + c * 4.6, 4 + r * 2.9, 1.4, 0.8);
         seat(t, 0, t.x + 0.7, t.y + 1.35);
       }
   } else if (room.kind === "seminar") {
     blocked.push({ x: 4, y: 0.3, width: room.width - 8, height: 2.6 });
-    for (let r = 0; r < 4; r++)
-      for (const [side, x0] of [["L", 2], ["R", room.width / 2 + 1.4]] as const) {
-        const t = table(`${String.fromCharCode(65 + r)}${side}`, "rect", x0, 4.6 + r * 2.3, 7.2, 0.5);
-        for (let i = 0; i < 5; i++) seat(t, i, t.x + 0.75 + i * 1.42, t.y + 1.0);
+    for (let r = 0; r < 5; r++)
+      for (const [side, x0] of [["L", 3.5], ["R", room.width / 2 + 2.5]] as const) {
+        const t = table(`${String.fromCharCode(65 + r)}${side}`, "rect", x0, 4.6 + r * 2.3, 10.6, 0.5);
+        for (let i = 0; i < 7; i++) seat(t, i, t.x + 0.8 + i * 1.5, t.y + 1.0);
       }
   } else {
     (room.stalls ?? []).forEach((_, i) => {
       const s = stallRect(i);
       blocked.push({ x: s.x, y: s.y, width: s.width, height: 0.5 }, { x: s.x + 0.3, y: s.y + 1.45, width: s.width - 0.6, height: 0.7 });
     });
-    for (let r = 0; r < 2; r++)
-      for (let c = 0; c < 4; c++) {
-        const t = table(`T${r * 4 + c + 1}`, "round", 2.6 + c * 6.3, 5.4 + r * 4.6, 1.8, 1.8);
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 5; c++) {
+        const t = table(`T${r * 5 + c + 1}`, "round", 2.6 + c * 6.6, 5.4 + r * 4.6, 1.8, 1.8);
         seatPositionsAround(t, 4).forEach((p, i) => seat(t, i, p.x, p.y));
       }
   }
   return { tables, seats, blocked };
 }
 
-/** A room as a walkable floor, with its exit door back to the hall. */
+/** The lift: a solid wall piece; you wait in front of it and pick a floor. */
+function liftObject(floorId: string): MapObjectView {
+  return { id: `${floorId}-lift`, type: "elevator", ...FAIR_LIFT, spriteKey: "lift", isWalkable: false, targetFloorId: null, targetX: null, targetY: null };
+}
+
+/** A room as a whole floor of its own, with the lift in the same corner as on the hall floors. */
 export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
   const id = fairRoomFloorId(fair, room.id);
   const { tables, seats, blocked } = roomFurniture(room);
-  const back = roomDoorFront(room);
   const objects: MapObjectView[] = [
-    { id: `${id}-exit`, type: "door", x: room.width / 2 - 1, y: room.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true, targetFloorId: fairFloorId(fair, room.floor), targetX: back.x, targetY: back.y },
+    liftObject(id),
     ...blocked.map((b, i): MapObjectView => ({ id: `${id}-obj-${i}`, type: "blocked", ...b, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
-    { id: `${id}-plant-a`, type: "decor", x: 0.3, y: room.height - 1.3, width: 1, height: 1, spriteKey: "plant", isWalkable: false, targetFloorId: null, targetX: null, targetY: null },
-    { id: `${id}-plant-b`, type: "decor", x: room.width - 1.3, y: room.height - 1.3, width: 1, height: 1, spriteKey: "plant", isWalkable: false, targetFloorId: null, targetX: null, targetY: null },
+    ...[
+      { key: "plant-a", spriteKey: "plant-big", x: 0.2, y: room.height - 1.6, width: 1.2, height: 1 },
+      { key: "plant-b", spriteKey: "plant", x: room.width - 1.3, y: 13.4, width: 1, height: 1 },
+      { key: "plant-c", spriteKey: "plant", x: 30.6, y: room.height - 1.3, width: 1, height: 1 },
+    ].map(({ key, ...o }): MapObjectView => ({ id: `${id}-${key}`, type: "decor", ...o, isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
   ];
   return { id, name: room.name, width: room.width, height: room.height, tables, seats, objects, theme: "hall" };
 }
-
-/** The two flights of stairs in the bottom-right corner of every floor (tiles). */
-export const FAIR_STAIRS = {
-  down: { x: 31.6, y: 16.8, width: 1.8, height: 2.4 },
-  up: { x: 34.6, y: 16.8, width: 1.8, height: 2.4 },
-};
 
 export const fairFloorId = (fair: { slug: string }, floor: number) => `${fair.slug}-f${floor + 1}`;
 
@@ -265,11 +274,6 @@ export const fairFloorIndex = (floorId: string) => {
   return m ? Number(m[1]) - 1 : -1;
 };
 
-/** Where someone lands after taking the stairs: just in front of the flight that leads back. */
-function landing(stairs: { x: number; y: number; width: number; height: number }) {
-  return { x: stairs.x + stairs.width / 2, y: stairs.y + stairs.height + 0.8 };
-}
-
 /** One walkable floor of the hall: booths, sponsors and the info desk become obstacles. */
 export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   const id = fairFloorId(fair, floor);
@@ -278,17 +282,6 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     objects.push({ ...o, id: `${id}-obj-${objects.length}`, targetFloorId: target ? fairFloorId(fair, target.floor) : null, targetX: target?.x ?? null, targetY: target?.y ?? null });
   for (const b of fair.booths) if (b.floor === floor) for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
   for (const sp of fair.sponsors) if (sp.floor === floor) add({ type: "blocked", x: sp.x, y: sp.y, width: SPONSOR_W, height: SPONSOR_H, spriteKey: "invisible", isWalkable: false });
-  for (const room of fair.rooms) {
-    if (room.floor !== floor) continue;
-    add({ type: "blocked", x: room.doorX, y: room.doorY, width: DOOR_POST, height: ROOM_DOOR_H, spriteKey: "invisible", isWalkable: false });
-    add({ type: "blocked", x: room.doorX + ROOM_DOOR_W - DOOR_POST, y: room.doorY, width: DOOR_POST, height: ROOM_DOOR_H, spriteKey: "invisible", isWalkable: false });
-    const inside = roomEntry(room);
-    add({ type: "door", x: room.doorX + DOOR_POST, y: room.doorY, width: ROOM_DOOR_W - DOOR_POST * 2, height: ROOM_DOOR_H, spriteKey: `room:${room.id}`, isWalkable: true }, undefined);
-    const o = objects[objects.length - 1]!;
-    o.targetFloorId = fairRoomFloorId(fair, room.id);
-    o.targetX = inside.x;
-    o.targetY = inside.y;
-  }
   if (fair.coinStand.floor === floor) {
     const c = fair.coinStand;
     add({ type: "blocked", x: c.x, y: c.y, width: COIN_STAND_W, height: 0.5, spriteKey: "invisible", isWalkable: false });
@@ -299,8 +292,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     add({ type: "blocked", x: d.x, y: d.y, width: d.width, height: d.height, spriteKey: "invisible", isWalkable: false });
     add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
   }
-  if (floor > 0) add({ type: "stairs", ...FAIR_STAIRS.down, spriteKey: "stairs-down", isWalkable: true }, { floor: floor - 1, ...landing(FAIR_STAIRS.up) });
-  if (floor < fair.floors.length - 1) add({ type: "stairs", ...FAIR_STAIRS.up, spriteKey: "stairs-up", isWalkable: true }, { floor: floor + 1, ...landing(FAIR_STAIRS.down) });
+  objects.push(liftObject(id));
   for (const o of fair.decor) if (o.floor === floor) add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
   const info = fair.floors[floor];
   return { id, name: info ? `${info.name} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats: [], objects, theme: "hall" };
@@ -431,7 +423,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
     { floor: 0, spriteKey: "plant", x: 26.1, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "lamp", x: 13.4, y: 20.4, width: 0.8, height: 0.8 },
     { floor: 0, spriteKey: "lamp", x: 22.4, y: 20.4, width: 0.8, height: 0.8 },
-    // Upper floors: one big lounge in the middle, room doors on the left.
+    // Upper floors: one big lounge in the middle.
     ...[1, 2].flatMap((floor) => [
       { floor, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant-big", x: 36.6, y: 5.6, width: 1.2, height: 1 },
@@ -464,12 +456,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Makan, kumpulkan voucher",
       emoji: "🍜",
       color: "#ea580c",
-      floor: 1,
-      doorX: 3,
-      doorY: 16.4,
+      level: 3,
       price: 0,
-      width: 26,
-      height: 16,
+      width: 38,
+      height: 22,
       staff: { name: "Bang Ucok", role: "Pengelola food court" },
       stalls: [
         {
@@ -525,12 +515,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Latihan psikotes, hasilnya dilihat recruiter",
       emoji: "🧠",
       color: "#7c3aed",
-      floor: 2,
-      doorX: 2.4,
-      doorY: 16.4,
+      level: 5,
       price: 20,
-      width: 20,
-      height: 13,
+      width: 38,
+      height: 22,
       staff: { name: "Bu Psikolog Rina", role: "Pengawas psikotes" },
     },
     {
@@ -540,12 +528,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Seminar karier bersertifikat",
       emoji: "🎤",
       color: "#0e7490",
-      floor: 2,
-      doorX: 7.4,
-      doorY: 16.4,
+      level: 4,
       price: 15,
-      width: 24,
-      height: 15,
+      width: 38,
+      height: 22,
       staff: { name: "Pak Arif", role: "Pembicara" },
     },
   ],
