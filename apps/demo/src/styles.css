@@ -281,3 +281,14 @@ button.hud-floor:active { transform: none; box-shadow: none; }
   .hud-tl .hud-title { font-size: 13px; }
   button.hud-floor > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Job fair: the player's menu sits at the very bottom; taps on people and desks replace prompts. */
+.game-fair .hud-bl { bottom: 12px; }
+.game-fair .hud-bottom { bottom: 76px; }
+.game-fair .toast { bottom: 80px; }
+@media (max-width: 640px) {
+  .game-fair .hud-bl { left: 8px; right: 8px; bottom: 8px; display: flex; justify-content: center; }
+  .game-fair .hud-bottom { bottom: 72px; }
+  .game-fair .toast { bottom: 76px; }
+}
+.hud-live { font-size: 11px; font-weight: 700; margin-top: 3px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

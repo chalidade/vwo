@@ -40,7 +40,8 @@ import {
 import { InstallButton } from "./install";
 import { CharacterCreator, type Character } from "./CharacterCreator";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { PLAYER_ID, recruiterId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { PLAYER_ID, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { LiveChannel, type LiveStatus } from "./live";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, SEMINARS, levelOf } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { LiftPanel } from "./fair/Lift";
@@ -106,13 +107,17 @@ export function JobFair() {
   const [psych, setPsych] = useState(false);
   const [seminar, setSeminar] = useState(false);
   const [lift, setLift] = useState(false);
+  const [live, setLive] = useState<{ status: LiveStatus; peers: number }>({ status: "connecting", peers: 0 });
+  /** How players on other devices look, by their visitor id here. */
+  const remoteLooks = useRef(new Map<string, Look>());
   const hud = useHud();
   savedSession = session;
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ x: number; y: number }[] | null>(null);
   /** Where a clicked walk ends, possibly on another floor: the route then leads to the lift first. */
-  const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string } | null>(null);
+  /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
+  const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
   busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift);
   const counted = useRef(new Set<string>());
@@ -173,7 +178,7 @@ export function JobFair() {
         if (Math.abs(self.x - at.x) < 2.2 && Math.abs(self.y - at.y) < 0.9) return { kind: "stall", stallId: st.id, name: st.name };
       }
     }
-    if (room) {
+    {
       const seat = floor.seats
         .filter((st) => !occupied.has(st.id))
         .map((st) => ({ st, d: Math.hypot(st.x - self.x, st.y - self.y) }))
@@ -237,8 +242,10 @@ export function JobFair() {
             return;
           }
           const seatId = goal.current?.seatId;
+          const then = goal.current?.then;
           goal.current = null;
           if (seatId) sitDown(seatId);
+          then?.();
           return;
         }
         ix = next.x - me.x;
@@ -255,6 +262,36 @@ export function JobFair() {
       const to = route.current ? { x: me.x + dx, y: me.y + dy } : slide(f, me.x, me.y, dx, dy);
       fair.move(me.memberId, to.x, to.y, facingOf(dx, dy, me.facing));
     });
+  }, [session]);
+
+  // --- Real people on other devices: share our player, mirror theirs.
+  useEffect(() => {
+    if (!session) return;
+    const channel = new LiveChannel(
+      "jobfair",
+      () => {
+        const v = fair.visitors.get(session.visitorId);
+        if (!v) return null;
+        const b = fair.bubbles.get(session.visitorId);
+        return { name: session.name, look: session.look, floorId: v.floorId, x: v.x, y: v.y, facing: v.facing, seatId: v.seatId ?? null, say: b && b.until > Date.now() ? b.text : null };
+      },
+      (p) => {
+        remoteLooks.current.set(remoteId(p.id), p.look);
+        fair.upsertRemote(p);
+      },
+      (id) => {
+        remoteLooks.current.delete(remoteId(id));
+        fair.removeRemote(id);
+      },
+      (id) => fair.floors.some((f) => f.id === id),
+      (status, peers) => setLive({ status, peers }),
+    );
+    channel.start();
+    const off = onFrame(() => channel.publish());
+    return () => {
+      off();
+      channel.stop();
+    };
   }, [session]);
 
   // --- Keyboard.
@@ -365,11 +402,12 @@ export function JobFair() {
     planRoute();
   };
 
-  /** Walk to a booth's desk, on whatever floor. Called from menus that are still closing, so no busy check. */
+  /** Walk to a booth's desk, on whatever floor, and talk to the recruiter there. Called from menus
+   *  that are still closing, so no busy check. */
   const goToBooth = (b: CompanyBooth) => {
     const me = session && fair.visitors.get(session.visitorId);
     if (!me) return;
-    goal.current = { floorId: fair.floorIdOf(b), ...boothSpot(b, "talk") };
+    goal.current = { floorId: fair.floorIdOf(b), ...boothSpot(b, "talk"), then: () => talkToRecruiter(b) };
     planRoute();
   };
 
@@ -379,22 +417,34 @@ export function JobFair() {
     if (st) pickFloor(st.floorId);
   }
 
-  /** Walk to a spot on a hall floor, from anywhere. */
-  function goToSpot(floor: number, x: number, y: number) {
-    goal.current = { floorId: fairFloorId(fair.fair, floor), x, y };
+  /** Walk to a spot, from anywhere, and do `then` on arrival. */
+  function goTo(floorId: string, x: number, y: number, then?: () => void) {
+    if (!savedSession || !fair.visitors.get(savedSession.visitorId)) return;
+    goal.current = { floorId, x, y, then };
     planRoute();
   }
 
   /** Walk to the lift and open its panel there. */
   const goToLift = () => {
     if (reachRef.current?.kind === "lift") setLift(true);
-    else walkTo(LIFT_FRONT.x, LIFT_FRONT.y);
+    else goTo(floor.id, LIFT_FRONT.x, LIFT_FRONT.y, () => setLift(true));
   };
 
   const goToCoinStand = () => {
     const c = fair.fair.coinStand;
-    goToSpot(c.floor, c.x + COIN_STAND_SPOTS.front.x, c.y + COIN_STAND_SPOTS.front.y);
-    setToast("Menuju Stand Koin di Lantai 1");
+    goTo(fairFloorId(fair.fair, c.floor), c.x + COIN_STAND_SPOTS.front.x, c.y + COIN_STAND_SPOTS.front.y, () => setWallet(true));
+  };
+
+  const goToInfo = () => {
+    const d = fair.fair.infoDesk;
+    goTo(fairFloorId(fair.fair, 0), d.x + d.width / 2, d.y + d.height + 0.6, talkToInfo);
+  };
+
+  const goToStall = (i: number) => {
+    const st = room?.stalls?.[i];
+    if (!st) return;
+    const at = stallSpot(i, "order");
+    goTo(floor.id, at.x, at.y, () => setStall(st.id));
   };
 
   function sitDown(seatId: string) {
@@ -402,6 +452,7 @@ export function JobFair() {
     if (!fair.sit(savedSession.visitorId, seatId)) return;
     const r = fair.roomOf(fair.visitors.get(savedSession.visitorId)!.floorId);
     if (r) startActivity(r);
+    else fair.say(savedSession.visitorId, "Santai dulu ☕", 2000);
   }
 
   /** What you do once seated: take the test, watch the seminar, or eat. */
@@ -513,7 +564,7 @@ export function JobFair() {
         ...fair.fair.booths
           .filter((b) => b.floor === i)
           .map((b) => ({
-            label: `${b.company} · ${b.jobs.length} lowongan`,
+            label: `${b.tier === "premium" ? "👑 " : ""}${b.company} · ${b.jobs.length} lowongan`,
             onPick: () => {
               setTalk(null);
               goToBooth(b);
@@ -553,7 +604,9 @@ export function JobFair() {
     setTalk({
       speaker: v.displayName,
       pages: [
-        sent.length
+        v.remote
+          ? `${v.displayName.replace("🌐 ", "")} sedang online dari device lain. Kirim sapaan, nanti muncul di layarnya.`
+          : sent.length
           ? `Hai! Aku barusan melamar ${sent[0]!.jobTitle} di ${sent[0]!.company}. Semoga lolos!`
           : `Hai! Aku ${v.displayName}, lagi keliling cari lowongan yang cocok.`,
       ],
@@ -612,13 +665,13 @@ export function JobFair() {
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...(!room && level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
+    ...(!room && level === 0 ? infoDeskExtras(fair.fair.infoDesk, session ? goToInfo : undefined) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
     ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
     ...liftSignExtras(room ? ROOM_SIGNS : level === 0 ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
     ...(room?.kind === "foodcourt"
-      ? foodStallExtras(room, session ? (id) => { const i = room.stalls!.findIndex((x) => x.id === id); const at = stallSpot(i, "order"); walkTo(at.x, at.y); } : undefined)
+      ? foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined)
       : []),
     ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
     ...(room?.kind === "seminar" ? seminarStageExtras(room, currentSlide()) : []),
@@ -629,34 +682,8 @@ export function JobFair() {
   });
   const avatars: AvatarState[] = [...fair.visitors.values()];
   const bubbles = Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]));
-  const lookOf = (a: AvatarState) => (session && a.memberId === session.visitorId ? session.look : lookFor(`${a.displayName}:${a.memberId}`));
-
-  const prompt =
-    reach?.kind === "coins"
-      ? "Beli koin"
-      : reach?.kind === "stall"
-        ? `Pesan di ${reach.name}`
-        : reach?.kind === "lift"
-          ? "🛗 Naik lift"
-          : reach?.kind === "seat"
-            ? "Duduk"
-            : reach?.kind === "seated"
-              ? reach.room.kind === "psikotes"
-                ? "Mulai psikotes"
-                : reach.room.kind === "seminar"
-                  ? "Ikuti seminar"
-                  : "Makan"
-              : reach?.kind === "recruiter"
-      ? `Ngobrol dengan ${reach.booth.recruiter} (${reach.booth.company})`
-      : reach?.kind === "banner"
-        ? `Lihat lowongan ${reach.booth.company}`
-        : reach?.kind === "info"
-          ? "Tanya panitia"
-          : reach?.kind === "sponsor"
-            ? `Lihat sponsor ${reach.sponsor.name}`
-          : reach?.kind === "person"
-            ? `Sapa ${reach.name}`
-            : null;
+  const lookOf = (a: AvatarState) =>
+    session && a.memberId === session.visitorId ? session.look : (remoteLooks.current.get(a.memberId) ?? lookFor(`${a.displayName}:${a.memberId}`));
 
   const boardBooth = board ? fair.booth(board.boothId) : undefined;
   const stallView = stall ? fair.fair.rooms.flatMap((r) => r.stalls ?? []).find((x) => x.id === stall) : undefined;
@@ -664,7 +691,7 @@ export function JobFair() {
   const totalJobs = fair.fair.booths.reduce((n, b) => n + b.jobs.length, 0);
 
   return (
-    <div className="game">
+    <div className="game game-fair">
       <CafeScene
         className="game-scene"
         floor={floor}
@@ -701,14 +728,9 @@ export function JobFair() {
                 const st = room?.stalls?.findIndex((x) => stallStaffId(x.id) === id) ?? -1;
                 if (b) goToBooth(b);
                 else if (id === "coin-staff") goToCoinStand();
-                else if (st >= 0) {
-                  const at = stallSpot(st, "order");
-                  walkTo(at.x, at.y);
-                } else if (room && id === roomStaffId(room.id)) fair.say(id, room.tagline, 2600);
-                else {
-                  const d = fair.fair.infoDesk;
-                  walkTo(d.x + d.width / 2, d.y + d.height + 0.6);
-                }
+                else if (st >= 0) goToStall(st);
+                else if (room && id === roomStaffId(room.id)) fair.say(id, room.tagline, 2600);
+                else goToInfo();
               }
             : undefined
         }
@@ -725,6 +747,11 @@ export function JobFair() {
             <button type="button" className="hud-level" onClick={() => setPanel("profile")} title="Level dan XP">
               <LevelBar compact level={seeker.level} title={SEEKER_TITLES[seeker.level - 1]!} progress={seeker.progress} xp={me.xp} next={seeker.to} />
             </button>
+          )}
+          {session && (
+            <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
+              {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : "⚪ Offline, hanya bot"}
+            </div>
           )}
           {hud.info && (
             <div className="hud-stats">
@@ -775,13 +802,9 @@ export function JobFair() {
         <div className="hud-bottom">
           {talk ? (
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
-          ) : prompt ? (
-            <button type="button" className="rpg-box prompt" onClick={interact} onPointerDown={(e) => e.stopPropagation()}>
-              <span className="rpg-kbd">E</span> {prompt}
-            </button>
-          ) : session ? (
+          ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> {room ? "duduk" : "bicara"} · 🛗 lift di pojok kanan bawah
+              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 lift di pojok kanan bawah
             </div>
           ) : null}
         </div>

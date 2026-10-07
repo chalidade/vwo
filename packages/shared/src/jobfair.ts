@@ -29,6 +29,8 @@ export interface CompanyBooth {
   color: string;
   /** Index into JobFairView.floors. */
   floor: number;
+  /** Premium booths pay for a bigger presence: gold trim, spotlights, and a crown on the sign. */
+  tier?: "premium" | "regular";
   /** Top-left corner of the booth, in tiles. Every booth is BOOTH_W × BOOTH_H. */
   x: number;
   y: number;
@@ -293,9 +295,23 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
   }
   objects.push(liftObject(id));
-  for (const o of fair.decor) if (o.floor === floor) add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
+  const seats: SeatView[] = [];
+  for (const o of fair.decor) {
+    if (o.floor !== floor) continue;
+    if (o.spriteKey === "sofa" || o.spriteKey === "sofa-left") {
+      // Sofas to sit on: the cushions are walkable seats, only the backrest blocks.
+      const right = o.spriteKey === "sofa";
+      add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: true });
+      add({ type: "blocked", x: right ? o.x : o.x + o.width - 0.3, y: o.y, width: 0.3, height: o.height, spriteKey: "invisible", isWalkable: false });
+      const n = seats.length / 2 + 1;
+      for (const [i, dy] of [0.7, o.height - 0.7].entries())
+        seats.push({ id: `${id}-sofa${n}-${"AB"[i]}`, label: `Sofa ${n}${"AB"[i]}`, tableId: null, x: o.x + (right ? 0.65 : o.width - 0.65), y: o.y + dy, isActive: true, sofa: true, facing: right ? "right" : "left" });
+      continue;
+    }
+    add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
+  }
   const info = fair.floors[floor];
-  return { id, name: info ? `${info.name} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats: [], objects, theme: "hall" };
+  return { id, name: info ? `${info.name} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats, objects, theme: "hall" };
 }
 
 /** Every hall floor, then every room. */
@@ -419,7 +435,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
     { floor: 0, spriteKey: "plant", x: 36.7, y: 13.8, width: 1, height: 1 },
     { floor: 0, spriteKey: "rug-plain", x: 23.6, y: 16.2, width: 6, height: 3.6, isWalkable: true },
     { floor: 0, spriteKey: "sofa", x: 23.9, y: 16.6, width: 1, height: 2.4 },
-    { floor: 0, spriteKey: "sofa", x: 28.3, y: 16.6, width: 1, height: 2.4 },
+    { floor: 0, spriteKey: "sofa-left", x: 28.3, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "plant", x: 26.1, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "lamp", x: 13.4, y: 20.4, width: 0.8, height: 0.8 },
     { floor: 0, spriteKey: "lamp", x: 22.4, y: 20.4, width: 0.8, height: 0.8 },
@@ -431,7 +447,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       { floor, spriteKey: "plant", x: 36.7, y: 13.8, width: 1, height: 1 },
       { floor, spriteKey: "rug-plain", x: 13, y: 16.2, width: 12, height: 3.6, isWalkable: true },
       { floor, spriteKey: "sofa", x: 13.3, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "sofa", x: 23.7, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "sofa-left", x: 23.7, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "plant", x: 18.5, y: 16.4, width: 1, height: 1 },
       { floor, spriteKey: "lamp", x: 27.6, y: 20.4, width: 0.8, height: 0.8 },
     ]),
@@ -544,6 +560,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "NT",
       color: "#2563eb",
       floor: 0,
+      tier: "premium",
       x: 1,
       y: 0.4,
       recruiter: "Bima",
@@ -577,6 +594,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "KK",
       color: "#b45309",
       floor: 1,
+      tier: "premium",
       x: 1,
       y: 0.4,
       recruiter: "Sinta",
@@ -610,6 +628,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "BS",
       color: "#0f766e",
       floor: 0,
+      tier: "premium",
       x: 16,
       y: 0.4,
       recruiter: "Hendra",
@@ -643,6 +662,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "GL",
       color: "#ea580c",
       floor: 2,
+      tier: "premium",
       x: 1,
       y: 0.4,
       recruiter: "Agus",
@@ -676,6 +696,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "HE",
       color: "#16a34a",
       floor: 2,
+      tier: "premium",
       x: 16,
       y: 0.4,
       recruiter: "Laila",
@@ -709,6 +730,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "KS",
       color: "#db2777",
       floor: 1,
+      tier: "premium",
       x: 16,
       y: 0.4,
       recruiter: "Rara",

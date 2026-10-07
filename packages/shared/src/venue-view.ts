@@ -20,6 +20,9 @@ export interface SeatView {
   x: number;
   y: number;
   isActive: boolean;
+  /** A place on a sofa rather than a chair: no chair is drawn, and the sitter faces this way. */
+  sofa?: boolean;
+  facing?: "front" | "back" | "left" | "right";
 }
 
 export type MapObjectType = "wall" | "counter" | "door" | "decor" | "spawn_point" | "blocked" | "stairs" | "elevator";

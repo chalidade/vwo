@@ -30,6 +30,20 @@ type Point = { x: number; y: number };
 export interface FairVisitor extends AvatarState {
   isBot: boolean;
   arrivedAt: number;
+  /** A real person on another device, mirrored from the live channel. */
+  remote?: boolean;
+}
+
+/** What another device says about its player, already checked by the live channel. */
+export interface RemotePlayer {
+  id: string;
+  name: string;
+  floorId: string;
+  x: number;
+  y: number;
+  facing: Facing;
+  seatId: string | null;
+  say: string | null;
 }
 
 /** A recruiter behind a booth desk, or the organisers' staff at the info desk. */
@@ -597,6 +611,28 @@ export class DemoJobFair {
     this.emit();
   }
 
+  /** Show or update a player from another device. */
+  upsertRemote(p: RemotePlayer) {
+    const id = remoteId(p.id);
+    const floor = this.floors.find((f) => f.id === p.floorId);
+    if (!floor) return;
+    const seatId = p.seatId && floor.seats.some((s) => s.id === p.seatId) ? p.seatId : null;
+    let v = this.visitors.get(id);
+    if (!v) {
+      v = { memberId: id, visitId: id, displayName: `🌐 ${p.name}`, memberType: "host", floorId: floor.id, x: p.x, y: p.y, facing: p.facing, isBot: false, remote: true, arrivedAt: this.now() };
+      this.visitors.set(id, v);
+      this.log({ type: "arrive", name: `${p.name} (online)` });
+    }
+    Object.assign(v, { displayName: `🌐 ${p.name}`, floorId: floor.id, x: p.x, y: p.y, facing: p.facing, seatId });
+    const bubble = this.bubbles.get(id);
+    if (p.say && bubble?.text !== p.say) this.say(id, p.say, 3000);
+    else this.emit();
+  }
+
+  removeRemote(peerId: string) {
+    this.leave(remoteId(peerId));
+  }
+
   join(name: string, isBot = false, id = this.id(isBot ? "bot" : "visitor")) {
     this.leave(id);
     const { x, y } = this.fair.spawn;
@@ -945,6 +981,7 @@ export class DemoJobFair {
   }
 }
 
+export const remoteId = (peerId: string) => `net:${peerId}`;
 export const recruiterId = (boothId: string) => `rec-${boothId}`;
 
 export const roomStaffId = (roomId: string) => `room-${roomId}`;

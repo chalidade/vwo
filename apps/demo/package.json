@@ -13,6 +13,7 @@
   "dependencies": {
     "@vwo/shared": "workspace:*",
     "@vwo/ui": "workspace:*",
+    "mqtt": "^5.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
