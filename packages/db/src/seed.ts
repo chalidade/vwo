@@ -1,7 +1,7 @@
 // Seeds a demo venue reachable at /vwo/cafe-a: two floors joined by stairs, tables with
 // auto-placed seats, an entrance QR, a small menu, default avatar items and demo users.
 import { randomBytes } from "node:crypto";
-import { DEMO_VENUE, seatLabel, seatPositionsAround } from "@vwo/shared";
+import { DEMO_VENUE, type ObjectSpec, seatLabel, seatPositionsAround } from "@vwo/shared";
 import { eq } from "drizzle-orm";
 import { createDb } from "./client";
 import {
@@ -70,15 +70,27 @@ await db.transaction(async (tx) => {
     .returning();
   if (!ground || !rooftop) throw new Error("seed floors failed");
 
-  await tx.insert(mapObjects).values([
-    { floorId: ground.id, venueId: venue.id, type: "door", x: 9, y: 13, width: 2, height: 1, isWalkable: true },
-    { floorId: ground.id, venueId: venue.id, type: "spawn_point", x: 10, y: 12, isWalkable: true },
-    { floorId: ground.id, venueId: venue.id, type: "counter", x: 1, y: 1, width: 6, height: 1 },
-    { floorId: ground.id, venueId: venue.id, type: "stairs", x: 18, y: 1, width: 1, height: 2, isWalkable: true, targetFloorId: rooftop.id, targetX: 1, targetY: 1 },
-    { floorId: rooftop.id, venueId: venue.id, type: "stairs", x: 0, y: 1, width: 1, height: 2, isWalkable: true, targetFloorId: ground.id, targetX: 17, targetY: 2 },
-  ]);
-
   const floorRows = [ground, rooftop];
+  await tx.insert(mapObjects).values(
+    DEMO_VENUE.objects.map((o: ObjectSpec) => {
+      const target = o.target ? floorRows[o.target.floor] : undefined;
+      return {
+        floorId: floorRows[o.floor]!.id,
+        venueId: venue.id,
+        type: o.type,
+        x: o.x,
+        y: o.y,
+        width: o.width,
+        height: o.height,
+        spriteKey: o.spriteKey ?? null,
+        isWalkable: o.isWalkable ?? false,
+        targetFloorId: target?.id ?? null,
+        targetX: o.target?.x ?? null,
+        targetY: o.target?.y ?? null,
+      };
+    }),
+  );
+
   const tableSpecs = DEMO_VENUE.tables.map((t) => ({ ...t, floor: floorRows[t.floor]! }));
   for (const spec of tableSpecs) {
     const [table] = await tx

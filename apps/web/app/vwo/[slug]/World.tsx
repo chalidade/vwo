@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { type AvatarState, type ClientToServerEvents, EMOTES, type Emote, type Facing, type ServerToClientEvents } from "@vwo/shared";
-import { FloorMap } from "@vwo/ui";
+import { CafeScene } from "@vwo/ui";
 import type { VenueLayout } from "@/lib/types";
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -188,13 +188,17 @@ export function World({ slug, floors, realtimeUrl, devCheckin }: { slug: string;
 
       {message && <div className="card" role="status">{message}</div>}
       {floor && (
-        <FloorMap
+        <CafeScene
           floor={floor}
+          floorName={(id) => floors.find((f) => f.id === id)?.name ?? ""}
           occupiedSeatIds={occupied}
           avatars={avatarList}
           selfMemberId={session?.memberId}
           onSeatClick={session ? sit : undefined}
           emotes={emotes}
+          follow={self ? { x: self.x, y: self.y } : null}
+          showFreeSeats={!!session}
+          style={{ height: "min(70vh, 640px)", borderRadius: 12 }}
         />
       )}
     </div>

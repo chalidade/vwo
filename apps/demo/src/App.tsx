@@ -17,36 +17,38 @@ export function App() {
   const hash = useHash();
   const route = hash.replace(/^#\/?/, "");
   return (
-    <>
-      <div className="banner">
-        Demo statis: semua data hanya ada di browser kamu, dan pelanggan lain adalah bot. Versi lengkap butuh server.
-      </div>
+    <div className={route === DEMO_VENUE.slug ? "app app-game" : "app"}>
       <nav className="top">
-        <a href="#/" className={route === "" ? "active" : ""}>VWO</a>
+        <a href="#/" className="brand">☕ VWO</a>
         <a href={`#/${DEMO_VENUE.slug}`} className={route === DEMO_VENUE.slug ? "active" : ""}>Masuk {DEMO_VENUE.name}</a>
         <a href="#/admin" className={route === "admin" ? "active" : ""}>Live view admin</a>
+        <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelanggan lain adalah bot. Versi lengkap butuh server.">
+          Demo · pelanggan lain bot
+        </span>
       </nav>
       {route === DEMO_VENUE.slug ? <World /> : route === "admin" ? <AdminLive /> : <Home />}
-    </>
+    </div>
   );
 }
 
 function Home() {
   return (
-    <main>
-      <h1>VWO Virtual Cafe</h1>
-      <p className="muted">Cermin virtual dari cafe sungguhan: denah, kursi, siapa di dalam, rombongan, dan interaksi.</p>
-      <ul>
-        <li>
-          <a href={`#/${DEMO_VENUE.slug}`}>Masuk ke {DEMO_VENUE.name}</a>: check-in, jalan dengan WASD atau tombol panah, klik kursi hijau untuk duduk.
-        </li>
-        <li>
-          <a href="#/admin">Live view admin</a>: jumlah orang, rombongan, kursi kosong, dan riwayat datang/keluar.
-        </li>
-      </ul>
-      <p className="muted">
-        Kode: <a href="https://github.com/chalidade/vwo">github.com/chalidade/vwo</a>
-      </p>
+    <main className="home">
+      <div className="rpg-box home-card">
+        <h1>VWO Virtual Cafe</h1>
+        <p>Cermin virtual dari cafe sungguhan. Buat karaktermu, check-in, jalan keliling cafe, dan duduk di kursi yang benar-benar kosong.</p>
+        <div className="home-actions">
+          <a className="btn" href={`#/${DEMO_VENUE.slug}`}>
+            ▶ Masuk ke {DEMO_VENUE.name}
+          </a>
+          <a className="btn ghost" href="#/admin">
+            Live view admin
+          </a>
+        </div>
+        <p className="muted small">
+          Demo statis: semua data hanya ada di browser kamu dan pelanggan lain adalah bot. Kode: <a href="https://github.com/chalidade/vwo">github.com/chalidade/vwo</a>
+        </p>
+      </div>
     </main>
   );
 }

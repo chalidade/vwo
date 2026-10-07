@@ -4,6 +4,27 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Tampilan RPG ala Pokémon
+
+**Konteks:** owner merasa tampilan denah belum terasa seperti game, dan minta dibuat seperti RPG Pokémon dengan referensi kota RPG di chalidade.github.io/tools.
+
+**Yang berubah**
+
+- `packages/ui/src/rpg/CafeScene.tsx` menggantikan denah SVG lama. Cafe digambar sebagai ruangan RPG tampak atas: lantai kayu, dinding belakang dengan jendela, papan menu kapur dan lampu gantung, meja kasir dengan barista, meja dan kursi kayu, sofa, rak, tanaman, karpet "Selamat Datang", tangga ke rooftop. Rooftop punya lantai dek, langit, gedung kota, dan lampu hias. Semua benda diurutkan menurut posisi y agar orang bisa berada di depan atau di belakang meja.
+- Karakter chibi dari repo chalidade/tools (`rpg/Person.tsx`, MIT, pemilik yang sama): 4 arah (depan, belakang, samping, dicerminkan untuk kiri), animasi jalan, kedip, dan pose duduk. Orang yang duduk menghadap mejanya, dan ada cangkir kopi di depan setiap kursi terisi.
+- Kamera mengikuti pemain. Admin melihat seluruh lantai dalam satu layar dengan gaya yang sama.
+- Dialog box ala Pokémon (`rpg/Dialog.tsx`): teks diketik, ▼ untuk lanjut, kursor ▶ untuk pilihan. Barista menyapa saat check-in dan bisa diajak bicara (menu). Pelanggan lain bisa disapa, dengan pilihan lambai atau cheers.
+- Layar "Siapa namamu?" sebelum check-in: nama, gaya dan warna rambut, kulit, baju, topi, dan jumlah orang yang ikut. Pilihan disimpan di browser.
+- Gerakan: jalan halus dengan WASD/panah, Shift untuk lari, klik lantai atau kursi untuk berjalan ke sana (pencarian jalan A*), E untuk duduk, berdiri, atau bicara. Di HP ada tombol arah dan tombol A. Masuk ke tangga memindahkan rombongan ke lantai lain.
+- `packages/shared/src/nav.ts`: tabrakan dengan meja dan benda, `findPath`, dan `portalAt` untuk tangga. Benda denah (`map_objects`) kini ikut di data venue contoh, seed database, dan `getVenueLayout`.
+- Demo: bot berjalan memutari meja dan ikut naik ke rooftop. Companion berjalan di belakang host mengikuti jejaknya. Saat berdiri, orang mundur dari kursi, bukan masuk ke meja. Riwayat admin mencatat pindah lantai.
+- `apps/web` (versi dengan server) memakai komponen yang sama untuk dunia pelanggan dan live view admin.
+
+**Verifikasi**
+
+- Tes: shared 9, demo 7 (termasuk bot tidak pernah berdiri di dalam meja dan bot ikut ke rooftop), db 9, realtime 3. Typecheck semua paket lulus, build web dan demo lulus.
+- Dicoba di browser (1280px dan 390px): check-in dengan 2 pengikut, jalan, klik kursi lalu duduk bersama, dialog barista, rooftop, live view admin. Tidak ada error di console.
+
 ## 2026-10-07 · Demo statis di GitHub Pages
 
 **Konteks:** owner ingin aplikasinya bisa dibuka sementara di `chalidade.github.io/vwo`. GitHub Pages hanya bisa menyajikan file statis, sedangkan aplikasi lengkap butuh Postgres dan server realtime.

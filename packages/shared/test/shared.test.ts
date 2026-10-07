@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidVenueSlug, seatPositionsAround, slugify } from "../src";
+import { DEMO_VENUE, buildDemoFloors, findPath, isBlocked, isValidVenueSlug, portalAt, seatPositionsAround, slide, slugify } from "../src";
 
 describe("venue slug", () => {
   it("accepts lowercase slugs and rejects reserved or malformed ones", () => {
@@ -46,5 +46,34 @@ describe("facingFor", () => {
     expect(facingFor(0, 1)).toBe("front");
     expect(facingFor(0.1, -1)).toBe("back");
     expect(facingFor(0, 0, "left")).toBe("left");
+  });
+});
+
+describe("walking", () => {
+  const floors = buildDemoFloors();
+  const ground = floors[0]!;
+
+  it("finds a path from the door to every seat without crossing furniture", () => {
+    const spawn = DEMO_VENUE.floors[0].spawn;
+    for (const seat of ground.seats) {
+      const path = findPath(ground, spawn, seat);
+      expect(path, seat.label).not.toBeNull();
+      // Every waypoint except the chair itself is clear of tables and objects.
+      for (const p of path!.slice(0, -1)) expect(isBlocked(ground, p.x, p.y, 0.2), `${seat.label} ${p.x},${p.y}`).toBe(false);
+    }
+  });
+
+  it("slides along a table instead of walking through it", () => {
+    const t = ground.tables[0]!;
+    const above = { x: t.x + 0.2, y: t.y - 0.5 };
+    const moved = slide(ground, above.x, above.y, 0.3, 0.5);
+    expect(moved.y).toBe(above.y);
+    expect(moved.x).toBeCloseTo(above.x + 0.3);
+  });
+
+  it("links the floors by stairs", () => {
+    const stairs = ground.objects!.find((o) => o.type === "stairs")!;
+    expect(portalAt(ground, stairs.x + 0.5, stairs.y + 0.5)?.targetFloorId).toBe(floors[1]!.id);
+    expect(portalAt(ground, 10, 12)).toBeNull();
   });
 });

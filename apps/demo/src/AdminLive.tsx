@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { FloorMap } from "@vwo/ui";
+import { CafeScene } from "@vwo/ui";
 import { useCafe } from "./useCafe";
 
 const EVENT_TEXT = {
   check_in: "datang",
   seat_claim: "duduk di",
   seat_release: "berdiri dari",
+  floor_change: "pindah ke",
   check_out: "keluar",
 } as const;
 
@@ -47,7 +48,14 @@ export function AdminLive() {
         ))}
       </div>
       <div className="layout2">
-        <FloorMap floor={floor} occupiedSeatIds={occupied} />
+        <CafeScene
+          className="admin-scene"
+          floor={floor}
+          floorName={(id) => cafe.floor(id).name}
+          occupiedSeatIds={occupied}
+          avatars={members}
+          showFreeSeats
+        />
         <div className="card" style={{ maxHeight: 520, overflow: "auto" }}>
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Riwayat</h2>
           <table className="list">
@@ -56,7 +64,7 @@ export function AdminLive() {
                 <tr key={i}>
                   <td className="muted">{new Date(e.at).toLocaleTimeString("id-ID")}</td>
                   <td>
-                    {e.name} {EVENT_TEXT[e.type]} {e.seatLabel ?? ""}
+                    {e.name} {EVENT_TEXT[e.type]} {e.seatLabel ?? e.floorName ?? ""}
                   </td>
                 </tr>
               ))}
@@ -77,7 +85,7 @@ export function AdminLive() {
                     {m.displayName} {m.memberType === "companion" && <span className="muted">(NPC)</span>}{" "}
                     {m.isBot && <span className="muted">· bot</span>}
                   </td>
-                  <td>{m.seatId ? cafe.seat(m.seatId)?.seat.label : <span className="muted">belum duduk</span>}</td>
+                  <td>{m.seatId ? cafe.seat(m.seatId)?.seat.label : <span className="muted">belum duduk · {cafe.floor(m.floorId).name}</span>}</td>
                   <td className="muted">{new Date(m.checkedInAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</td>
                 </tr>
               )),
