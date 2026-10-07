@@ -1,11 +1,10 @@
 "use client";
-import type { AvatarState } from "@vwo/shared";
-import type { FloorLayout } from "@/lib/types";
+import type { AvatarState, FloorView } from "@vwo/shared";
 
 const SCALE = 40; // px per tile in the SVG's coordinate space
 
 interface Props {
-  floor: FloorLayout;
+  floor: FloorView;
   occupiedSeatIds: Set<string>;
   avatars?: AvatarState[];
   selfMemberId?: string | null;

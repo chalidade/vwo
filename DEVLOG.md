@@ -4,6 +4,27 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Demo statis di GitHub Pages
+
+**Konteks:** owner ingin aplikasinya bisa dibuka sementara di `chalidade.github.io/vwo`. GitHub Pages hanya bisa menyajikan file statis, sedangkan aplikasi lengkap butuh Postgres dan server realtime.
+
+**Yang dibangun**
+
+- `apps/demo` (Vite + React): versi yang jalan sepenuhnya di browser. Mesin cafe di `engine.ts` meniru aturan backend: satu kursi satu orang, satu kursi per anggota, duduk satu rombongan sekaligus, companion mengikuti host, check-out mengosongkan kursi.
+- Bot pelanggan datang berkelompok, berjalan ke meja yang cukup untuk rombongannya, duduk, kadang memberi emote, lalu pulang. Jadi live view terlihat hidup walau hanya ada satu pengunjung.
+- Halaman: dunia pelanggan (`#/cafe-a`, check-in, WASD atau tombol arah di HP, klik kursi, emote, berdiri, keluar), live view admin (`#/admin`, statistik, denah per lantai, riwayat datang/duduk/keluar, siapa di dalam).
+- `packages/ui`: komponen denah dipindah dari `apps/web` agar dipakai web dan demo. Denah cafe contoh dipindah ke `packages/shared` agar seed database dan demo memakai data yang sama.
+- Workflow `pages.yml` men-deploy demo setiap push ke `main`. CI juga mem-build demo.
+
+**Verifikasi**
+
+- 5 tes mesin demo lulus, termasuk simulasi 5 menit bot tanpa ada kursi ganda.
+- Dicoba di browser: check-in rombongan 3 orang, bot datang dan duduk, live view menampilkan 9 orang, 3 rombongan, 21/30 kursi kosong. Lebar 390px tidak menggulung ke samping.
+
+**Catatan**
+
+- GitHub Pages perlu diaktifkan sekali di Settings → Pages dengan Source "GitHub Actions".
+
 ## 2026-10-07 · Base aplikasi: monorepo, skema database, realtime, live view
 
 **Yang dibangun**

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { FloorMap } from "@/components/FloorMap";
+import { FloorMap } from "@vwo/ui";
 import type { LiveSnapshot, VenueLayout } from "@/lib/types";
 
 /** Staff view of who is inside, per floor. Polls the live endpoint; realtime push comes later. */

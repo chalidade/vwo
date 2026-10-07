@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { type AvatarState, type ClientToServerEvents, EMOTES, type Emote, type Facing, type ServerToClientEvents } from "@vwo/shared";
-import { FloorMap } from "@/components/FloorMap";
+import { FloorMap } from "@vwo/ui";
 import type { VenueLayout } from "@/lib/types";
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>;

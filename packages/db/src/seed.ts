@@ -1,7 +1,7 @@
 // Seeds a demo venue reachable at /vwo/cafe-a: two floors joined by stairs, tables with
 // auto-placed seats, an entrance QR, a small menu, default avatar items and demo users.
 import { randomBytes } from "node:crypto";
-import { seatPositionsAround } from "@vwo/shared";
+import { DEMO_VENUE, seatLabel, seatPositionsAround } from "@vwo/shared";
 import { eq } from "drizzle-orm";
 import { createDb } from "./client";
 import {
@@ -78,15 +78,8 @@ await db.transaction(async (tx) => {
     { floorId: rooftop.id, venueId: venue.id, type: "stairs", x: 0, y: 1, width: 1, height: 2, isWalkable: true, targetFloorId: ground.id, targetX: 17, targetY: 2 },
   ]);
 
-  const tableSpecs = [
-    { floor: ground, label: "M-01", shape: "square" as const, x: 3, y: 5, width: 2, height: 2, capacity: 4 },
-    { floor: ground, label: "M-02", shape: "square" as const, x: 8, y: 5, width: 2, height: 2, capacity: 4 },
-    { floor: ground, label: "M-03", shape: "round" as const, x: 13, y: 5, width: 2, height: 2, capacity: 2 },
-    { floor: ground, label: "M-04", shape: "rect" as const, x: 4, y: 9, width: 4, height: 2, capacity: 6 },
-    { floor: ground, label: "BAR", shape: "bar" as const, x: 12, y: 9, width: 5, height: 1, capacity: 4 },
-    { floor: rooftop, label: "R-01", shape: "round" as const, x: 4, y: 4, width: 2, height: 2, capacity: 4 },
-    { floor: rooftop, label: "R-02", shape: "rect" as const, x: 9, y: 4, width: 4, height: 2, capacity: 6 },
-  ];
+  const floorRows = [ground, rooftop];
+  const tableSpecs = DEMO_VENUE.tables.map((t) => ({ ...t, floor: floorRows[t.floor]! }));
   for (const spec of tableSpecs) {
     const [table] = await tx
       .insert(cafeTables)
@@ -99,7 +92,7 @@ await db.transaction(async (tx) => {
         floorId: spec.floor.id,
         tableId: table.id,
         venueId: venue.id,
-        label: `${spec.label}-${String.fromCharCode(65 + i)}`,
+        label: seatLabel(spec.label, i),
         x: p.x,
         y: p.y,
         rotation: p.rotation,
