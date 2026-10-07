@@ -131,7 +131,7 @@ export function JobFairAdmin() {
             {[...booths].sort((a, b) => a.floor - b.floor).map((b) => (
               <tr key={b.id}>
                 <td>
-                  <span className="dot" style={{ background: b.color }} /> {b.company}
+                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span title="Stand premium">👑</span>}
                 </td>
                 <td>{fair.fair.floors[b.floor]?.name}</td>
                 <td>{b.recruiter}</td>

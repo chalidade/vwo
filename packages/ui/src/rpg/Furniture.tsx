@@ -229,11 +229,15 @@ export function StairsSprite({ w, h, up, label }: { w: number; h: number; up: bo
   );
 }
 
-export function PlantSprite({ big = false }: { big?: boolean }) {
+/** A potted plant whose leaves sway gently; `seed` gives each plant its own rhythm. */
+export function PlantSprite({ big = false, seed = "" }: { big?: boolean; seed?: string }) {
+  let n = 7;
+  for (const ch of seed) n = (n * 31 + ch.charCodeAt(0)) % 997;
+  const sway = { ["--sway" as string]: `${3.6 + (n % 17) / 8}s`, ["--sway-delay" as string]: `-${(n % 23) / 5}s` };
   return big ? (
     <svg width={60} height={92} viewBox="0 0 60 92" style={{ overflow: "visible", display: "block" }}>
       <ellipse cx={30} cy={88} rx={18} ry={4} fill="black" opacity={0.2} />
-      <g className="pg-sway">
+      <g className="pg-sway" style={sway}>
         {[
           "M30 64C10 58 4 38 12 22c10 6 16 22 18 42Z",
           "M30 64C50 58 56 38 48 22c-10 6-16 22-18 42Z",
@@ -241,7 +245,7 @@ export function PlantSprite({ big = false }: { big?: boolean }) {
           "M30 64C14 62 2 52 2 40c12 0 22 10 28 24Z",
           "M30 64C46 62 58 52 58 40c-12 0-22 10-28 24Z",
         ].map((d, i) => (
-          <path key={i} d={d} fill={i % 2 ? "#2f855a" : "#38a169"} {...ink} />
+          <path key={i} d={d} fill={i % 2 ? "#2f855a" : "#38a169"} {...ink} className="pg-leaf" style={{ animationDelay: `-${i * 0.7 + (n % 5) / 3}s` }} />
         ))}
       </g>
       <path d="M16 64h28l-4 24H20Z" fill="#c2410c" {...ink} />
@@ -250,7 +254,7 @@ export function PlantSprite({ big = false }: { big?: boolean }) {
   ) : (
     <svg width={46} height={58} viewBox="0 0 46 58" style={{ overflow: "visible", display: "block" }}>
       <ellipse cx={23} cy={55} rx={14} ry={3.5} fill="black" opacity={0.2} />
-      <g className="pg-sway">
+      <g className="pg-sway" style={sway}>
         <circle cx={14} cy={22} r={11} fill="#38a169" {...ink} />
         <circle cx={32} cy={22} r={11} fill="#38a169" {...ink} />
         <circle cx={23} cy={13} r={12} fill="#48bb78" {...ink} />

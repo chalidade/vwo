@@ -370,7 +370,9 @@
 }
 .pg-sway {
   transform-origin: 50% 100%;
-  animation: pg-sway 4.2s ease-in-out infinite;
+  transform-box: fill-box;
+  animation: pg-sway var(--sway, 4.2s) ease-in-out infinite;
+  animation-delay: var(--sway-delay, 0s);
 }
 @keyframes pg-bob {
   50% {
@@ -404,8 +406,20 @@
   }
 }
 @keyframes pg-sway {
+  0%, 100% {
+    transform: rotate(-2.5deg) skewX(1deg);
+  }
   50% {
-    transform: rotate(2.5deg);
+    transform: rotate(3deg) skewX(-1.5deg);
+  }
+}
+.pg-leaf {
+  transform-origin: 30px 64px;
+  animation: pg-leaf 3.1s ease-in-out infinite;
+}
+@keyframes pg-leaf {
+  50% {
+    transform: rotate(4deg);
   }
 }
 @keyframes pg-hop {
@@ -421,6 +435,7 @@
   .rpg-steam,
   .pg-eye,
   .pg-sway,
+  .pg-leaf,
   [data-walking] .pg-body,
   [data-walking] .pg-leg-a,
   [data-walking] .pg-leg-b,
@@ -990,3 +1005,15 @@
 .fr-whiteboard { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; background: #fff; border: 4px solid #94a3b8; border-radius: 6px; box-shadow: 0 5px 0 rgb(0 0 0 / 0.2); font-family: system-ui, sans-serif; color: #1f2937; box-sizing: border-box; }
 .fr-whiteboard b { font-size: 22px; letter-spacing: 0.1em; color: #7c3aed; }
 .fr-whiteboard span { font-size: 12px; font-weight: 700; }
+
+/* Premium booths: gold carpet edge with a slow shine, a crown, and spotlights. */
+.jb-carpet[data-premium] { border: 4px double #eab308; box-shadow: 0 0 0 3px rgb(234 179 8 / 0.25), inset 0 0 18px rgb(250 204 21 / 0.35); position: relative; overflow: hidden; }
+.jb-carpet[data-premium]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%); background-size: 250% 100%; animation: jb-shine 5s ease-in-out infinite; }
+@keyframes jb-shine { 0%, 40% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
+.jb-crown { animation: jb-crown 2.6s ease-in-out infinite; }
+@keyframes jb-crown { 50% { transform: translateY(-3px); } }
+.jb-spot { animation: jb-spot 3.2s ease-in-out infinite; }
+@keyframes jb-spot { 50% { opacity: 0.18; } }
+@media (prefers-reduced-motion: reduce) {
+  .jb-carpet[data-premium]::after, .jb-crown, .jb-spot { animation: none; }
+}

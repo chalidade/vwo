@@ -38,6 +38,13 @@ describe("DemoJobFair", () => {
       const front = { x: sp.x + SPONSOR_W / 2, y: sp.y + SPONSOR_H + 0.75 };
       expect(findPath(fair.floors[sp.floor]!, starts[sp.floor]!, front), sp.id).not.toBeNull();
     }
+    // Sofas in each hall's lounge are seats you can walk to.
+    for (const f of halls) {
+      const sofas = f.seats.filter((st) => st.sofa);
+      expect(sofas.length, f.id).toBe(4);
+      for (const st of sofas) expect(findPath(f, LIFT_FRONT, st), st.id).not.toBeNull();
+    }
+    expect(DEMO_JOB_FAIR.booths.filter((b) => b.tier === "premium")).toHaveLength(6);
     // Each room floor: every seat and stall from the lift.
     for (const room of DEMO_JOB_FAIR.rooms) {
       const inside = fair.floor(fairRoomFloorId(DEMO_JOB_FAIR, room.id));

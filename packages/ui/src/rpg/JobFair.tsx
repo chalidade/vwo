@@ -176,19 +176,46 @@ export interface BoothRating {
   level: number;
 }
 
+const GOLD = "#eab308";
+
 function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
   const w = BOOTH_W * T;
   const h = 2.2 * T;
+  const premium = booth.tier === "premium";
+  const post = premium ? GOLD : "#cbd5e1";
   return (
     <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
       {/* Side posts. */}
-      <rect x={0} y={4} width={8} height={h - 4} fill="#cbd5e1" {...ink} strokeWidth={1.6} />
-      <rect x={w - 8} y={4} width={8} height={h - 4} fill="#cbd5e1" {...ink} strokeWidth={1.6} />
+      <rect x={0} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
+      <rect x={w - 8} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
       {/* The wall itself. */}
-      <rect x={6} y={10} width={w - 12} height={h - 12} fill="#f8fafc" {...ink} strokeWidth={1.8} />
-      <rect x={6} y={h - 26} width={w - 12} height={24} fill="#e2e8f0" />
+      <rect x={6} y={10} width={w - 12} height={h - 12} fill={premium ? "#fffbeb" : "#f8fafc"} {...ink} strokeWidth={1.8} />
+      <rect x={6} y={h - 26} width={w - 12} height={24} fill={premium ? "#fde68a" : "#e2e8f0"} />
+      {premium && (
+        <>
+          {/* Spotlights on the posts, shining on the wall. */}
+          {[14, w - 14].map((cx) => (
+            <g key={cx}>
+              <path d={`M${cx} 40L${cx + (cx < w / 2 ? 46 : -46)} ${h - 4}H${cx + (cx < w / 2 ? 10 : -10)}Z`} fill="#fde047" opacity={0.35} className="jb-spot" />
+              <circle cx={cx} cy={38} r={7} fill="#1f2937" {...ink} strokeWidth={1.4} />
+              <circle cx={cx} cy={39} r={3.5} fill="#fde047" />
+            </g>
+          ))}
+          <rect x={-9} y={-5} width={w + 18} height={44} rx={7} fill={GOLD} {...ink} />
+        </>
+      )}
       {/* Fascia with the company name. */}
       <rect x={-4} y={0} width={w + 8} height={34} rx={4} fill={booth.color} {...ink} />
+      {premium && (
+        <g transform={`translate(${w / 2}, 42)`}>
+          <g className="jb-crown">
+            <rect x={-46} y={-9} width={92} height={18} rx={9} fill={GOLD} {...ink} strokeWidth={1.6} />
+            <text x={0} y={4} textAnchor="middle" fontSize={10.5} fontWeight={900} fill="#422006" letterSpacing={1} fontFamily="system-ui, sans-serif">
+              👑 PREMIUM
+            </text>
+          </g>
+        </g>
+      )}
       <g transform="translate(24, 17)">
         <Logo booth={booth} r={13} />
       </g>
@@ -208,14 +235,14 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
         </text>
       )}
       {/* Posters. */}
-      <g transform={`translate(18, 42)`}>
+      <g transform={`translate(18, ${premium ? 52 : 42})`}>
         <rect width={104} height={50} rx={4} fill="#fff" {...ink} strokeWidth={1.4} />
         <rect width={104} height={12} rx={3} fill={booth.color} opacity={0.85} />
         <foreignObject x={4} y={13} width={96} height={36}>
           <div className="jb-poster">{booth.tagline}</div>
         </foreignObject>
       </g>
-      <g transform={`translate(134, 42)`}>
+      <g transform={`translate(134, ${premium ? 52 : 42})`}>
         <rect width={96} height={50} rx={4} fill="#fef3c7" {...ink} strokeWidth={1.4} />
         <text x={48} y={22} textAnchor="middle" fontSize={13} fontWeight={900} fill={INK} fontFamily="system-ui, sans-serif">
           KAMI
@@ -284,7 +311,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       y: y + 0.5,
       z: 0,
       ground: true,
-      node: <div className="jb-carpet" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
+      node: <div className="jb-carpet" data-premium={booth.tier === "premium" ? "" : undefined} style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
     },
     { key: `${booth.id}-panel`, x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} rating={opts.rating} /> },
     {

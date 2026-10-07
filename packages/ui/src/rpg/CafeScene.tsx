@@ -47,6 +47,7 @@ export function chairSide(seat: SeatView, table: TableView | undefined): ChairSi
 
 /** A seated person faces their table. */
 export function seatFacing(seat: SeatView, table: TableView | undefined): Facing {
+  if (seat.facing) return seat.facing;
   return ({ n: "front", s: "back", w: "right", e: "left" } as const)[chairSide(seat, table)];
 }
 
@@ -271,22 +272,27 @@ export function CafeScene({
           ground.push({ key: o.id, z: 0, x: px(o.x), y: py(o.y), node: <RugSprite w={w} h={h} label={o.spriteKey === "rug" ? undefined : null} /> });
           break;
         case "plant":
-          ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite /> });
+          ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite seed={o.id} /> });
           break;
         case "plant-big":
-          ents.push({ key: o.id, z: base, x: cx - 30, y: base - 90, node: <PlantSprite big /> });
+          ents.push({ key: o.id, z: base, x: cx - 30, y: base - 90, node: <PlantSprite big seed={o.id} /> });
           break;
         case "shelf":
           ents.push({ key: o.id, z: base, x: px(o.x), y: py(o.y) - 54, node: <ShelfSprite w={w} h={h} /> });
           break;
         case "sofa":
-          ents.push({ key: o.id, z: base, x: px(o.x), y: py(o.y), node: <SofaSprite w={w} h={h} /> });
+        case "sofa-left": {
+          const node = o.spriteKey === "sofa-left" ? <div style={{ transform: "scaleX(-1)" }}><SofaSprite w={w} h={h} /></div> : <SofaSprite w={w} h={h} />;
+          // A sofa you can sit on lies under the people on it.
+          if (o.isWalkable) ground.push({ key: o.id, z: 1, x: px(o.x), y: py(o.y), node });
+          else ents.push({ key: o.id, z: base, x: px(o.x), y: py(o.y), node });
           break;
+        }
         case "lamp":
           ents.push({ key: o.id, z: base, x: cx - 20, y: base - 94, node: <LampSprite /> });
           break;
         default:
-          ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite /> });
+          ents.push({ key: o.id, z: base, x: cx - 23, y: base - 56, node: <PlantSprite seed={o.id} /> });
       }
     } else if ((o.type === "wall" || o.type === "blocked") && o.spriteKey !== "invisible") {
       ents.push({ key: o.id, z: py(o.y + o.height), x: px(o.x), y: py(o.y), node: <div className="rpg-wall-edge" style={{ width: w, height: h, borderRadius: 4 }} /> });
@@ -326,7 +332,10 @@ export function CafeScene({
     const y = py(s.y) - 32;
     const click = free && onSeatClick ? () => onSeatClick(s.id) : undefined;
     const title = `${s.label} · ${free ? "kosong" : "terisi"}`;
-    if (table?.shape === "bar") ents.push({ key: s.id, z: py(s.y) - 2, x, y, node: <StoolSprite />, onClick: click, title });
+    if (s.sofa) {
+      // The sofa is drawn as decor; this is only where to tap to sit on it.
+      if (click) ents.push({ key: s.id, z: py(s.y) - 2, x: px(s.x) - 20, y: py(s.y) - 22, node: <div style={{ width: 40, height: 40 }} />, onClick: click, title });
+    } else if (table?.shape === "bar") ents.push({ key: s.id, z: py(s.y) - 2, x, y, node: <StoolSprite />, onClick: click, title });
     else {
       ents.push({ key: s.id, z: py(s.y) - 2, x, y, node: <ChairSprite side={side} part={side === "s" ? "seat" : "all"} />, onClick: click, title });
       if (side === "s") ents.push({ key: `${s.id}-back`, z: py(s.y) + 2, x, y, node: <ChairSprite side="s" part="back" /> });

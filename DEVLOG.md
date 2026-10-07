@@ -4,6 +4,26 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: menu di bawah, tap untuk ngobrol, sofa, stand premium, multiplayer real time
+
+**Konteks:** owner minta menu pengguna di paling bawah, tombol seperti "Tanya panitia" dihapus dan diganti otomatis saat orangnya di-tap, bisa duduk di sofa, tanaman bergerak halus, sebagian stand terlihat premium, dan bisa bertemu pengguna lain dari device berbeda secara real time di web yang sama.
+
+**Yang berubah**
+
+- **Menu di paling bawah** (Profil, Lamaran, koin, Keluar). Tombol aksi seperti "Tanya panitia" dan "Ngobrol dengan…" dihapus.
+- **Tap langsung:** tap recruiter atau meja stand, panitia, Stand Koin, stand makanan, atau lift; karakter berjalan ke sana dan dialog atau menu terbuka sendiri saat sampai. Diantar panitia ke stand juga langsung disambut recruiter. Tombol E tetap jalan di laptop.
+- **Sofa:** dua sofa di lounge tiap lantai stand bisa diduduki (4 kursi per lantai). Tap sofa untuk duduk, jalan lagi untuk berdiri.
+- **Tanaman** bergoyang halus dengan ritme berbeda tiap pot, daun tanaman besar bergerak sendiri-sendiri.
+- **Stand premium:** 6 stand (2 per lantai) dengan tiang dan bingkai emas, pita "👑 PREMIUM", lampu sorot, dan karpet berkilau. Ditandai 👑 juga di daftar panitia dan menu meja info.
+- **Multiplayer real time:** setiap orang yang membuka job fair membagikan nama, tampilan karakter, posisi, kursi, dan balon obrolan lewat broker MQTT publik (broker.emqx.io, cadangan broker.hivemq.com). Pengunjung lain muncul dengan tanda 🌐, bisa disapa, dan sapaanmu muncul di layar mereka. HUD menampilkan "🟢 Online · N orang dari device lain". Pesan dari broker divalidasi (nama, posisi, lantai, warna) sebelum digambar. Bot tetap lokal di tiap device. Library MQTT dimuat terpisah agar halaman awal tetap ringan.
+
+**Verifikasi**
+
+- Tes baru: validasi pesan live (JSON rusak, lantai tak dikenal, angka tak valid, id aneh, warna berbahaya), pemain jarak jauh muncul, pindah, duduk di sofa, lalu hilang; sofa di tiap lantai bisa dicapai; 6 stand premium. Tes demo 18 dan shared 9 lulus, typecheck bersih.
+- Dicoba dengan dua browser (desktop dan HP 390px) lewat broker MQTT lokal: keduanya saling melihat, duduk di sofa terlihat di layar lain, tutup tab menghilangkan pemain di layar lain; tap Dewi dan tap meja stand premium membuka dialog saat tiba. Broker publik tidak bisa dijangkau dari server pengujian, jadi perlu dicoba dari dua HP setelah tayang.
+
+---
+
 ## 2026-10-07 · Job fair: lift, lantai penuh untuk food court, seminar, psikotes, layar HP bersih, install aplikasi
 
 **Konteks:** owner minta layar HP tidak tertutup informasi (petunjuk tap, notifikasi pindah lantai, nav hitam di atas), penunjuk arah atau lift untuk pindah lantai, food court, seminar, dan psikotes masing-masing satu lantai penuh lewat lift, dan opsi install sebagai aplikasi.
