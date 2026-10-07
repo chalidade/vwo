@@ -342,7 +342,7 @@ function RollUp({ booth }: { booth: CompanyBooth }) {
 }
 
 /** Everything that draws one booth, in scene coordinates. */
-export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
+export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; onAccessory?: (id: string) => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
   const { x, y } = booth;
   return [
     {
@@ -389,7 +389,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       onClick: opts.onBanner,
       title: opts.onBanner ? `Lowongan ${booth.company}` : undefined,
     },
-    ...boothAccessoryExtras(booth),
+    ...boothAccessoryExtras(booth, opts.onAccessory),
   ];
 }
 

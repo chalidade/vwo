@@ -1,7 +1,7 @@
-import { type ReactNode, useEffect } from "react";
+import { type CSSProperties, type ReactNode, useEffect } from "react";
 
 /** A popup in the game's style. Escape or a click outside closes it. */
-export function Modal({ title, onClose, children, className, foot }: { title: ReactNode; onClose: () => void; children: ReactNode; className?: string; foot?: ReactNode }) {
+export function Modal({ title, onClose, children, className, foot, style }: { title: ReactNode; onClose: () => void; children: ReactNode; className?: string; foot?: ReactNode; style?: CSSProperties }) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Escape") onClose();
@@ -12,7 +12,7 @@ export function Modal({ title, onClose, children, className, foot }: { title: Re
   });
   return (
     <div className="mb-backdrop" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>
-      <div className={`rpg-box mb ${className ?? ""}`} role="dialog" onClick={(e) => e.stopPropagation()}>
+      <div className={`rpg-box mb ${className ?? ""}`} role="dialog" style={style} onClick={(e) => e.stopPropagation()}>
         <div className="mb-head">
           <span className="mb-title">{title}</span>
           <button type="button" className="mb-close" onClick={onClose} aria-label="Tutup">

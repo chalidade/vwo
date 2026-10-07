@@ -82,8 +82,8 @@ export const SEMINARS: SeminarSession[] = [
 ];
 
 /** Sessions take turns on the stage, three minutes each, so everyone in the room sees the same one. */
-export function liveSeminar(now = Date.now()) {
-  return SEMINARS[Math.floor(now / 180000) % SEMINARS.length]!;
+export function liveSeminar(now = Date.now(), list: SeminarSession[] = SEMINARS) {
+  return list[Math.floor(now / 180000) % list.length]!;
 }
 
 /** What the speaker says over a slide, line by line: an opening, one line per point, then the takeaway.

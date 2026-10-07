@@ -14,7 +14,10 @@ import {
   SPONSOR_H,
   SPONSOR_W,
   boothSpot,
+  buildJobFairFloor,
   buildJobFairFloors,
+  type Promoter,
+  type SponsorView,
   fairFloorId,
   fairFloorIndex,
   LIFT_FRONT,
@@ -24,6 +27,7 @@ import {
   stallSpot,
   facingFor,
   findPath,
+  isBlocked,
 } from "@vwo/shared";
 import {
   APPLY_COST,
@@ -41,6 +45,11 @@ import {
   levelOf,
   streakBonus,
   todaysMissions,
+  PSYCH_MINUTES,
+  PSYCH_PASS,
+  PSYCH_TEST,
+  type PsychQuestion,
+  type SeminarSession,
 } from "./fair/content";
 import { ACCESSORY_PRODUCTS, BOT_REPLIES, productOf } from "./fair/company";
 import { FLOOR_SLOTS } from "@vwo/ui";
@@ -105,6 +114,34 @@ export interface CallLog {
   seconds: number;
 }
 
+/** What the organiser changed: booths added or taken out, ads, announcements, rooms. */
+export interface OrgState {
+  /** Event booths the organiser took out. */
+  removed: string[];
+  /** Booths the organiser added in free slots. */
+  added: CompanyBooth[];
+  /** Promoter NPCs (standing and walking), when the organiser changed the list. */
+  promoters?: Promoter[];
+  /** Sponsors, when the organiser edited them. */
+  sponsors?: SponsorView[];
+  announcement?: { text: string; at: number };
+  psych?: PsychConfig;
+  seminars?: SeminarSession[];
+}
+
+export interface PsychConfig {
+  questions: PsychQuestion[];
+  minutes: number;
+  /** Share of right answers needed for the certificate, 0–1. */
+  pass: number;
+}
+
+/** Where a booth can stand on a hall floor: three columns, two rows. */
+export const BOOTH_SLOTS = [1, 16, 31].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
+
+/** Paid booth decorations visitors can use, and what happened. */
+export type AccessoryResult = { ok: true; text: string; voucher?: Voucher; coins?: number } | { ok: false; text: string };
+
 /** What a company changed and bought in its portal. */
 export interface CompanyState {
   /** Booth fields the company edited, applied over the event's data. */
@@ -126,7 +163,7 @@ export interface CompanyInvoice {
 }
 
 /** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
-const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts"] as const;
+const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts", "media"] as const;
 export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
@@ -233,6 +270,8 @@ export interface PlayerState {
   roadmap?: Record<string, string[]>;
   /** Today's missions and mini game earnings; reset when the day changes. */
   daily?: DailyState;
+  /** Booth decoration rewards taken, by key, with the day they were taken. */
+  claims?: Record<string, string>;
 }
 
 export interface DailyState {
@@ -268,6 +307,8 @@ export interface FairSaved {
   ads?: Record<string, AdStat>;
   /** What each company changed and bought in the company portal, by booth id. */
   company?: Record<string, CompanyState>;
+  /** The organiser's changes. */
+  org?: OrgState;
 }
 
 export interface FairStorage {
@@ -330,6 +371,12 @@ export class DemoJobFair {
   readonly company = new Map<string, CompanyState>();
   /** The event's booths as published, before any company edits. */
   private readonly original: Map<string, CompanyBooth>;
+  private readonly originalPromoters: Promoter[];
+  private readonly originalSponsors: SponsorView[];
+  /** The organiser's changes. */
+  org: OrgState = { removed: [], added: [] };
+  /** Walking promoters: where they are heading and who they last talked to. */
+  private walkers = new Map<string, { path: Point[] | null; target: Goal | null; until: number; met: Map<string, number>; pitching: string | null }>();
   readonly events: FairEvent[] = [];
   /** Visits counted per booth (a visitor stopping at its desk or banner). */
   readonly visits = new Map<string, number>();
@@ -352,12 +399,45 @@ export class DemoJobFair {
     fair: JobFairView = DEMO_JOB_FAIR,
     private readonly storage: FairStorage | null = null,
   ) {
-    // Companies edit their own booths, so work on a copy rather than the shared event data.
+    // Companies and the organiser edit booths, ads and sponsors, so work on a copy of the event data.
     this.original = new Map(fair.booths.map((b) => [b.id, structuredClone(b)]));
-    this.fair = { ...fair, booths: fair.booths.map((b) => structuredClone(b)) };
-    this.floors = buildJobFairFloors(fair);
-    this.stops = fairStops(fair);
-    this.staff = [
+    this.originalPromoters = structuredClone(fair.promoters);
+    this.originalSponsors = structuredClone(fair.sponsors);
+    this.fair = { ...fair, booths: fair.booths.map((b) => structuredClone(b)), promoters: structuredClone(fair.promoters), sponsors: structuredClone(fair.sponsors) };
+    this.floors = buildJobFairFloors(this.fair);
+    this.stops = fairStops(this.fair);
+    this.staff = [];
+    this.rebuildStaff();
+    this.nextBotAt = this.now() + 400;
+    this.nextCalloutAt = this.now() + 5000;
+    this.restore();
+  }
+
+  private dirty = false;
+
+  private restore() {
+    const saved = this.storage?.load();
+    if (!saved || (saved.version !== 1 && saved.version !== 2)) return;
+    if (saved.player) Object.assign(this.player, freshPlayer(), saved.player);
+    this.loadOrg(saved.org);
+    this.loadCompany(saved.company);
+    for (const [k, list] of Object.entries(saved.reviews ?? {})) if (this.booth(k)) this.reviews.set(k, list);
+    for (const a of saved.applications ?? []) {
+      if (!this.booth(a.boothId)) continue;
+      this.applications.push({ ...a, status: a.status === "Terkirim" ? "Dilihat" : a.status });
+    }
+    for (const [k, n] of Object.entries(saved.visits ?? {})) this.visits.set(k, n);
+    for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
+    for (const [k, a] of Object.entries(saved.ads ?? {})) this.ads.set(k, a);
+    for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
+  }
+
+  /** Everyone who stands at a fixed spot or walks for the organiser: recruiters, desk staff, room hosts, promoters. */
+  private rebuildStaff() {
+    const fair = this.fair;
+    const old = new Map(this.staff.map((x) => [x.id, x]));
+    const promoFloor = (p: Promoter) => this.stops.find((st) => st.level === p.level)?.floorId ?? this.floors[0]!.id;
+    const next: FairStaff[] = [
       ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
       { id: "fair-info", name: fair.infoDesk.staff, boothId: null, floorId: fairFloorId(fair, 0), x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
       {
@@ -379,36 +459,255 @@ export class DemoJobFair {
           ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
-      ...fair.promoters.map((p) => ({ id: promoterId(p.id), name: `📣 ${p.brand}`, boothId: null, floorId: this.stops.find((st) => st.level === p.level)!.floorId, x: p.x, y: p.y, facing: "front" as Facing })),
+      ...fair.promoters.map((p) => {
+        const id = promoterId(p.id);
+        const was = old.get(id);
+        // A walker keeps walking from where it is; a standing promoter goes back to its spot.
+        if (p.walks && was && was.floorId === promoFloor(p)) return { ...was, name: `📣 ${p.brand}` };
+        return { id, name: `📣 ${p.brand}`, boothId: null, floorId: promoFloor(p), x: p.x, y: p.y, facing: "front" as Facing };
+      }),
     ];
-    this.nextBotAt = this.now() + 400;
-    this.nextCalloutAt = this.now() + 5000;
-    this.restore();
+    this.staff.splice(0, this.staff.length, ...next);
+    for (const id of [...this.walkers.keys()]) if (!fair.promoters.some((p) => p.walks && p.id === id)) this.walkers.delete(id);
   }
 
-  private dirty = false;
+  /** Apply the organiser's changes: which booths stand where, the ads, the sponsors. */
+  private loadOrg(org: OrgState | undefined) {
+    this.org = org ? structuredClone(org) : { removed: [], added: [] };
+    const before = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
+    const base = [...[...this.original.values()].filter((b) => !this.org.removed.includes(b.id)), ...this.org.added];
+    const byId = new Map(this.fair.booths.map((b) => [b.id, b]));
+    // Keep the same objects for booths that stay, so open dialogs keep pointing at them.
+    const booths = base.map((b) => {
+      const mine = byId.get(b.id);
+      if (!mine) return structuredClone(b);
+      for (const k of Object.keys(mine)) delete (mine as unknown as Record<string, unknown>)[k];
+      return Object.assign(mine, structuredClone(b));
+    });
+    this.fair.booths.splice(0, this.fair.booths.length, ...booths);
+    this.fair.promoters.splice(0, this.fair.promoters.length, ...structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.active !== false));
+    this.fair.sponsors.splice(0, this.fair.sponsors.length, ...structuredClone(this.org.sponsors ?? this.originalSponsors));
+    const after = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
+    if (before !== after) this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
+    this.rebuildStaff();
+  }
 
-  private restore() {
-    const saved = this.storage?.load();
-    if (!saved || (saved.version !== 1 && saved.version !== 2)) return;
-    if (saved.player) Object.assign(this.player, freshPlayer(), saved.player);
-    for (const [k, list] of Object.entries(saved.reviews ?? {})) if (this.booth(k)) this.reviews.set(k, list);
-    for (const a of saved.applications ?? []) {
-      if (!this.booth(a.boothId)) continue;
-      this.applications.push({ ...a, status: a.status === "Terkirim" ? "Dilihat" : a.status });
+  private saveOrg() {
+    this.loadOrg(this.org);
+    this.loadCompany(Object.fromEntries(this.company));
+    this.persist();
+    this.emit();
+  }
+
+  // ---- Organiser ----------------------------------------------------------------------
+
+  /** Empty booth places on the hall floors. */
+  freeSlots() {
+    return this.fair.floors.flatMap((_, floor) => BOOTH_SLOTS.filter((sl) => !this.fair.booths.some((b) => b.floor === floor && b.x === sl.x && b.y === sl.y)).map((sl) => ({ floor, ...sl })));
+  }
+
+  /** Put a new company in a free slot. */
+  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; floor: number; x: number; y: number; tier?: "premium" | "regular" }) {
+    const name = input.company.trim();
+    if (!name || !this.freeSlots().some((sl) => sl.floor === input.floor && sl.x === input.x && sl.y === input.y)) return null;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
+    let id = slug;
+    for (let n = 2; this.original.has(id) || this.org.added.some((b) => b.id === id); n++) id = `${slug}-${n}`;
+    const booth: CompanyBooth = {
+      id,
+      company: name,
+      tagline: input.tagline?.trim() || `Bergabung bersama ${name}`,
+      industry: input.industry.trim() || "Umum",
+      logo: (input.logo?.trim() || name.split(/\s+/).map((w) => w[0]).join("")).slice(0, 2).toUpperCase(),
+      color: input.color,
+      floor: input.floor,
+      tier: input.tier ?? "regular",
+      x: input.x,
+      y: input.y,
+      recruiter: input.recruiter?.trim() || "Recruiter",
+      about: `${name} membuka lowongan di job fair ini. Profil lengkap diisi perusahaan lewat portal perusahaan.`,
+      faq: [{ q: "Bagaimana cara melamar?", a: "Pilih lowongan di banner stand lalu kirim lamaran." }],
+      jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],
+    };
+    this.org.added.push(booth);
+    this.saveOrg();
+    return booth;
+  }
+
+  /** Take a booth out of the event. Its applications go with it. */
+  removeBooth(id: string) {
+    if (!this.booth(id)) return;
+    if (this.org.added.some((b) => b.id === id)) this.org.added = this.org.added.filter((b) => b.id !== id);
+    else this.org.removed.push(id);
+    this.company.delete(id);
+    for (let i = this.applications.length - 1; i >= 0; i--) if (this.applications[i]!.boothId === id) this.applications.splice(i, 1);
+    this.saveOrg();
+  }
+
+  /** Bring back an event booth the organiser took out, if its slot is still free. */
+  restoreBooth(id: string) {
+    const b = this.original.get(id);
+    if (!b || !this.org.removed.includes(id)) return false;
+    if (this.fair.booths.some((x) => x.floor === b.floor && x.x === b.x && x.y === b.y)) return false;
+    this.org.removed = this.org.removed.filter((x) => x !== id);
+    this.saveOrg();
+    return true;
+  }
+
+  /** Booths taken out that could come back. */
+  removedBooths() {
+    return this.org.removed.map((id) => this.original.get(id)!).filter(Boolean);
+  }
+
+  /** Add or change a promoter NPC (standing or walking). */
+  savePromoter(p: Promoter) {
+    const list = structuredClone(this.org.promoters ?? this.originalPromoters);
+    const i = list.findIndex((x) => x.id === p.id);
+    if (i >= 0) list[i] = p;
+    else list.push(p);
+    this.org.promoters = list;
+    this.saveOrg();
+  }
+
+  removePromoter(id: string) {
+    this.org.promoters = structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.id !== id);
+    this.saveOrg();
+  }
+
+  /** Every promoter, including those switched off. */
+  allPromoters() {
+    return this.org.promoters ?? this.originalPromoters;
+  }
+
+  newAdId(prefix: string) {
+    return `${prefix}-${this.now().toString(36)}${Math.floor(this.rand() * 1000)}`;
+  }
+
+  /** Change a sponsor's banner text, tier or link. Position stays. */
+  saveSponsor(sp: SponsorView) {
+    const list = structuredClone(this.org.sponsors ?? this.originalSponsors);
+    const i = list.findIndex((x) => x.id === sp.id);
+    if (i < 0) return;
+    list[i] = { ...sp, x: list[i]!.x, y: list[i]!.y, floor: list[i]!.floor };
+    this.org.sponsors = list;
+    this.saveOrg();
+  }
+
+  /** A message from the organiser to everyone in the hall. */
+  announce(text: string) {
+    const t = text.trim().slice(0, 200);
+    this.org.announcement = t ? { text: t, at: this.now() } : undefined;
+    if (t) this.notices.push(`📢 Panitia: ${t}`);
+    this.saveOrg();
+  }
+
+  psychConfig(): PsychConfig {
+    return this.org.psych ?? { questions: PSYCH_TEST, minutes: PSYCH_MINUTES, pass: PSYCH_PASS };
+  }
+
+  savePsych(cfg: PsychConfig) {
+    const questions = cfg.questions.filter((q) => q.q.trim() && q.options.filter((o) => o.trim()).length >= 2 && q.answer >= 0 && q.answer < q.options.length);
+    if (!questions.length) return false;
+    this.org.psych = { questions, minutes: Math.max(1, Math.min(60, Math.round(cfg.minutes))), pass: Math.max(0.1, Math.min(1, cfg.pass)) };
+    this.saveOrg();
+    return true;
+  }
+
+  resetPsych() {
+    delete this.org.psych;
+    this.saveOrg();
+  }
+
+  seminars(): SeminarSession[] {
+    return this.org.seminars ?? SEMINARS;
+  }
+
+  saveSeminar(sem: SeminarSession) {
+    const list = structuredClone(this.seminars());
+    const i = list.findIndex((x) => x.id === sem.id);
+    if (i >= 0) list[i] = sem;
+    else list.push(sem);
+    this.org.seminars = list;
+    this.saveOrg();
+  }
+
+  removeSeminar(id: string) {
+    const list = this.seminars().filter((x) => x.id !== id);
+    if (!list.length) return;
+    this.org.seminars = structuredClone(list);
+    this.saveOrg();
+  }
+
+  // ---- Booth decorations visitors can use ------------------------------------------------
+
+  /** A visitor uses a booth's paid decoration: watch the video, take a brochure, claim merch, pop a balloon... */
+  useAccessory(boothId: string, acc: string, action: "view" | "claim" | "share" = "view"): AccessoryResult {
+    const b = this.booth(boothId);
+    if (!b || !(b.accessories ?? []).includes(acc)) return { ok: false, text: "Aksesoris tidak ada" };
+    const key = `acc:${boothId}:${acc}`;
+    if (action === "view") {
+      this.ad(key, "view");
+      return { ok: true, text: "" };
     }
-    for (const [k, n] of Object.entries(saved.visits ?? {})) this.visits.set(k, n);
-    for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
-    for (const [k, a] of Object.entries(saved.ads ?? {})) this.ads.set(k, a);
-    for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
-    this.loadCompany(saved.company);
+    if (action === "share") {
+      this.ad(key, "click");
+      return { ok: true, text: "Dibagikan" };
+    }
+    const claims = (this.player.claims ??= {});
+    const today = this.today();
+    const ckey = `${acc}:${boothId}`;
+    if (acc === "giveaway") {
+      const merch = b.media?.merch ?? { name: `Tote bag ${b.company}`, stock: 50 };
+      if (claims[ckey]) return { ok: false, text: "Kamu sudah ambil merchandise di stand ini" };
+      const given = this.ads.get(key)?.sold ?? 0;
+      if (given >= merch.stock) return { ok: false, text: "Yah, merchandise sudah habis" };
+      claims[ckey] = today;
+      this.ad(key, "sold");
+      const v = this.giveVoucher(`🎁 ${merch.name}`, b, "Tunjukkan di stand untuk mengambil");
+      this.gainXp(3);
+      return { ok: true, text: `${merch.name} jadi milikmu! Ambil di stand dengan menunjukkan voucher.`, voucher: v };
+    }
+    if (acc === "coffee") {
+      if (claims[ckey] === today) return { ok: false, text: "Kopi gratisnya sudah kamu ambil hari ini" };
+      claims[ckey] = today;
+      this.ad(key, "sold");
+      const v = this.giveVoucher(`☕ ${b.media?.coffee || "Kopi gratis"}`, b, "Berlaku hari ini di coffee cart stand");
+      return { ok: true, text: "Kopi gratis menunggumu di coffee cart. Sambil ngopi, ngobrol dengan recruiter yuk!", voucher: v };
+    }
+    if (acc === "balloons") {
+      if (claims[ckey] === today) return { ok: false, text: "Balon di stand ini sudah kamu pecahkan hari ini" };
+      claims[ckey] = today;
+      const coins = 1 + Math.floor(this.rand() * 3);
+      this.earn(coins, `Balon di stand ${b.company}`);
+      this.ad(key, "click");
+      return { ok: true, text: `Pop! Kamu dapat ${coins} koin 🎈`, coins };
+    }
+    if (acc === "photobooth") {
+      this.ad(key, "click");
+      if (!claims[ckey]) {
+        claims[ckey] = today;
+        this.gainXp(5);
+      }
+      return { ok: true, text: "Foto tersimpan" };
+    }
+    this.ad(key, "click");
+    return { ok: true, text: "" };
+  }
+
+  private giveVoucher(title: string, b: CompanyBooth, terms: string) {
+    const v: Voucher = { id: this.id("vc"), kind: "merchant", title, code: `${b.logo}-${Math.floor(1000 + this.rand() * 9000)}`, terms, outlet: `Stand ${b.company}`, from: b.company, at: this.now(), used: false };
+    this.player.vouchers.unshift(v);
+    this.persist();
+    this.emit();
+    return v;
   }
 
   /** Put every booth back to the event's data, then apply what each company saved. */
   private loadCompany(saved: Record<string, CompanyState> | undefined) {
     this.company.clear();
     for (const b of this.fair.booths) {
-      Object.assign(b, structuredClone(this.original.get(b.id)!));
+      const base = this.original.get(b.id) ?? this.org.added.find((x) => x.id === b.id);
+      if (base) Object.assign(b, structuredClone(base));
       const st = saved?.[b.id];
       if (st) {
         this.company.set(b.id, st);
@@ -423,6 +722,7 @@ export class DemoJobFair {
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
     if (!saved) return;
+    this.loadOrg(saved.org);
     this.loadCompany(saved.company);
     for (const a of saved.applications ?? []) {
       if (!this.booth(a.boothId)) continue;
@@ -453,6 +753,7 @@ export class DemoJobFair {
       sponsorViews: Object.fromEntries(this.sponsorViews),
       ads: Object.fromEntries(this.ads),
       company: Object.fromEntries(this.company),
+      org: this.org,
       visitedBy: Object.fromEntries([...this.visitedBy].filter(([id]) => real.has(id)).map(([id, set]) => [id, [...set]])),
     });
   }
@@ -460,6 +761,7 @@ export class DemoJobFair {
   /** Forget everything saved: applications, stamps and counters. */
   reset() {
     this.applications.length = 0;
+    this.loadOrg(undefined);
     this.loadCompany(undefined);
     this.visits.clear();
     this.sponsorViews.clear();
@@ -1344,6 +1646,7 @@ export class DemoJobFair {
 
     const step = (WALK_SPEED * Math.min(dtMs, 250)) / 1000;
     for (const bot of [...this.bots]) if (this.tickBot(bot, now, step)) changed = true;
+    if (this.tickWalkers(now, step * 0.85)) changed = true;
     if (changed) this.emit();
   }
 
@@ -1372,7 +1675,8 @@ export class DemoJobFair {
         this.say(v.memberId, this.pick(ROOM_CHATTER[room.kind]), 2200);
       }
       if (room.kind === "seminar" && this.rand() < 0.6) {
-        const session = SEMINARS[Math.floor(this.now() / 180000) % SEMINARS.length]!;
+        const list = this.seminars();
+        const session = list[Math.floor(this.now() / 180000) % list.length]!;
         const slide = session.slides[this.speakerLine++ % session.slides.length]!;
         this.say(roomStaffId(room.id), slide.say, 3600);
       }
@@ -1426,7 +1730,14 @@ export class DemoJobFair {
         this.after(500, () => this.visitors.has(v.memberId) && this.say(v.memberId, sp.promo ? "Wah, ada promo!" : `Oh, ${sp.name}!`, 1800));
         return true;
       }
-      const booth = this.booth(stop.boothId)!;
+      const booth = this.booth(stop.boothId);
+      if (!booth) {
+        // The organiser took this booth out.
+        bot.plan.shift();
+        bot.target = null;
+        bot.path = null;
+        return true;
+      }
       if (!bot.target) {
         const base = boothSpot(booth, stop.spot);
         const floorId = this.floorIdOf(booth);
@@ -1490,6 +1801,64 @@ export class DemoJobFair {
     if (bot.target && this.walk(v, bot, bot.target, step)) return true;
     this.leave(v.memberId);
     return true;
+  }
+
+  /** Walking promoters wander the floor, go up to visitors (the player first) and pitch their offer. */
+  private tickWalkers(now: number, step: number) {
+    let moved = false;
+    for (const p of this.fair.promoters) {
+      if (!p.walks) continue;
+      const s = this.staff.find((x) => x.id === promoterId(p.id));
+      if (!s) continue;
+      let w = this.walkers.get(p.id);
+      if (!w) this.walkers.set(p.id, (w = { path: null, target: null, until: 0, met: new Map(), pitching: null }));
+      if (now < w.until) continue;
+      if (!w.target) {
+        const fresh = [...this.visitors.values()].filter(
+          (v) => v.floorId === s.floorId && !v.seatId && now - (w!.met.get(v.memberId) ?? -1e12) > (v.memberId === PLAYER_ID ? 75000 : 40000),
+        );
+        const who = fresh.find((v) => v.memberId === PLAYER_ID) ?? (fresh.length && this.rand() < 0.5 ? this.pick(fresh) : undefined);
+        if (who) {
+          w.pitching = who.memberId;
+          w.target = { floorId: s.floorId, x: who.x + (who.x > s.x ? -0.9 : 0.9), y: who.y + 0.1 };
+        } else {
+          w.pitching = null;
+          const floor = this.floor(s.floorId);
+          for (let i = 0; i < 12 && !w.target; i++) {
+            const x = 2 + this.rand() * (floor.width - 4);
+            const y = 5 + this.rand() * (floor.height - 7);
+            if (!isBlocked(floor, x, y)) w.target = { floorId: s.floorId, x, y };
+          }
+          if (!w.target) {
+            w.until = now + 2000;
+            continue;
+          }
+        }
+        w.path = null;
+      }
+      moved = true;
+      if (this.walk(s as unknown as FairVisitor, w, w.target, step)) {
+        // Chasing someone who walked off: aim again.
+        const v = w.pitching ? this.visitors.get(w.pitching) : undefined;
+        if (w.pitching && (!v || v.floorId !== s.floorId || Math.hypot(v.x - w.target.x, v.y - w.target.y) > 2)) w.target = null;
+        continue;
+      }
+      w.target = null;
+      const v = w.pitching ? this.visitors.get(w.pitching) : undefined;
+      w.pitching = null;
+      if (v && Math.hypot(v.x - s.x, v.y - s.y) < 2.4) {
+        s.facing = facingFor(v.x - s.x, v.y - s.y, s.facing);
+        w.met.set(v.memberId, now);
+        w.until = now + 6500;
+        this.ad(`promo:${p.id}`, "view");
+        if (v.memberId === PLAYER_ID) this.say(s.id, `Halo ${v.displayName}! ${p.headline} 🎁 Tap aku ya!`, 6000);
+        else {
+          this.say(s.id, `Halo kak! ${p.headline}`, 3000);
+          this.after(2000, () => this.visitors.has(v.memberId) && this.say(v.memberId, this.pick(["Wah boleh juga!", "Simpan kodenya ah", "Nanti aku cek ya", "Makasih kak!"]), 2000));
+        }
+      } else w.until = now + 1200 + this.rand() * 2500;
+    }
+    return moved;
   }
 
   /** One step toward `goal`, riding the lift when it is on another floor. False once arrived. */

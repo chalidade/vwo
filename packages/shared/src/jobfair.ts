@@ -72,6 +72,26 @@ export interface CompanyBooth {
   ticker?: string;
   /** Lines the recruiter calls out to people walking by. */
   callouts?: string[];
+  /** What visitors get when they tap the booth's paid decorations. */
+  media?: BoothMedia;
+}
+
+/** Content behind a booth's decorations, set in the company portal. */
+export interface BoothMedia {
+  /** Company video for the TV: a YouTube link or a video file URL. Without it the TV plays a slideshow. */
+  videoUrl?: string;
+  /** Brochure pages the mascot hands out. */
+  brochure?: { title: string; text: string }[];
+  /** What the mascot says to people walking by. */
+  mascotLine?: string;
+  /** Free merchandise at the giveaway shelf, and how many are left. */
+  merch?: { name: string; stock: number };
+  /** The coffee cart's offer. */
+  coffee?: string;
+  /** Hashtag on the photo booth frame. */
+  hashtag?: string;
+  /** Employee stories told on the bean bags. */
+  stories?: { name: string; role: string; text: string }[];
 }
 
 /** A sponsor of the event: its logo on the hall wall and a standing banner on the floor. */
@@ -174,6 +194,10 @@ export interface Promoter {
   code?: string;
   /** What they call out to passers-by. */
   callouts: string[];
+  /** Walks around the floor and goes up to visitors instead of standing still. */
+  walks?: boolean;
+  /** Switched off by the organiser: not shown. */
+  active?: boolean;
 }
 
 export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
@@ -527,6 +551,40 @@ export const DEMO_JOB_FAIR: JobFairView = {
   ],
 
   promoters: [
+    {
+      id: "promo-ojek",
+      name: "Gilang",
+      brand: "Ojek Kita",
+      emoji: "🛵",
+      color: "#16a34a",
+      level: 0,
+      x: 24,
+      y: 13,
+      headline: "Diskon 50% ojek ke lokasi interview",
+      offer: "Pulang dari job fair atau berangkat interview? Pakai kode ini untuk diskon 50% dua kali perjalanan.",
+      cta: "Pesan ojek",
+      url: "https://ojekkita.example/jobfair",
+      code: "INTERVIEW50",
+      callouts: ["Ojek murah ke lokasi interview! 🛵", "Diskon 50% buat pencari kerja!"],
+      walks: true,
+    },
+    {
+      id: "promo-foto",
+      name: "Sekar",
+      brand: "Studio Pas Foto",
+      emoji: "📷",
+      color: "#7c3aed",
+      level: 1,
+      x: 24,
+      y: 13,
+      headline: "Pas foto CV profesional Rp15 ribu",
+      offer: "Foto CV latar polos, langsung jadi digital 5 menit. Tunjukkan kode di studio kami.",
+      cta: "Lihat studio",
+      url: "https://pasfoto.example/jobfair",
+      code: "CVKECE",
+      callouts: ["Foto CV kece, 5 menit jadi! 📷"],
+      walks: true,
+    },
     {
       id: "promo-telko",
       name: "Rani",
