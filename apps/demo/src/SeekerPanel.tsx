@@ -33,6 +33,7 @@ export function SeekerPanel({
   companyRating,
   visited,
   onSaveProfile,
+  onReply,
   onOpenJob,
   onOpenCompany,
   onGoTo,
@@ -50,6 +51,7 @@ export function SeekerPanel({
   companyRating: (boothId: string) => { average: number; count: number };
   visited: Set<string>;
   onSaveProfile: (p: SeekerProfile) => void;
+  onReply: (applicationId: string, text: string) => void;
   onOpenJob: (boothId: string, jobId: string) => void;
   onOpenCompany: (boothId: string) => void;
   onGoTo: (boothId: string) => void;
@@ -218,6 +220,14 @@ export function SeekerPanel({
                         ) : (
                           <span className="sp-rating sp-muted">Menunggu penilaian perusahaan…</span>
                         )}
+                        {a.interview && (
+                          <span className="sp-interview">
+                            📅 Interview {a.interview.mode} · <b>{new Date(a.interview.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b>
+                            {a.interview.place ? ` · ${a.interview.place}` : ""}
+                          </span>
+                        )}
+                        {(a.calls ?? []).some((c) => !c.answered) && <span className="sp-missed">📞 {a.company} mencoba menelepon kamu</span>}
+                        {(a.messages ?? []).length > 0 && <Chat app={a} onReply={onReply} />}
                         <span className="sp-links">
                           <button type="button" onClick={() => onOpenJob(a.boothId, a.jobId)}>
                             Lowongan
@@ -267,6 +277,33 @@ export function SeekerPanel({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Messages from the company about one application, with a reply box. */
+function Chat({ app, onReply }: { app: FairApplication; onReply: (applicationId: string, text: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <div className="sp-chat">
+      {app.messages!.map((m, i) => (
+        <div key={i} className="sp-bubble" data-me={m.from === "seeker" ? "" : undefined}>
+          {m.text}
+        </div>
+      ))}
+      <form
+        className="sp-reply"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onReply(app.id, text);
+          setText("");
+        }}
+      >
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={`Balas ${app.company}`} maxLength={600} aria-label={`Balas ${app.company}`} />
+        <button type="submit" disabled={!text.trim()}>
+          Kirim
+        </button>
+      </form>
     </div>
   );
 }

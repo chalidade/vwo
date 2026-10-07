@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { DemoJobFair, type FairSaved, PLAYER_ID, promoterId } from "../src/jobfair-engine";
+import { DemoJobFair, type FairSaved, PLAYER_ID, promoterId, recruiterId } from "../src/jobfair-engine";
+import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
 function clock() {
   let t = 1_000_000;
@@ -299,5 +300,95 @@ describe("DemoJobFair", () => {
     fair.toggleStep(a.id, stepKey(0, 0));
     fair.toggleStep(a.id, stepKey(0, 0));
     expect(fair.player.xp).toBe(xp1 + 15);
+  });
+
+  it("lets a company edit its booth, vacancies and FAQ, and keeps the edits", () => {
+    const c = clock();
+    let stored: FairSaved | null = null;
+    const storage = { load: () => stored, save: (d: FairSaved) => (stored = JSON.parse(JSON.stringify(d))), clear: () => (stored = null) };
+    const fair = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    fair.editBooth("kopi-kita", { tagline: "Kopi untuk semua", theme: "wood", recruiter: "Bu Rina", faq: [{ q: "Ada mess?", a: "Ada untuk luar kota." }], x: 99 } as never);
+    const b = fair.booth("kopi-kita")!;
+    expect([b.tagline, b.theme, b.recruiter, b.faq.length, b.x]).toEqual(["Kopi untuk semua", "wood", "Bu Rina", 1, DEMO_JOB_FAIR.booths.find((x) => x.id === "kopi-kita")!.x]);
+    expect(fair.staff.find((s) => s.id === recruiterId("kopi-kita"))!.name).toBe("Bu Rina");
+    // The shared event data is untouched.
+    expect(DEMO_JOB_FAIR.booths.find((x) => x.id === "kopi-kita")!.tagline).not.toBe("Kopi untuk semua");
+
+    const id = fair.newJobId("kopi-kita");
+    fair.saveJob("kopi-kita", { id, title: "Roaster", type: "Kontrak", location: "Bandung", requirements: ["Paham kopi"] });
+    fair.join("Chalid", false, PLAYER_ID);
+    expect(fair.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: id })).not.toBeNull();
+    // A vacancy with applicants is closed instead of deleted, and stops taking applications.
+    expect(fair.deleteJob("kopi-kita", id)).toBe("closed");
+    const v = fair.join("Sari", true);
+    expect(fair.apply(v.memberId, { boothId: "kopi-kita", jobId: id })).toBeNull();
+    fair.flush();
+
+    const again = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    const b2 = again.booth("kopi-kita")!;
+    expect([b2.tagline, b2.theme, b2.jobs.find((j) => j.id === id)?.closed]).toEqual(["Kopi untuk semua", "wood", true]);
+    again.reset();
+    expect(again.booth("kopi-kita")!.tagline).toBe(DEMO_JOB_FAIR.booths.find((x) => x.id === "kopi-kita")!.tagline);
+  });
+
+  it("bills VIP and decorations, and switches them on once paid", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const id = fair.fair.booths.find((b) => b.tier !== "premium")!.id;
+    expect(fair.toggleAccessory(id, "plant")).toBe(true);
+    expect(fair.toggleAccessory(id, "tv")).toBe(false);
+    const inv = fair.createInvoice(id, ["vip", "tv", "plant", "nope"])!;
+    expect(inv.items.map((i) => i.id)).toEqual(["vip", "tv"]);
+    expect(inv.total).toBe(VIP_PRODUCT.price + 300_000);
+    expect(fair.payInvoice(id, inv.id, "QRIS")).toBe(true);
+    expect(fair.payInvoice(id, inv.id, "QRIS")).toBe(false);
+    const b = fair.booth(id)!;
+    expect(b.tier).toBe("premium");
+    expect(b.accessories).toEqual(["plant", "tv"]);
+    expect(fair.createInvoice(id, ["vip", "tv"])).toBeNull();
+    // Only four floor items fit.
+    for (const a of ["flag", "standee", "giveaway"]) fair.toggleAccessory(id, a);
+    expect(fair.toggleAccessory(id, "beanbag")).toBe(false);
+  });
+
+  it("lets a company review, chat with and invite an applicant", () => {
+    const c = clock();
+    const fair = new DemoJobFair(() => 0.5, c.now);
+    fair.join("Chalid", false, PLAYER_ID);
+    const job = fair.booth("kopi-kita")!.jobs[0]!;
+    const a = fair.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: job.id, cvUrl: "https://cv.example/c", phone: "0812", skills: job.requirements.join(", ") })!;
+    expect(matchScore(a, job)).toBeGreaterThan(matchScore({ ...a, skills: "", cvUrl: "", phone: "" }, job));
+    fair.notices.length = 0;
+    fair.setStatus(a.id, "Shortlist");
+    fair.scheduleInterview(a.id, { at: c.now() + 86400000, mode: "Video call" });
+    expect(a.status).toBe("Diundang interview");
+    expect(a.messages?.[0]?.text).toContain("Video call");
+    expect(fair.notices.some((n) => n.includes("Shortlist"))).toBe(true);
+    fair.replyToCompany(a.id, "Siap!");
+    expect(a.messages?.map((m) => m.from)).toEqual(["company", "seeker"]);
+    fair.logCall(a.id, { at: c.now(), kind: "voice", answered: false, seconds: 0 });
+    expect(fair.notices.at(-1)).toContain("tak terjawab");
+  });
+
+  it("takes newer application changes and company edits from another tab", () => {
+    const c = clock();
+    const tabA = new DemoJobFair(() => 0.5, c.now);
+    const tabB = new DemoJobFair(() => 0.5, c.now);
+    tabA.join("Chalid", false, PLAYER_ID);
+    const a = tabA.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: tabA.booth("kopi-kita")!.jobs[0]!.id })!;
+    let saved: FairSaved | null = null;
+    const grab = (f: DemoJobFair) => {
+      (f as unknown as { storage: unknown }).storage = { load: () => saved, save: (d: FairSaved) => (saved = JSON.parse(JSON.stringify(d))), clear() {} };
+      (f as unknown as { dirty: boolean }).dirty = true;
+      f.flush();
+      return saved;
+    };
+    tabB.mergeSaved(grab(tabA));
+    expect(tabB.applications.map((x) => x.id)).toEqual([a.id]);
+    c.advance(1000);
+    tabB.editBooth("kopi-kita", { theme: "neon" });
+    tabB.setStatus(a.id, "Diterima");
+    tabA.mergeSaved(grab(tabB));
+    expect(tabA.applications[0]!.status).toBe("Diterima");
+    expect(tabA.booth("kopi-kita")!.theme).toBe("neon");
   });
 });

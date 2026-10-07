@@ -4,6 +4,42 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: portal perusahaan (booth, lowongan, FAQ, VIP, review pelamar, telepon & video call)
+
+**Konteks:** owner minta halaman untuk perusahaan: mengatur tema booth, mengisi FAQ, membayar VIP, menambah aksesoris booth, mengisi informasi perusahaan dan lowongan, mereview lamaran, serta menelepon atau video call pelamar yang cocok. Fitur pelengkap yang biasanya dibutuhkan juga diminta untuk ditambahkan.
+
+**Yang berubah**
+- **Halaman baru `#/jobfair/company`:** pilih perusahaan (pengganti login di demo), lalu ada 7 tab.
+- **Ringkasan:** jumlah orang di stand sekarang, kunjungan, pelamar, yang perlu direview, interview, dan lowongan aktif. Ada corong rekrutmen, pelamar per lowongan, rating dan level, jadwal interview, balasan pelamar, serta daftar "lengkapi stand kamu".
+- **Pelamar:**
+  - Daftar bisa dicari, difilter per lowongan atau status, diurutkan (terbaru, paling cocok, psikotes, rating), dan diekspor ke CSV.
+  - Tiap pelamar punya skor kecocokan 0–100%, dihitung dari kualifikasi lowongan dibanding keahlian dan pesan pelamar, ditambah CV, nomor HP, psikotes, dan centang biru.
+  - Detail pelamar berisi data, CV, pesan, rating dengan feedback, catatan internal, dan status pipeline (Shortlist, Interview, Diterima, Belum cocok).
+  - Perusahaan bisa menjadwalkan interview (waktu, cara, tempat atau link, pesan), lalu undangannya otomatis masuk ke chat pelamar. Chat dua arah tersedia, dan bot pelamar ikut membalas.
+- **Telepon & video call:**
+  - Tombol 🎥 Video call dan 📞 Telepon membuka layar panggilan dengan kamera dan mikrofon asli (WebRTC), lengkap dengan tombol bisu, matikan kamera, tutup, dan durasi.
+  - Pelamar mendapat layar "panggilan masuk" dengan tombol Angkat dan Tolak. Panggilan yang tak terjawab dicatat dan muncul di tas pelamar.
+  - Di demo tanpa server, panggilan sungguhan hanya tersambung antar tab di browser yang sama. Panggilan ke bot berupa simulasi dengan teks ucapan.
+  - Ada juga tautan langsung ke nomor HP (`tel:`), WhatsApp, dan email pelamar.
+- **Lowongan:** tambah, ubah, tutup atau buka lagi, dan hapus lowongan. Isinya deskripsi, kualifikasi, gaji, batas melamar, dan kebutuhan orang. Lowongan yang sudah punya pelamar ditutup, bukan dihapus. Lowongan yang ditutup hilang dari banner, form lamar, dan bot.
+- **Booth:**
+  - Pratinjau stand langsung dari aula, 5 tema (Klasik, Modern gelap, Kayu natural, Pastel, Neon), 12 warna brand plus pemilih warna bebas.
+  - 10 aksesoris yang digambar di stand: tanaman, umbul-umbul, standee maskot, rak merchandise, coffee cart, bean bag, TV, photo booth, balon, dan neon "We're hiring". Maksimal 4 barang lantai.
+  - Teks LED berjalan sendiri dan sapaan recruiter ke pengunjung bisa diatur.
+- **Profil:** nama, logo, tagline, industri, nama recruiter, tentang, website, email, nomor HP/WA HR, alamat, tahun berdiri, jumlah karyawan, benefit, dan sosial media.
+- **FAQ:** tambah, ubah, urutkan, dan hapus pertanyaan. Jawabannya dipakai recruiter saat ngobrol dengan pengunjung.
+- **VIP & tagihan:** keranjang untuk VIP (Rp 2.500.000) dan aksesoris berbayar. Tagihan bisa dibayar lewat QRIS, VA, kartu, atau transfer. **Pembayaran hanya demo, tidak ada uang yang ditarik.** Begitu lunas, stand langsung VIP dan aksesoris langsung terpasang.
+- **Sisi pelamar:** tas pelamar menampilkan jadwal interview, panggilan tak terjawab, dan chat dengan perusahaan, lengkap dengan kotak balas. Pelamar juga mendapat notifikasi saat status lamaran berubah.
+- **Sinkron antar tab:** perubahan dari portal (booth, lowongan, status, chat) langsung terlihat di tab job fair lain di browser yang sama.
+
+**Teknis:** engine menyimpan salinan booth per tab, sehingga data acara asli tidak berubah. Edit perusahaan dan tagihan disimpan di `localStorage` (`company` di `vwo:jobfair`). Gambar aksesoris ada di `packages/ui/src/rpg/BoothDecor.tsx`.
+
+**Cek:** typecheck, 27 test demo lolos (4 test baru: edit booth, tagihan VIP/aksesoris, review pelamar, dan sinkron antar tab). Diuji di Chromium ukuran HP, termasuk video call sungguhan antar dua tab memakai kamera palsu Chromium. Screenshot ada di `screenshots/jobfair-company/`.
+
+**Lanjutan:** login perusahaan sungguhan, server untuk data dan panggilan lintas perangkat (signaling + TURN), payment gateway asli, dan undangan kalender.
+
+---
+
 ## 2026-10-07 · Job fair: mini game di sofa, pojok baca, roadmap profesi, misi harian
 
 **Konteks:** owner bertanya bagaimana supaya pelamar tidak bosan dan betah lama di aplikasi. Usulannya: mini game di sofa untuk dapat koin gratis, bacaan tentang profesi, dan roadmap untuk jadi ahli di profesi tertentu.

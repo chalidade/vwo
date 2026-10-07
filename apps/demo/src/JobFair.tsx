@@ -14,6 +14,7 @@ import {
   fairFloorId,
   LIFT_FRONT,
   findPath,
+  openJobs,
   slide,
   stallSpot,
 } from "@vwo/shared";
@@ -46,6 +47,8 @@ import { PLAYER_ID, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId
 import { LiveChannel, type LiveStatus } from "./live";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
+import { CallScreen } from "./fair/Call";
+import { type RingSignal, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
@@ -119,6 +122,7 @@ export function JobFair() {
   const [promo, setPromo] = useState<Promoter | null>(null);
   const [games, setGames] = useState(false);
   const [missions, setMissions] = useState(false);
+  const [ring, setRing] = useState<RingSignal | null>(null);
   const [live, setLive] = useState<{ status: LiveStatus; peers: number }>({ status: "connecting", peers: 0 });
   /** How players on other devices look, by their visitor id here. */
   const remoteLooks = useRef(new Map<string, Look>());
@@ -163,9 +167,23 @@ export function JobFair() {
     if (up) setToast(`🎉 Naik level! Lv ${up} · ${SEEKER_TITLES[up - 1]}`);
     else {
       const n = fair.notices.shift();
-      if (n) setToast(`⭐ ${n}`);
+      if (n) setToast(/^\p{L}/u.test(n) ? `⭐ ${n}` : n);
     }
   });
+
+  // A company calls about an application, from its portal in another tab.
+  useEffect(
+    () =>
+      onSignal((s) => {
+        if (s.type !== "ring" || s.to !== PLAYER_ID) return;
+        setRing((cur) => {
+          if (cur) sendSignal({ type: "decline", callId: s.callId });
+          return cur ?? s;
+        });
+        navigator.vibrate?.([300, 200, 300]);
+      }),
+    [],
+  );
 
   // --- What is within reach: a recruiter across the desk, a hiring banner, the info desk, a person.
   const reach: Reach | null = (() => {
@@ -344,7 +362,7 @@ export function JobFair() {
       speaker: fair.fair.infoDesk.staff,
       pages: [
         `Halo, ${c.name}! Selamat datang di ${fair.fair.name}.`,
-        `Ada ${fair.fair.booths.length} perusahaan dengan ${fair.fair.booths.reduce((n, b) => n + b.jobs.length, 0)} lowongan di ${fair.fair.floors.length} lantai: ${fair.fair.floors.map((f) => `${f.name} ${f.theme}`).join(", ")}.`,
+        `Ada ${fair.fair.booths.length} perusahaan dengan ${fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0)} lowongan di ${fair.fair.floors.length} lantai: ${fair.fair.floors.map((f) => `${f.name} ${f.theme}`).join(", ")}.`,
         `Lift ada di pojok kanan bawah tiap lantai, ikuti tanda 🛗 di lantai. ${fair.stops.filter((st) => st.roomId).map((st) => `${st.name} ${st.label}`).join(", ")}.`,
         "Kalau bingung, tanya aku saja, nanti aku antar ke stand mana pun.",
         "Berdiri di depan meja stand untuk ngobrol dengan recruiter, atau dekati banner di samping meja untuk lihat lowongan. Tekan E untuk bicara.",
@@ -579,7 +597,7 @@ export function JobFair() {
   function talkToRecruiter(b: CompanyBooth) {
     const me = session && fair.visitors.get(session.visitorId);
     if (me) fair.move(me.memberId, me.x, me.y, "back");
-    const open = b.jobs.filter((j) => !appliedIdsNow().has(j.id)).length;
+    const open = openJobs(b).filter((j) => !appliedIdsNow().has(j.id)).length;
     const main = (pages: string[]): Talk => ({
       speaker: `${b.recruiter} · ${b.company}`,
       pages,
@@ -605,7 +623,7 @@ export function JobFair() {
     setTalk(
       main([
         `Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`,
-        `${b.about} Saat ini kami buka ${b.jobs.length} posisi.`,
+        `${b.about} Saat ini kami buka ${openJobs(b).length} posisi.`,
         `Pelamar memberi kami ★${rating.average.toFixed(1)} dari ${rating.count} ulasan (Lv ${lv} · ${COMPANY_TITLES[lv - 1]}).`,
       ]),
     );
@@ -630,7 +648,7 @@ export function JobFair() {
         ...fair.fair.booths
           .filter((b) => b.floor === i)
           .map((b) => ({
-            label: `${b.tier === "premium" ? "👑 " : ""}${b.company} · ${b.jobs.length} lowongan`,
+            label: `${b.tier === "premium" ? "👑 " : ""}${b.company} · ${openJobs(b).length} lowongan`,
             onPick: () => {
               setTalk(null);
               goToBooth(b);
@@ -703,7 +721,7 @@ export function JobFair() {
       setWallet(true);
       return;
     }
-    const a = fair.apply(session.visitorId, { boothId, ...input });
+    const a = fair.apply(session.visitorId, { boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
     if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${APPLY_COST} 🪙)` : " (voucher)"}`);
@@ -757,7 +775,7 @@ export function JobFair() {
   const boardBooth = board ? fair.booth(board.boothId) : undefined;
   const stallView = stall ? fair.fair.rooms.flatMap((r) => r.stalls ?? []).find((x) => x.id === stall) : undefined;
   const applyBooth = applying ? fair.booth(applying.boothId) : undefined;
-  const totalJobs = fair.fair.booths.reduce((n, b) => n + b.jobs.length, 0);
+  const totalJobs = fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0);
 
   return (
     <div className="game game-fair">
@@ -930,6 +948,7 @@ export function JobFair() {
             companyRating={(id) => fair.companyRating(id)}
             visited={fair.visitedBy.get(session.visitorId) ?? new Set()}
             onSaveProfile={updateProfile}
+            onReply={(id, text) => fair.replyToCompany(id, text)}
             onOpenJob={(boothId, jobId) => {
               setPanel(null);
               setBoard({ boothId, jobId });
@@ -973,7 +992,7 @@ export function JobFair() {
             onToggleStep={(id, key) => fair.toggleStep(id, key)}
             jobsFor={(keys) =>
               fair.fair.booths
-                .flatMap((b) => b.jobs.filter((j) => keys.some((k) => j.title.toLowerCase().includes(k))).map((j) => ({ boothId: b.id, company: b.company, title: j.title })))
+                .flatMap((b) => openJobs(b).filter((j) => keys.some((k) => j.title.toLowerCase().includes(k))).map((j) => ({ boothId: b.id, company: b.company, title: j.title })))
                 .slice(0, 4)
             }
             onGoToBooth={(id) => {
@@ -982,6 +1001,21 @@ export function JobFair() {
               if (b) goToBooth(b);
             }}
             onClose={() => setGames(false)}
+          />
+        )}
+
+        {ring && (
+          <CallScreen
+            kind={ring.kind}
+            peerName={`${ring.recruiter} · ${ring.company}`}
+            peerSub={`Tentang lamaran ${ring.jobTitle}`}
+            peerLogo={ring.logo}
+            peerColor={ring.color}
+            incoming={ring}
+            onEnd={(r) => {
+              setRing(null);
+              setToast(r.answered ? `Panggilan dengan ${ring.company} selesai` : r.result === "declined" ? "Panggilan ditolak" : `Panggilan tak terjawab dari ${ring.company}`);
+            }}
           />
         )}
 
