@@ -797,3 +797,14 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .org-slide .small-btn { justify-self: start; }
 .org-stagecard p { margin: 0 0 8px; }
 .st-live-head { justify-self: start; margin: 2px 0; }
+
+/* Cafe: same bottom menu as the job fair; expressions open from one button. */
+.game-cafe .cafe-emotes { left: 50%; transform: translateX(-50%); bottom: 72px; display: flex; gap: 4px; padding: 6px; z-index: 7; }
+.game-cafe .cafe-emotes button { background: #fff; color: var(--text); padding: 4px 8px; font-size: 20px; box-shadow: 0 2px 0 #3b2a20; border-width: 2px; }
+.game-cafe .actions button[data-on] { background: #fde68a; }
+.hud-mini-seats { font-weight: 700; opacity: 0.85; }
+@media (max-width: 640px) { .game-cafe .cafe-emotes { bottom: 68px; } }
+.org-hub > *, .org > * { min-width: 0; }
+.org .layout2 { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .org .layout2 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
+.org-scroll table.list:not(.cp-table) td, .org-scroll table.list:not(.cp-table) th { white-space: nowrap; }

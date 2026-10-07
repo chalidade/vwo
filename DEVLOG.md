@@ -4,6 +4,26 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: dashboard panitia (mobile), aksesoris interaktif, promotor keliling, panggung pembicara, HUD cafe
+
+**Konteks:** owner minta 10 hal: halaman panitia ramah HP, aksesoris premium yang bisa diklik, tambah/kurangi stand, halaman pembicara seminar dengan share screen dan komunikasi, pengaturan psikotes, pengaturan semua iklan, NPC promotor yang mendatangi pelamar, perbaikan overlap detail iklan, info job fair yang lebih ringkas, dan fitur pelengkap. Setelah itu menyusul: HUD cafe dibuat sama dengan job fair.
+
+**Yang berubah**
+- **Dashboard panitia `#/jobfair/admin`** sekarang punya 5 tab yang rapi di HP: Live, Stand, Iklan, Psikotes, Seminar. Tabel lebar bisa digeser, angka jadi kartu 2 kolom.
+- **Stand:** denah 6 tempat per lantai aula. Panitia bisa melepas stand (lamarannya ikut terhapus), menambah perusahaan baru di tempat kosong, dan memasang lagi stand yang dilepas. Jumlah tempat tetap 18 supaya peta dan lift tidak bergeser.
+- **Iklan:** pengumuman ke semua pengunjung, NPC promotor (tambah, ubah, aktif/nonaktif, berdiri atau keliling, statistik dilihat dan klik), ubah banner sponsor, laporan food court dan aksesoris premium.
+- **Psikotes:** waktu, nilai lulus, bank soal (tambah, ubah, hapus, kunci jawaban), kembali ke soal bawaan, daftar peserta dan sertifikat. Tes di lantai 6 memakai pengaturan ini.
+- **Seminar:** jadwal sesi dan slide bisa diubah, status siaran live, tautan ke halaman pembicara.
+- **Halaman pembicara `#/jobfair/speaker`:** pilih sesi, share layar (atau geser slide di HP), mikrofon, chat, Q&A dengan tanda "dijawab", jumlah penonton, reaksi. Penonton yang duduk di Ruang Seminar langsung melihat siaran live, bisa chat, bertanya, memberi reaksi, dan mendapat sertifikat. Tanpa server, siaran hanya sampai ke tab lain di browser yang sama; penonton bot mengisi chat sebagai simulasi.
+- **Aksesoris premium bisa diklik:** TV memutar video perusahaan (YouTube/MP4) atau slideshow profil, standee maskot membagikan brosur, rak merchandise memberi voucher (stok terbatas), coffee cart memberi kopi gratis harian, balon berisi koin, photo booth memotret dengan bingkai brand lalu bisa dibagikan, bean bag berisi cerita karyawan, neon membuka lowongan. Perusahaan mengisi kontennya dan melihat statistik (dilihat, interaksi, diklaim) di portal perusahaan.
+- **Promotor keliling:** Ojek Kita (Lantai 1) dan Studio Pas Foto (Lantai 2) berjalan di aula, mendatangi pengunjung, dan menawarkan promo. Tap untuk membuka kartu promo.
+- **Perbaikan:** kode promo tidak lagi menimpa tombol "Tersimpan di dompet"; info job fair saat dilipat jadi satu baris (lantai, level, status), judul lengkap muncul saat dibuka.
+- **Cafe:** HUD sama dengan job fair. Info cafe dilipat jadi satu baris, ajakan "Duduk di M-04-C" dan notifikasinya dihapus (tap kursi untuk duduk, tombol Berdiri muncul saat duduk), menu pengguna pindah ke bawah: Ekspresi, Menu, kode rombongan (tap untuk menyalin), Keluar.
+
+**Dicek:** typecheck, 31 tes (4 baru: stand panitia, simpan pengaturan panitia, aksesoris, promotor keliling), build, screenshot HP di `/mnt/project-files/screenshots/jobfair-organizer/`.
+
+---
+
 ## 2026-10-07 · Job fair: portal perusahaan (booth, lowongan, FAQ, VIP, review pelamar, telepon & video call)
 
 **Konteks:** owner minta halaman untuk perusahaan: mengatur tema booth, mengisi FAQ, membayar VIP, menambah aksesoris booth, mengisi informasi perusahaan dan lowongan, mereview lamaran, serta menelepon atau video call pelamar yang cocok. Fitur pelengkap yang biasanya dibutuhkan juga diminta untuk ditambahkan.
