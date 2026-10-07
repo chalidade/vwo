@@ -54,6 +54,8 @@ import { LevelBar } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
+import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
+import { useStageLive } from "./fair/stage";
 import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
@@ -120,6 +122,7 @@ export function JobFair() {
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
+  const [media, setMedia] = useState<{ boothId: string; acc: string } | null>(null);
   const [games, setGames] = useState(false);
   const [missions, setMissions] = useState(false);
   const [ring, setRing] = useState<RingSignal | null>(null);
@@ -127,6 +130,7 @@ export function JobFair() {
   /** How players on other devices look, by their visitor id here. */
   const remoteLooks = useRef(new Map<string, Look>());
   const hud = useHud();
+  const stageLive = useStageLive();
   savedSession = session;
 
   const keys = useRef(new Set<string>());
@@ -147,7 +151,7 @@ export function JobFair() {
   const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === level);
   const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === level);
   const coinHere = !room && fair.fair.coinStand.floor === level;
-  const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level);
+  const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks);
   const me = fair.player;
   const seeker = levelOf(me.xp);
   const occupied = fair.occupiedSeats();
@@ -510,6 +514,19 @@ export function JobFair() {
   function goToPromoter(p: Promoter) {
     const st = fair.stops.find((x) => x.level === p.level);
     if (!st) return;
+    if (p.walks) {
+      // A walking promoter: close by, the card opens at once; else walk up to where it is now.
+      const npc = fair.staff.find((x) => x.id === promoterId(p.id));
+      const v = savedSession && fair.visitors.get(savedSession.visitorId);
+      if (!npc || !v) return;
+      const open = () => {
+        fair.ad(`promo:${p.id}`, "view");
+        setPromo(p);
+      };
+      if (v.floorId === npc.floorId && Math.hypot(v.x - npc.x, v.y - npc.y) < 3) open();
+      else goTo(npc.floorId, npc.x, npc.y + 1, open);
+      return;
+    }
     goTo(st.floorId, p.x, p.y + 1.1, () => {
       const me = savedSession && fair.visitors.get(savedSession.visitorId);
       if (me) fair.move(me.memberId, me.x, me.y, "back");
@@ -737,7 +754,8 @@ export function JobFair() {
 
   /** The seminar running now (sessions rotate every three minutes), for the stage screen. */
   function currentSlide() {
-    const s = liveSeminar();
+    if (stageLive) return { session: `🔴 LIVE · ${stageLive.speaker}`, title: stageLive.title };
+    const s = liveSeminar(Date.now(), fair.seminars());
     return { session: `Sedang berlangsung · ${s.speaker}`, title: s.title };
   }
 
@@ -747,6 +765,7 @@ export function JobFair() {
       boothExtras(b, {
         onBanner: () => setBoard({ boothId: b.id }),
         onDesk: session ? () => goToBooth(b) : undefined,
+        onAccessory: session ? (acc) => (acc === "neon" ? setBoard({ boothId: b.id }) : setMedia({ boothId: b.id, acc })) : undefined,
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
@@ -773,6 +792,7 @@ export function JobFair() {
     session && a.memberId === session.visitorId ? session.look : (remoteLooks.current.get(a.memberId) ?? lookFor(`${a.displayName}:${a.memberId}`));
 
   const boardBooth = board ? fair.booth(board.boothId) : undefined;
+  const mediaBooth = media ? fair.booth(media.boothId) : undefined;
   const stallView = stall ? fair.fair.rooms.flatMap((r) => r.stalls ?? []).find((x) => x.id === stall) : undefined;
   const applyBooth = applying ? fair.booth(applying.boothId) : undefined;
   const totalJobs = fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0);
@@ -825,30 +845,49 @@ export function JobFair() {
         }
       >
         <div className="hud hud-tl rpg-box" data-collapsed={hud.info ? undefined : ""} onPointerDown={(e) => e.stopPropagation()}>
-          <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
-            🎪 {fair.fair.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
-          </button>
-          <button type="button" className="hud-floor" onClick={() => session && setLift(true)} title="Pindah lantai lewat lift">
-            <span>📍 {stop.name} · {stop.emoji} {stop.label}</span>
-            {session && <span className="hud-lift">🛗</span>}
-          </button>
-          {session && (
-            <button type="button" className="hud-level" onClick={() => setPanel("profile")} title="Level dan XP">
-              <LevelBar compact level={seeker.level} title={SEEKER_TITLES[seeker.level - 1]!} progress={seeker.progress} xp={me.xp} next={seeker.to} />
-            </button>
-          )}
-          {session && (
-            <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
-              {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : "⚪ Offline, hanya bot"}
-            </div>
-          )}
-          {hud.info && (
-            <div className="hud-stats">
-              <span>🏬 {fair.stops.length} lantai</span>
-              <span>🏢 {fair.fair.booths.length} perusahaan</span>
-              <span>⭐ {fair.fair.sponsors.length} sponsor</span>
-              <span>💼 {totalJobs} lowongan</span>
-              <span>👥 {fair.visitors.size} pengunjung</span>
+          {hud.info ? (
+            <>
+              <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded title="Sembunyikan info">
+                🎪 {fair.fair.name} <span className="hud-caret">▴</span>
+              </button>
+              <button type="button" className="hud-floor" onClick={() => session && setLift(true)} title="Pindah lantai lewat lift">
+                <span>📍 {stop.name} · {stop.emoji} {stop.label}</span>
+                {session && <span className="hud-lift">🛗</span>}
+              </button>
+              {session && (
+                <button type="button" className="hud-level" onClick={() => setPanel("profile")} title="Level dan XP">
+                  <LevelBar compact level={seeker.level} title={SEEKER_TITLES[seeker.level - 1]!} progress={seeker.progress} xp={me.xp} next={seeker.to} />
+                </button>
+              )}
+              {session && (
+                <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
+                  {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : "⚪ Offline, hanya bot"}
+                </div>
+              )}
+              <div className="hud-stats">
+                <span>🏬 {fair.stops.length} lantai</span>
+                <span>🏢 {fair.fair.booths.length} perusahaan</span>
+                <span>⭐ {fair.fair.sponsors.length} sponsor</span>
+                <span>💼 {totalJobs} lowongan</span>
+                <span>👥 {fair.visitors.size} pengunjung</span>
+              </div>
+            </>
+          ) : (
+            // Folded: one short line with where you are and your level; the rest opens on tap.
+            <div className="hud-mini">
+              <button type="button" className="hud-mini-floor" onClick={() => (session ? setLift(true) : hud.toggleInfo())} title="Pindah lantai lewat lift">
+                📍 {stop.name}
+                {session && <span className="hud-lift">🛗</span>}
+              </button>
+              {session && (
+                <button type="button" className="hud-mini-lv" onClick={() => setPanel("profile")} title="Level dan XP">
+                  Lv {seeker.level}
+                </button>
+              )}
+              {session && <span className="hud-mini-dot" data-status={live.status} title={live.status === "online" ? `Online · ${live.peers} orang lain` : live.status} />}
+              <button type="button" className="hud-mini-more" onClick={hud.toggleInfo} aria-expanded={false} title="Tampilkan info acara">
+                ▾
+              </button>
             </div>
           )}
         </div>
@@ -1059,6 +1098,21 @@ export function JobFair() {
           />
         )}
 
+        {session && mediaBooth && media && (
+          <BoothMediaPanel
+            booth={mediaBooth}
+            acc={media.acc}
+            merchLeft={(mediaOf(mediaBooth).merch.stock ?? 0) - (fair.ads.get(`acc:${mediaBooth.id}:giveaway`)?.sold ?? 0)}
+            onUse={(action) => fair.useAccessory(mediaBooth.id, media.acc, action)}
+            onJobs={() => {
+              setMedia(null);
+              setBoard({ boothId: mediaBooth.id });
+            }}
+            onToast={setToast}
+            onClose={() => setMedia(null)}
+          />
+        )}
+
         {sponsor && <SponsorCard sponsor={sponsor} onClose={() => setSponsor(null)} />}
 
         {session && wallet && (
@@ -1106,6 +1160,7 @@ export function JobFair() {
           <PsychTest
             name={profile.name || session.name}
             past={me.psych}
+            config={fair.psychConfig()}
             onDone={(res) => fair.recordPsych(res)}
             onClose={() => {
               setPsych(false);
@@ -1118,6 +1173,8 @@ export function JobFair() {
         {session && seminar && (
           <SeminarView
             attended={me.seminars}
+            sessions={fair.seminars()}
+            viewerId={session.visitorId}
             name={profile.name || session.name}
             speakerLook={(n) => staffLook(n, "#0e7490")}
             audience={avatars.filter((a) => a.floorId === floor.id).length}

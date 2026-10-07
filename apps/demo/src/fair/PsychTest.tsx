@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import type { PsychResult } from "../jobfair-engine";
-import { PSYCH_MINUTES, PSYCH_PASS, PSYCH_TEST, psychGrade } from "./content";
+import type { PsychConfig } from "../jobfair-engine";
+import { psychGrade } from "./content";
 import { Certificate, certNo } from "./Seminar";
 import { Modal } from "./Modal";
 
 /** The psikotes at a desk: an intro, timed multiple-choice questions, then the result. */
-export function PsychTest({ name, past, onDone, onClose }: { name: string; past: PsychResult[]; onDone: (r: Omit<PsychResult, "at">) => void; onClose: () => void }) {
+export function PsychTest({ name, past, config, onDone, onClose }: { name: string; past: PsychResult[]; config: PsychConfig; onDone: (r: Omit<PsychResult, "at">) => void; onClose: () => void }) {
+  // The organiser's questions, fixed for the length of one sitting.
+  const [{ questions: PSYCH_TEST, minutes: PSYCH_MINUTES, pass: PSYCH_PASS }] = useState(config);
   const [phase, setPhase] = useState<"intro" | "test" | "done">("intro");
   const [answers, setAnswers] = useState<(number | null)[]>(() => PSYCH_TEST.map(() => null));
   const [i, setI] = useState(0);
@@ -75,7 +78,7 @@ export function PsychTest({ name, past, onDone, onClose }: { name: string; past:
       {phase === "intro" && (
         <div className="fx-intro">
           <p>
-            Tes latihan berisi <b>{PSYCH_TEST.length} soal</b> (deret angka, logika, verbal, spasial) dengan waktu <b>{PSYCH_MINUTES} menit</b>.
+            Tes latihan berisi <b>{PSYCH_TEST.length} soal</b> dengan waktu <b>{PSYCH_MINUTES} menit</b>.
           </p>
           <p>
             Lulus dengan nilai minimal <b>{Math.round(PSYCH_PASS * 100)}%</b> dapat <b>sertifikat psikotes</b>.

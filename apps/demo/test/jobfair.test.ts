@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { DemoJobFair, type FairSaved, PLAYER_ID, promoterId, recruiterId } from "../src/jobfair-engine";
+import { BOOTH_SLOTS, DemoJobFair, type FairSaved, PLAYER_ID, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
 function clock() {
@@ -390,5 +390,92 @@ describe("DemoJobFair", () => {
     tabA.mergeSaved(grab(tabB));
     expect(tabA.applications[0]!.status).toBe("Diterima");
     expect(tabA.booth("kopi-kita")!.theme).toBe("neon");
+  });
+  it("lets the organiser take a booth out, put a new company in its place, and bring the old one back", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    expect(fair.freeSlots()).toHaveLength(fair.fair.floors.length * BOOTH_SLOTS.length - fair.fair.booths.length);
+    fair.join("Chalid", false, PLAYER_ID);
+    const old = fair.fair.booths.find((b) => b.floor === 1)!;
+    fair.apply(PLAYER_ID, { boothId: old.id, jobId: old.jobs[0]!.id });
+    expect(fair.addBooth({ company: "Tak Ada Tempat", industry: "", color: "#000", floor: old.floor, x: old.x, y: old.y })).toBeNull();
+    fair.removeBooth(old.id);
+    expect(fair.booth(old.id)).toBeUndefined();
+    expect(fair.applications.some((a) => a.boothId === old.id)).toBe(false);
+    expect(fair.staff.some((s) => s.id === recruiterId(old.id))).toBe(false);
+    const nb = fair.addBooth({ company: "Studio Contoh", industry: "Desain", color: "#9333ea", floor: old.floor, x: old.x, y: old.y })!;
+    expect(nb.id).toBe("studio-contoh");
+    expect(fair.staff.some((s) => s.id === recruiterId(nb.id))).toBe(true);
+    // The new booth is reachable from the lift.
+    const f = fair.floors[nb.floor]!;
+    expect(findPath(f, LIFT_FRONT, boothSpot(nb, "talk"))).not.toBeNull();
+    expect(fair.restoreBooth(old.id)).toBe(false); // its place is taken
+    fair.removeBooth(nb.id);
+    expect(fair.restoreBooth(old.id)).toBe(true);
+    expect(fair.booth(old.id)?.company).toBe(old.company);
+  });
+
+  it("keeps the organiser's booths, ads, psikotes and seminars across reloads", () => {
+    let saved: FairSaved | null = null;
+    const storage = { load: () => saved, save: (d: FairSaved) => (saved = JSON.parse(JSON.stringify(d))), clear() {} };
+    const a = new DemoJobFair(() => 0.5, undefined, undefined, storage);
+    const slot = a.freeSlots()[0] ?? (a.removeBooth(a.fair.booths[0]!.id), a.freeSlots()[0]!);
+    a.addBooth({ company: "Kopi Baru", industry: "F&B", color: "#f97316", ...slot });
+    const p = a.allPromoters().find((x) => x.walks)!;
+    a.savePromoter({ ...p, active: false });
+    a.announce("Walk-in interview jam 13.00");
+    expect(a.notices.at(-1)).toContain("Walk-in");
+    expect(a.savePsych({ questions: [{ id: "x", section: "Logika", q: "1+1?", options: ["2", "3"], answer: 0 }], minutes: 3, pass: 0.5 })).toBe(true);
+    expect(a.savePsych({ questions: [{ id: "y", section: "Logika", q: "", options: ["2"], answer: 0 }], minutes: 3, pass: 0.5 })).toBe(false);
+    a.saveSeminar({ id: "new", title: "Sesi baru", speaker: "Bu Rina", role: "HR", slides: [{ title: "Halo", points: ["Satu"], say: "Hai" }] });
+    a.flush();
+    const b = new DemoJobFair(() => 0.5, undefined, undefined, storage);
+    expect(b.booth("kopi-baru")?.company).toBe("Kopi Baru");
+    expect(b.fair.promoters.some((x) => x.id === p.id)).toBe(false);
+    expect(b.allPromoters().find((x) => x.id === p.id)?.active).toBe(false);
+    expect(b.org.announcement?.text).toContain("13.00");
+    expect(b.psychConfig().questions).toHaveLength(1);
+    expect(b.seminars().at(-1)?.title).toBe("Sesi baru");
+  });
+
+  it("lets visitors use a booth's paid decorations, and counts it for the company", () => {
+    const c = clock();
+    const fair = new DemoJobFair(() => 0.5, c.now);
+    fair.join("Chalid", false, PLAYER_ID);
+    const id = fair.fair.booths.find((b) => !(b.accessories ?? []).includes("giveaway"))!.id;
+    expect(fair.useAccessory(id, "giveaway", "claim").ok).toBe(false);
+    fair.editBooth(id, { accessories: ["giveaway", "balloons"], media: { merch: { name: "Tumbler", stock: 1 } } });
+    const vouchers = fair.player.vouchers.length;
+    const got = fair.useAccessory(id, "giveaway", "claim");
+    expect(got.ok && got.voucher?.title).toContain("Tumbler");
+    expect(fair.player.vouchers).toHaveLength(vouchers + 1);
+    expect(fair.useAccessory(id, "giveaway", "claim").ok).toBe(false);
+    const coins = fair.player.coins;
+    const pop = fair.useAccessory(id, "balloons", "claim");
+    expect(pop.ok && pop.coins).toBeGreaterThan(0);
+    expect(fair.player.coins).toBeGreaterThan(coins);
+    expect(fair.useAccessory(id, "balloons", "claim").ok).toBe(false);
+    c.advance(86_400_000);
+    expect(fair.useAccessory(id, "balloons", "claim").ok).toBe(true);
+    fair.useAccessory(id, "balloons", "view");
+    expect(fair.ads.get(`acc:${id}:giveaway`)?.sold).toBe(1);
+    expect(fair.ads.get(`acc:${id}:balloons`)?.views).toBe(1);
+  });
+
+  it("sends walking promoters up to the player to pitch their offer", () => {
+    const c = clock();
+    const fair = new DemoJobFair(() => 0.3, c.now);
+    const p = fair.fair.promoters.find((x) => x.walks && x.level === 0)!;
+    fair.join("Chalid", false, PLAYER_ID);
+    const me = fair.visitors.get(PLAYER_ID)!;
+    const npc = fair.staff.find((s) => s.id === promoterId(p.id))!;
+    const start = { x: npc.x, y: npc.y };
+    for (let i = 0; i < 600 && !fair.ads.get(`promo:${p.id}`)?.views; i++) {
+      c.advance(100);
+      fair.tick(100);
+    }
+    expect(fair.ads.get(`promo:${p.id}`)?.views).toBeGreaterThan(0);
+    expect(Math.hypot(npc.x - start.x, npc.y - start.y)).toBeGreaterThan(1);
+    expect(Math.hypot(npc.x - me.x, npc.y - me.y)).toBeLessThan(2.4);
+    expect(fair.bubbles.get(npc.id)?.text).toContain(p.headline);
   });
 });

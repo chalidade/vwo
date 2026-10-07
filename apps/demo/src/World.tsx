@@ -36,6 +36,7 @@ export function World() {
   const [toast, setToast] = useState<string | null>(null);
   const hud = useHud();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [emotesOpen, setEmotesOpen] = useState(false);
   savedSession = session;
 
   const keys = useRef(new Set<string>());
@@ -181,7 +182,7 @@ export function World() {
       { memberId: s.memberId, seatId },
       ...s.companionIds.slice(0, free.length).map((memberId, i) => ({ memberId, seatId: free[i]!.id })),
     ]);
-    setToast(res.ok ? `Duduk di ${seat.label}` : "Kursi sudah terisi, pilih yang lain.");
+    if (!res.ok) setToast("Kursi sudah terisi, pilih yang lain.");
   }
 
   const standUp = () => {
@@ -285,20 +286,8 @@ export function World() {
   const lookOf = (a: AvatarState) => (session && a.memberId === session.memberId ? session.look : lookFor(`${a.displayName}:${a.memberId}`));
   const freeHere = floor.seats.filter((s) => !occupied.has(s.id)).length;
 
-  const prompt = !self
-    ? null
-    : self.seatId
-      ? `Berdiri dari ${cafe.seat(self.seatId)?.seat.label}`
-      : reach?.kind === "seat"
-        ? `Duduk di ${reach.label}`
-        : reach?.kind === "barista"
-          ? "Ngobrol dengan barista"
-          : reach?.kind === "person"
-            ? `Sapa ${reach.name}`
-            : null;
-
   return (
-    <div className="game">
+    <div className="game game-fair game-cafe">
       <CafeScene
         className="game-scene"
         floor={floor}
@@ -320,15 +309,25 @@ export function World() {
         onAvatarClick={session ? talkTo : undefined}
         onBaristaClick={session ? talkToBarista : undefined}
       >
-        {/* Place plate. */}
+        {/* Place plate: one short line, the rest opens on tap (same as the job fair). */}
         <div className="hud hud-tl rpg-box" data-collapsed={hud.info ? undefined : ""} onPointerDown={(e) => e.stopPropagation()}>
-          <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded={hud.info} title={hud.info ? "Sembunyikan info" : "Tampilkan info"}>
-            ☕ Cafe A · {floor.name} <span className="hud-caret">{hud.info ? "▴" : "▾"}</span>
-          </button>
-          {hud.info && (
-            <div className="hud-stats">
-              <span>👥 {counts.peopleInside} orang</span>
-              <span>🪑 {counts.seatsFree}/{counts.seatsTotal} kosong</span>
+          {hud.info ? (
+            <>
+              <button type="button" className="hud-title hud-toggle" onClick={hud.toggleInfo} aria-expanded title="Sembunyikan info">
+                ☕ Cafe A · {floor.name} <span className="hud-caret">▴</span>
+              </button>
+              <div className="hud-stats">
+                <span>👥 {counts.peopleInside} orang</span>
+                <span>🪑 {counts.seatsFree}/{counts.seatsTotal} kosong</span>
+              </div>
+            </>
+          ) : (
+            <div className="hud-mini">
+              <span>☕ {floor.name}</span>
+              <span className="hud-mini-seats">🪑 {freeHere}</span>
+              <button type="button" className="hud-mini-more" onClick={hud.toggleInfo} aria-expanded={false} title="Tampilkan info cafe">
+                ▾
+              </button>
             </div>
           )}
           {!session && (
@@ -372,41 +371,65 @@ export function World() {
           </button>
         )}
 
-        {/* Bottom: dialog, what's in reach, or how to play. */}
+        {/* Bottom: a dialog, standing up, or how to play. Tapping a chair or a person replaces prompts. */}
         <div className="hud-bottom">
           {talk ? (
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
-          ) : prompt ? (
-            <button type="button" className="rpg-box prompt" onClick={interact} onPointerDown={(e) => e.stopPropagation()}>
-              <span className="rpg-kbd">E</span> {prompt}
+          ) : self?.seatId ? (
+            <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={standUp}>
+              🚶 Berdiri
             </button>
-          ) : session ? (
-            <div className="rpg-box hint">
-              <span className="hint-keys">
-                <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">Shift</span> lari · <span className="rpg-kbd">E</span> duduk / bicara · klik lantai untuk berjalan
-              </span>
+          ) : session && !reach ? (
+            <div className="rpg-box hint hint-keys">
+              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> duduk / bicara · klik kursi untuk duduk
             </div>
           ) : null}
         </div>
 
         {toast && <div className="toast rpg-box">{toast}</div>}
 
+        {session && emotesOpen && (
+          <div className="hud cafe-emotes rpg-box" onPointerDown={(e) => e.stopPropagation()}>
+            {EMOTES.map((e) => (
+              <button
+                key={e}
+                type="button"
+                title={EMOTE_NAME[e]}
+                onClick={() => {
+                  cafe.emote(session.memberId, e);
+                  setEmotesOpen(false);
+                }}
+              >
+                {EMOTE_ICON[e]}
+              </button>
+            ))}
+          </div>
+        )}
+
         {session && (
           <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
             <div className="rpg-box actions">
-              {EMOTES.map((e) => (
-                <button key={e} type="button" title={EMOTE_NAME[e]} onClick={() => cafe.emote(session.memberId, e)}>
-                  {EMOTE_ICON[e]}
-                </button>
-              ))}
+              <button type="button" className="menu-btn" data-on={emotesOpen ? "" : undefined} onClick={() => setEmotesOpen(!emotesOpen)} title="Ekspresi">
+                😄<span className="menu-label"> Ekspresi</span>
+              </button>
               <button type="button" className="menu-btn" onClick={() => setMenuOpen(true)} title="Lihat menu">
                 📖 Menu
+              </button>
+              <button
+                type="button"
+                className="menu-btn"
+                title="Kode rombongan: bagikan ke teman supaya duduk bersama"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(session.groupCode).catch(() => {});
+                  setToast(`Kode rombongan ${session.groupCode} disalin`);
+                }}
+              >
+                👥 {session.groupCode}
               </button>
               <button type="button" className="leave" onClick={leave} title="Check-out">
                 🚪 Keluar
               </button>
             </div>
-            <div className="group-code">Kode rombongan {session.groupCode}</div>
           </div>
         )}
 

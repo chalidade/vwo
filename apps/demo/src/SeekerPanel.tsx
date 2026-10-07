@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { CompanyBooth, FairFloorInfo } from "@vwo/shared";
 import { type Look, Person } from "@vwo/ui";
-import { SEEKER_TITLES, SEMINARS, levelOf } from "./fair/content";
+import { SEEKER_TITLES, levelOf } from "./fair/content";
+import { fair } from "./useFair";
 import { LevelBar, Stars } from "./fair/Modal";
 import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
@@ -127,7 +128,7 @@ export function SeekerPanel({
                     [visited.size, "stand dikunjungi"],
                     [avgRating ? `★${avgRating.toFixed(1)}` : "–", "rating dari perusahaan"],
                     [best != null ? best : "–", "nilai psikotes terbaik"],
-                    [`${player.seminars.length}/${SEMINARS.length}`, "sertifikat seminar"],
+                    [`${player.seminars.length}/${fair.seminars().length}`, "sertifikat seminar"],
                     [player.coins, "koin"],
                   ] as const
                 ).map(([n, label]) => (

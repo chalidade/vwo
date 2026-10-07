@@ -4,6 +4,7 @@ import { BOOTH_THEMES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo
 import { staffLook } from "../JobFair";
 import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
 import { fair } from "../useFair";
+import { MediaEditor } from "./MediaEditor";
 import type { PortalTab } from "./Portal";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#84cc16", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#4f46e5", "#334155"];
@@ -132,6 +133,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
           </button>
         )}
       </div>
+      <MediaEditor booth={booth} />
       <div className="card">
         <h2 className="cp-h2">Teks LED & sapaan recruiter</h2>
         <form

@@ -5,6 +5,7 @@ import { JobFair } from "./JobFair";
 import { InstallButton } from "./install";
 import { JobFairAdmin } from "./JobFairAdmin";
 import { CompanyPortal } from "./company/Portal";
+import { SpeakerStage } from "./organizer/Speaker";
 import { World } from "./World";
 
 function useHash() {
@@ -32,6 +33,7 @@ export function App() {
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
         <a href="#/jobfair/admin" className={route === "jobfair/admin" ? "active" : ""}>Panitia job fair</a>
         <a href="#/jobfair/company" className={route.startsWith("jobfair/company") ? "active" : ""}>🏢 Portal perusahaan</a>
+        <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>
         <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelanggan lain adalah bot. Versi lengkap butuh server.">
           Demo · pengunjung lain bot
         </span>
@@ -45,6 +47,8 @@ export function App() {
         <JobFair />
       ) : route === "jobfair/admin" ? (
         <JobFairAdmin />
+      ) : route === "jobfair/speaker" ? (
+        <SpeakerStage />
       ) : route.startsWith("jobfair/company") ? (
         <CompanyPortal boothId={route.split("/")[2]} />
       ) : (
@@ -80,6 +84,9 @@ function Home() {
           </a>
           <a className="btn ghost" href="#/jobfair/company">
             Portal perusahaan
+          </a>
+          <a className="btn ghost" href="#/jobfair/speaker">
+            Halaman pembicara
           </a>
         </div>
         <p className="muted small">

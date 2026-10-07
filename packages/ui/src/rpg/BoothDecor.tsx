@@ -195,7 +195,10 @@ function NeonSign({ color }: { color: string }) {
 }
 
 /** Scene pieces for every decoration the booth has switched on. */
-export function boothAccessoryExtras(booth: CompanyBooth): SceneExtra[] {
+/** Decorations visitors can tap; the rest are just for looks. */
+export const INTERACTIVE_ACCESSORIES = new Set(["standee", "giveaway", "coffee", "beanbag", "tv", "photobooth", "balloons", "neon"]);
+
+export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) => void): SceneExtra[] {
   const on = new Set(booth.accessories ?? []);
   const items = BOOTH_ACCESSORIES.filter((a) => on.has(a.id));
   const { x, y } = booth;
@@ -234,6 +237,15 @@ export function boothAccessoryExtras(booth: CompanyBooth): SceneExtra[] {
       out.push({ key, x: x + s.x, y: y + s.y + 1.15 - h / T, z: y + 3.45, node });
     }
   }
+  if (onUse)
+    for (const e of out) {
+      const id = e.key.replace(`${booth.id}-acc-`, "").replace(/-2$/, "");
+      const a = BOOTH_ACCESSORIES.find((x) => x.id === id);
+      if (a && INTERACTIVE_ACCESSORIES.has(id)) {
+        e.onClick = () => onUse(id);
+        e.title = `${a.name} ${booth.company}`;
+      }
+    }
   return out;
 }
 
