@@ -4,6 +4,24 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · VWO: login pelamar, logo perusahaan, 5 gaya stand VIP, foto profil, Lounge Konsultasi, siaran Aula tersambung
+
+**Konteks:** owner minta (1) login pelamar yang sebelum launch disimpan di local storage, (2) pengaturan logo perusahaan, (3) variasi desain VIP supaya perusahaan tertarik upgrade dan stand tidak sama semua, (4) foto profil pelamar, (5) satu lantai konsultasi dengan sofa besar, telepon ke HR atau sesama pelamar dengan potongan koin dan durasi terbatas. Di tengah pengerjaan owner melapor siaran dari halaman pembicara tidak tampil di Aula: tidak ada layar, suara, atau MC.
+
+**Yang berubah**
+- **Login pelamar:** sebelum masuk job fair ada layar Masuk / Daftar (nama, email, password). Akun disimpan di browser (`vwo:accounts`); password tidak pernah disimpan, hanya hash PBKDF2-SHA256 dengan salt acak (120.000 iterasi). Pesan salah login sama untuk email tak terdaftar dan password salah. Profil, CV, dan karakter disimpan per akun; akun pertama mewarisi profil yang dibuat sebelum ada login. Tombol "Ganti akun" di layar karakter dan "Keluar akun" di Profil.
+- **Foto profil:** upload di Profil, dipotong persegi dan diperkecil jadi JPEG kecil lewat canvas (metadata dan isi aneh ikut terbuang). Foto ikut terkirim bersama lamaran dan tampil di daftar dan detail pelamar di portal HR.
+- **Logo perusahaan:** upload di Portal → Profil. Logo gambar menggantikan huruf logo di papan nama stand, sayap VIP, roll-up banner, kartu undangan interview, stempel, dan header portal.
+- **5 gaya stand VIP:** Emas Klasik, Platinum, Royal (mahkota), Taman Hijau (tanaman gantung, karpet rumput), Cyber Neon (lampu neon). Masing-masing mengganti warna bingkai, truss, sayap, karpet, karpet jalan, dan tali. Perusahaan VIP juga bisa menulis sendiri dua baris backdrop (misalnya JOIN / OUR TEAM). Perusahaan non-VIP melihat semua gaya dengan label "Khusus VIP" dan tombol upgrade. Stand VIP demo kini memakai gaya berbeda-beda.
+- **Lounge Konsultasi (Lantai 8):** empat meja konsultan di dinding belakang (HR Nusantara Tech, konsultan karier, psikolog industri, HR Bank Sejahtera), enam set sofa panjang berhadapan dengan meja kopi (36 kursi sofa), dan papan tarif. Telepon atau video call ke konsultan: 20 koin/10 menit atau 28 koin/15 menit; ke sesama pelamar: 10 atau 14 koin. Koin dipotong saat mulai, sisa waktu tampil di layar panggilan (merah di menit terakhir), dan panggilan berhenti sendiri saat waktu habis. Di demo lawan bicaranya bot.
+- **Siaran Aula dan seminar:** begitu pembicara siaran ke Aula (atau seminar), pengunjung di lantai itu langsung tersambung: layar LED panggung menampilkan layar yang dibagikan, panel kecil "LIVE" di kanan atas memutar layar dan suara (ada tombol "Nyalakan suara" kalau browser menahan autoplay), dan tombol layar penuh + chat. Pembicara kini berdiri di panggung di belakang podium dengan namanya; sebelumnya podium menutupi MC.
+
+**Kemungkinan teknis telepon dan beban server:** panggilan memakai WebRTC peer-to-peer, jadi suara dan video langsung antar pengguna; server hanya untuk sinyal awal yang ringan. Sekitar 10–20% pengguna di balik NAT ketat butuh relay TURN, dan itu yang memakan bandwidth server, jadi perlu TURN dengan kuota. Batas durasi dan potongan koin di versi live harus dicek di server (bukan di browser).
+
+**Cek:** typecheck semua paket, 42 tes demo (tambahan: lounge dan tarif, sanitasi gambar, akun dan hash password), build demo, screenshot di `screenshots/jobfair-lounge/`.
+
+---
+
 ## 2026-10-08 · VWO - Virtual World Job: notifikasi pelamar ⇄ HRD, stand VIP jauh lebih lebar, layar LED seminar, lantai Aula
 
 **Konteks:** owner minta (1) notifikasi antara pelamar dan HRD, (2) stand VIP lebih lebar ke samping supaya bisa taruh TV di depan atau samping kiri, lebih besar dan mewah, (3) layar besar di ruang seminar, (4) satu lantai penuh untuk Aula dengan panggung, jadwal acara, info, dan meeting point, (5) nama aplikasi jadi "VWO - Virtual World Job".

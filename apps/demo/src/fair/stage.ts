@@ -2,6 +2,7 @@
 // Like calls, the demo has no server: the stage reaches other tabs of this browser through a
 // BroadcastChannel, and the screen itself goes over WebRTC, one connection per viewer.
 import { useEffect, useState } from "react";
+import { connectPeer } from "./call";
 
 export interface StageChat {
   id: string;
@@ -93,3 +94,39 @@ export const BOT_QUESTIONS = [
 export const BOT_CHAT = ["Suaranya jelas kak 👍", "Izin mencatat 📝", "Materinya daging 🔥", "Terima kasih ilmunya 🙏", "Slide-nya kelihatan jelas", "Halo dari Bekasi 👋"];
 
 export const BOT_NAMES = ["Rina", "Dimas", "Putri", "Fajar", "Ayu", "Bagas", "Nadia", "Yoga"];
+
+/**
+ * The live broadcast as it plays on a floor's big screen: while `on` (the job seeker is in the room
+ * the speaker broadcasts to), this tab joins as a viewer and gets the speaker's screen and voice.
+ * Each tab joins under its own id, so two tabs watching never take each other's connection.
+ */
+export function useStageFeed(live: StageLive | null, on: boolean, name: string) {
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [viewerId] = useState(() => `feed-${Math.random().toString(36).slice(2, 10)}`);
+  const key = on && live ? live.startedAt : null;
+  useEffect(() => {
+    if (key === null) {
+      setStream(null);
+      return;
+    }
+    let peer: { close(): void } | null = null;
+    const join = () => {
+      peer?.close();
+      setStream(null);
+      peer = connectPeer({ callId: stageCallId(viewerId), caller: false, kind: "video", local: null, onRemote: (s) => setStream(new MediaStream(s.getTracks())) });
+      sendStage({ type: "join", viewerId, name });
+    };
+    const off = onStage((m) => {
+      if (m.type === "restart") join();
+    });
+    join();
+    return () => {
+      off();
+      sendStage({ type: "leave", viewerId, name });
+      peer?.close();
+      setStream(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, viewerId]);
+  return stream;
+}

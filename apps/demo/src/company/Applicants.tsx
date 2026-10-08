@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type CompanyBooth, safeUrl } from "@vwo/shared";
+import { type CompanyBooth, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
 import { CallScreen, type CallResult } from "../fair/Call";
@@ -94,6 +94,7 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
               return (
                 <li key={a.id}>
                   <button type="button" className="cp-app-row" data-active={a.id === openId ? "" : undefined} onClick={() => setOpenId(a.id)}>
+                    {safeImage(a.photo) ? <img className="cp-app-thumb" src={safeImage(a.photo)} alt="" /> : null}
                     <span className="cp-match" data-level={m >= 75 ? "hi" : m >= 55 ? "mid" : "lo"}>{m}%</span>
                     <span className="cp-app-main">
                       <b>
@@ -177,7 +178,8 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         ← Daftar pelamar
       </button>
       <div className="cp-detail-head">
-        <div>
+        {safeImage(a.photo) && <img className="cp-app-photo" src={safeImage(a.photo)} alt={`Foto ${a.name}`} />}
+        <div className="cp-grow">
           <h2 className="cp-h2" style={{ margin: 0 }}>
             {a.name}
             {a.verified && <span className="rpg-check">✔</span>}

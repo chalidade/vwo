@@ -10,6 +10,11 @@ import {
   type FairStop,
   type FloorView,
   DEMO_JOB_FAIR,
+  LOUNGE,
+  LOUNGE_PLANS,
+  loungeBoardSpot,
+  loungeSpot,
+  safeImage,
   type JobFairView,
   SPONSOR_H,
   SPONSOR_W,
@@ -299,7 +304,7 @@ export interface CompanyInvoice {
 }
 
 /** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
-const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts", "media", "promoter"] as const;
+const EDITABLE = ["company", "tagline", "industry", "logo", "logoImg", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "vipStyle", "vipHeadline", "callouts", "media", "promoter"] as const;
 export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
@@ -329,6 +334,8 @@ export interface FairApplication {
   education?: string;
   skills?: string;
   city?: string;
+  /** The applicant's profile photo when they applied (a small inline JPEG). */
+  photo?: string;
   /** The company's private notes. */
   notes?: string;
   interview?: Interview;
@@ -490,6 +497,7 @@ const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
   psikotes: ["Hmm... 2, 4, 8, 16...", "Soal logikanya tricky", "Fokus, fokus...", "Semoga lulus 🙏", "✏️"],
   seminar: ["Catat 📝", "Wah, insightful!", "Setuju!", "👏", "Metode STAR ya..."],
   aula: ["👏👏👏", "Seru acaranya!", "Semoga dapat door prize 🎁", "Ketemu di meeting point ya", "Abis ini talkshow"],
+  konsultasi: ["Sofanya empuk 😌", "Nunggu giliran konsultasi", "📞 Halo?", "Tadi dapat tips CV bagus", "Ngobrol yuk!", "Pak Hendra baik banget"],
 };
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
 const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
@@ -598,6 +606,11 @@ export class DemoJobFair {
             ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(i, "vendor"), facing: "front" as Facing })),
           ];
         if (room.kind === "aula") return [{ ...host, x: room.width / 2 - 4, y: 2.3 }];
+        if (room.kind === "konsultasi")
+          return [
+            { ...host, x: loungeBoardSpot().x - 2.2, y: loungeBoardSpot().y },
+            ...(room.consultants ?? []).slice(0, LOUNGE.pods.length).map((c, i) => ({ id: consultantId(c.id), name: c.name, boothId: null, floorId, ...loungeSpot(i, "consultant"), facing: "front" as Facing })),
+          ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
       ...fair.promoters.map((p) => {
@@ -1165,6 +1178,7 @@ export class DemoJobFair {
       if (room.kind === "foodcourt") this.say(roomStaffId(room.id), `Selamat makan, ${v.displayName}! Tiap pesanan dapat voucher 🎟️`, 3000);
       else if (room.kind === "psikotes") this.say(roomStaffId(room.id), "Silakan duduk di meja yang kosong, lalu mulai tesnya.", 3000);
       else if (room.kind === "aula") this.say(roomStaffId(room.id), `Selamat datang di Aula, ${v.displayName}! Jadwal acara ada di papan kiri.`, 3000);
+      else if (room.kind === "konsultasi") this.say(roomStaffId(room.id), `Halo ${v.displayName}! Pilih konsultan di meja belakang, atau duduk di sofa dan telepon teman.`, 3400);
       else this.say(roomStaffId(room.id), `Selamat datang! Silakan duduk, seminar segera dimulai.`, 3000);
     }
     this.emit();
@@ -1452,6 +1466,19 @@ export class DemoJobFair {
     return true;
   }
 
+  /** Start a paid call in the consultation lounge: with a consultant, or with another job seeker.
+   *  The price buys one call of up to `minutes`; the call screen hangs up when the time is over. */
+  startLoungeCall(kind: "consult" | "peer", minutes: number, who: string) {
+    const plan = LOUNGE_PLANS.find((p) => p.minutes === minutes);
+    if (!plan) return false;
+    const cost = kind === "consult" ? plan.consultCoins : plan.coins;
+    if (!this.spend(cost, `${kind === "consult" ? "Konsultasi" : "Telepon"} ${minutes} menit dengan ${who}`)) return false;
+    this.gainXp(kind === "consult" ? 15 : 5);
+    this.persist();
+    this.emit();
+    return true;
+  }
+
   /** Free applications left from vouchers. */
   freeApplies() {
     return this.player.vouchers.filter((v) => !v.used && v.kind === "free-apply").length;
@@ -1647,7 +1674,7 @@ export class DemoJobFair {
 
   apply(
     visitorId: string,
-    input: { boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string },
+    input: { boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string; photo?: string },
   ) {
     const v = this.visitors.get(visitorId);
     const b = this.booth(input.boothId);
@@ -1681,6 +1708,7 @@ export class DemoJobFair {
       education: input.education,
       skills: input.skills,
       city: input.city,
+      photo: v.isBot ? undefined : safeImage(input.photo),
       updatedAt: this.now(),
     };
     this.applications.unshift(a);
@@ -1750,6 +1778,7 @@ export class DemoJobFair {
     for (const k of EDITABLE) if (k in patch) (clean as Record<string, unknown>)[k] = structuredClone(patch[k]);
     if (clean.company !== undefined && !clean.company.trim()) delete clean.company;
     if (clean.logo !== undefined) clean.logo = clean.logo.trim().slice(0, 3) || b.logo;
+    if ("logoImg" in clean) clean.logoImg = safeImage(clean.logoImg);
     Object.assign(b, clean);
     Object.assign(this.companyOf(boothId).edits, clean);
     if ("promoter" in clean || "color" in clean || "company" in clean || "jobs" in clean) this.syncCompanyPromoters();
@@ -2311,6 +2340,7 @@ export const recruiterId = (boothId: string) => `rec-${boothId}`;
 
 export const roomStaffId = (roomId: string) => `room-${roomId}`;
 export const stallStaffId = (stallId: string) => `stall-${stallId}`;
+export const consultantId = (id: string) => `consult-${id}`;
 export const promoterId = (id: string) => `npc-${id}`;
 
 const FEEDBACK = [

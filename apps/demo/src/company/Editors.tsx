@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { type BoothTheme, type CompanyBooth, type JobPosting, fairFloorId } from "@vwo/shared";
-import { BOOTH_THEMES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
+import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
+import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
+import { readImageFile } from "../imageFile";
 import { staffLook } from "../JobFair";
 import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
 import { fair } from "../useFair";
@@ -137,6 +138,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
           </button>
         )}
       </div>
+      <VipEditor booth={booth} onTab={onTab} />
       <GateEditor booth={booth} />
       <MediaEditor booth={booth} />
       <PromoterEditor booth={booth} onTab={onTab} />
@@ -233,8 +235,9 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
       }}
     >
       <h2 className="cp-h2 cp-span">Informasi perusahaan</h2>
+      <LogoUpload booth={booth} />
       {field("company", "Nama perusahaan", { required: true, maxLength: 40 })}
-      {field("logo", "Logo (1–3 huruf/emoji)", { required: true, maxLength: 3 })}
+      {field("logo", "Logo teks (1–3 huruf/emoji, dipakai jika belum ada gambar)", { required: true, maxLength: 3 })}
       {field("tagline", "Tagline", { maxLength: 80 })}
       {field("industry", "Industri", { maxLength: 40 })}
       {field("recruiter", "Nama recruiter di stand", { maxLength: 30 })}
@@ -447,5 +450,116 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
         </button>
       </div>
     </form>
+  );
+}
+
+/** The company's logo picture: shown on the booth sign, the roll-up banner, invites and the portal. */
+function LogoUpload({ booth }: { booth: CompanyBooth }) {
+  const [error, setError] = useState<string | null>(null);
+  const [saved, flash] = useSaved();
+  return (
+    <div className="cp-span cp-logo-up">
+      <BoothLogo booth={booth} className="cp-logo cp-logo-big" />
+      <div className="cp-logo-up-main">
+        <b>Logo perusahaan</b>
+        <span className="muted small">PNG, JPG, atau WebP. Gambar dipotong persegi dan tampil bulat di papan nama stand.</span>
+        <div className="row">
+          <label className="small-btn cp-file">
+            🖼️ {booth.logoImg ? "Ganti logo" : "Upload logo"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setError(null);
+                readImageFile(file, 160)
+                  .then((logoImg) => {
+                    fair.editBooth(booth.id, { logoImg });
+                    flash();
+                  })
+                  .catch((err: Error) => setError(err.message));
+              }}
+            />
+          </label>
+          {booth.logoImg && (
+            <button type="button" className="small-btn ghost" onClick={() => fair.editBooth(booth.id, { logoImg: undefined })}>
+              Hapus gambar
+            </button>
+          )}
+          <Saved show={saved} />
+        </div>
+        {error && <span className="cp-warn">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** The VIP look: five styles and the words on the big backdrop. Other stands see what they would get. */
+function VipEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab) => void }) {
+  const vip = booth.tier === "premium";
+  const current: VipStyle = booth.vipStyle ?? "emas";
+  const [l1, setL1] = useState(booth.vipHeadline?.[0] ?? "");
+  const [l2, setL2] = useState(booth.vipHeadline?.[1] ?? "");
+  const [saved, flash] = useSaved();
+  return (
+    <div className="card cp-vip-card" data-locked={vip ? undefined : ""}>
+      <h2 className="cp-h2">👑 Tampilan VIP {!vip && <span className="cp-lock">Khusus VIP</span>}</h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        {vip ? "Pilih gaya stand supaya beda dari stand VIP lain. Langsung tampil di job fair." : "Stand VIP bisa memilih salah satu gaya ini, lengkap dengan layar video, lounge, dan gapura."}
+      </p>
+      <div className="cp-vip-styles">
+        {(Object.keys(VIP_STYLES) as VipStyle[]).map((k) => {
+          const v = VIP_STYLES[k];
+          return (
+            <button
+              key={k}
+              type="button"
+              className="cp-vip-style"
+              data-active={vip && current === k ? "" : undefined}
+              disabled={!vip}
+              onClick={() => fair.editBooth(booth.id, { vipStyle: k })}
+              style={{ ["--trim" as string]: v.trim, ["--truss" as string]: v.truss, ["--wing" as string]: v.wing ?? booth.color, ["--runner" as string]: v.runner }}
+            >
+              <span className="cp-vip-sw" aria-hidden>
+                <i />
+                <i />
+                <i />
+              </span>
+              <b>{v.name}</b>
+              <span>{v.about}</span>
+            </button>
+          );
+        })}
+      </div>
+      {vip ? (
+        <form
+          className="cp-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            fair.editBooth(booth.id, { vipHeadline: [l1.trim(), l2.trim()] });
+            flash();
+          }}
+        >
+          <label>
+            Tulisan backdrop, baris 1
+            <input value={l1} onChange={(e) => setL1(e.target.value)} maxLength={9} placeholder="WE’RE" />
+          </label>
+          <label>
+            Baris 2
+            <input value={l2} onChange={(e) => setL2(e.target.value)} maxLength={9} placeholder="HIRING" />
+          </label>
+          <div className="row cp-span">
+            <button type="submit">Simpan</button>
+            <Saved show={saved} />
+          </div>
+        </form>
+      ) : (
+        <button type="button" onClick={() => onTab("billing")}>
+          👑 Upgrade ke VIP
+        </button>
+      )}
+    </div>
   );
 }

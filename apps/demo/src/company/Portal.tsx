@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BoothLogo } from "@vwo/ui";
 import type { CompanyBooth } from "@vwo/shared";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
@@ -98,7 +99,7 @@ function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) 
                   setError(false);
                 }}
               >
-                <span className="cp-logo">{b.logo}</span>
+                <BoothLogo booth={b} className="cp-logo" />
                 <span>
                   <b>
                     {b.company} {b.tier === "premium" && "👑"}
@@ -135,7 +136,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
   return (
     <main className="cp">
       <header className="cp-head card" style={{ ["--c" as string]: booth.color }}>
-        <span className="cp-logo cp-logo-big">{booth.logo}</span>
+        <BoothLogo booth={booth} className="cp-logo cp-logo-big" />
         <div className="cp-head-text">
           <h1 className="cp-h1">
             {booth.company} {booth.tier === "premium" && <span className="cp-vip">👑 VIP</span>}

@@ -19,6 +19,9 @@ import {
   slide,
   stallSpot,
   aulaSpot,
+  LOUNGE,
+  loungeBoardSpot,
+  loungeSpot,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -41,14 +44,17 @@ import {
   promoterExtras,
   seminarStageExtras,
   aulaExtras,
+  loungeExtras,
   type StageScreen,
   lookFor,
   sponsorExtras,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
 import { CharacterCreator, type Character } from "./CharacterCreator";
+import { AccountGate } from "./AccountGate";
+import { type Account, currentAccount, logout } from "./account";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { PLAYER_ID, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
@@ -63,7 +69,9 @@ import { SofaGames } from "./fair/Games";
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
 import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
-import { useStageLive } from "./fair/stage";
+import { useStageFeed, useStageLive } from "./fair/stage";
+import { StageFeedPanel } from "./fair/StageFeed";
+import { LoungeDesk, type LoungeCallStart, type LoungeView, PEER_LINES } from "./fair/Lounge";
 import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
@@ -100,7 +108,9 @@ type Reach =
   | { kind: "promoter"; promoter: Promoter }
   | { kind: "seated"; room: FairRoom }
   | { kind: "sofa" }
-  | { kind: "aula"; tab: AulaTab };
+  | { kind: "aula"; tab: AulaTab }
+  | { kind: "consult"; index: number }
+  | { kind: "loungeBoard" };
 
 const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
 
@@ -120,13 +130,14 @@ let savedSession: Session | null = null; // survives switching to the organiser 
 
 export function JobFair() {
   useFair();
-  const [session, setSession] = useState<Session | null>(() => (savedSession && fair.visitors.has(savedSession.visitorId) ? savedSession : null));
+  const [session, setSession] = useState<Session | null>(() => (savedSession && currentAccount() && fair.visitors.has(savedSession.visitorId) ? savedSession : null));
   const [talk, setTalk] = useState<Talk | null>(null);
   const [board, setBoard] = useState<{ boothId: string; jobId?: string; about?: boolean } | null>(null);
   const [applying, setApplying] = useState<{ boothId: string; jobId?: string } | null>(null);
   const [panel, setPanel] = useState<SeekerTab | null>(null);
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
+  const [account, setAccount] = useState<Account | null>(currentAccount);
   const [toast, setToast] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState<string | null>(null);
   // The organiser's announcement stays on screen until the visitor closes it; a new one shows again.
@@ -152,6 +163,8 @@ export function JobFair() {
   const [seminar, setSeminar] = useState(false);
   const [aula, setAula] = useState<AulaTab | null>(null);
   const [notifs, setNotifs] = useState(false);
+  const [lounge, setLounge] = useState<LoungeView | null>(null);
+  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[] }) | null>(null);
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
@@ -173,7 +186,7 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs || lounge || loungeCall);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -186,6 +199,9 @@ export function JobFair() {
   const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === level);
   const coinHere = !room && fair.fair.coinStand.floor === level;
   const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks);
+  /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
+  const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
+  const feed = useStageFeed(stageLive, liveHere && !seminar, session?.name ?? "Pengunjung");
   const me = fair.player;
   const seeker = levelOf(me.xp);
   const occupied = fair.occupiedSeats();
@@ -240,6 +256,14 @@ export function JobFair() {
     }
     for (const sp of sponsors) {
       if (Math.abs(self.x - (sp.x + SPONSOR_W / 2)) < 0.9 && self.y > sp.y + SPONSOR_H && self.y < sp.y + SPONSOR_H + 1.2) return { kind: "sponsor", sponsor: sp };
+    }
+    if (room?.kind === "konsultasi" && !self.seatId) {
+      for (let i = 0; i < (room.consultants ?? []).length && i < LOUNGE.pods.length; i++) {
+        const at = loungeSpot(i, "front");
+        if (Math.abs(self.x - at.x) < 1.8 && Math.abs(self.y - at.y) < 0.9) return { kind: "consult", index: i };
+      }
+      const b = loungeBoardSpot();
+      if (Math.abs(self.x - b.x) < 1.6 && Math.abs(self.y - b.y) < 0.9) return { kind: "loungeBoard" };
     }
     if (self.seatId && room) return { kind: "seated", room };
     if (room?.kind === "aula")
@@ -404,7 +428,7 @@ export function JobFair() {
 
   const enter = (c: Character) => {
     const v = fair.join(c.name, false, PLAYER_ID);
-    if (!profile.name) updateProfile({ ...profile, name: c.name });
+    if (!profile.name || (!profile.email && account)) updateProfile({ ...profile, name: profile.name || account?.name || c.name, email: profile.email || account?.email || "" });
     counted.current.clear();
     setSession({ visitorId: v.memberId, name: c.name, look: c.look });
     setTalk({
@@ -435,6 +459,8 @@ export function JobFair() {
     else if (r.kind === "sofa") setGames(true);
     else if (r.kind === "promoter") goToPromoter(r.promoter);
     else if (r.kind === "aula") setAula(r.tab);
+    else if (r.kind === "consult") setLounge({ mode: "consult", index: r.index });
+    else if (r.kind === "loungeBoard") setLounge({ mode: "info" });
     else talkToVisitor(r.memberId);
   }
 
@@ -607,6 +633,7 @@ export function JobFair() {
     if (r.kind === "psikotes") setPsych(true);
     else if (r.kind === "seminar") setSeminar(true);
     else if (r.kind === "aula") stageLive?.venue === "aula" ? setSeminar(true) : setAula("jadwal");
+    else if (r.kind === "konsultasi") setLounge({ mode: "peer" });
     else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Voucher aman, nanti makan di outletnya 😋" : "Lihat-lihat promo dulu ah", 2200);
   }
 
@@ -767,9 +794,31 @@ export function JobFair() {
             setTalk(null);
           },
         })),
+        ...(fair.roomOf(v.floorId)?.kind === "konsultasi" && !v.remote
+          ? [{ label: "📞 Telepon", onPick: () => (setTalk(null), setLounge({ mode: "peer", memberId: v.memberId })) }]
+          : []),
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     });
+  }
+
+  /** People the job seeker can call from the lounge: the others on this floor. */
+  function loungePeers() {
+    return [...fair.visitors.values()].filter((x) => x.floorId === floor.id && x.memberId !== session?.visitorId && !x.remote).map((x) => ({ memberId: x.memberId, name: x.displayName }));
+  }
+
+  /** Pay for a lounge call, then ring the consultant or the other job seeker. */
+  function startLoungeCall(c: LoungeCallStart) {
+    const who = c.consultant?.name ?? c.peer?.name ?? "";
+    if (!fair.startLoungeCall(c.consultant ? "consult" : "peer", c.minutes, who)) {
+      setLounge(null);
+      setWallet(true);
+      return;
+    }
+    setLounge(null);
+    if (c.consultant)
+      setLoungeCall({ ...c, name: c.consultant.name, sub: `${c.consultant.role}${c.consultant.org ? ` · ${c.consultant.org}` : ""}`, color: c.consultant.color, look: staffLook(c.consultant.name, c.consultant.color), lines: c.consultant.lines });
+    else if (c.peer) setLoungeCall({ ...c, name: c.peer.name, sub: "Pencari kerja · Lounge Konsultasi", color: "#0f766e", look: lookFor(`${c.peer.name}:${c.peer.memberId}`), lines: PEER_LINES });
   }
 
   function appliedIdsNow() {
@@ -785,10 +834,22 @@ export function JobFair() {
       setWallet(true);
       return;
     }
-    const a = fair.apply(session.visitorId, { boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city });
+    const a = fair.apply(session.visitorId, { boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
     if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${APPLY_COST} 🪙)` : " (voucher)"}`);
+  };
+
+  /** Sign out: leave the fair and go back to the login screen. */
+  const signOut = () => {
+    if (session) fair.leave(session.visitorId);
+    savedSession = null;
+    setSession(null);
+    setTalk(null);
+    setPanel(null);
+    logout();
+    setAccount(null);
+    setProfile(loadProfile());
   };
 
   const leave = () => {
@@ -806,7 +867,7 @@ export function JobFair() {
     if (stageLive && stageLive.venue !== "aula") {
       const sem = list.find((x) => x.id === stageLive.sessionId);
       const sl = sem?.slides[stageLive.slide];
-      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined };
+      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined, stream: feed };
     }
     const now = Date.now();
     const s = liveSeminar(now, list);
@@ -823,7 +884,7 @@ export function JobFair() {
       now: current,
       next,
       over,
-      live: stageLive?.venue === "aula" ? { title: stageLive.title, speaker: stageLive.speaker } : null,
+      live: stageLive?.venue === "aula" ? { title: stageLive.title, speaker: stageLive.speaker, stream: feed } : null,
       rundown: fair.rundown().map((e) => ({ start: e.start, title: e.title, on: e.id === current?.id })),
       announcement: announcement?.text,
     };
@@ -851,6 +912,12 @@ export function JobFair() {
     ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
     ...promotersHere.flatMap((p) => promoterExtras(p, session ? () => goToPromoter(p) : undefined)),
     ...(room?.kind === "seminar" ? seminarStageExtras(room, currentSlide()) : []),
+    ...(room?.kind === "konsultasi"
+      ? loungeExtras(room, {
+          consult: session ? (i) => goTo(floor.id, loungeSpot(i, "front").x, loungeSpot(i, "front").y, () => setLounge({ mode: "consult", index: i })) : undefined,
+          board: session ? () => goTo(floor.id, loungeBoardSpot().x, loungeBoardSpot().y, () => setLounge({ mode: "info" })) : undefined,
+        })
+      : []),
     ...(room?.kind === "aula"
       ? aulaExtras(room, aulaScreen(), fair.stops, {
           rundown: session ? () => goTo(floor.id, aulaSpot("rundown").x, aulaSpot("rundown").y, () => setAula("jadwal")) : undefined,
@@ -863,7 +930,12 @@ export function JobFair() {
     const b = s.boothId ? fair.booth(s.boothId) : undefined;
     const pr = fair.fair.promoters.find((x) => promoterId(x.id) === s.id);
     // The speaker on the seminar stage is whoever the LED wall says is presenting.
-    const name = room?.kind === "seminar" && s.id === roomStaffId(room.id) ? currentSlide().speaker : s.name;
+    const name =
+      room?.kind === "seminar" && s.id === roomStaffId(room.id)
+        ? currentSlide().speaker
+        : room?.kind === "aula" && s.id === roomStaffId(room.id) && stageLive?.venue === "aula"
+          ? stageLive.speaker
+          : s.name;
     return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
   const avatars: AvatarState[] = [...fair.visitors.values()];
@@ -916,7 +988,9 @@ export function JobFair() {
                 const b = fair.fair.booths.find((x) => recruiterId(x.id) === id);
                 const st = room?.stalls?.findIndex((x) => stallStaffId(x.id) === id) ?? -1;
                 const pr = fair.fair.promoters.find((x) => promoterId(x.id) === id);
-                if (b) goToBooth(b);
+                const ci = room?.consultants?.findIndex((x) => consultantId(x.id) === id) ?? -1;
+                if (ci >= 0) goTo(floor.id, loungeSpot(ci, "front").x, loungeSpot(ci, "front").y, () => setLounge({ mode: "consult", index: ci }));
+                else if (b) goToBooth(b);
                 else if (pr) goToPromoter(pr);
                 else if (id === "coin-staff") goToCoinStand();
                 else if (st >= 0) goToStall(st);
@@ -982,12 +1056,14 @@ export function JobFair() {
           </button>
         )}
 
+        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed} onOpen={() => setSeminar(true)} />}
+
         <div className="hud-bottom">
           {talk ? (
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
           ) : reach?.kind === "seated" && reach.room.kind !== "foodcourt" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => startActivity(reach.room)}>
-              {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : "📝 Kerjakan psikotes"}
+              {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : reach.room.kind === "konsultasi" ? "📞 Telepon seseorang" : "📝 Kerjakan psikotes"}
             </button>
           ) : reach?.kind === "sofa" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGames(true)}>
@@ -1084,6 +1160,8 @@ export function JobFair() {
               setPanel(null);
               setVerify(true);
             }}
+            account={account?.email}
+            onSignOut={signOut}
             onClose={() => setPanel(null)}
           />
         )}
@@ -1332,6 +1410,36 @@ export function JobFair() {
           />
         )}
 
+        {session && lounge && (
+          <LoungeDesk
+            view={lounge}
+            consultants={room?.consultants ?? []}
+            peers={loungePeers()}
+            coins={me.coins}
+            onStart={startLoungeCall}
+            onTopUp={() => (setLounge(null), setWallet(true))}
+            onClose={() => setLounge(null)}
+          />
+        )}
+
+        {session && loungeCall && (
+          <CallScreen
+            kind={loungeCall.kind}
+            peerName={loungeCall.name}
+            peerSub={loungeCall.sub}
+            peerLook={loungeCall.look}
+            peerColor={loungeCall.color}
+            bot
+            lines={loungeCall.lines}
+            botNote="Demo: lawan bicara adalah bot. Versi live menyambungkan panggilan sungguhan lewat server."
+            limit={loungeCall.minutes * 60}
+            onEnd={(r) => {
+              setLoungeCall(null);
+              if (r.answered) setToast(`Panggilan selesai (${Math.floor(r.seconds / 60)}:${String(r.seconds % 60).padStart(2, "0")})`);
+            }}
+          />
+        )}
+
         {applyBooth && session && (
           <ApplyForm
             booth={applyBooth}
@@ -1349,7 +1457,24 @@ export function JobFair() {
           <div className="title-screen" onPointerDown={(e) => e.stopPropagation()}>
             <a className="home-link rpg-box" href="#/">← Beranda</a>
             <InstallButton className="title-install rpg-box" />
-            <CharacterCreator onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Di acara sungguhan, pengunjung registrasi lewat scan QR di pintu masuk." />
+            {account ? (
+              <div className="title-stack">
+                <div className="title-account rpg-box">
+                  <span>👤 {account.name} · {account.email}</span>
+                  <button type="button" onClick={signOut}>
+                    Ganti akun
+                  </button>
+                </div>
+                <CharacterCreator key={account.email} defaultName={account.name} onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Di acara sungguhan, pengunjung registrasi lewat scan QR di pintu masuk." />
+              </div>
+            ) : (
+              <AccountGate
+                onIn={(a) => {
+                  setAccount(a);
+                  setProfile(loadProfile());
+                }}
+              />
+            )}
           </div>
         )}
       </CafeScene>

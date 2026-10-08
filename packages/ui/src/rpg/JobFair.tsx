@@ -2,7 +2,7 @@
 // The job fair room: the hall's back wall, company booths (back panel, desk, roll-up banner),
 // the organisers' info desk, and the popups for reading vacancies and applying.
 import { type CSSProperties, type FormEvent, memo, useEffect, useId, useState } from "react";
-import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, boothFrame, boothHasGate, openJobs, safeUrl, vipLounge } from "@vwo/shared";
+import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, type VipStyle, boothFrame, boothHasGate, openJobs, safeImage, safeUrl, vipLounge } from "@vwo/shared";
 import { boothAccessoryExtras } from "./BoothDecor";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -161,7 +161,30 @@ export function SponsorCard({ sponsor, onClose }: { sponsor: SponsorView; onClos
   );
 }
 
+/** A company's logo as HTML: its uploaded picture, or the logo letters in its colour. */
+export function BoothLogo({ booth, className }: { booth: Pick<CompanyBooth, "logo" | "logoImg" | "color" | "company">; className?: string }) {
+  const img = safeImage(booth.logoImg);
+  return (
+    <span className={className} data-img={img ? "" : undefined} style={{ ["--c" as string]: booth.color }}>
+      {img ? <img src={img} alt={`Logo ${booth.company}`} /> : booth.logo}
+    </span>
+  );
+}
+
 function Logo({ booth, r }: { booth: CompanyBooth; r: number }) {
+  const img = safeImage(booth.logoImg);
+  const clip = useId().replace(/:/g, "");
+  if (img)
+    return (
+      <g>
+        <clipPath id={clip}>
+          <circle r={r - 1} />
+        </clipPath>
+        <circle r={r} fill="#fff" {...ink} strokeWidth={1.8} />
+        <image href={img} x={-r} y={-r} width={2 * r} height={2 * r} clipPath={`url(#${clip})`} preserveAspectRatio="xMidYMid slice" />
+        <circle r={r} fill="none" {...ink} strokeWidth={1.8} />
+      </g>
+    );
   return (
     <g>
       <circle r={r} fill="#fff" {...ink} strokeWidth={1.8} />
@@ -179,6 +202,70 @@ export interface BoothRating {
 }
 
 const GOLD = "#eab308";
+
+/** The looks a VIP stand can pick in the company portal. */
+export const VIP_STYLES: Record<VipStyle, { name: string; about: string; trim: string; truss: string; wing?: string; runner: string; rope: string; text: string; glow?: string }> = {
+  emas: { name: "Emas Klasik", about: "Bingkai emas, karpet merah, tali beludru", trim: GOLD, truss: "#111827", runner: "#b91c1c", rope: "#b91c1c", text: GOLD },
+  platinum: { name: "Platinum", about: "Perak mengilap, karpet biru tua, kilau berlian", trim: "#cbd5e1", truss: "#1e293b", wing: "#334155", runner: "#1e3a8a", rope: "#475569", text: "#f1f5f9" },
+  royal: { name: "Royal", about: "Ungu beludru dan emas, mahkota di atas stand", trim: "#f59e0b", truss: "#3b0764", wing: "#581c87", runner: "#6b21a8", rope: "#7e22ce", text: "#fcd34d" },
+  taman: { name: "Taman Hijau", about: "Kayu, tanaman gantung, karpet rumput", trim: "#a16207", truss: "#14532d", wing: "#166534", runner: "#15803d", rope: "#65a30d", text: "#bbf7d0" },
+  cyber: { name: "Cyber Neon", about: "Hitam pekat dengan lampu neon biru dan pink", trim: "#22d3ee", truss: "#020617", wing: "#0f172a", runner: "#be185d", rope: "#22d3ee", text: "#22d3ee", glow: "#e879f9" },
+};
+export const vipLook = (b: { vipStyle?: VipStyle }) => VIP_STYLES[b.vipStyle ?? "emas"] ?? VIP_STYLES.emas;
+
+/** What each look adds on top of a VIP wing: a crown, hanging plants, neon edges, or sparkles. */
+function VipOrnament({ style, w, h }: { style: VipStyle; w: number; h: number }) {
+  const v = VIP_STYLES[style];
+  if (style === "royal")
+    return (
+      <g transform={`translate(${w / 2}, -12)`} className="jb-crown">
+        <path d="M-20 10L-22 -8L-10 2L0 -12L10 2L22 -8L20 10Z" fill={v.trim} {...ink} strokeWidth={1.6} />
+        {[-12, 0, 12].map((x) => (
+          <circle key={x} cx={x} cy={4} r={2.6} fill={x ? "#ef4444" : "#38bdf8"} />
+        ))}
+      </g>
+    );
+  if (style === "taman")
+    return (
+      <g>
+        <path d={`M2 6Q${w / 4} 22 ${w / 2} 8T${w - 2} 6`} fill="none" stroke="#166534" strokeWidth={4} />
+        {Array.from({ length: 9 }, (_, i) => {
+          const x = 6 + (i * (w - 12)) / 8;
+          return <ellipse key={i} cx={x} cy={10 + (i % 2) * 6} rx={7} ry={4} transform={`rotate(${i % 2 ? 30 : -30} ${x} ${10 + (i % 2) * 6})`} fill={i % 3 ? "#22c55e" : "#4ade80"} {...ink} strokeWidth={1} />;
+        })}
+        {[10, w - 10].map((x) => (
+          <g key={x} className="jb-sway">
+            <path d={`M${x} 8V${h * 0.55}`} stroke="#15803d" strokeWidth={2} />
+            {[0.2, 0.32, 0.44].map((f) => (
+              <ellipse key={f} cx={x + (f === 0.32 ? 4 : -4)} cy={h * f + 8} rx={5} ry={3} fill="#22c55e" {...ink} strokeWidth={0.8} />
+            ))}
+          </g>
+        ))}
+      </g>
+    );
+  if (style === "cyber")
+    return (
+      <g>
+        <rect x={4} y={2} width={w - 8} height={h - 10} rx={4} fill="none" stroke={v.trim} strokeWidth={3} className="jb-neon-edge" style={{ color: v.trim }} />
+        <path d={`M10 ${h - 22}H${w - 10}`} stroke={v.glow} strokeWidth={3} className="jb-neon-edge" style={{ color: v.glow }} />
+      </g>
+    );
+  if (style === "platinum")
+    return (
+      <g>
+        {[
+          [14, 14],
+          [w - 16, 22],
+          [w / 2, 10],
+          [22, h * 0.6],
+          [w - 20, h * 0.66],
+        ].map(([x, y], i) => (
+          <path key={i} d={`M${x} ${y! - 6}L${x! + 2} ${y! - 2}L${x! + 6} ${y}L${x! + 2} ${y! + 2}L${x} ${y! + 6}L${x! - 2} ${y! + 2}L${x! - 6} ${y}L${x! - 2} ${y! - 2}Z`} fill="#fff" className="jb-sparkle" style={{ animationDelay: `${-i * 0.5}s` }} />
+        ))}
+      </g>
+    );
+  return null;
+}
 
 /** Wall, base strip and post colours for each booth theme. */
 export const BOOTH_THEMES: Record<BoothTheme, { name: string; wall: string; base: string; post: string; dark?: boolean }> = {
@@ -198,13 +285,18 @@ function VipWing({ booth, side }: { booth: CompanyBooth; side: "l" | "r" }) {
   const w = VIP_WING * T;
   const h = 2.2 * T + 26;
   const jobs = openJobs(booth).length;
+  const v = vipLook(booth);
+  const style = booth.vipStyle ?? "emas";
+  const [l1, l2] = (booth.vipHeadline?.some((x) => x.trim()) ? booth.vipHeadline : ["WE’RE", "HIRING"]).map((x) => x.toUpperCase().slice(0, 9));
+  // Longer words get a smaller font so they still fit the wing.
+  const fs = (t: string) => Math.min(20, Math.floor(140 / Math.max(t.length, 1)));
   if (side === "l")
     return (
       <g transform="translate(0, -26)">
         {/* Black truss with gold trim, speakers under the screen. */}
-        <rect x={2} y={0} width={w - 4} height={h} rx={5} fill="#111827" {...ink} strokeWidth={1.8} />
+        <rect x={2} y={0} width={w - 4} height={h} rx={5} fill={v.truss} {...ink} strokeWidth={1.8} />
         <path d={`M8 6V${h - 10}M${w - 8} 6V${h - 10}`} stroke="#475569" strokeWidth={3} strokeDasharray="4 3" />
-        <rect x={6} y={4} width={w - 12} height={h - 8} rx={3} fill="none" stroke={GOLD} strokeWidth={2} />
+        <rect x={6} y={4} width={w - 12} height={h - 8} rx={3} fill="none" stroke={v.trim} strokeWidth={2} />
         {[22, w - 22].map((cx) => (
           <g key={cx} transform={`translate(${cx}, ${h - 30})`}>
             <rect x={-11} y={-14} width={22} height={28} rx={3} fill="#1f2937" {...ink} strokeWidth={1.2} />
@@ -213,33 +305,35 @@ function VipWing({ booth, side }: { booth: CompanyBooth; side: "l" | "r" }) {
           </g>
         ))}
         <g transform={`translate(${w / 2}, ${h - 30})`}>
-          <rect x={-22} y={-9} width={44} height={18} rx={9} fill="#000" stroke={GOLD} strokeWidth={2} />
-          <text x={0} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={GOLD} letterSpacing={2} fontFamily="system-ui, sans-serif">
+          <rect x={-22} y={-9} width={44} height={18} rx={9} fill="#000" stroke={v.trim} strokeWidth={2} />
+          <text x={0} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={v.trim} letterSpacing={2} fontFamily="system-ui, sans-serif">
             VIP
           </text>
         </g>
-        <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={GOLD} {...ink} strokeWidth={1.2} />
+        <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={v.trim} {...ink} strokeWidth={1.2} />
+        <VipOrnament style={style} w={w} h={h} />
       </g>
     );
   return (
     <g transform="translate(0, -26)">
-      <rect x={2} y={0} width={w - 4} height={h} rx={5} fill={booth.color} {...ink} strokeWidth={1.8} />
+      <rect x={2} y={0} width={w - 4} height={h} rx={5} fill={v.wing ?? booth.color} {...ink} strokeWidth={1.8} />
       <rect x={2} y={h * 0.55} width={w - 4} height={h * 0.45 - 4} fill="#000" opacity={0.18} />
-      <rect x={7} y={5} width={w - 14} height={h - 10} rx={3} fill="none" stroke={GOLD} strokeWidth={2} />
+      <rect x={7} y={5} width={w - 14} height={h - 10} rx={3} fill="none" stroke={v.trim} strokeWidth={2} />
       <g transform={`translate(${w / 2}, 24)`}>
         <Logo booth={booth} r={13} />
       </g>
-      <text x={w / 2} y={60} textAnchor="middle" fontSize={20} fontWeight={900} fill="#fff" letterSpacing={1.5} fontFamily="system-ui, sans-serif">
-        WE’RE
+      <text x={w / 2} y={60} textAnchor="middle" fontSize={fs(l1!)} fontWeight={900} fill="#fff" letterSpacing={1.5} fontFamily="system-ui, sans-serif">
+        {l1}
       </text>
-      <text x={w / 2} y={82} textAnchor="middle" fontSize={20} fontWeight={900} fill={GOLD} letterSpacing={1.5} fontFamily="system-ui, sans-serif">
-        HIRING
+      <text x={w / 2} y={82} textAnchor="middle" fontSize={fs(l2!)} fontWeight={900} fill={v.text} letterSpacing={1.5} fontFamily="system-ui, sans-serif">
+        {l2}
       </text>
       <rect x={w / 2 - 44} y={91} width={88} height={18} rx={9} fill="#fff" {...ink} strokeWidth={1.4} />
       <text x={w / 2} y={104} textAnchor="middle" fontSize={10.5} fontWeight={900} fill={booth.color} fontFamily="system-ui, sans-serif">
         {jobs ? `${jobs} LOWONGAN` : "SEGERA DIBUKA"}
       </text>
-      <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={GOLD} {...ink} strokeWidth={1.2} />
+      <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={v.trim} {...ink} strokeWidth={1.2} />
+      <VipOrnament style={style} w={w} h={h} />
     </g>
   );
 }
@@ -268,7 +362,8 @@ function BoothWall({ booth, rating }: { booth: CompanyBooth; rating?: BoothRatin
   const premium = booth.tier === "premium";
   const themeId = booth.theme ?? "classic";
   const theme = BOOTH_THEMES[themeId] ?? BOOTH_THEMES.classic;
-  const post = premium ? GOLD : theme.post;
+  const vip = vipLook(booth);
+  const post = premium ? vip.trim : theme.post;
   const classicVip = premium && themeId === "classic";
   const open = openJobs(booth);
   return (
@@ -300,7 +395,7 @@ function BoothWall({ booth, rating }: { booth: CompanyBooth; rating?: BoothRatin
               <stop offset="1" stopColor="#fde047" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <rect x={-9} y={-5} width={w + 18} height={44} rx={7} fill={GOLD} {...ink} />
+          <rect x={-9} y={-5} width={w + 18} height={44} rx={7} fill={vip.trim} {...ink} />
           {/* Chasing marquee bulbs along the gold frame. */}
           {Array.from({ length: 22 }, (_, i) => (
             <circle key={i} cx={-3 + (i * (w + 6)) / 21} cy={36} r={2.3} className="jb-bulb" data-odd={i % 2 ? "" : undefined} />
@@ -322,8 +417,8 @@ function BoothWall({ booth, rating }: { booth: CompanyBooth; rating?: BoothRatin
           </foreignObject>
           <g transform="translate(30, 46.5)">
             <g className="jb-crown">
-              <rect x={-21} y={-9} width={42} height={18} rx={9} fill="#111827" stroke={GOLD} strokeWidth={2} />
-              <text x={0} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={GOLD} letterSpacing={2} fontFamily="system-ui, sans-serif">
+              <rect x={-21} y={-9} width={42} height={18} rx={9} fill="#111827" stroke={vip.trim} strokeWidth={2} />
+              <text x={0} y={4.5} textAnchor="middle" fontSize={11} fontWeight={900} fill={vip.trim} letterSpacing={2} fontFamily="system-ui, sans-serif">
                 VIP
               </text>
             </g>
@@ -416,6 +511,7 @@ const VideoWall = memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
 
 /** Two armchairs, a coffee table and a plant at the back of a VIP booth's right wing. */
 const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
+  const v = vipLook(booth);
   const w = (VIP_WING - 0.4) * T;
   const h = 1.7 * T;
   const chair = (cx: number) => (
@@ -423,7 +519,7 @@ const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
       <rect x={-17} y={-22} width={34} height={22} rx={8} fill={booth.color} {...ink} strokeWidth={1.6} />
       <rect x={-19} y={-6} width={38} height={18} rx={6} fill={booth.color} {...ink} strokeWidth={1.6} />
       <rect x={-13} y={-4} width={26} height={9} rx={4} fill="#fff" opacity={0.25} />
-      <path d="M-14 12v6M14 12v6" stroke={GOLD} strokeWidth={3} strokeLinecap="round" />
+      <path d="M-14 12v6M14 12v6" stroke={v.trim} strokeWidth={3} strokeLinecap="round" />
     </g>
   );
   return (
@@ -433,7 +529,7 @@ const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
       {chair(w - 22)}
       <g transform={`translate(${w / 2}, ${h - 22})`}>
         <ellipse rx={15} ry={6} fill="#f8fafc" {...ink} strokeWidth={1.4} />
-        <path d="M0 6v10" stroke={GOLD} strokeWidth={3} />
+        <path d="M0 6v10" stroke={v.trim} strokeWidth={3} />
         <rect x={-4} y={-12} width={8} height={9} rx={2} fill="#fff" {...ink} strokeWidth={1.1} />
         <path d="M-2 -14q2 -4 0 -8M2 -14q2 -4 0 -8" stroke="#94a3b8" strokeWidth={1} fill="none" />
       </g>
@@ -442,19 +538,19 @@ const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
 }, sameProps);
 
 /** Gold posts with a red velvet rope, across the front of a VIP wing. */
-const VelvetRope = memo(function VelvetRope({ width }: { width: number }) {
+const VelvetRope = memo(function VelvetRope({ width, trim = GOLD, rope = "#b91c1c" }: { width: number; trim?: string; rope?: string }) {
   const n = Math.max(2, Math.round(width / 50) + 1);
   const xs = Array.from({ length: n }, (_, i) => 6 + (i * (width - 0)) / (n - 1));
   return (
     <svg width={width + 12} height={42} style={{ display: "block", overflow: "visible" }}>
       {xs.slice(1).map((x1, i) => (
-        <path key={i} d={`M${xs[i]} 12Q${(xs[i]! + x1) / 2} 26 ${x1} 12`} fill="none" stroke="#b91c1c" strokeWidth={4} strokeLinecap="round" />
+        <path key={i} d={`M${xs[i]} 12Q${(xs[i]! + x1) / 2} 26 ${x1} 12`} fill="none" stroke={rope} strokeWidth={4} strokeLinecap="round" />
       ))}
       {xs.map((x) => (
         <g key={x}>
-          <rect x={x - 2.5} y={8} width={5} height={30} fill={GOLD} {...ink} strokeWidth={1.1} />
-          <circle cx={x} cy={8} r={4} fill={GOLD} {...ink} strokeWidth={1.1} />
-          <ellipse cx={x} cy={38} rx={7} ry={3} fill={GOLD} {...ink} strokeWidth={1.1} />
+          <rect x={x - 2.5} y={8} width={5} height={30} fill={trim} {...ink} strokeWidth={1.1} />
+          <circle cx={x} cy={8} r={4} fill={trim} {...ink} strokeWidth={1.1} />
+          <ellipse cx={x} cy={38} rx={7} ry={3} fill={trim} {...ink} strokeWidth={1.1} />
         </g>
       ))}
     </svg>
@@ -601,13 +697,15 @@ const RollUp = memo(function RollUp({ booth }: { booth: CompanyBooth }) {
           {j.title}
         </div>
       ))}
-      <div className="jb-rollup-foot">{booth.logo}</div>
+      <div className="jb-rollup-foot"><BoothLogo booth={booth} className="vwo-logo-inline" /></div>
     </div>
   );
 }, sameProps);
 
 /** Everything that draws one booth, in scene coordinates. */
-export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; onAccessory?: (id: string) => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
+export function boothExtras(live: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; onAccessory?: (id: string) => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
+  // The engine edits booths in place; a snapshot lets the memoized parts see that something changed.
+  const booth: CompanyBooth = { ...live, media: live.media && { ...live.media } };
   const { x, y } = booth;
   const f = boothFrame(booth);
   const premium = booth.tier === "premium";
@@ -619,7 +717,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       y: y + 0.5,
       z: 0,
       ground: true,
-      node: <div className="jb-carpet" data-premium={premium ? "" : undefined} data-theme={booth.theme ?? "classic"} style={{ width: (f.width - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
+      node: <div className="jb-carpet" data-premium={premium ? "" : undefined} data-vip={premium ? (booth.vipStyle ?? "emas") : undefined} data-theme={booth.theme ?? "classic"} style={{ width: (f.width - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color, ["--trim" as string]: vipLook(booth).trim }} />,
     },
     ...(booth.tier === "premium"
       ? [
@@ -643,12 +741,12 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       ? [
           { key: `${booth.id}-videowall`, x: f.x + 9 / T, y: y - 1.7 - 18 / T, z: y + 0.55, node: <VideoWall booth={booth} />, onClick: onTv, title: onTv ? `Tonton video ${booth.company}` : undefined },
           // A red carpet from the gate to the recruiter's desk.
-          { key: `${booth.id}-runner`, x: x + 1.85, y: y + 2.7, z: 0.8, ground: true, node: <div className="jb-runner" style={{ width: 1.7 * T, height: (BOOTH_H - 2.7 + 0.35) * T }} /> },
+          { key: `${booth.id}-runner`, x: x + 1.85, y: y + 2.7, z: 0.8, ground: true, node: <div className="jb-runner" style={{ width: 1.7 * T, height: (BOOTH_H - 2.7 + 0.35) * T, ["--trim" as string]: vipLook(booth).trim, ["--runner" as string]: vipLook(booth).runner }} /> },
           { key: `${booth.id}-lounge`, x: vipLounge(booth).x - 0.1, y: y - 0.2, z: vipLounge(booth).y + vipLounge(booth).height, node: <VipLounge booth={booth} /> },
           ...([
             [f.x + 0.5, x - 0.2],
             [x + BOOTH_W + 0.2, f.x + f.width - 0.5],
-          ] as const).map(([from, to], i) => ({ key: `${booth.id}-rope${i}`, x: from - 0.12, y: y + BOOTH_H - 0.25 - 40 / T, z: y + BOOTH_H - 0.1, node: <VelvetRope width={(to - from) * T} /> })),
+          ] as const).map(([from, to], i) => ({ key: `${booth.id}-rope${i}`, x: from - 0.12, y: y + BOOTH_H - 0.25 - 40 / T, z: y + BOOTH_H - 0.1, node: <VelvetRope width={(to - from) * T} trim={vipLook(booth).trim} rope={vipLook(booth).rope} /> })),
         ]
       : []),
     ...(boothHasGate(booth)

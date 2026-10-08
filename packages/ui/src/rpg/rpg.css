@@ -1021,7 +1021,7 @@
 .fr-whiteboard span { font-size: 12px; font-weight: 700; }
 
 /* Premium booths: gold carpet edge with a slow shine, a crown, and spotlights. */
-.jb-carpet[data-premium] { border: 4px double #eab308; box-shadow: 0 0 0 3px rgb(234 179 8 / 0.25), inset 0 0 18px rgb(250 204 21 / 0.35); position: relative; overflow: hidden; }
+.jb-carpet[data-premium] { border: 4px double var(--trim, #eab308); box-shadow: 0 0 0 3px color-mix(in srgb, var(--trim, #eab308) 25%, transparent), inset 0 0 18px color-mix(in srgb, var(--trim, #eab308) 35%, transparent); position: relative; overflow: hidden; }
 .jb-carpet[data-premium]::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 60%; background: linear-gradient(110deg, transparent 20%, rgb(255 255 255 / 0.35) 50%, transparent 80%); animation: jb-shine 5s ease-in-out infinite; will-change: transform; }
 @keyframes jb-shine { 0%, 40% { transform: translateX(0); } 100% { transform: translateX(270%); } }
 .jb-crown { animation: jb-crown 2.6s ease-in-out infinite; }
@@ -1110,7 +1110,7 @@
 
 /* VIP booths: a red carpet runner to the desk and a blinking REC dot on the video wall. */
 .jb-runner {
-  background: linear-gradient(90deg, #eab308 0 4px, #b91c1c 4px calc(100% - 4px), #eab308 calc(100% - 4px));
+  background: linear-gradient(90deg, var(--trim, #eab308) 0 4px, var(--runner, #b91c1c) 4px calc(100% - 4px), var(--trim, #eab308) calc(100% - 4px));
   box-shadow: inset 0 0 0 1px #7f1d1d;
   border-radius: 3px 3px 0 0;
   opacity: 0.92;
@@ -1160,3 +1160,32 @@
 .fr-meet { box-sizing: border-box; border-radius: 50%; border: 6px double #16a34a; background: radial-gradient(circle, rgb(34 197 94 / 0.28), rgb(34 197 94 / 0.08) 70%); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 14px; }
 .fr-meet span { font-family: system-ui, sans-serif; font-weight: 900; font-size: 16px; letter-spacing: 0.14em; color: #15803d; opacity: 0.85; }
 @media (prefers-reduced-motion: reduce) { .fr-led-ticker span, .fr-led-slide, .fr-led-badge[data-live] { animation: none; } }
+
+/* A company's uploaded logo picture inside any logo badge. */
+[data-img] > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.cp-logo[data-img], .iv-logo[data-img], .sp-stamp-mark[data-img] { overflow: hidden; background: #fff; padding: 0; }
+.vwo-logo-inline[data-img] { display: inline-block; width: 1.5em; height: 1.5em; border-radius: 50%; overflow: hidden; vertical-align: middle; background: #fff; }
+
+/* A live screen share on an LED wall. */
+.fr-feed { position: relative; min-width: 0; min-height: 0; background: #000; border-radius: 4px; overflow: hidden; }
+.fr-feed video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.fr-led-feedrow { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 30%; gap: 10px; padding: 0 10px; }
+.fr-led-caption { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+.fr-led-caption b { font-size: 18px; line-height: 1.15; }
+.fr-led-caption span { font-size: 12px; font-weight: 700; color: #fde68a; }
+
+/* VIP looks: carpets per style, and the platinum sparkle. */
+.jb-carpet[data-vip="platinum"] { background: linear-gradient(135deg, #e2e8f0, #f8fafc 40%, #cbd5e1); }
+.jb-carpet[data-vip="royal"] { background: color-mix(in srgb, #7e22ce 22%, #faf5ff); background-image: radial-gradient(circle, rgb(245 158 11 / 0.35) 1.5px, transparent 2px); background-size: 18px 18px; }
+.jb-carpet[data-vip="taman"] { background: #86efac; background-image: repeating-linear-gradient(100deg, rgb(21 128 61 / 0.25) 0 2px, transparent 2px 7px); }
+.jb-carpet[data-vip="cyber"] { background: #0b1020; background-image: linear-gradient(rgb(34 211 238 / 0.18) 1px, transparent 1px), linear-gradient(90deg, rgb(232 121 249 / 0.18) 1px, transparent 1px); background-size: 18px 18px; box-shadow: 0 0 12px #22d3ee, inset 0 0 14px rgb(232 121 249 / 0.45); }
+.jb-sparkle { transform-box: fill-box; transform-origin: center; animation: jb-sparkle 2s ease-in-out infinite; }
+@keyframes jb-sparkle { 0%, 100% { opacity: 0.2; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .jb-sparkle { animation: none; } }
+
+/* Consultation lounge. */
+.fr-lounge-sign { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 10px; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 60%, #0b1020)); border: 4px solid #111827; color: #fff; font-family: system-ui, sans-serif; box-shadow: 0 6px 0 rgb(0 0 0 / 0.25); }
+.fr-lounge-sign b { font-size: 24px; letter-spacing: 0.08em; }
+.fr-lounge-sign span { font-size: 12px; font-weight: 700; color: #ccfbf1; }
+.fr-avail { animation: jb-rec 1.6s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) { .fr-avail { animation: none; } }
