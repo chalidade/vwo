@@ -36,7 +36,8 @@ export function BoothPreview({ booth }: { booth: CompanyBooth }) {
       floor={floor}
       occupiedSeatIds={new Set()}
       follow={{ x: booth.x + 3, y: booth.y + 1.2 }}
-      hallTitle={fair.fair.name}
+      hallTitle={fair.hallBanner(booth.floor).title}
+      hallSubtitle={fair.hallBanner(booth.floor).subtitle}
       hallBanner
       npcs={rec ? [{ id: rec.id, name: rec.name, floorId, x: rec.x, y: rec.y, facing: rec.facing, look: staffLook(rec.name, booth.color) }] : []}
       avatars={[...fair.visitors.values()].filter((v) => v.floorId === floorId)}

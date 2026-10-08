@@ -116,6 +116,8 @@ export interface CafeSceneProps {
   hallSponsors?: SponsorView[];
   /** Big title on the hall banner; the floor's name then goes underneath. */
   hallTitle?: string;
+  /** The banner's second line; defaults to the floor's name. */
+  hallSubtitle?: string;
   /** Hide the hall banner and sponsor plates (rooms hang their own screen). */
   hallBanner?: boolean;
   /** Screen pixels the bottom HUD covers: the camera may scroll that far past the floor's edge. */
@@ -164,6 +166,7 @@ export function CafeScene({
   extras = [],
   hallSponsors,
   hallTitle,
+  hallSubtitle,
   hallBanner = true,
   zoomable = true,
   hudBottom = 0,
@@ -515,7 +518,7 @@ export function CafeScene({
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
         ) : floor.theme === "hall" ? (
-          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallTitle ? floor.name : undefined} sponsors={hallSponsors} banner={hallBanner} />
+          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallSubtitle ?? (hallTitle ? floor.name : undefined)} sponsors={hallSponsors} banner={hallBanner} />
         ) : (
           <IndoorWall w={worldW} h={wall} windows={windows} />
         )}

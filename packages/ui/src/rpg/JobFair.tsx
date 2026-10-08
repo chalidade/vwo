@@ -56,22 +56,23 @@ export function HallWall({
         })}
         {/* The event banner. */}
         {banner && (
-          <g transform={`translate(${(w - bw) / 2}, 32)`}>
-            <rect x={0} y={0} width={bw} height={72} rx={8} fill="#1e3a8a" {...ink} />
-            <rect x={6} y={6} width={bw - 12} height={60} rx={5} fill="none" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" />
-            <text x={bw / 2} y={36} textAnchor="middle" fontSize={26} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
-              {title.toUpperCase()}
+          // Kept short so it clears the VIP banners and gates of the booths standing right below it.
+          <g transform={`translate(${(w - bw) / 2}, 22)`}>
+            <rect x={0} y={0} width={bw} height={46} rx={8} fill="#1e3a8a" {...ink} />
+            <rect x={5} y={5} width={bw - 10} height={36} rx={5} fill="none" stroke="#fbbf24" strokeWidth={1.6} strokeDasharray="6 4" />
+            <text x={bw / 2} y={25} textAnchor="middle" fontSize={19} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif" letterSpacing={1}>
+              {title.toUpperCase().slice(0, 34)}
             </text>
-            <text x={bw / 2} y={56} textAnchor="middle" fontSize={13} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
-              {subtitle}
+            <text x={bw / 2} y={38} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fde68a" fontFamily="system-ui, sans-serif">
+              {subtitle.slice(0, 70)}
             </text>
           </g>
         )}
       </svg>
       {banner && sponsors.length > 0 && (
         <>
-          <SponsorStrip sponsors={sponsors.slice(0, Math.ceil(sponsors.length / 2))} style={{ right: (w + bw) / 2 + 16, top: 40 }} />
-          <SponsorStrip sponsors={sponsors.slice(Math.ceil(sponsors.length / 2))} style={{ left: (w + bw) / 2 + 16, top: 40 }} />
+          <SponsorStrip sponsors={sponsors.slice(0, Math.ceil(sponsors.length / 2))} style={{ right: (w + bw) / 2 + 16, top: 26 }} />
+          <SponsorStrip sponsors={sponsors.slice(Math.ceil(sponsors.length / 2))} style={{ left: (w + bw) / 2 + 16, top: 26 }} />
         </>
       )}
     </div>
@@ -202,14 +203,21 @@ function VipWing({ booth, side }: { booth: CompanyBooth; side: "l" | "r" }) {
       <g transform={`translate(${w / 2}, 22)`}>
         <Logo booth={booth} r={11} />
       </g>
-      <text x={w / 2} y={52} textAnchor="middle" fontSize={10} fontWeight={900} fill={GOLD} letterSpacing={1} fontFamily="system-ui, sans-serif">
+      <text x={w / 2} y={47} textAnchor="middle" fontSize={10} fontWeight={900} fill={GOLD} letterSpacing={1} fontFamily="system-ui, sans-serif">
         VIP
       </text>
-      {(side === "l" ? ["W", "E", "\u2019", "R", "E"] : ["H", "I", "R", "I", "N", "G"]).map((ch, i) => (
-        <text key={i} x={w / 2} y={72 + i * 13} textAnchor="middle" fontSize={11} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif">
-          {ch}
-        </text>
-      ))}
+      {/* One word per wing, written upwards so it fits the banner's height. */}
+      <text
+        transform={`translate(${w / 2 + 4}, ${(56 + h - 10) / 2}) rotate(-90)`}
+        textAnchor="middle"
+        fontSize={12}
+        fontWeight={900}
+        fill="#fff"
+        letterSpacing={1.5}
+        fontFamily="system-ui, sans-serif"
+      >
+        {side === "l" ? "WE’RE" : "HIRING"}
+      </text>
       <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={GOLD} {...ink} strokeWidth={1.2} />
     </g>
   );
@@ -386,7 +394,7 @@ const VideoWall = memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
 export const GATE_STYLES: Record<GateStyle, string> = { klasik: "Klasik", janur: "Janur & bambu", balon: "Lengkung balon", neon: "Neon" };
 
 /** The beam sits just above the booth's header; the posts stand at the front corners of the carpet. */
-const BEAM_H = 44;
+const BEAM_H = 34;
 const POST_H = 62;
 
 const gateLook = (booth: CompanyBooth) => {
@@ -400,8 +408,15 @@ const gateLook = (booth: CompanyBooth) => {
 const GateBeam = memo(function GateBeam({ booth, width }: { booth: CompanyBooth; width: number }) {
   const w = width * T;
   const { style, dark, fill } = gateLook(booth);
-  const text = (booth.media?.gateText?.trim() || `Selamat datang di ${booth.company}`).slice(0, Math.floor((w - 70) / 6.6));
-  const plateW = Math.min(w - 60, text.length * 6.6 + 26);
+  // A "We're hiring" neon hangs on the beam's left half, where it would otherwise clash with the name plate.
+  const neon = !!booth.accessories?.includes("neon");
+  const inner = booth.tier === "premium" ? VIP_WING * T + 6 : 24;
+  const neonW = 112;
+  const left = neon ? inner + neonW + 8 : 30;
+  const room = w - left - (neon ? inner : 30);
+  const text = (booth.media?.gateText?.trim() || `Selamat datang di ${booth.company}`).slice(0, Math.max(6, Math.floor((room - 20) / 6.6)));
+  const plateW = Math.min(room, text.length * 6.6 + 20);
+  const plateX = left + room / 2;
   const leg = 18;
   return (
     <svg width={w} height={BEAM_H} style={{ display: "block", overflow: "visible" }}>
@@ -425,7 +440,15 @@ const GateBeam = memo(function GateBeam({ booth, width }: { booth: CompanyBooth;
           )}
         </g>
       )}
-      <g transform={`translate(${w / 2}, 12)`}>
+      {neon && (
+        <g transform={`translate(${inner}, 1)`} style={{ ["--c" as string]: booth.color }}>
+          <rect width={neonW} height={22} rx={6} fill="#0b1020" stroke={booth.color} strokeWidth={2} className="jb-neon-edge" />
+          <text x={neonW / 2} y={15} textAnchor="middle" fontSize={11} fontWeight={900} letterSpacing={1.2} fill="#fff" fontFamily="system-ui, sans-serif" style={{ textShadow: `0 0 4px ${booth.color}, 0 0 8px ${booth.color}` }}>
+            WE&apos;RE HIRING
+          </text>
+        </g>
+      )}
+      <g transform={`translate(${plateX}, 12)`}>
         <rect x={-plateW / 2} y={-12} width={plateW} height={24} rx={6} fill={dark ? "#0b1020" : "#fff"} stroke={dark ? booth.color : INK} strokeWidth={dark ? 2.5 : 1.8} />
         <text y={4} textAnchor="middle" fontSize={11} fontWeight={900} fill={dark ? "#fff" : booth.color} fontFamily="system-ui, sans-serif">
           {text}
@@ -550,7 +573,7 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
       : []),
     ...(boothHasGate(booth)
       ? [
-          { key: `${booth.id}-gate`, x: f.x, y: y - 1.7 - (BEAM_H - 4) / T, z: y + 0.45, node: <GateBeam booth={booth} width={f.width} /> },
+          { key: `${booth.id}-gate`, x: f.x, y: y - 1.7 - (BEAM_H + 8) / T, z: y + 0.45, node: <GateBeam booth={booth} width={f.width} />, ...(booth.accessories?.includes("neon") && opts.onAccessory ? { onClick: () => opts.onAccessory!("neon"), title: `Papan lowongan ${booth.company}` } : {}) },
           { key: `${booth.id}-gateposts`, x: f.x, y: y + BOOTH_H - POST_H / T, z: y + BOOTH_H, node: <GatePosts booth={booth} width={f.width} /> },
         ]
       : []),

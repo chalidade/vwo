@@ -12,6 +12,7 @@ import {
   type SponsorView,
   boothSpot,
   fairFloorId,
+  fairFloorIndex,
   LIFT_FRONT,
   findPath,
   openJobs,
@@ -52,6 +53,7 @@ import { CallScreen } from "./fair/Call";
 import { type RingSignal, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
+import { InviteCard } from "./fair/Invite";
 import { SofaGames } from "./fair/Games";
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
@@ -93,6 +95,8 @@ type Reach =
   | { kind: "seated"; room: FairRoom }
   | { kind: "sofa" };
 
+const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
+
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
 
 /** Recruiters wear a jacket in their company's colour; the organisers wear navy. */
@@ -117,6 +121,24 @@ export function JobFair() {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [toast, setToast] = useState<string | null>(null);
+  const [inviteId, setInviteId] = useState<string | null>(null);
+  // The organiser's announcement stays on screen until the visitor closes it; a new one shows again.
+  const announcement = fair.org.announcement;
+  const [annSeen, setAnnSeenRaw] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem(ANN_SEEN_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  });
+  const setAnnSeen = (at: number) => {
+    setAnnSeenRaw(at);
+    try {
+      localStorage.setItem(ANN_SEEN_KEY, String(at));
+    } catch {
+      // Private mode: it shows again next visit.
+    }
+  };
   const [wallet, setWallet] = useState(false);
   const [stall, setStall] = useState<string | null>(null);
   const [psych, setPsych] = useState(false);
@@ -142,7 +164,7 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -166,6 +188,12 @@ export function JobFair() {
     const id = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // A company scheduled an interview: show the invitation once, over everything but a call.
+  const invite = inviteId ? fair.applications.find((a) => a.id === inviteId) : undefined;
+  useEffect(() => {
+    if (!inviteId && fair.interviewAlerts.length) setInviteId(fair.interviewAlerts.shift()!);
+  });
 
   // Level-ups and company ratings arrive from the engine; show them one at a time.
   useEffect(() => {
@@ -808,7 +836,8 @@ export function JobFair() {
         hudBottom={session ? 72 : 0}
         floor={floor}
         floorName={shortName}
-        hallTitle={room ? undefined : fair.fair.name}
+        hallTitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).title}
+        hallSubtitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).subtitle}
         hallBanner={!room}
         occupiedSeatIds={occupied}
         highlightSeatId={reach?.kind === "seat" ? reach.seatId : null}
@@ -952,6 +981,18 @@ export function JobFair() {
 
         {toast && <div className="toast rpg-box">{toast}</div>}
 
+        {session && announcement && announcement.at !== annSeen && (
+          <div className="fair-ann rpg-box" role="status" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="fair-ann-ico">📢</span>
+            <span className="fair-ann-text">
+              <b>Panitia</b> · {announcement.text}
+            </span>
+            <button type="button" className="fair-ann-x" onClick={() => setAnnSeen(announcement.at)} aria-label="Tutup pengumuman">
+              ✕
+            </button>
+          </div>
+        )}
+
         {session && (
           <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
             <div className="rpg-box actions tabbar">
@@ -1052,6 +1093,17 @@ export function JobFair() {
               if (b) goToBooth(b);
             }}
             onClose={() => setGames(false)}
+          />
+        )}
+
+        {session && !ring && invite && (
+          <InviteCard
+            application={invite}
+            onClose={() => setInviteId(null)}
+            onOpen={() => {
+              setInviteId(null);
+              setPanel("applications");
+            }}
           />
         )}
 

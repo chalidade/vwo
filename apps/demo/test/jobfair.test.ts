@@ -390,6 +390,15 @@ describe("DemoJobFair", () => {
     tabA.mergeSaved(grab(tabB));
     expect(tabA.applications[0]!.status).toBe("Diterima");
     expect(tabA.booth("kopi-kita")!.theme).toBe("neon");
+    // The applicant's tab hears about a status change, a chat message and an interview set in the portal.
+    expect(tabA.notices.some((n) => n.includes("Diterima"))).toBe(true);
+    c.advance(1000);
+    tabB.scheduleInterview(a.id, { at: c.now() + 86_400_000, mode: "Video call", place: "https://meet.example/abc" });
+    tabA.notices.length = 0;
+    tabA.mergeSaved(grab(tabB));
+    expect(tabA.interviewAlerts).toEqual([a.id]);
+    expect(tabA.applications[0]!.interview?.place).toBe("https://meet.example/abc");
+    expect(tabA.notices.some((n) => n.startsWith("💬"))).toBe(true);
   });
   it("lets the organiser take a booth out, put a new company in its place, and bring the old one back", () => {
     const fair = new DemoJobFair(() => 0.5);
@@ -559,6 +568,10 @@ describe("DemoJobFair", () => {
     fair.flush();
     const again = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
     const b2 = again.booth(id)!;
+    expect(again.hallBanner(0).title).toBe(DEMO_JOB_FAIR.name);
+    again.setHallBanner("Bursa Kerja Kota", ["Lantai 1 · Teknologi"]);
+    expect(again.hallBanner(0)).toEqual({ title: "Bursa Kerja Kota", subtitle: "Lantai 1 · Teknologi" });
+    expect(again.hallBanner(1).subtitle).toBe(again.floors[1]!.name);
     expect([b2.tier, b2.theme, [...b2.accessories!].sort(), b2.media?.gate, b2.media?.gateText, b2.media?.videoUrl]).toEqual(["regular", "wood", ["gapura", "plant", "tv"], "balon", "Ayo masuk", "https://video.example/a.mp4"]);
     expect(isBlocked(again.floors[b2.floor]!, b2.x + 0.25, b2.y + 3.35)).toBe(true);
   });

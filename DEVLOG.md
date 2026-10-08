@@ -4,6 +4,23 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · Job fair: undangan interview untuk pelamar, tagihan rapi, VIP tanpa tumpang tindih, banner aula bisa diatur, pengumuman tampil
+
+**Konteks:** owner menanyakan tampilan pelamar saat HR menelepon atau menjadwalkan interview, menilai tagihan kurang rapi, stand VIP masih tumpang tindih (neon dengan gapura, tulisan umbul-umbul terpotong), banner aula tertutup dan tidak bisa diatur, serta pengumuman panitia tidak muncul di halaman pengunjung. Owner juga minta kesimpulan apa yang kurang untuk live.
+
+**Yang berubah**
+- **Undangan interview:** saat HR menjadwalkan dari portal (tab lain), pelamar langsung melihat kartu "Undangan interview" berisi tanggal, jam, cara (video call/tatap muka), link atau lokasi, catatan, tombol simpan ke kalender (.ics), dan tombol ke lamaran + chat. Chat baru dan perubahan status dari portal juga muncul sebagai notifikasi.
+- **Telepon/video call:** sudah ada layar panggilan masuk (Tolak/Angkat) dan layar panggilan; sekarang diuji ulang dari portal ke halaman pelamar.
+- **Tagihan:** dua kolom: produk di kiri, keranjang dan tagihan di kanan (menempel saat digulir). Keranjang punya tombol hapus per item dan total jelas; tagihan diberi warna status (belum dibayar, lunas, dibatalkan). Daftar keuntungan VIP diperbarui.
+- **Stand VIP:** tulisan WE'RE / HIRING di umbul-umbul ditulis vertikal sehingga muat; neon "We're hiring" dipasang di balok gapura di samping papan nama, tidak lagi menumpuk.
+- **Banner aula:** dibuat lebih ringkas supaya tidak tertutup stand di bawahnya. Panitia bisa mengubah judul dan baris kedua per lantai di Kelola iklan → Banner aula.
+- **Pengumuman:** tampil sebagai strip di atas layar pengunjung (di HP di bawah kartu lantai) sampai ditutup; pengumuman baru muncul lagi.
+- **Kesimpulan untuk live:** ditulis sebagai Claude Doc "Kesiapan Live VWO Job Fair & Cafe".
+
+**Dicek:** typecheck, 35 tes (tes lintas tab dan banner ditambah), build demo dan web, screenshot alur HR → pelamar di `/mnt/project-files/screenshots/jobfair-hr/`.
+
+---
+
 ## 2026-10-08 · Job fair: lebih ringan, stand VIP lebih lebar dengan gapura dan layar video, perbaikan cocokan logo, pengaturan add-on
 
 **Konteks:** owner merasa beberapa kondisi agak lemot, minta stand VIP lebih besar dengan tema seperti gapura, layar video besar untuk VIP yang bisa diputar, perbaikan bug mini game cocokan logo, dan halaman pengaturan untuk semua itu (link video, add-on booth).

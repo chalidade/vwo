@@ -136,6 +136,8 @@ export interface OrgState {
   pins?: Record<string, string>;
   /** Empty stands companies booked and paid for themselves. */
   bookings?: StandBooking[];
+  /** The banner on each hall's back wall: one title for the event, a second line per floor. */
+  banner?: { title?: string; subtitles?: string[] };
 }
 
 /** A company booking an empty stand from the hall map. Payment is a demo. */
@@ -682,6 +684,17 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
+  /** What the banner on a hall's back wall says. */
+  hallBanner(floor: number) {
+    const b = this.org.banner;
+    return { title: b?.title?.trim() || this.fair.name, subtitle: b?.subtitles?.[floor]?.trim() || this.floors[floor]?.name || this.fair.floors[floor]?.name || "" };
+  }
+
+  setHallBanner(title: string, subtitles: string[]) {
+    this.org.banner = { title: title.trim().slice(0, 34), subtitles: subtitles.map((t) => t.trim().slice(0, 70)) };
+    this.saveOrg();
+  }
+
   /** A message from the organiser to everyone in the hall. */
   announce(text: string) {
     const t = text.trim().slice(0, 200);
@@ -886,6 +899,14 @@ export class DemoJobFair {
   }
 
 
+  /** The company changed one of the player's applications in another tab (its portal): say what changed. */
+  private tellPlayer(before: FairApplication, after: FairApplication) {
+    const seen = before.messages?.length ?? 0;
+    for (const m of (after.messages ?? []).slice(seen)) if (m.from === "company") this.notices.push(`💬 ${after.company}: ${m.text.slice(0, 80)}`);
+    if (after.interview && JSON.stringify(after.interview) !== JSON.stringify(before.interview) && !this.interviewAlerts.includes(after.id)) this.interviewAlerts.push(after.id);
+    else if (after.status !== before.status && after.status !== "Dilihat") this.notices.push(`📋 ${after.company}: lamaran ${after.jobTitle} kamu sekarang "${after.status}"`);
+  }
+
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
     if (!saved) return;
@@ -895,7 +916,10 @@ export class DemoJobFair {
       if (!this.booth(a.boothId)) continue;
       const mine = this.applications.find((x) => x.id === a.id);
       if (!mine) this.applications.push(a);
-      else if ((a.updatedAt ?? 0) > (mine.updatedAt ?? 0)) Object.assign(mine, a);
+      else if ((a.updatedAt ?? 0) > (mine.updatedAt ?? 0)) {
+        if (a.visitorId === PLAYER_ID) this.tellPlayer(mine, a);
+        Object.assign(mine, a);
+      }
     }
     this.applications.sort((x, y) => y.at - x.at);
     this.emit();
@@ -1703,6 +1727,7 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
     a.interview = iv;
+    if (a.visitorId === PLAYER_ID && !this.interviewAlerts.includes(a.id)) this.interviewAlerts.push(a.id);
     this.setStatus(a.id, "Diundang interview");
     const when = new Date(iv.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
     this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`);
@@ -1740,6 +1765,8 @@ export class DemoJobFair {
 
   /** Messages for the player that the UI shows as toasts, oldest first. */
   readonly notices: string[] = [];
+  /** The player's applications with a new or moved interview, to show as an invitation card. */
+  readonly interviewAlerts: string[] = [];
 
   /** How a company rates an application: a complete form, a CV and a good psikotes score help. */
   private autoRating(a: FairApplication) {
