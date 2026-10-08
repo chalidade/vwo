@@ -124,12 +124,19 @@
 }
 .rpg-shadow {
   position: absolute;
-  left: 8px;
+  left: 7px;
   bottom: -4px;
-  width: 28px;
-  height: 9px;
+  width: 30px;
+  height: 10px;
   border-radius: 50%;
-  background: rgb(0 0 0 / 0.25);
+  /* Dark under the feet, soft at the edge: contact shadow rather than a flat disc. */
+  background: radial-gradient(closest-side, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.22) 60%, rgb(0 0 0 / 0));
+}
+[data-walking] .rpg-shadow {
+  animation: pg-shadow 0.36s ease-in-out infinite;
+}
+[data-running] .rpg-shadow {
+  animation-duration: 0.24s;
 }
 .rpg-name {
   position: absolute;
@@ -318,15 +325,34 @@
 }
 
 /* ---- Character rules from chalidade/tools ---- */
-.pg-flip,
 .pg-eyes {
   transition: transform 140ms ease-out;
 }
+/* No transition on the flip: easing scaleX from 1 to -1 squashes the sprite to a flat line
+   halfway, which reads as paper. A turn snaps instead, with a small hop (the flip is keyed
+   by facing, so it remounts and runs pg-turn). */
 .pg-flip {
   transform-origin: 50% 100%;
 }
+.rpg-sprite .pg-flip {
+  animation: pg-turn 220ms ease-out;
+}
 .pg-body {
   transform-origin: 50% 100%;
+  /* Leaning into a walk, set below; it composes with the bob on transform. */
+  transition: rotate 180ms ease-out;
+}
+/* Standing still, everyone breathes, each on their own beat. */
+.rpg-sprite:not([data-walking]) .pg-body {
+  animation: pg-breathe 3.2s ease-in-out infinite;
+  animation-delay: var(--breath, 0s);
+}
+[data-walking][data-dir="side"] .pg-body {
+  rotate: 6deg;
+}
+[data-walking][data-dir="down"] .pg-body,
+[data-walking][data-dir="up"] .pg-body {
+  rotate: 0deg;
 }
 .pg-leg-a,
 .pg-leg-b,
@@ -389,8 +415,35 @@
   animation-delay: var(--sway-delay, 0s);
 }
 @keyframes pg-bob {
+  0%,
+  100% {
+    transform: scale(1.04, 0.95);
+  }
   50% {
-    transform: translateY(-2px) scaleY(0.97);
+    transform: translateY(-3px) scale(0.97, 1.03);
+  }
+}
+@keyframes pg-breathe {
+  50% {
+    transform: scale(1.015, 1.025);
+  }
+}
+@keyframes pg-turn {
+  0% {
+    translate: 0 0;
+  }
+  45% {
+    translate: 0 -4px;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+/* The ground shadow shrinks and fades as the body lifts off the floor. */
+@keyframes pg-shadow {
+  50% {
+    transform: scale(0.82);
+    opacity: 0.7;
   }
 }
 @keyframes pg-step {
@@ -450,6 +503,9 @@
   .pg-eye,
   .pg-sway,
   .pg-leaf,
+  .rpg-shadow,
+  .rpg-sprite .pg-flip,
+  .rpg-sprite .pg-body,
   [data-walking] .pg-body,
   [data-walking] .pg-leg-a,
   [data-walking] .pg-leg-b,
