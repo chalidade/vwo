@@ -494,4 +494,40 @@ describe("DemoJobFair", () => {
     fair.editBooth(b.id, { promoter: { headline: "Walk-in interview jam 13.00" } });
     expect(fair.fair.promoters.find((x) => x.boothId === b.id)!.headline).toBe("Walk-in interview jam 13.00");
   });
+
+  it("lets a company book an empty stand from the map and sign in with the PIN it gets", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const gone = fair.fair.booths.find((x) => x.floor === 0)!;
+    fair.removeBooth(gone.id);
+    const slot = fair.freeSlots().find((sl) => sl.floor === 0 && sl.x === gone.x && sl.y === gone.y)!;
+    expect(slot).toBeTruthy();
+    const r = fair.bookStand({ company: "Kopi Nusa", industry: "F&B", color: "#16a34a", contact: "Dewi", email: "hr@kopinusa.example", tier: "premium", method: "QRIS", ...slot })!;
+    expect(r.booth.tier).toBe("premium");
+    expect(fair.booth(r.booth.id)?.email).toBe("hr@kopinusa.example");
+    expect(fair.bookings()[0]!.price).toBe(15_000_000);
+    expect(fair.freeSlots().some((sl) => sl.floor === 0 && sl.x === slot.x && sl.y === slot.y)).toBe(false);
+    expect(fair.bookStand({ company: "Telat", industry: "", color: "#000", contact: "A", email: "a@b.example", tier: "regular", method: "QRIS", ...slot })).toBeNull();
+    expect(fair.companyLogin(r.booth.id, r.pin)?.id).toBe(r.booth.id);
+    expect(fair.companyLogin(r.booth.id, "0000")).toBeUndefined();
+    const other = fair.fair.booths.find((x) => x.id !== r.booth.id)!;
+    expect(fair.companyLogin(other.id.toUpperCase(), fair.companyPin(other.id))?.id).toBe(other.id);
+    expect(fair.setCompanyPin(other.id, "12ab")).toBe(false);
+    expect(fair.setCompanyPin(other.id, "246810")).toBe(true);
+    expect(fair.companyLogin(other.id, "246810")?.id).toBe(other.id);
+  });
+
+  it("lets the organiser cap how many of its walking promoters are out", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const walking = () => fair.fair.promoters.filter((p) => p.walks && !p.boothId).length;
+    const all = walking();
+    expect(fair.walkerLimit()).toBe(all);
+    fair.setWalkerLimit(2);
+    expect(walking()).toBe(2);
+    expect(fair.fair.promoters.some((p) => !p.walks)).toBe(true);
+    fair.setWalkerLimit(0);
+    expect(walking()).toBe(0);
+    fair.setWalkerLimit(99);
+    expect(walking()).toBe(all);
+    expect(fair.walkerLimit()).toBe(all);
+  });
 });

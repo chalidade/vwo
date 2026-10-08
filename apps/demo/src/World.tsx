@@ -290,6 +290,7 @@ export function World() {
     <div className="game game-fair game-cafe">
       <CafeScene
         className="game-scene"
+        hudBottom={session ? 72 : 0}
         floor={floor}
         floorName={(id) => cafe.floor(id).name}
         occupiedSeatIds={occupied}
@@ -408,12 +409,14 @@ export function World() {
 
         {session && (
           <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="rpg-box actions">
+            <div className="rpg-box actions tabbar">
               <button type="button" className="menu-btn" data-on={emotesOpen ? "" : undefined} onClick={() => setEmotesOpen(!emotesOpen)} title="Ekspresi">
-                😄<span className="menu-label"> Ekspresi</span>
+                <span className="tab-ico">😄</span>
+                <span className="tab-txt">Ekspresi</span>
               </button>
               <button type="button" className="menu-btn" onClick={() => setMenuOpen(true)} title="Lihat menu">
-                📖 Menu
+                <span className="tab-ico">📖</span>
+                <span className="tab-txt">Menu</span>
               </button>
               <button
                 type="button"
@@ -424,10 +427,12 @@ export function World() {
                   setToast(`Kode rombongan ${session.groupCode} disalin`);
                 }}
               >
-                👥 {session.groupCode}
+                <span className="tab-ico">👥</span>
+                <span className="tab-txt">{session.groupCode}</span>
               </button>
               <button type="button" className="leave" onClick={leave} title="Check-out">
-                🚪 Keluar
+                <span className="tab-ico">🚪</span>
+                <span className="tab-txt">Keluar</span>
               </button>
             </div>
           </div>

@@ -127,6 +127,35 @@ export interface OrgState {
   announcement?: { text: string; at: number };
   psych?: PsychConfig;
   seminars?: SeminarSession[];
+  /** How many of the organiser's walking promoters are out at once. Unset: all of them. */
+  walkers?: number;
+  /** Company portal PINs the organiser set or a booking created. Others use a default PIN. */
+  pins?: Record<string, string>;
+  /** Empty stands companies booked and paid for themselves. */
+  bookings?: StandBooking[];
+}
+
+/** A company booking an empty stand from the hall map. Payment is a demo. */
+export interface StandBooking {
+  id: string;
+  boothId: string;
+  company: string;
+  contact: string;
+  email: string;
+  tier: "premium" | "regular";
+  price: number;
+  method: string;
+  at: number;
+}
+
+/** Stand prices for a booking, in rupiah. */
+export const STAND_PRICES = { regular: 7_500_000, premium: 15_000_000 } as const;
+
+/** The PIN a company uses to open its portal until the organiser sets another. */
+export function defaultPin(boothId: string) {
+  let h = 7;
+  for (const c of boothId) h = (h * 131 + c.charCodeAt(0)) % 9000;
+  return String(1000 + h);
 }
 
 export interface PsychConfig {
@@ -485,7 +514,11 @@ export class DemoJobFair {
       return Object.assign(mine, structuredClone(b));
     });
     this.fair.booths.splice(0, this.fair.booths.length, ...booths);
-    this.fair.promoters.splice(0, this.fair.promoters.length, ...structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.active !== false));
+    const active = structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.active !== false);
+    // The organiser caps how many walkers are out; the first ones in the list go first.
+    let walking = 0;
+    const cap = this.org.walkers ?? Infinity;
+    this.fair.promoters.splice(0, this.fair.promoters.length, ...active.filter((p) => !p.walks || walking++ < cap));
     this.fair.sponsors.splice(0, this.fair.sponsors.length, ...structuredClone(this.org.sponsors ?? this.originalSponsors));
     const after = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
     if (before !== after) this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
@@ -507,7 +540,7 @@ export class DemoJobFair {
   }
 
   /** Put a new company in a free slot. */
-  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; floor: number; x: number; y: number; tier?: "premium" | "regular" }) {
+  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; email?: string; floor: number; x: number; y: number; tier?: "premium" | "regular" }) {
     const name = input.company.trim();
     if (!name || !this.freeSlots().some((sl) => sl.floor === input.floor && sl.x === input.x && sl.y === input.y)) return null;
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
@@ -525,6 +558,7 @@ export class DemoJobFair {
       x: input.x,
       y: input.y,
       recruiter: input.recruiter?.trim() || "Recruiter",
+      ...(input.email?.trim() ? { email: input.email.trim() } : {}),
       about: `${name} membuka lowongan di job fair ini. Profil lengkap diisi perusahaan lewat portal perusahaan.`,
       faq: [{ q: "Bagaimana cara melamar?", a: "Pilih lowongan di banner stand lalu kirim lamaran." }],
       jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],
@@ -539,6 +573,7 @@ export class DemoJobFair {
     if (!this.booth(id)) return;
     if (this.org.added.some((b) => b.id === id)) this.org.added = this.org.added.filter((b) => b.id !== id);
     else this.org.removed.push(id);
+    if (this.org.bookings) this.org.bookings = this.org.bookings.filter((x) => x.boothId !== id);
     this.company.delete(id);
     for (let i = this.applications.length - 1; i >= 0; i--) if (this.applications[i]!.boothId === id) this.applications.splice(i, 1);
     this.saveOrg();
@@ -572,6 +607,54 @@ export class DemoJobFair {
   removePromoter(id: string) {
     this.org.promoters = structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.id !== id);
     this.saveOrg();
+  }
+
+  /** How many of the organiser's walking promoters are out at once. */
+  walkerLimit() {
+    const all = this.allPromoters().filter((p) => p.walks && p.active !== false).length;
+    return Math.min(this.org.walkers ?? all, all);
+  }
+
+  setWalkerLimit(n: number) {
+    this.org.walkers = Math.max(0, Math.round(n));
+    this.saveOrg();
+  }
+
+  // ---- Company sign-in and stand bookings ---------------------------------------------------
+
+  companyPin(boothId: string) {
+    return this.org.pins?.[boothId] ?? defaultPin(boothId);
+  }
+
+  setCompanyPin(boothId: string, pin: string) {
+    if (!/^\d{4,6}$/.test(pin)) return false;
+    this.org.pins = { ...this.org.pins, [boothId]: pin };
+    this.saveOrg();
+    return true;
+  }
+
+  /** The booth a company code and PIN open, if they match. The code is the booth id. */
+  companyLogin(code: string, pin: string) {
+    const b = this.booth(code.trim().toLowerCase());
+    return b && this.companyPin(b.id) === pin.trim() ? b : undefined;
+  }
+
+  bookings() {
+    return this.org.bookings ?? [];
+  }
+
+  /** A company books an empty stand, pays (demo), and its booth appears on the map with a portal PIN. */
+  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: "premium" | "regular"; method: string; floor: number; x: number; y: number }) {
+    const booth = this.addBooth({ company: input.company, industry: input.industry, color: input.color, recruiter: input.contact, email: input.email, floor: input.floor, x: input.x, y: input.y, tier: input.tier });
+    if (!booth) return null;
+    const pin = String(1000 + Math.floor(this.rand() * 9000));
+    this.org.pins = { ...this.org.pins, [booth.id]: pin };
+    this.org.bookings = [
+      { id: this.newAdId("book"), boothId: booth.id, company: booth.company, contact: input.contact.trim(), email: input.email.trim(), tier: input.tier, price: STAND_PRICES[input.tier], method: input.method, at: this.now() },
+      ...(this.org.bookings ?? []),
+    ];
+    this.saveOrg();
+    return { booth: this.booth(booth.id)!, pin };
   }
 
   /** Every promoter, including those switched off. */

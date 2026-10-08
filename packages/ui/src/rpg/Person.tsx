@@ -2,7 +2,7 @@
 // character style of the walkable town on chalidade.github.io/tools. Changes here: the
 // `overflow-visible` utility became an inline style, `at()` is typed for noUncheckedIndexedAccess,
 // and Person is memoised so a moving sprite does not redraw its whole SVG every frame.
-import { memo, useId } from 'react'
+import { createContext, memo, useContext, useId } from 'react'
 
 /*
  * A chibi character in a "2D casual game" style: big head, thick dark
@@ -30,7 +30,11 @@ export type HairStyle =
   | 'mohawk'
   | 'bald'
   | 'messy'
-export type Hat = 'cap' | 'beanie' | 'straw' | 'beret' | 'guard' | 'hardhat' | 'bucket'
+  /** One braid over the shoulder. */
+  | 'braid'
+  /** Two buns on top. */
+  | 'buns'
+export type Hat = 'cap' | 'beanie' | 'straw' | 'beret' | 'guard' | 'hardhat' | 'bucket' | 'hijab' | 'peci' | 'bandana'
 export type Outfit =
   | 'tee'
   | 'hoodie'
@@ -44,6 +48,12 @@ export type Outfit =
   | 'flannel'
   /** Khaki vest with pockets and a camera (accent = the vest). */
   | 'explorer'
+  /** Batik shirt (accent = the motif). */
+  | 'batik'
+  /** Blazer over a white shirt and a tie (accent = the tie). */
+  | 'blazer'
+  /** Long-sleeved shirt with a tie (accent = the tie). */
+  | 'kemeja'
 export type Face = 'smile' | 'happy' | 'grin' | 'calm'
 
 export interface Look {
@@ -74,9 +84,9 @@ export interface Look {
 
 const SKINS = ['#fde0c8', '#fbd6b8', '#f1c27d', '#e0ac69', '#c68642', '#a0663a', '#8d5524']
 const HAIRS = ['#3b2418', '#5a3622', '#26201f', '#7a4a26', '#b7652d', '#d9a441', '#9a3b2e', '#3b2f5c']
-const STYLES: HairStyle[] = ['short', 'long', 'bun', 'spiky', 'curly', 'ponytail', 'pigtails', 'bob', 'afro', 'messy']
-const OUTFITS: Outfit[] = ['tee', 'hoodie', 'jacket', 'dress', 'overall', 'vest', 'flannel', 'hoodie', 'tee']
-const HATS: (Hat | undefined)[] = [undefined, undefined, undefined, 'cap', 'beanie', 'straw', 'beret', 'bucket']
+const STYLES: HairStyle[] = ['short', 'long', 'bun', 'spiky', 'curly', 'ponytail', 'pigtails', 'bob', 'afro', 'messy', 'braid', 'buns', 'mohawk']
+const OUTFITS: Outfit[] = ['tee', 'hoodie', 'jacket', 'dress', 'overall', 'vest', 'flannel', 'hoodie', 'tee', 'batik', 'blazer', 'kemeja', 'batik']
+const HATS: (Hat | undefined)[] = [undefined, undefined, undefined, undefined, 'cap', 'beanie', 'straw', 'beret', 'bucket', 'hijab', 'hijab', 'peci', 'bandana']
 const FACES: Face[] = ['smile', 'happy', 'grin', 'calm']
 const PANTS = ['#2f3e5c', '#1e3a5f', '#3f3f46', '#4b3a2a', '#365314', '#7c2d12', '#1f2937']
 const ACCENTS = ['#fef3c7', '#e0f2fe', '#fce7f3', '#dcfce7', '#f1f5f9', '#ede9fe', '#ffedd5']
@@ -139,7 +149,7 @@ const fill = (color: string) => ({ fill: color })
 /** A darker shade of any colour, for shading and folds. */
 const Shade = ({ d, opacity = 0.18 }: { d: string; opacity?: number }) => <path d={d} fill="black" opacity={opacity} />
 
-const sleeveOf = (look: Look) => (look.outfit === 'labcoat' ? '#f8fafc' : look.outfit === 'vest' ? look.accent : look.shirt)
+const sleeveOf = (look: Look) => (look.outfit === 'labcoat' || look.outfit === 'kemeja' ? '#f8fafc' : look.outfit === 'vest' ? look.accent : look.shirt)
 const legsOf = (look: Look) => (look.outfit === 'dress' ? look.skin : look.pants)
 const hatOf = (look: Look) => look.hatColor ?? '#f97316'
 /** Hair that shows below a hat: no top tufts, just what frames the face. */
@@ -168,6 +178,24 @@ function Plaid({ d }: { d: string }) {
 }
 
 /** A skateboard held upright by the hand at (x, y). */
+/** Batik motif (kawung-like rings and dots) clipped to a body shape. */
+function Batik({ d, color }: { d: string; color: string }) {
+  const id = useId()
+  return (
+    <>
+      <clipPath id={id}>
+        <path d={d} />
+      </clipPath>
+      <g clipPath={`url(#${id})`} fill="none" stroke={color} strokeWidth="1.1" opacity="0.85">
+        {[33, 39, 45, 51].flatMap((y, r) =>
+          [8, 14, 20, 26, 32, 38].map((x) => <ellipse key={`${x}-${y}`} cx={x + (r % 2) * 3} cy={y} rx="2.2" ry="1.4" transform={`rotate(45 ${x + (r % 2) * 3} ${y})`} />),
+        )}
+        {[36, 42, 48].flatMap((y) => [11, 17, 23, 29, 35].map((x) => <circle key={`d${x}-${y}`} cx={x} cy={y} r="0.6" fill={color} stroke="none" />))}
+      </g>
+    </>
+  )
+}
+
 function Skateboard({ x, y }: { x: number; y: number }) {
   return (
     <g>
@@ -181,21 +209,81 @@ function Skateboard({ x, y }: { x: number; y: number }) {
 
 export const Person = memo(PersonSvg, (a, b) => a.size === b.size && JSON.stringify(a.look) === JSON.stringify(b.look))
 
-function PersonSvg({ look, size = 1 }: { look: Look; size?: number }) {
+function PersonSvg({ look: given, size = 1 }: { look: Look; size?: number }) {
+  const id = useId().replace(/:/g, '')
+  // A hijab covers the hair entirely.
+  const look = given.hat === 'hijab' ? { ...given, style: 'bald' as const, hair: given.skin } : given
   return (
     <svg viewBox="0 0 44 62" width={44 * size} height={62 * size} className="pg-body" style={{ overflow: 'visible' }}>
-      <g className="pg-v-front">
-        <Front look={look} />
-      </g>
-      <g className="pg-v-back">
-        <Back look={look} />
-      </g>
-      <g className="pg-v-side">
-        <Side look={look} />
-      </g>
+      <LightDefs id={id} />
+      <Light.Provider value={id}>
+        <g className="pg-v-front">
+          <Front look={look} />
+        </g>
+        <g className="pg-v-back">
+          <Back look={look} />
+        </g>
+        <g className="pg-v-side">
+          <Side look={look} />
+        </g>
+      </Light.Provider>
     </svg>
   )
 }
+
+// ---------------------------------------------------------------- light
+
+/*
+ * Soft light from the top left gives the flat chibi a rounded, semi-3D look: a highlight and
+ * a core shadow on the head, a rim of shade on the body and limbs, and a gloss on the hair.
+ * Each Person has its own gradients (ids from useId), shared by its three views.
+ */
+const Light = createContext('')
+
+function LightDefs({ id }: { id: string }) {
+  return (
+    <defs>
+      <radialGradient id={`${id}h`} cx="0.36" cy="0.3" r="0.78">
+        <stop offset="0" stopColor="white" stopOpacity="0.55" />
+        <stop offset="0.32" stopColor="white" stopOpacity="0" />
+        <stop offset="0.7" stopColor="black" stopOpacity="0" />
+        <stop offset="1" stopColor="black" stopOpacity="0.26" />
+      </radialGradient>
+      <linearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="0.35">
+        <stop offset="0" stopColor="white" stopOpacity="0.28" />
+        <stop offset="0.35" stopColor="white" stopOpacity="0" />
+        <stop offset="0.65" stopColor="black" stopOpacity="0" />
+        <stop offset="1" stopColor="black" stopOpacity="0.26" />
+      </linearGradient>
+      <linearGradient id={`${id}l`} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="white" stopOpacity="0.32" />
+        <stop offset="0.45" stopColor="white" stopOpacity="0" />
+        <stop offset="1" stopColor="black" stopOpacity="0.24" />
+      </linearGradient>
+    </defs>
+  )
+}
+
+function HeadLight({ cx = 22 }: { cx?: number }) {
+  const id = useContext(Light)
+  return <circle cx={cx} cy="20" r="12.3" fill={`url(#${id}h)`} pointerEvents="none" />
+}
+
+function BodyLight({ d }: { d: string }) {
+  const id = useContext(Light)
+  return <path d={d} fill={`url(#${id}b)`} pointerEvents="none" />
+}
+
+function LimbLight({ x, y, w, h, r = 3 }: { x: number; y: number; w: number; h: number; r?: number }) {
+  const id = useContext(Light)
+  return <rect x={x + 0.5} y={y + 0.5} width={w - 1} height={h - 1} rx={r} fill={`url(#${id}l)`} pointerEvents="none" />
+}
+
+/** A shine on the hair's crown, and the shadow the head casts on the shoulders. */
+const HairGloss = ({ x = 0 }: { x?: number }) => (
+  <path d={`M${13.5 + x} 13.5q3-5.2 8.5-6`} fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.4" pointerEvents="none" />
+)
+const NeckShadow = ({ cx = 22 }: { cx?: number }) => <ellipse cx={cx} cy="32.6" rx="8" ry="2.2" fill="black" opacity="0.16" pointerEvents="none" />
 
 // ---------------------------------------------------------------- front
 
@@ -218,15 +306,19 @@ function Front({ look }: { look: Look }) {
       {/* Arms. */}
       <g className="pg-arm-a">
         <rect x="7.5" y="32" width="6" height="13" rx="3" style={fill(sleeveOf(look))} {...ink} />
+        <LimbLight x={7.5} y={32} w={6} h={13} />
         <circle cx="10.5" cy="45.5" r="2.5" style={fill(skin)} {...ink} />
         {look.cane && <path d="M10.5 46v14" stroke="#78350f" strokeWidth="2" strokeLinecap="round" />}
       </g>
       <g className="pg-arm-b">
         {look.prop === 'skateboard' && <Skateboard x={36.5} y={46} />}
         <rect x="30.5" y="32" width="6" height="13" rx="3" style={fill(sleeveOf(look))} {...ink} />
+        <LimbLight x={30.5} y={32} w={6} h={13} />
         <circle cx="33.5" cy="45.5" r="2.5" style={fill(skin)} {...ink} />
       </g>
       <TorsoFront look={look} />
+      <BodyLight d={BODY} />
+      <NeckShadow />
       {look.backpack && (
         <g stroke={look.backpack} strokeWidth="2.2" strokeLinecap="round">
           <path d="M14.2 32.5q.6 4 .3 8.5M29.8 32.5q-.6 4-.3 8.5" />
@@ -235,8 +327,10 @@ function Front({ look }: { look: Look }) {
 
       {/* Head. */}
       <circle cx="22" cy="20" r="13" style={fill(skin)} {...ink} />
+      <HeadLight />
       <FaceFront look={look} />
       <HairFront look={look} />
+      {look.style !== 'bald' && !look.hat && <HairGloss />}
       {look.hat && <HatFront hat={look.hat} color={hatOf(look)} />}
     </>
   )
@@ -254,6 +348,7 @@ function Legs({ look, side = false }: { look: Look; side?: boolean }) {
       ) : (
         <rect x={x} y="45" width="6.5" height="11" rx="2.5" style={fill(legs)} {...ink} />
       )}
+      <LimbLight x={x} y={45} w={6.5} h={look.shorts ? 5.5 : 11} r={2.5} />
       <path
         d={side ? `M${x - 0.5} 55.5h8.5a2.6 2.6 0 0 1 0 5.2h-8.5Z` : `M${x - 1.2} 55.5h8.9a2.6 2.6 0 0 1 0 5.2h-8.9a2.6 2.6 0 0 1 0-5.2Z`}
         style={fill(look.shoes)}
@@ -353,6 +448,30 @@ function TorsoFront({ look }: { look: Look }) {
           <path d="M18 31.5 16 37l2 1.5M26 31.5 28 37l-2 1.5" style={fill(shirt)} {...ink} strokeWidth={1} />
         </>
       )
+    case 'batik':
+      return (
+        <>
+          <path d={body} style={fill(shirt)} {...ink} />
+          <Batik d={body} color={accent} />
+          <path d="M17.5 31.5 22 34.5l4.5-3-1 3.5L22 36l-3.5-1Z" style={fill(shirt)} {...ink} strokeWidth={1} />
+          <path d="M22 36v13" stroke={INK} strokeWidth="0.8" opacity="0.6" />
+        </>
+      )
+    case 'blazer':
+    case 'kemeja': {
+      const blazer = outfit === 'blazer'
+      return (
+        <>
+          <path d={body} style={fill(blazer ? shirt : '#f8fafc')} {...ink} />
+          {blazer && <path d="M18.5 31.5h7l-1.5 10h-4Z" fill="#f8fafc" {...ink} strokeWidth={1} />}
+          {!blazer && <path d="M12 37q0-6 6-6h8q6 0 6 6v1H12Z" style={fill(shirt)} opacity="0.35" />}
+          <path d="M20.6 33.5h2.8l-.4 1.6 1 6.5-2 2-2-2 1-6.5Z" style={fill(accent)} {...ink} strokeWidth={0.9} />
+          <path d="M18.5 31.5 22 34l3.5-2.5" fill="#f8fafc" {...ink} strokeWidth={1} />
+          {blazer && <path d="M18.5 31.5 16.5 37l3 1.5 1-3M25.5 31.5 27.5 37l-3 1.5-1-3" style={fill(shirt)} {...ink} strokeWidth={1} />}
+          {blazer && <circle cx="22" cy="46" r="0.8" fill={INK} />}
+        </>
+      )
+    }
     case 'explorer':
       return (
         <>
@@ -494,6 +613,23 @@ function HairFront({ look }: { look: Look }) {
           {fringe}
         </>
       )
+    case 'braid':
+      return (
+        <>
+          {!hatted && <path d="M9 20C9 10.5 15 6.5 22 6.5S35 10.5 35 20Q31 13.5 22 13t-13 7Z" {...f} />}
+          <Braid x={32.5} y={24} n={5} f={f} />
+          {fringe}
+        </>
+      )
+    case 'buns':
+      return (
+        <>
+          {!hatted && <circle cx="12.5" cy="8" r="4.6" {...f} />}
+          {!hatted && <circle cx="31.5" cy="8" r="4.6" {...f} />}
+          {!hatted && <path d="M9 20C9 10.5 15 6.5 22 6.5S35 10.5 35 20Q31 13.5 22 13t-13 7Z" {...f} />}
+          {fringe}
+        </>
+      )
     case 'bun':
       return (
         <>
@@ -510,6 +646,18 @@ function HairFront({ look }: { look: Look }) {
         </>
       )
   }
+}
+
+/** A plait: a chain of small lobes from (x, y) downwards, ending in a tie. */
+function Braid({ x, y, n, f }: { x: number; y: number; n: number; f: Record<string, unknown> }) {
+  return (
+    <g {...f}>
+      {Array.from({ length: n }, (_, i) => (
+        <ellipse key={i} cx={x + (i % 2 ? 0.6 : -0.6)} cy={y + i * 3.3} rx="2.6" ry="2.1" />
+      ))}
+      <path d={`M${x - 1.6} ${y + n * 3.3 - 0.8}h3.2l.8 3h-4.8Z`} />
+    </g>
+  )
 }
 
 /** A hat seen from the front (and, minus the visor, from behind). */
@@ -563,6 +711,39 @@ function HatFront({ hat, color, back = false }: { hat: Hat; color: string; back?
           {!back && <path d="M22 5.8l2.4 1.4V10L22 11.3 19.6 10V7.2Z" fill="#facc15" />}
         </>
       )
+    case 'hijab':
+      return (
+        <>
+          <path
+            d={`M22 5.5C13.5 5.5 7.5 11.5 7.5 20c0 3.5.8 6.5 2 9C7 31 5.5 33.5 5.5 37.5h33c0-4-1.5-6.5-4-8.5 1.2-2.5 2-5.5 2-9 0-8.5-6-14.5-14.5-14.5Z${back ? '' : 'M12.6 21.5a9.4 10.2 0 1 0 18.8 0a9.4 10.2 0 1 0-18.8 0Z'}`}
+            fillRule="evenodd"
+            {...f}
+          />
+          {!back && <path d="M13.5 30.5q8.5 5 17 0" fill="none" stroke={INK} strokeWidth="1" opacity="0.5" />}
+          <Shade d="M30 8q6 4.5 6.5 12-1 6-2.5 9 1.5-7-.5-13-1.5-5-3.5-8Z" opacity={0.12} />
+          <path d="M13 11q3.5-4 9-4.5" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.35" />
+        </>
+      )
+    case 'peci':
+      return (
+        <>
+          <path d="M10.5 14.5 11.5 6Q22 3 32.5 6l1 8.5Q22 12 10.5 14.5Z" fill="#1f2937" {...ink} />
+          <path d="M11.5 6Q22 3 32.5 6" fill="none" stroke="white" strokeWidth="1" opacity="0.25" />
+          <path d="M11 12.4q11-2.3 22 0" fill="none" stroke={color} strokeWidth="1.2" opacity="0.8" />
+        </>
+      )
+    case 'bandana':
+      return (
+        <>
+          <path d="M8.6 15.5q13.4-5.5 26.8 0l-.4 3.6Q22 13.8 9 19.1Z" {...f} />
+          <g fill="white" opacity="0.85">
+            {[13, 18, 23, 28, 32].map((x) => (
+              <circle key={x} cx={x} cy={15.8 - (x > 22 ? (32 - x) * 0.12 : (x - 13) * 0.12)} r="0.7" />
+            ))}
+          </g>
+          {back && <path d="M20 16.5l-3 6 3-1 2 2 2-2 3 1-3-6Z" {...f} />}
+        </>
+      )
     case 'hardhat':
       return (
         <>
@@ -586,16 +767,18 @@ function HatFront({ hat, color, back = false }: { hat: Hat; color: string; back?
 
 function Back({ look }: { look: Look }) {
   const { hair, style } = look
-  const torso = look.outfit === 'labcoat' ? '#f8fafc' : look.outfit === 'overall' ? look.pants : look.shirt
+  const torso = look.outfit === 'labcoat' || look.outfit === 'kemeja' ? '#f8fafc' : look.outfit === 'overall' ? look.pants : look.shirt
   return (
     <>
       <Legs look={look} />
       <g className="pg-arm-a">
         <rect x="7.5" y="32" width="6" height="13" rx="3" style={fill(sleeveOf(look))} {...ink} />
+        <LimbLight x={7.5} y={32} w={6} h={13} />
         <circle cx="10.5" cy="45.5" r="2.5" style={fill(look.skin)} {...ink} />
       </g>
       <g className="pg-arm-b">
         <rect x="30.5" y="32" width="6" height="13" rx="3" style={fill(sleeveOf(look))} {...ink} />
+        <LimbLight x={30.5} y={32} w={6} h={13} />
         <circle cx="33.5" cy="45.5" r="2.5" style={fill(look.skin)} {...ink} />
       </g>
       <path
@@ -605,10 +788,14 @@ function Back({ look }: { look: Look }) {
       />
       {look.outfit === 'hoodie' && <path d="M15 31.5q7 7.5 14 0v3q-7 6.5-14 0Z" fill="black" opacity="0.14" />}
       {look.outfit === 'flannel' && <Plaid d={BODY} />}
+      {look.outfit === 'batik' && <Batik d={BODY} color={look.accent} />}
       {look.outfit === 'explorer' && <path d="M13 37q0-5 5-5h8q5 0 5 5v11H13Z" style={fill(look.accent)} {...ink} strokeWidth={1} />}
+      <BodyLight d={BODY} />
       {look.prop === 'skateboard' && <Skateboard x={34} y={44} />}
+      <NeckShadow />
       {/* The back of the head is all hair (or skin, for the bald). */}
       <circle cx="22" cy="20" r="13" style={fill(style === 'bald' ? look.skin : hair)} {...ink} />
+      <HeadLight />
       {(style === 'long' || style === 'bob') && (
         <path
           d={style === 'long' ? 'M9.5 20q-1 10 1.5 18 5 2.5 11 2.5T33 38q2.5-8 1.5-18Z' : 'M9.5 20q-.5 8 1.5 13h22q2-5 1.5-13Z'}
@@ -625,6 +812,13 @@ function Back({ look }: { look: Look }) {
         </>
       )}
       {style === 'ponytail' && <path d="M19 27q3 12 3 13 0-1 3-13Z" style={fill(hair)} {...ink} />}
+      {style === 'braid' && <Braid x={22} y={31} n={4} f={{ ...fill(hair), ...ink }} />}
+      {style === 'buns' && !look.hat && (
+        <g style={fill(hair)} {...ink}>
+          <circle cx="12.5" cy="8" r="4.6" />
+          <circle cx="31.5" cy="8" r="4.6" />
+        </g>
+      )}
       {style === 'pigtails' && (
         <g style={fill(hair)} {...ink}>
           <path d="M10 24c-5 3-6 11-3 15 2-4 4-8 5-12Z" />
@@ -655,6 +849,7 @@ function Side({ look }: { look: Look }) {
         <path d={style === 'long' ? 'M11 18q-4 13-1 25h9q-3-12-1-24Z' : 'M11 18q-3 8-1 15h9q-2-8 0-14Z'} {...f} />
       )}
       {style === 'ponytail' && <path d="M12 14c-7 4-7 15-3 21 1-6 3-10 6-13Z" {...f} />}
+      {style === 'braid' && <Braid x={12} y={26} n={4} f={f} />}
       {style === 'pigtails' && <path d="M12 22c-5 3-6 11-3 15 2-4 4-8 5-12Z" {...f} />}
       {look.backpack && (
         <>
@@ -665,10 +860,13 @@ function Side({ look }: { look: Look }) {
       <Legs look={look} side />
       <path
         d={look.outfit === 'dress' ? 'M14 37q0-6 5-6h6q5 0 5 6l3 14H11Z' : look.outfit === 'labcoat' ? 'M13 37q0-6 5-6h8q5 0 5 6v15H13Z' : SIDE_BODY}
-        style={fill(look.outfit === 'labcoat' ? '#f8fafc' : look.outfit === 'overall' ? look.pants : look.shirt)}
+        style={fill(look.outfit === 'labcoat' || look.outfit === 'kemeja' ? '#f8fafc' : look.outfit === 'overall' ? look.pants : look.shirt)}
         {...ink}
       />
       {look.outfit === 'flannel' && <Plaid d={SIDE_BODY} />}
+      {look.outfit === 'batik' && <Batik d={SIDE_BODY} color={look.accent} />}
+      {(look.outfit === 'blazer' || look.outfit === 'kemeja') && <path d="M27 31.8l2.5 4-1.5 7-1.5-1.5Z" style={fill(look.accent)} {...ink} strokeWidth={0.9} />}
+      <BodyLight d={SIDE_BODY} />
       {look.outfit === 'explorer' && <path d="M20 31.5h4q5 .5 6 5.5v12.5h-10Z" style={fill(look.accent)} {...ink} strokeWidth={1} />}
       {look.outfit === 'explorer' && <rect x="26" y="37" width="5" height="5.5" rx="1.2" fill="#374151" {...ink} strokeWidth={1} />}
       {look.backpack && <path d="M16.5 31.5q1.5 6 0 13" stroke={INK} strokeWidth="1.6" fill="none" />}
@@ -681,11 +879,14 @@ function Side({ look }: { look: Look }) {
           </g>
         )}
         <rect x="19.5" y="32" width="6" height="13.5" rx="3" style={fill(sleeveOf(look))} {...ink} />
+        <LimbLight x={19.5} y={32} w={6} h={13.5} />
         <circle cx="22.5" cy="46" r="2.5" style={fill(skin)} {...ink} />
       </g>
 
+      <NeckShadow cx={23} />
       {/* Head in profile: face to the right, hair over the back. */}
       <circle cx="23" cy="20" r="13" style={fill(skin)} {...ink} />
+      <HeadLight cx={23} />
       <g className="pg-face">
         {look.face === 'happy' ? (
           <path d="M27.5 22.5q2-2.4 4 0" fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round" />
@@ -728,6 +929,8 @@ function Side({ look }: { look: Look }) {
         </>
       )}
       {style === 'bun' && !look.hat && <circle cx="16" cy="6.5" r="4.3" {...f} />}
+      {style === 'buns' && !look.hat && <circle cx="18" cy="5.5" r="4.4" {...f} />}
+      {style !== 'bald' && !look.hat && <HairGloss x={1} />}
       {look.hat && <HatSide hat={look.hat} color={hatOf(look)} />}
     </>
   )
@@ -762,6 +965,23 @@ function HatSide({ hat, color }: { hat: Hat; color: string }) {
         <>
           <path d="M10.5 15.5C11 8.5 16 4 23 4s11.5 4.5 12 11.5Z" {...f} />
           <path d="M33 13.5h7.5a1.8 1.8 0 0 1 0 3.6H33Z" {...f} />
+        </>
+      )
+    case 'hijab':
+      return (
+        <>
+          <path
+            d="M30 8C21.5 3.5 9 7.5 8.5 20.5c.2 3.5 1 6 2 8.5-3 2-4 4.5-4 8.5H34c0-3-1-5.5-3.5-7.5C26.5 27.5 25 24 25 20c0-5 1.8-9 5-12Z"
+            {...f}
+          />
+          <path d="M14 11q3.5-4 9-4.5" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.35" />
+        </>
+      )
+    case 'bandana':
+      return (
+        <>
+          <path d="M9.6 15.5q13.4-5.5 26.8 0l-.4 3.6Q23 13.8 10 19.1Z" {...f} />
+          <path d="M10.5 17l-4 4.5 3.5-.5 1 3 1.5-6Z" {...f} />
         </>
       )
     case 'guard':

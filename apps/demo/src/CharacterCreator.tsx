@@ -1,22 +1,30 @@
 import { useState } from "react";
-import { type HairStyle, type Look, type Outfit, PLAYER_LOOK, Person } from "@vwo/ui";
+import { type Face, type HairStyle, type Look, type Outfit, PLAYER_LOOK, Person, lookFor } from "@vwo/ui";
 
-const HAIR_STYLES: HairStyle[] = ["long", "short", "bob", "ponytail", "pigtails", "bun", "curly", "spiky", "afro", "messy", "mohawk", "bald"];
-const OUTFITS: Outfit[] = ["hoodie", "tee", "jacket", "dress", "overall", "flannel", "vest", "explorer"];
-const HATS: (Look["hat"] | "none")[] = ["beanie", "none", "cap", "straw", "beret", "bucket"];
+const HAIR_STYLES: HairStyle[] = ["long", "short", "bob", "ponytail", "pigtails", "braid", "bun", "buns", "curly", "spiky", "afro", "messy", "mohawk", "bald"];
+const OUTFITS: Outfit[] = ["hoodie", "tee", "kemeja", "blazer", "batik", "jacket", "dress", "overall", "flannel", "vest", "explorer"];
+const HATS: (Look["hat"] | "none")[] = ["beanie", "none", "hijab", "peci", "cap", "straw", "beret", "bucket", "bandana"];
+const FACES: Face[] = ["smile", "happy", "grin", "calm"];
+const FACE_NAMES: Record<Face, string> = { smile: "Senyum", happy: "Ceria", grin: "Nyengir", calm: "Kalem" };
+const EXTRAS = ["none", "glasses", "backpack", "both"] as const;
+const EXTRA_NAMES = { none: "Tidak ada", glasses: "Kacamata", backpack: "Ransel", both: "Kacamata + ransel" } as const;
+const PANTS = ["#2f3e5c", "#1f2937", "#3f3f46", "#4b3a2a", "#365314", "#7c2d12", "#e5e7eb"];
 const SKINS = ["#fde0c8", "#fbd6b8", "#f1c27d", "#e0ac69", "#c68642", "#a0663a", "#8d5524"];
 const HAIRS = ["#5a3622", "#3b2418", "#26201f", "#7a4a26", "#b7652d", "#d9a441", "#9a3b2e", "#3b2f5c"];
 const COLORS = ["#fbbf24", "#ef4444", "#2563eb", "#16a34a", "#7c3aed", "#0f766e", "#db2777", "#f97316", "#f8fafc", "#1f2937"];
 
 const HAIR_NAMES: Record<HairStyle, string> = {
   long: "Panjang", short: "Pendek", bob: "Bob", ponytail: "Kuncir", pigtails: "Kuncir dua", bun: "Cepol",
-  curly: "Keriting", spiky: "Jabrik", afro: "Afro", messy: "Acak", mohawk: "Mohawk", bald: "Botak",
+  curly: "Keriting", spiky: "Jabrik", afro: "Afro", messy: "Acak", mohawk: "Mohawk", bald: "Botak", braid: "Kepang", buns: "Cepol dua",
 };
 const OUTFIT_NAMES: Record<Outfit, string> = {
   hoodie: "Hoodie", tee: "Kaos", jacket: "Jaket", dress: "Dress", overall: "Overall", flannel: "Flanel",
-  vest: "Rompi", explorer: "Petualang", labcoat: "Jas lab", apron: "Celemek",
+  vest: "Rompi", explorer: "Petualang", labcoat: "Jas lab", apron: "Celemek", batik: "Batik", blazer: "Blazer", kemeja: "Kemeja + dasi",
 };
-const HAT_NAMES: Record<string, string> = { beanie: "Kupluk", none: "Tanpa topi", cap: "Topi", straw: "Topi jerami", beret: "Baret", bucket: "Bucket" };
+const HAT_NAMES: Record<string, string> = {
+  beanie: "Kupluk", none: "Tanpa topi", cap: "Topi", straw: "Topi jerami", beret: "Baret", bucket: "Bucket", hijab: "Hijab", peci: "Peci", bandana: "Bandana",
+};
+const extraOf = (l: Look): (typeof EXTRAS)[number] => (l.glasses && l.backpack ? "both" : l.glasses ? "glasses" : l.backpack ? "backpack" : "none");
 const DIRS = ["down", "side", "up"] as const;
 
 const STORE_KEY = "vwo:character";
@@ -114,6 +122,9 @@ export function CharacterCreator({
           <span>Putar</span>
           <button type="button" onClick={() => setDir((d) => (d + 1) % 3)} aria-label="Putar kanan">⟳</button>
         </span>
+        <button type="button" className="cc-random" onClick={() => setLook(lookFor(`${Math.random()}`, { backpack: Math.random() < 0.3 ? "#7c4a2a" : undefined }))}>
+          🎲 Acak
+        </button>
       </div>
       <div className="cc-fields">
         <h2 className="cc-title">Siapa namamu?</h2>
@@ -133,6 +144,12 @@ export function CharacterCreator({
         <Row label="Warna baju">
           <Swatches colors={COLORS} value={look.shirt} onPick={(shirt) => set({ shirt })} />
         </Row>
+        <Row label="Warna aksen">
+          <Swatches colors={COLORS} value={look.accent} onPick={(accent) => set({ accent })} />
+        </Row>
+        <Row label="Celana">
+          <Swatches colors={PANTS} value={look.pants} onPick={(pants) => set({ pants })} />
+        </Row>
         <Row label="Topi">
           <Picker
             value={HAT_NAMES[look.hat ?? "none"] ?? ""}
@@ -143,6 +160,27 @@ export function CharacterCreator({
             onNext={() => {
               const h = cycle(HATS, look.hat ?? "none", 1);
               set({ hat: h === "none" ? undefined : h });
+            }}
+          />
+        </Row>
+        {look.hat && look.hat !== "peci" && (
+          <Row label="Warna topi">
+            <Swatches colors={COLORS} value={look.hatColor ?? ""} onPick={(hatColor) => set({ hatColor })} />
+          </Row>
+        )}
+        <Row label="Ekspresi">
+          <Picker value={FACE_NAMES[look.face]} onPrev={() => set({ face: cycle(FACES, look.face, -1) })} onNext={() => set({ face: cycle(FACES, look.face, 1) })} />
+        </Row>
+        <Row label="Aksesori">
+          <Picker
+            value={EXTRA_NAMES[extraOf(look)]}
+            onPrev={() => {
+              const x = cycle(EXTRAS, extraOf(look), -1);
+              set({ glasses: x === "glasses" || x === "both", backpack: x === "backpack" || x === "both" ? "#7c4a2a" : undefined });
+            }}
+            onNext={() => {
+              const x = cycle(EXTRAS, extraOf(look), 1);
+              set({ glasses: x === "glasses" || x === "both", backpack: x === "backpack" || x === "both" ? "#7c4a2a" : undefined });
             }}
           />
         </Row>
