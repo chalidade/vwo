@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { AULA, aulaSpot, fairStops } from "@vwo/shared";
-import { BOOTH_SLOTS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
+import { AULA, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
+import { BOOTH_SLOTS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
 function clock() {
@@ -11,12 +11,12 @@ function clock() {
 }
 
 describe("DemoJobFair", () => {
-  it("can walk from the entrance or the lift to every booth, sponsor, seat and stall on all seven floors", () => {
+  it("can walk from the entrance or the lift to every booth, sponsor, seat and stall on all eight floors", () => {
     const fair = new DemoJobFair(() => 0.5);
     const halls = fair.floors.slice(0, DEMO_JOB_FAIR.floors.length);
     expect(halls).toHaveLength(3);
-    expect(fair.stops.map((s) => s.name)).toEqual(["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6", "Lantai 7"]);
-    expect(fair.stops.slice(3).map((s) => s.roomId)).toEqual(["aula", "foodcourt", "seminar", "psikotes"]);
+    expect(fair.stops.map((s) => s.name)).toEqual(["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6", "Lantai 7", "Lantai 8"]);
+    expect(fair.stops.slice(3).map((s) => s.roomId)).toEqual(["aula", "foodcourt", "seminar", "psikotes", "konsultasi"]);
     expect(isBlocked(fair.floors[0]!, fair.fair.spawn.x, fair.fair.spawn.y)).toBe(false);
     // Every floor has the lift in the same corner, reachable from where you step out of it.
     for (const f of fair.floors) {
@@ -668,5 +668,46 @@ describe("DemoJobFair", () => {
     expect(fair.fair.sponsors.map((sp) => sp.x)).toEqual(DEMO_JOB_FAIR.sponsors.map((sp) => sp.x));
     expect(fair.fair.promoters[0]).toMatchObject({ level: 4, x: 38.5 });
     expect(fair.org.layout).toBe(2);
+  });
+
+  it("has a consultation lounge with big sofas and consultants, and charges for each call", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const room = fair.fair.rooms.find((r) => r.kind === "konsultasi")!;
+    expect(fairStops(fair.fair).find((s) => s.roomId === "konsultasi")?.name).toBe("Lantai 8");
+    const floor = fair.floor(fairRoomFloorId(DEMO_JOB_FAIR, room.id));
+    // Six groups of two long sofas, three seats each.
+    expect(floor.seats.filter((s) => s.sofa)).toHaveLength(LOUNGE.groups.length * LOUNGE.rows.length * 2 * 3);
+    room.consultants!.forEach((c, i) => {
+      const st = fair.staff.find((x) => x.id === consultantId(c.id))!;
+      expect(st).toMatchObject({ floorId: floor.id, ...loungeSpot(i, "consultant") });
+      const front = loungeSpot(i, "front");
+      expect(isBlocked(floor, front.x, front.y)).toBe(false);
+      expect(findPath(floor, LIFT_FRONT, front)).not.toBeNull();
+    });
+    const plan = LOUNGE_PLANS[0];
+    const before = fair.player.coins;
+    expect(fair.startLoungeCall("consult", plan.minutes, "Pak Hendra")).toBe(true);
+    expect(fair.player.coins).toBe(before - plan.consultCoins);
+    expect(fair.startLoungeCall("peer", plan.minutes, "Rina")).toBe(true);
+    expect(fair.player.coins).toBe(before - plan.consultCoins - plan.coins);
+    expect(fair.player.txns[0]?.reason).toBe("Telepon 10 menit dengan Rina");
+    expect(fair.startLoungeCall("peer", 99, "Rina")).toBe(false);
+    fair.player.coins = 3;
+    expect(fair.startLoungeCall("consult", 15, "Bu Rina")).toBe(false);
+    expect(fair.player.coins).toBe(3);
+  });
+
+  it("keeps only inline PNG, JPEG or WebP pictures as logos and photos", () => {
+    const png = "data:image/png;base64,iVBORw0KGgo=";
+    expect(safeImage(png)).toBe(png);
+    expect(safeImage("data:image/svg+xml;base64,PHN2Zz4=")).toBeUndefined();
+    expect(safeImage("https://evil.example/logo.png")).toBeUndefined();
+    expect(safeImage('data:image/png;base64,AAAA" onerror="alert(1)')).toBeUndefined();
+    const fair = new DemoJobFair(() => 0.5);
+    const id = fair.fair.booths[0]!.id;
+    fair.editBooth(id, { logoImg: "javascript:alert(1)", vipStyle: "cyber", vipHeadline: ["JOIN", "US"] });
+    expect(fair.booth(id)).toMatchObject({ logoImg: undefined, vipStyle: "cyber", vipHeadline: ["JOIN", "US"] });
+    fair.editBooth(id, { logoImg: png });
+    expect(fair.booth(id)?.logoImg).toBe(png);
   });
 });

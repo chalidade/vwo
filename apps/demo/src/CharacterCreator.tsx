@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { accountKey } from "./account";
 import { type Face, type HairStyle, type Look, type Outfit, PLAYER_LOOK, Person, lookFor } from "@vwo/ui";
 
 const HAIR_STYLES: HairStyle[] = ["long", "short", "bob", "ponytail", "pigtails", "braid", "bun", "buns", "curly", "spiky", "afro", "messy", "mohawk", "bald"];
@@ -28,6 +29,7 @@ const extraOf = (l: Look): (typeof EXTRAS)[number] => (l.glasses && l.backpack ?
 const DIRS = ["down", "side", "up"] as const;
 
 const STORE_KEY = "vwo:character";
+const storeKey = () => accountKey(STORE_KEY);
 
 export interface Character {
   name: string;
@@ -36,7 +38,7 @@ export interface Character {
 
 export function loadCharacter(): Character | null {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const raw = localStorage.getItem(storeKey());
     return raw ? (JSON.parse(raw) as Character) : null;
   } catch {
     return null;
@@ -45,7 +47,7 @@ export function loadCharacter(): Character | null {
 
 function saveCharacter(c: Character) {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(c));
+    localStorage.setItem(storeKey(), JSON.stringify(c));
   } catch {
     // Private mode or blocked storage: the character just isn't remembered.
   }
@@ -62,7 +64,10 @@ export function CharacterCreator({
   withCompanions = true,
   cta = "Check-in ▶",
   note = "Di cafe sungguhan, check-in lewat scan QR di pintu masuk.",
+  defaultName = "",
 }: {
+  /** Name to start with when there is no saved character yet, e.g. the account's name. */
+  defaultName?: string;
   onCheckIn: (c: Character, companions: number) => void;
   /** Ask who came along (a cafe visit) or not (a job fair). */
   withCompanions?: boolean;
@@ -70,7 +75,7 @@ export function CharacterCreator({
   note?: string;
 }) {
   const saved = loadCharacter();
-  const [name, setName] = useState(saved?.name ?? "");
+  const [name, setName] = useState(saved?.name ?? defaultName.slice(0, 16));
   const [look, setLook] = useState<Look>(saved?.look ?? PLAYER_LOOK);
   const [companions, setCompanions] = useState(0);
   const [dir, setDir] = useState(0);

@@ -1,7 +1,8 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { AULA, COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
+import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
+import { useEffect, useRef } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -224,7 +225,29 @@ export interface StageScreen {
   /** "2/4" */
   page?: string;
   next?: string;
+  /** The speaker's shared screen, while they broadcast to this room. */
+  stream?: MediaStream | null;
 }
+
+/** The speaker's live screen on a big LED wall. Always muted: the sound plays once, from the
+ *  stage feed panel on the job seeker's screen. */
+export function LiveFeed({ stream, className = "fr-feed" }: { stream: MediaStream; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (v && v.srcObject !== stream) {
+      v.srcObject = stream;
+      void v.play().catch(() => {});
+    }
+  }, [stream]);
+  return (
+    <div className={className}>
+      <video ref={ref} autoPlay playsInline muted />
+    </div>
+  );
+}
+
+const hasVideo = (s?: MediaStream | null) => !!s && s.getVideoTracks().length > 0;
 
 /** The speaker on the LED wall's camera panel: a simple bust in front of a backdrop. */
 function SpeakerCam({ color, name, role }: { color: string; name: string; role: string }) {
@@ -287,6 +310,9 @@ export function seminarStageExtras(room: FairRoom, screen: StageScreen | null): 
             {sc.page && <span className="fr-led-page">{sc.page}</span>}
           </div>
           <div className="fr-led-body">
+            {hasVideo(sc.stream) ? (
+              <LiveFeed stream={sc.stream!} />
+            ) : (
             <div className="fr-led-slide" key={sc.slideTitle}>
               <b>{sc.slideTitle ?? sc.title}</b>
               {sc.points?.length ? (
@@ -299,6 +325,7 @@ export function seminarStageExtras(room: FairRoom, screen: StageScreen | null): 
                 <span className="fr-led-sub">Seminar karier bersertifikat · duduk di kursi untuk menonton</span>
               )}
             </div>
+            )}
             <SpeakerCam color={room.color} name={sc.speaker} role={sc.role} />
           </div>
           <div className="fr-led-ticker">
@@ -340,7 +367,7 @@ export interface AulaScreen {
   next: { title: string; host: string; start: string; end: string; place?: string } | null;
   over: boolean;
   /** Someone is speaking live on the Aula stage. */
-  live?: { title: string; speaker: string } | null;
+  live?: { title: string; speaker: string; stream?: MediaStream | null } | null;
   /** The first items of the rundown, for the standing board. */
   rundown: { start: string; title: string; on?: boolean }[];
   announcement?: string;
@@ -358,7 +385,8 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
       key: "aula-stage",
       x: st.x,
       y: st.y,
-      z: st.y + st.height,
+      // Behind the MC, who stands on the stage behind the podium.
+      z: st.y + 0.95,
       node: (
         <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
           {/* Backdrop curtain, the stage floor, and steps in the middle. */}
@@ -373,16 +401,6 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
           <path d={`M0 ${0.9 * T}H${w}`} stroke="#fbbf24" strokeWidth={3} />
           <rect x={0} y={st.height * T - 10} width={w} height={10} fill="#000" opacity={0.3} />
           <rect x={w / 2 - 1.4 * T} y={st.height * T - 6} width={2.8 * T} height={0.4 * T} rx={3} fill="#7c2d12" {...ink} strokeWidth={1.6} />
-          {/* Podium with the event logo, where the MC stands. */}
-          <g transform={`translate(${(room.width / 2 - 4 - st.x) * T - 26}, ${1.55 * T})`}>
-            <path d="M0 0h52l-6 58h-40Z" fill="#1e3a8a" {...ink} strokeWidth={1.8} />
-            <rect x={-4} y={-6} width={60} height={10} rx={3} fill="#93c5fd" {...ink} strokeWidth={1.4} />
-            <text x={26} y={34} textAnchor="middle" fontSize={13} fontWeight={900} fill="#facc15" fontFamily={font}>
-              VWO
-            </text>
-            <path d="M40 -6l8 -18" stroke="#1f2937" strokeWidth={2.5} />
-            <circle cx={49} cy={-25} r={4} fill="#1f2937" />
-          </g>
           {/* Flower arrangements at the front corners and lights along the edge. */}
           {[0.25 * T, w - 0.95 * T].map((x) => (
             <g key={x} transform={`translate(${x}, ${st.height * T - 40})`}>
@@ -395,6 +413,26 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
           {Array.from({ length: Math.floor(w / 80) }, (_, i) => (
             <circle key={i} cx={40 + i * 80} cy={0.9 * T + 6} r={3} className="jb-bulb" data-odd={i % 2 ? "" : undefined} />
           ))}
+        </svg>
+      ),
+    },
+    {
+      // The podium with the event logo, in front of the MC or the speaker.
+      key: "aula-podium",
+      x: room.width / 2 - 4 - 26 / T,
+      y: st.y + 1.55 - 30 / T,
+      z: 2.6,
+      node: (
+        <svg width={60} height={92} style={{ display: "block", overflow: "visible" }}>
+          <g transform="translate(0, 30)">
+            <path d="M0 0h52l-6 58h-40Z" fill="#1e3a8a" {...ink} strokeWidth={1.8} />
+            <rect x={-4} y={-6} width={60} height={10} rx={3} fill="#93c5fd" {...ink} strokeWidth={1.4} />
+            <text x={26} y={34} textAnchor="middle" fontSize={13} fontWeight={900} fill="#facc15" fontFamily={font}>
+              VWO
+            </text>
+            <path d="M40 -6l8 -18" stroke="#1f2937" strokeWidth={2.5} />
+            <circle cx={49} cy={-25} r={4} fill="#1f2937" />
+          </g>
         </svg>
       ),
     },
@@ -413,10 +451,20 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
             </span>
             <span className="fr-led-title">AULA UTAMA · VWO - Virtual World Job</span>
           </div>
-          <div className="fr-led-hero">
-            <b>{headline.title}</b>
-            <span>{headline.sub}</span>
-          </div>
+          {hasVideo(screen.live?.stream) ? (
+            <div className="fr-led-feedrow">
+              <LiveFeed stream={screen.live!.stream!} />
+              <div className="fr-led-caption">
+                <b>{headline.title}</b>
+                <span>{headline.sub}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="fr-led-hero">
+              <b>{headline.title}</b>
+              <span>{headline.sub}</span>
+            </div>
+          )}
           <div className="fr-led-ticker">
             <span>
               {screen.next ? `⏭ Berikutnya ${screen.next.start}: ${screen.next.title} · ` : ""}
@@ -550,6 +598,145 @@ export function psikotesExtras(room: FairRoom): SceneExtra[] {
             PENGAWAS
           </text>
         </svg>
+      ),
+    },
+  ];
+}
+
+/** The consultation lounge: a booth per consultant along the back wall (name sign, glass sides, a desk
+ *  with a phone), coffee tables between the sofas, a big wall sign, and the price board. */
+export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void; board?: () => void } = {}): SceneExtra[] {
+  const pw = LOUNGE.podW * T;
+  const consultants = (room.consultants ?? []).slice(0, LOUNGE.pods.length);
+  return [
+    {
+      key: "lounge-sign",
+      x: room.width / 2 - 5,
+      y: -3.4,
+      z: 0.2,
+      node: (
+        <div className="fr-lounge-sign" style={{ width: 10 * T, height: 1.4 * T, ["--c" as string]: room.color }}>
+          <b>🛋️ LOUNGE KONSULTASI</b>
+          <span>Telepon HR & konsultan karier · ngobrol santai di sofa</span>
+        </div>
+      ),
+    },
+    ...consultants.flatMap((c, i): SceneExtra[] => {
+      const x = LOUNGE.pods[i]!;
+      const click = on.consult ? () => on.consult!(i) : undefined;
+      const title = click ? `Konsultasi dengan ${c.name}` : undefined;
+      return [
+        {
+          key: `pod-${c.id}`,
+          x,
+          y: -1.9,
+          z: 0.8,
+          onClick: click,
+          title,
+          node: (
+            <svg width={pw} height={4.7 * T} style={{ display: "block", overflow: "visible" }}>
+              {/* Back panel in the consultant's colour with their name sign. */}
+              <rect x={4} y={0} width={pw - 8} height={2.7 * T} rx={6} fill="#f8fafc" {...ink} />
+              <rect x={4} y={0} width={pw - 8} height={44} rx={6} fill={c.color} {...ink} />
+              <text x={pw / 2} y={20} textAnchor="middle" fontSize={15} fontWeight={900} fill="#fff" fontFamily={font}>
+                {c.emoji} {c.name}
+              </text>
+              <text x={pw / 2} y={36} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff" opacity={0.9} fontFamily={font}>
+                {c.role}
+                {c.org ? ` · ${c.org}` : ""}
+              </text>
+              {/* Topics on a small board, and an "available" lamp. */}
+              <g transform={`translate(${pw - 120}, 54)`}>
+                <rect width={100} height={56} rx={4} fill="#fff" {...ink} strokeWidth={1.4} />
+                {c.topics.slice(0, 3).map((t, k) => (
+                  <text key={t} x={6} y={15 + k * 15} fontSize={8.5} fontWeight={700} fill={INK} fontFamily={font}>
+                    • {t.length > 19 ? `${t.slice(0, 18)}…` : t}
+                  </text>
+                ))}
+              </g>
+              <g transform="translate(24, 62)">
+                <rect width={74} height={22} rx={11} fill="#dcfce7" {...ink} strokeWidth={1.4} />
+                <circle cx={13} cy={11} r={5} fill="#16a34a" className="fr-avail" />
+                <text x={24} y={15} fontSize={10} fontWeight={900} fill="#166534" fontFamily={font}>
+                  TERSEDIA
+                </text>
+              </g>
+              {/* Glass partitions on both sides. */}
+              {[6, pw - 14].map((gx) => (
+                <rect key={gx} x={gx} y={2.2 * T} width={8} height={2.4 * T} rx={3} fill="#bae6fd" opacity={0.7} {...ink} strokeWidth={1.2} />
+              ))}
+            </svg>
+          ),
+        },
+        {
+          key: `pod-desk-${c.id}`,
+          x: x + LOUNGE.podW / 2 - 1.6,
+          y: 1.75,
+          z: 2.65,
+          onClick: click,
+          title,
+          node: (
+            <svg width={3.2 * T} height={1.0 * T} style={{ display: "block", overflow: "visible" }}>
+              <rect x={0} y={10} width={3.2 * T} height={18} rx={4} fill="#e7d3b5" {...ink} />
+              <rect x={4} y={28} width={3.2 * T - 8} height={1.0 * T - 28} fill="#a16207" {...ink} />
+              {/* Laptop and desk phone. */}
+              <rect x={22} y={-2} width={34} height={20} rx={2} fill="#334155" {...ink} strokeWidth={1.3} />
+              <rect x={25} y={1} width={28} height={13} rx={1} fill={c.color} opacity={0.75} />
+              <rect x={3.2 * T - 52} y={6} width={30} height={14} rx={4} fill="#1f2937" {...ink} strokeWidth={1.3} />
+              <path d={`M${3.2 * T - 48} 7q11 -12 22 0`} fill="none" stroke="#1f2937" strokeWidth={5} strokeLinecap="round" />
+              <text x={1.6 * T} y={44} textAnchor="middle" fontSize={10} fontWeight={900} fill="#fff" fontFamily={font}>
+                📞 KONSULTASI
+              </text>
+            </svg>
+          ),
+        },
+      ];
+    }),
+    ...LOUNGE.rows.flatMap((y) =>
+      LOUNGE.groups.map(
+        (cx): SceneExtra => ({
+          key: `coffee-${cx}-${y}`,
+          x: cx - 1,
+          y: y + 1.1,
+          z: y + 2.2,
+          node: (
+            <svg width={2 * T} height={1.2 * T} style={{ display: "block", overflow: "visible" }}>
+              <ellipse cx={T} cy={0.75 * T} rx={T - 6} ry={0.38 * T} fill="#000" opacity={0.15} />
+              <ellipse cx={T} cy={0.6 * T} rx={T - 8} ry={0.36 * T} fill="#78350f" {...ink} />
+              <ellipse cx={T} cy={0.55 * T} rx={T - 14} ry={0.28 * T} fill="#92400e" />
+              <rect x={T - 22} y={0.42 * T} width={10} height={11} rx={2} fill="#fff" {...ink} strokeWidth={1.1} />
+              <rect x={T + 12} y={0.46 * T} width={10} height={11} rx={2} fill="#fff" {...ink} strokeWidth={1.1} />
+              <circle cx={T} cy={0.44 * T} r={7} fill="#22c55e" {...ink} strokeWidth={1.1} />
+            </svg>
+          ),
+        }),
+      ),
+    ),
+    {
+      key: "lounge-board",
+      x: LOUNGE.board.x - 0.1,
+      y: LOUNGE.board.y + LOUNGE.board.height - 3.7,
+      z: LOUNGE.board.y + LOUNGE.board.height,
+      onClick: on.board,
+      title: on.board ? "Tarif telepon" : undefined,
+      node: (
+        <div className="fr-board" style={{ width: (LOUNGE.board.width + 0.2) * T, height: 3.7 * T, ["--c" as string]: room.color }}>
+          <div className="fr-board-head">📞 TARIF TELEPON</div>
+          <ul>
+            {LOUNGE_PLANS.map((p) => (
+              <li key={p.minutes}>
+                <i>{p.minutes} mnt</i> konsultan {p.consultCoins}🪙
+              </li>
+            ))}
+            {LOUNGE_PLANS.map((p) => (
+              <li key={`p${p.minutes}`}>
+                <i>{p.minutes} mnt</i> sesama {p.coins}🪙
+              </li>
+            ))}
+            <li>Panggilan berhenti otomatis saat waktu habis</li>
+          </ul>
+          <div className="fr-board-foot">ketuk untuk info</div>
+        </div>
       ),
     },
   ];

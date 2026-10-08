@@ -1,11 +1,12 @@
 import { useState } from "react";
-import type { CompanyBooth, FairFloorInfo } from "@vwo/shared";
-import { type Look, Person } from "@vwo/ui";
+import { type CompanyBooth, type FairFloorInfo, safeImage } from "@vwo/shared";
+import { BoothLogo, type Look, Person } from "@vwo/ui";
 import { SEEKER_TITLES, levelOf } from "./fair/content";
 import { fair } from "./useFair";
 import { LevelBar, Stars } from "./fair/Modal";
 import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
+import { readImageFile } from "./imageFile";
 
 export type SeekerTab = "profile" | "applications" | "stamps";
 
@@ -40,6 +41,8 @@ export function SeekerPanel({
   onGoTo,
   onReset,
   onVerify,
+  account,
+  onSignOut,
   onClose,
 }: {
   tab?: SeekerTab;
@@ -58,11 +61,20 @@ export function SeekerPanel({
   onGoTo: (boothId: string) => void;
   onReset: () => void;
   onVerify: () => void;
+  /** The signed-in account's email. */
+  account?: string;
+  onSignOut?: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<SeekerTab>(startTab);
   const [form, setForm] = useState(profile);
   const [saved, setSaved] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photo = safeImage(profile.photo);
+  const setPhoto = (p: string | undefined) => {
+    onSaveProfile({ ...profile, photo: p });
+    setForm((f) => ({ ...f, photo: p }));
+  };
   const companies = new Set(applications.map((a) => a.boothId));
   const invited = applications.filter((a) => a.status === "Diundang interview").length;
   const boothOf = (id: string) => booths.find((b) => b.id === id);
@@ -97,10 +109,37 @@ export function SeekerPanel({
           {tab === "profile" && (
             <div className="sp-profile">
               <div className="sp-card">
-                <div className="sp-avatar rpg-sprite-preview" data-dir="down">
-                  <div className="pg-flip">
-                    <Person look={look} size={1.6} />
-                  </div>
+                <div className="sp-photo-col">
+                  {photo ? (
+                    <img className="sp-photo" src={photo} alt="Foto profil" />
+                  ) : (
+                    <div className="sp-avatar rpg-sprite-preview" data-dir="down">
+                      <div className="pg-flip">
+                        <Person look={look} size={1.6} />
+                      </div>
+                    </div>
+                  )}
+                  <label className="sp-photo-btn">
+                    📷 {photo ? "Ganti foto" : "Upload foto"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        setPhotoError(null);
+                        readImageFile(file, 192)
+                          .then(setPhoto)
+                          .catch((err: Error) => setPhotoError(err.message));
+                      }}
+                    />
+                  </label>
+                  {photo && (
+                    <button type="button" className="sp-photo-del" onClick={() => setPhoto(undefined)}>
+                      Hapus foto
+                    </button>
+                  )}
                 </div>
                 <div>
                   <div className="sp-name">
@@ -108,8 +147,10 @@ export function SeekerPanel({
                     {player.verified && <span className="rpg-check vf-check">✔</span>}
                   </div>
                   <div className="sp-muted">{profile.headline || "Lengkapi profilmu supaya form lamaran terisi otomatis."}</div>
+                  <div className="sp-muted small">Foto profil terlihat oleh HR di setiap lamaranmu.</div>
                 </div>
               </div>
+              {photoError && <p className="ag-error">{photoError}</p>}
               {!player.verified && (
                 <div className="sp-verify">
                   <span>Dapatkan centang biru supaya profilmu lebih dipercaya.</span>
@@ -168,6 +209,14 @@ export function SeekerPanel({
                   {saved && <span className="jb-applied">✓ Tersimpan</span>}
                 </div>
               </form>
+              {account && onSignOut && (
+                <div className="sp-reset">
+                  <span className="sp-muted">Masuk sebagai {account}</span>
+                  <button type="button" className="sp-danger" onClick={onSignOut}>
+                    Keluar akun
+                  </button>
+                </div>
+              )}
               <div className="sp-reset">
                 <span className="sp-muted">Data demo (profil, lamaran, stempel) tersimpan di browser ini.</span>
                 <button
@@ -263,7 +312,7 @@ export function SeekerPanel({
                         const n = applications.filter((a) => a.boothId === b.id).length;
                         return (
                           <button key={b.id} type="button" className="sp-stamp" data-got={got ? "" : undefined} style={{ ["--c" as string]: b.color }} onClick={() => onGoTo(b.id)} title={`Antar ke stand ${b.company}`}>
-                            <span className="sp-stamp-mark">{got ? b.logo : "?"}</span>
+                            {got ? <BoothLogo booth={b} className="sp-stamp-mark" /> : <span className="sp-stamp-mark">?</span>}
                             <b>{b.company}</b>
                             <Stars value={companyRating(b.id).average} />
                             <span className="sp-muted">{got ? (n ? `${n} lamaran` : "Sudah mampir") : "Belum dikunjungi"}</span>

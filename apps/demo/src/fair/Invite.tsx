@@ -1,4 +1,5 @@
 import type { FairApplication } from "../jobfair-engine";
+import { BoothLogo } from "@vwo/ui";
 import { fair } from "../useFair";
 import { Modal } from "./Modal";
 
@@ -35,7 +36,7 @@ export function InviteCard({ application: a, onOpen, onClose }: { application: F
   return (
     <Modal title="📅 Undangan interview" onClose={onClose} className="iv-card">
       <div className="iv-head" style={{ ["--c" as string]: b?.color ?? "#2563eb" }}>
-        <span className="iv-logo">{b?.logo ?? a.company.slice(0, 2)}</span>
+        {b ? <BoothLogo booth={b} className="iv-logo" /> : <span className="iv-logo">{a.company.slice(0, 2)}</span>}
         <span>
           <b>{a.company}</b>
           <span className="sp-muted">mengundangmu interview untuk {a.jobTitle}</span>

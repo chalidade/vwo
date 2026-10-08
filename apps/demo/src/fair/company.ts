@@ -16,7 +16,7 @@ export const VIP_PRODUCT: CompanyProduct = {
   name: "Upgrade stand VIP",
   emoji: "👑",
   price: 2_500_000,
-  about: "Bingkai emas, lampu sorot, LED berjalan dengan teks sendiri, mahkota VIP, dan posisi teratas di daftar stand.",
+  about: "Stand lebih lebar dengan layar video, lounge dan gapura, 5 pilihan tampilan VIP (Emas, Platinum, Royal, Taman Hijau, Cyber Neon), tulisan backdrop sendiri, lampu sorot, LED berjalan, dan posisi teratas di daftar stand.",
 };
 
 export const PROMOTER_PRODUCT: CompanyProduct = {

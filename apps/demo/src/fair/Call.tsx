@@ -38,6 +38,9 @@ export function CallScreen({
   peerLogo,
   peerColor = "#2563eb",
   bot,
+  lines = BOT_CALL_LINES,
+  botNote = "Pelamar ini bot demo: jawabannya simulasi.",
+  limit,
   outgoing,
   incoming,
   onEnd,
@@ -50,6 +53,12 @@ export function CallScreen({
   peerColor?: string;
   /** Calling a bot applicant: it picks up by itself and talks from a script. */
   bot?: boolean;
+  /** What a bot says during the call, one line every few seconds. Defaults to an applicant's answers. */
+  lines?: readonly string[];
+  /** Shown under the call for a bot. */
+  botNote?: string;
+  /** A paid call's time limit in seconds: the remaining time shows, and the call ends when it runs out. */
+  limit?: number;
   outgoing?: RingSignal;
   incoming?: RingSignal;
   onEnd: (r: CallResult) => void;
@@ -142,7 +151,8 @@ export function CallScreen({
     const t = setInterval(() => {
       secondsRef.current += 1;
       setSeconds(secondsRef.current);
-      if (bot && secondsRef.current % 4 === 1) setLine((n) => Math.min(n + 1, BOT_CALL_LINES.length));
+      if (bot && secondsRef.current % 4 === 1) setLine((n) => Math.min(n + 1, lines.length));
+      if (limit && secondsRef.current >= limit) finish("ended");
     }, 1000);
     return () => clearInterval(t);
   }, [phase, bot]);
@@ -230,9 +240,14 @@ export function CallScreen({
         <span className="cl-status">
           {kind === "video" ? "🎥" : "📞"} {status}
         </span>
-        {bot && phase === "live" && line > 0 && <p className="cl-caption">“{BOT_CALL_LINES[line - 1]}”</p>}
+        {bot && phase === "live" && line > 0 && <p className="cl-caption">“{lines[line - 1]}”</p>}
         {noMedia && phase !== "incoming" && <p className="cl-note">Kamera/mikrofon tidak tersedia atau belum diizinkan. Kamu tetap bisa mendengar dan melihat lawan bicara.</p>}
-        {bot && <p className="cl-note">Pelamar ini bot demo: jawabannya simulasi.</p>}
+        {limit && phase === "live" && (
+          <span className="cl-limit" data-low={limit - seconds <= 60 ? "" : undefined}>
+            ⏳ Sisa {mmss(Math.max(0, limit - seconds))} dari {Math.round(limit / 60)} menit
+          </span>
+        )}
+        {bot && <p className="cl-note">{botNote}</p>}
       </div>
       <div className="cl-controls">
         {phase === "incoming" ? (

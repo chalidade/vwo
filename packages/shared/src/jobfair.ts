@@ -29,6 +29,8 @@ export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.c
 export type BoothTheme = "classic" | "modern" | "wood" | "pastel" | "neon";
 /** Look of the gate (gapura) at a booth's entrance. */
 export type GateStyle = "klasik" | "janur" | "balon" | "neon";
+/** Looks a VIP stand can pick: the trim, truss, carpet, ropes and the decoration on its wings. */
+export type VipStyle = "emas" | "platinum" | "royal" | "taman" | "cyber";
 
 export interface BoothFaq {
   q: string;
@@ -42,6 +44,9 @@ export interface CompanyBooth {
   industry: string;
   /** Short logo text (1–2 letters). */
   logo: string;
+  /** The company's own logo picture, uploaded in its portal (an inline PNG/JPEG/WebP, see safeImage).
+   *  Shown instead of the logo text wherever the logo appears. */
+  logoImg?: string;
   color: string;
   /** Index into JobFairView.floors. */
   floor: number;
@@ -72,6 +77,9 @@ export interface CompanyBooth {
   accessories?: string[];
   /** Custom text for the VIP LED ticker. */
   ticker?: string;
+  /** The VIP stand's look (default "emas") and the two lines on its big right-wing backdrop. */
+  vipStyle?: VipStyle;
+  vipHeadline?: [string, string];
   /** Lines the recruiter calls out to people walking by. */
   callouts?: string[];
   /** What visitors get when they tap the booth's paid decorations. */
@@ -257,7 +265,7 @@ export interface Promoter {
   boothId?: string;
 }
 
-export type FairRoomKind = "psikotes" | "seminar" | "foodcourt" | "aula";
+export type FairRoomKind = "psikotes" | "seminar" | "foodcourt" | "aula" | "konsultasi";
 
 /** A whole floor of its own, reached by lift. Premium floors cost coins to enter. */
 export interface FairRoom {
@@ -277,7 +285,30 @@ export interface FairRoom {
   staff: { name: string; role: string };
   /** Food court stalls along the back wall. */
   stalls?: FoodStall[];
+  /** The consultation lounge's consultants, one per desk along the back wall. */
+  consultants?: Consultant[];
 }
+
+/** Someone job seekers can call in the consultation lounge: an HR person, a career coach, a psychologist. */
+export interface Consultant {
+  id: string;
+  name: string;
+  role: string;
+  /** Where they work, for HR people. */
+  org?: string;
+  emoji: string;
+  color: string;
+  topics: string[];
+  /** What they say during a call (the demo's consultants are bots). */
+  lines: string[];
+}
+
+/** Paid calls in the consultation lounge: how long a call may last and what starting it costs.
+ *  A consultant costs more than a call between two job seekers. */
+export const LOUNGE_PLANS = [
+  { minutes: 10, coins: 10, consultCoins: 20 },
+  { minutes: 15, coins: 14, consultCoins: 28 },
+] as const;
 
 /** A food court stall: a real cafe or restaurant promoting its outlet and selling vouchers for it. */
 export interface FoodStall {
@@ -376,6 +407,46 @@ export const AULA = {
   chairGap: 1.1,
 } as const;
 
+/** The consultation lounge: consultation desks along the back wall, and groups of big sofas facing
+ *  each other around a coffee table, where anyone can sit and call someone. */
+export const LOUNGE = {
+  /** Left edge of each consultation desk's booth; every booth is `podW` wide. */
+  pods: [2.5, 12.5, 22.5, 32.5],
+  podW: 8,
+  /** Centre x of each sofa group, on two rows starting at these y. */
+  groups: [7, 18.5, 30],
+  rows: [6.4, 12.6],
+  sofaH: 3.4,
+  /** The price board on the right wall. */
+  board: { x: 40.6, y: 5.4, width: 2.6, height: 0.5 },
+} as const;
+
+/** Where a consultant stands behind their desk, and where a visitor stands to talk to them. */
+export function loungeSpot(i: number, spot: "consultant" | "front") {
+  const x = LOUNGE.pods[i]! + LOUNGE.podW / 2;
+  return spot === "consultant" ? { x, y: 1.55 } : { x, y: 3.35 };
+}
+
+/** Where to stand to read the lounge's price board. */
+export function loungeBoardSpot() {
+  return { x: LOUNGE.board.x + LOUNGE.board.width / 2, y: LOUNGE.board.y + LOUNGE.board.height + 0.7 };
+}
+
+/** Seats along a sofa: two on a short one, three on a long one. `right` sofas face right. */
+function sofaSeats(id: string, n: number, o: { x: number; y: number; width: number; height: number }, right: boolean): SeatView[] {
+  const count = Math.max(2, Math.round((o.height - 0.3) / 1.1));
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${id}-sofa${n}-${"ABCD"[i]}`,
+    label: `Sofa ${n}${"ABCD"[i]}`,
+    tableId: null,
+    x: o.x + (right ? 0.65 : o.width - 0.65),
+    y: o.y + 0.7 + (i * (o.height - 1.4)) / (count - 1),
+    isActive: true,
+    sofa: true,
+    facing: right ? ("right" as const) : ("left" as const),
+  }));
+}
+
 /** Where to stand to read an Aula board. */
 export function aulaSpot(board: "rundown" | "info") {
   const b = AULA[board];
@@ -424,6 +495,13 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
           seats.push({ id: `${room.id}-${label}`, label: `Kursi ${label}`, tableId: null, x: x0 + 0.5 + i * AULA.chairGap, y: AULA.rowY + r * AULA.rowGap, isActive: true, facing: "back" });
         }
       });
+  } else if (room.kind === "konsultasi") {
+    LOUNGE.pods.forEach((x) => {
+      blocked.push({ x, y: 0.3, width: LOUNGE.podW, height: 0.5 }, { x: x + LOUNGE.podW / 2 - 1.5, y: 2.0, width: 3, height: 0.6 });
+    });
+    blocked.push(LOUNGE.board);
+    // Coffee tables between each pair of sofas; the sofas themselves are added as decor below.
+    for (const y of LOUNGE.rows) for (const cx of LOUNGE.groups) blocked.push({ x: cx - 0.9, y: y + 1.3, width: 1.8, height: 0.9 });
   } else {
     (room.stalls ?? []).forEach((_, i) => {
       const s = stallRect(i);
@@ -456,6 +534,21 @@ export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
       { key: "plant-c", spriteKey: "plant", x: FAIR_LIFT.x - 1.6, y: room.height - 1.3, width: 1, height: 1 },
     ].map(({ key, ...o }): MapObjectView => ({ id: `${id}-${key}`, type: "decor", ...o, isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
   ];
+  if (room.kind === "konsultasi") {
+    let n = 0;
+    for (const y of LOUNGE.rows)
+      for (const cx of LOUNGE.groups) {
+        objects.push({ id: `${id}-rug-${n}`, type: "decor", x: cx - 3.4, y: y - 0.2, width: 6.8, height: LOUNGE.sofaH + 0.6, spriteKey: "rug-plain", isWalkable: true, targetFloorId: null, targetX: null, targetY: null });
+        for (const right of [true, false]) {
+          const o = { x: right ? cx - 3.1 : cx + 2.1, y: y + 0.1, width: 1, height: LOUNGE.sofaH };
+          n++;
+          // Sofas to sit on: the cushions are walkable seats, only the backrest blocks.
+          objects.push({ id: `${id}-sofa-${n}`, type: "decor", ...o, spriteKey: right ? "sofa" : "sofa-left", isWalkable: true, targetFloorId: null, targetX: null, targetY: null });
+          objects.push({ id: `${id}-sofa-${n}-back`, type: "blocked", x: right ? o.x : o.x + o.width - 0.3, y: o.y, width: 0.3, height: o.height, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null });
+          seats.push(...sofaSeats(id, n, o, right));
+        }
+      }
+  }
   return { id, name: room.name, width: room.width, height: room.height, tables, seats, objects, theme: "hall" };
 }
 
@@ -494,9 +587,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
       const right = o.spriteKey === "sofa";
       add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: true });
       add({ type: "blocked", x: right ? o.x : o.x + o.width - 0.3, y: o.y, width: 0.3, height: o.height, spriteKey: "invisible", isWalkable: false });
-      const n = seats.length / 2 + 1;
-      for (const [i, dy] of [0.7, o.height - 0.7].entries())
-        seats.push({ id: `${id}-sofa${n}-${"AB"[i]}`, label: `Sofa ${n}${"AB"[i]}`, tableId: null, x: o.x + (right ? 0.65 : o.width - 0.65), y: o.y + dy, isActive: true, sofa: true, facing: right ? "right" : "left" });
+      seats.push(...sofaSeats(id, seats.length / 2 + 1, o, right));
       continue;
     }
     add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
@@ -982,6 +1073,83 @@ export const DEMO_JOB_FAIR: JobFairView = {
       staff: { name: "Bu Psikolog Rina", role: "Pengawas psikotes" },
     },
     {
+      id: "konsultasi",
+      kind: "konsultasi",
+      name: "Lounge Konsultasi",
+      tagline: "Konsultasi dengan HR lewat telepon, atau ngobrol santai di sofa",
+      emoji: "🛋️",
+      color: "#0f766e",
+      level: 7,
+      price: 0,
+      width: 46,
+      height: 22,
+      staff: { name: "Kak Dinda", role: "Host lounge" },
+      consultants: [
+        {
+          id: "hr-hendra",
+          name: "Pak Hendra",
+          role: "HR Manager",
+          org: "Nusantara Tech",
+          emoji: "💼",
+          color: "#2563eb",
+          topics: ["Review CV", "Negosiasi gaji", "Karier di bidang IT"],
+          lines: [
+            "Halo, saya Hendra dari tim HR. Ada yang bisa saya bantu hari ini?",
+            "Boleh ceritakan sedikit latar belakang dan posisi yang kamu incar?",
+            "Untuk CV, taruh pencapaian dengan angka di bagian atas. Recruiter membaca sekilas saja.",
+            "Soal gaji, riset dulu kisaran pasar, lalu sebutkan rentang, bukan satu angka.",
+            "Kalau sudah siap, lamar lewat stand kami di Lantai 1. Semoga sukses ya!",
+          ],
+        },
+        {
+          id: "coach-maya",
+          name: "Kak Maya",
+          role: "Konsultan karier",
+          emoji: "🧭",
+          color: "#db2777",
+          topics: ["Bingung pilih jurusan karier", "Pindah bidang kerja", "Personal branding"],
+          lines: [
+            "Hai! Aku Maya, konsultan karier. Lagi bingung soal apa nih?",
+            "Coba tulis tiga hal yang kamu suka kerjakan dan tiga hal yang kamu jago.",
+            "Pindah bidang itu wajar. Mulai dari proyek kecil yang bisa ditunjukkan di portofolio.",
+            "Rapikan profil LinkedIn dengan judul yang jelas, misalnya 'Fresh graduate Akuntansi'.",
+            "Waktunya hampir habis. Semangat ya, kamu pasti bisa!",
+          ],
+        },
+        {
+          id: "psi-rina",
+          name: "Bu Rina",
+          role: "Psikolog industri",
+          emoji: "🧠",
+          color: "#7c3aed",
+          topics: ["Persiapan psikotes", "Gugup saat interview", "Kenali minat dan bakat"],
+          lines: [
+            "Selamat datang, saya Rina. Silakan cerita, santai saja.",
+            "Gugup itu normal. Tarik napas empat hitungan, tahan, lalu buang pelan.",
+            "Untuk psikotes, latihan soal deret dan logika sehari 15 menit sudah cukup membantu.",
+            "Jawab tes kepribadian dengan jujur, jangan menebak jawaban yang 'benar'.",
+            "Terima kasih sudah cerita. Jaga kesehatan dan istirahat yang cukup ya.",
+          ],
+        },
+        {
+          id: "hr-sari",
+          name: "Bu Sari",
+          role: "Talent Acquisition",
+          org: "Bank Sejahtera",
+          emoji: "🏦",
+          color: "#0f766e",
+          topics: ["Program management trainee", "Interview perbankan", "Tes online"],
+          lines: [
+            "Halo, saya Sari dari Bank Sejahtera. Mau tanya soal program trainee?",
+            "Program kami terbuka untuk lulusan semua jurusan dengan IPK minimal 3,0.",
+            "Di interview, kami suka jawaban dengan metode STAR: situasi, tugas, aksi, hasil.",
+            "Tes online biasanya ada numerik, verbal, dan bahasa Inggris. Latih ketiganya.",
+            "Pendaftaran bisa lewat stand kami. Sampai ketemu di sana!",
+          ],
+        },
+      ],
+    },
+    {
       id: "seminar",
       kind: "seminar",
       name: "Ruang Seminar",
@@ -1039,6 +1207,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#b45309",
       floor: 1,
       tier: "premium",
+      vipStyle: "royal",
       x: 3,
       y: 0.4,
       recruiter: "Sinta",
@@ -1073,6 +1242,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#0f766e",
       floor: 0,
       tier: "premium",
+      vipStyle: "platinum",
       x: 20,
       y: 0.4,
       recruiter: "Hendra",
@@ -1141,6 +1311,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#16a34a",
       floor: 2,
       tier: "premium",
+      vipStyle: "taman",
       x: 20,
       y: 0.4,
       recruiter: "Laila",
@@ -1175,6 +1346,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#db2777",
       floor: 1,
       tier: "premium",
+      vipStyle: "cyber",
       x: 20,
       y: 0.4,
       recruiter: "Rara",
@@ -1537,4 +1709,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
 export function safeUrl(url: string | undefined | null) {
   const u = url?.trim();
   return u && /^(https?:\/\/|mailto:|tel:)/i.test(u) ? u : undefined;
+}
+
+/** An uploaded image (company logo, profile photo) only if it is an inline PNG, JPEG or WebP picture.
+ *  Anything else, SVG included, is dropped, so a stored value can never carry script or a remote link. */
+export function safeImage(src: string | undefined | null) {
+  return src && src.length < 400_000 && /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(src) ? src : undefined;
 }
