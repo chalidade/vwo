@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { FoodStall } from "@vwo/shared";
+import { type FoodStall, safeUrl } from "@vwo/shared";
 import type { Voucher } from "../jobfair-engine";
 import { Modal } from "./Modal";
 
@@ -60,7 +60,7 @@ export function FoodMenu({
             <li>🕒 {stall.hours}</li>
             <li>
               🌐{" "}
-              <a href={stall.website} target="_blank" rel="noopener noreferrer" onClick={onVisit}>
+              <a href={safeUrl(stall.website)} target="_blank" rel="noopener noreferrer" onClick={onVisit}>
                 {stall.website.replace(/^https?:\/\//, "")}
               </a>
             </li>

@@ -1,4 +1,4 @@
-import type { Promoter } from "@vwo/shared";
+import { type Promoter, safeUrl } from "@vwo/shared";
 import { type Look, Person } from "@vwo/ui";
 import { Modal } from "./Modal";
 
@@ -41,7 +41,7 @@ export function PromoCard({ promoter: p, look, saved, onSave, onVisit, onJobs, o
           💼 {p.cta}
         </button>
       ) : (
-      <a className="mb-order jb-apply pc-cta" href={p.url} target="_blank" rel="noopener noreferrer" onClick={onVisit} style={{ ["--c" as string]: p.color }}>
+      <a className="mb-order jb-apply pc-cta" href={safeUrl(p.url)} target="_blank" rel="noopener noreferrer" onClick={onVisit} style={{ ["--c" as string]: p.color }}>
         {p.cta} ↗
       </a>
       )}

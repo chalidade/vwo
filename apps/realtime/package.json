@@ -12,7 +12,7 @@
   "dependencies": {
     "@vwo/db": "workspace:*",
     "@vwo/shared": "workspace:*",
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.45.2",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {

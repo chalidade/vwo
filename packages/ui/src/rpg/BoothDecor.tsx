@@ -1,7 +1,7 @@
 "use client";
 // Decorations a company can place in its job fair booth from the company portal.
 // Floor items fill four spots along the booth's front edge, keeping the middle free for visitors.
-import { BOOTH_W, type CompanyBooth, boothHasGate } from "@vwo/shared";
+import { BOOTH_W, type CompanyBooth, VIP_WING, boothHasGate } from "@vwo/shared";
 import { Mascot, mascotFor } from "./Mascot";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -40,6 +40,16 @@ const SLOTS = [
   { x: 4.1, y: 2.42 },
   { x: 5.0, y: 2.3 },
 ];
+/** VIP booths spread their decorations over the wings; a TV stands at the front of the left wing,
+ *  under the video wall. */
+const VIP_SLOTS = [
+  { x: -VIP_WING + 0.35, y: 2.15 },
+  { x: -VIP_WING + 1.35, y: 2.15 },
+  { x: BOOTH_W + 0.3, y: 2.25 },
+  { x: BOOTH_W + VIP_WING - 1.2, y: 2.25 },
+  { x: 0.1, y: 2.3 },
+];
+const VIP_TV = { x: -VIP_WING + 0.8, y: 2.05 };
 
 function Plant() {
   return (
@@ -202,7 +212,8 @@ export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) =
       if (boothHasGate(booth)) continue; // hung on the gate's beam instead, see GateBeam
       out.push({ key, x: x + 1.6, y: y - 2.35, z: y + 0.62, node: <NeonSign color={booth.color} /> });
     } else {
-      const s = SLOTS[slot++];
+      const vip = booth.tier === "premium";
+      const s = vip && a.id === "tv" ? VIP_TV : (vip ? VIP_SLOTS.filter((_, i) => !on.has("tv") || i > 1) : SLOTS)[slot++];
       if (!s) continue;
       const node =
         a.id === "flag" ? (

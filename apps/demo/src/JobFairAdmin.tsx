@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { OrgAds } from "./organizer/Ads";
+import { OrgAula } from "./organizer/Aula";
 import { OrgBooths } from "./organizer/Booths";
 import { OrgLive } from "./organizer/Live";
 import { OrgPsych } from "./organizer/Psych";
@@ -12,6 +13,7 @@ const TABS = [
   ["ads", "📣 Iklan"],
   ["psych", "🧠 Psikotes"],
   ["seminar", "🎤 Seminar"],
+  ["aula", "🏛️ Aula"],
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
 
@@ -81,6 +83,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
       {tab === "ads" && <OrgAds onToast={setToast} />}
       {tab === "psych" && <OrgPsych onToast={setToast} />}
       {tab === "seminar" && <OrgSeminars onToast={setToast} />}
+      {tab === "aula" && <OrgAula onToast={setToast} />}
       {toast && <div className="cp-toast">{toast}</div>}
     </main>
   );

@@ -18,6 +18,7 @@ import {
   openJobs,
   slide,
   stallSpot,
+  aulaSpot,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -39,6 +40,8 @@ import {
   psikotesExtras,
   promoterExtras,
   seminarStageExtras,
+  aulaExtras,
+  type StageScreen,
   lookFor,
   sponsorExtras,
 } from "@vwo/ui";
@@ -54,6 +57,8 @@ import { type RingSignal, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard } from "./fair/Invite";
+import { NotifList } from "./fair/Notifs";
+import { Modal } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
@@ -64,6 +69,7 @@ import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
 import { WalletPanel } from "./fair/Wallet";
 import { BookStand } from "./fair/BookStand";
+import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./useCafe";
@@ -93,7 +99,8 @@ type Reach =
   | { kind: "seat"; seatId: string }
   | { kind: "promoter"; promoter: Promoter }
   | { kind: "seated"; room: FairRoom }
-  | { kind: "sofa" };
+  | { kind: "sofa" }
+  | { kind: "aula"; tab: AulaTab };
 
 const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
 
@@ -105,9 +112,9 @@ export function staffLook(name: string, color: string): Look {
 }
 
 /** Floor arrows pointing to the lift, laid in the aisles of each kind of floor. */
-const GROUND_SIGNS = [{ x: 11.5, y: 15.2 }, { x: 19, y: 6.7 }, { x: 27.5, y: 14.8 }];
-const HALL_SIGNS = [{ x: 5, y: 15.2 }, { x: 19, y: 6.7 }, { x: 27.5, y: 14.8 }];
-const ROOM_SIGNS = [{ x: 8, y: 19.6 }, { x: 20, y: 19.6 }];
+const GROUND_SIGNS = [{ x: 13, y: 15.2 }, { x: 23, y: 6.7 }, { x: 32.5, y: 14.8 }];
+const HALL_SIGNS = [{ x: 6, y: 15.2 }, { x: 23, y: 6.7 }, { x: 33.5, y: 14.8 }];
+const ROOM_SIGNS = [{ x: 11, y: 19.6 }, { x: 25, y: 19.6 }];
 
 let savedSession: Session | null = null; // survives switching to the organiser view and back
 
@@ -143,6 +150,8 @@ export function JobFair() {
   const [stall, setStall] = useState<string | null>(null);
   const [psych, setPsych] = useState(false);
   const [seminar, setSeminar] = useState(false);
+  const [aula, setAula] = useState<AulaTab | null>(null);
+  const [notifs, setNotifs] = useState(false);
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
@@ -164,7 +173,7 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -233,6 +242,11 @@ export function JobFair() {
       if (Math.abs(self.x - (sp.x + SPONSOR_W / 2)) < 0.9 && self.y > sp.y + SPONSOR_H && self.y < sp.y + SPONSOR_H + 1.2) return { kind: "sponsor", sponsor: sp };
     }
     if (self.seatId && room) return { kind: "seated", room };
+    if (room?.kind === "aula")
+      for (const tab of ["rundown", "info"] as const) {
+        const at = aulaSpot(tab);
+        if (Math.abs(self.x - at.x) < 1.6 && Math.abs(self.y - at.y) < 0.9) return { kind: "aula", tab: tab === "rundown" ? "jadwal" : "info" };
+      }
     if (self.seatId) return { kind: "sofa" };
     if (coinHere) {
       const c = fair.fair.coinStand;
@@ -420,6 +434,7 @@ export function JobFair() {
     else if (r.kind === "seated") startActivity(r.room);
     else if (r.kind === "sofa") setGames(true);
     else if (r.kind === "promoter") goToPromoter(r.promoter);
+    else if (r.kind === "aula") setAula(r.tab);
     else talkToVisitor(r.memberId);
   }
 
@@ -591,6 +606,7 @@ export function JobFair() {
   function startActivity(r: FairRoom) {
     if (r.kind === "psikotes") setPsych(true);
     else if (r.kind === "seminar") setSeminar(true);
+    else if (r.kind === "aula") stageLive?.venue === "aula" ? setSeminar(true) : setAula("jadwal");
     else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Voucher aman, nanti makan di outletnya 😋" : "Lihat-lihat promo dulu ah", 2200);
   }
 
@@ -708,7 +724,7 @@ export function JobFair() {
     });
     const main: Talk = {
       speaker: `${staff} · Panitia`,
-      pages: ["Ada yang bisa dibantu? Pilih lantainya, food court, seminar, psikotes, atau Stand Koin. Nanti aku antar."],
+      pages: ["Ada yang bisa dibantu? Pilih lantainya: Aula, food court, seminar, psikotes, atau Stand Koin. Nanti aku antar."],
       choices: [
         ...fair.fair.floors.map((f, i) => ({
           label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand)`,
@@ -783,11 +799,34 @@ export function JobFair() {
     setPanel(null);
   };
 
-  /** The seminar running now (sessions rotate every three minutes), for the stage screen. */
-  function currentSlide() {
-    if (stageLive) return { session: `🔴 LIVE · ${stageLive.speaker}`, title: stageLive.title };
-    const s = liveSeminar(Date.now(), fair.seminars());
-    return { session: `Sedang berlangsung · ${s.speaker}`, title: s.title };
+  /** The seminar running now (sessions rotate every three minutes), for the stage's LED wall: the
+   *  slides advance every few seconds so the wall feels like a talk in progress. */
+  function currentSlide(): StageScreen {
+    const list = fair.seminars();
+    if (stageLive && stageLive.venue !== "aula") {
+      const sem = list.find((x) => x.id === stageLive.sessionId);
+      const sl = sem?.slides[stageLive.slide];
+      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined };
+    }
+    const now = Date.now();
+    const s = liveSeminar(now, list);
+    const i = Math.floor(now / 9000) % Math.max(1, s.slides.length);
+    const sl = s.slides[i];
+    const next = list[(list.indexOf(s) + 1) % list.length];
+    return { badge: "Sedang berlangsung", title: s.title, speaker: s.speaker, role: s.role, slideTitle: sl?.title, points: sl?.points, page: sl ? `${i + 1}/${s.slides.length}` : undefined, next: next && next !== s ? `${next.title} · ${next.speaker}` : undefined };
+  }
+
+  /** What the Aula's LED wall and boards show, by the clock. */
+  function aulaScreen() {
+    const { current, next, over } = fair.aulaNow();
+    return {
+      now: current,
+      next,
+      over,
+      live: stageLive?.venue === "aula" ? { title: stageLive.title, speaker: stageLive.speaker } : null,
+      rundown: fair.rundown().map((e) => ({ start: e.start, title: e.title, on: e.id === current?.id })),
+      announcement: announcement?.text,
+    };
   }
 
   // --- Scene.
@@ -812,11 +851,20 @@ export function JobFair() {
     ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
     ...promotersHere.flatMap((p) => promoterExtras(p, session ? () => goToPromoter(p) : undefined)),
     ...(room?.kind === "seminar" ? seminarStageExtras(room, currentSlide()) : []),
+    ...(room?.kind === "aula"
+      ? aulaExtras(room, aulaScreen(), fair.stops, {
+          rundown: session ? () => goTo(floor.id, aulaSpot("rundown").x, aulaSpot("rundown").y, () => setAula("jadwal")) : undefined,
+          info: session ? () => goTo(floor.id, aulaSpot("info").x, aulaSpot("info").y, () => setAula("info")) : undefined,
+          meet: session ? () => setAula("meet") : undefined,
+        })
+      : []),
   ];
   const npcs: NpcView[] = fair.staff.map((s) => {
     const b = s.boothId ? fair.booth(s.boothId) : undefined;
     const pr = fair.fair.promoters.find((x) => promoterId(x.id) === s.id);
-    return { id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? s.name, pr?.color ?? b?.color ?? "#1e3a8a") };
+    // The speaker on the seminar stage is whoever the LED wall says is presenting.
+    const name = room?.kind === "seminar" && s.id === roomStaffId(room.id) ? currentSlide().speaker : s.name;
+    return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
   const avatars: AvatarState[] = [...fair.visitors.values()];
   const bubbles = Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]));
@@ -926,38 +974,11 @@ export function JobFair() {
           )}
         </div>
 
-        {hud.map ? (
-        <div className="hud hud-tr rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Sembunyikan denah" role="button">
-          <svg aria-hidden viewBox={`-0.5 -0.5 ${floor.width + 1} ${floor.height + 1}`} className="minimap">
-            <rect x={0} y={0} width={floor.width} height={floor.height} rx={0.6} fill="#cfd6df" />
-            {booths.map((b) => (
-              <g key={b.id}>
-                <rect x={b.x} y={b.y} width={6} height={3.6} rx={0.3} fill={b.color} opacity={0.35} />
-                <rect x={b.x} y={b.y} width={6} height={0.6} fill={b.color} />
-              </g>
-            ))}
-            {sponsors.map((sp) => (
-              <rect key={sp.id} x={sp.x} y={sp.y} width={0.9} height={0.9} fill={sp.color} />
-            ))}
-            {(floor.tables ?? []).map((t) => (
-              <rect key={t.id} x={t.x} y={t.y} width={t.width} height={t.height} rx={0.2} fill="#a8a29e" />
-            ))}
-            {coinHere && <rect x={fair.fair.coinStand.x} y={fair.fair.coinStand.y} width={5.4} height={2.2} rx={0.2} fill="#ca8a04" opacity={0.7} />}
-            {!room && level === 0 && <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />}
-            {(floor.objects ?? [])
-              .filter((o) => o.type === "elevator")
-              .map((o) => (
-                <rect key={o.id} x={o.x} y={o.y} width={o.width} height={o.height} rx={0.2} fill="#facc15" />
-              ))}
-            {avatars.filter((a) => a.floorId === floor.id).map((a) => (
-              <circle key={a.memberId} cx={a.x} cy={a.y} r={a.memberId === session?.visitorId ? 0.55 : 0.32} fill={a.memberId === session?.visitorId ? "#f97316" : "#fff"} stroke="#2b1e19" strokeWidth={0.12} />
-            ))}
-          </svg>
-          <div className="minimap-legend">Denah {stop.name} · 🟨 lift</div>
-        </div>
-        ) : (
-          <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
-            🗺️
+        {session && (
+          // The bell sits where the mini map used to be: one less button in the bottom bar.
+          <button type="button" className="hud hud-tr-btn rpg-box notif-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setNotifs(true)} title="Notifikasi dari HR" aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}>
+            🔔
+            {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
           </button>
         )}
 
@@ -966,7 +987,7 @@ export function JobFair() {
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
           ) : reach?.kind === "seated" && reach.room.kind !== "foodcourt" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => startActivity(reach.room)}>
-              {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : "📝 Kerjakan psikotes"}
+              {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : "📝 Kerjakan psikotes"}
             </button>
           ) : reach?.kind === "sofa" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGames(true)}>
@@ -1005,12 +1026,6 @@ export function JobFair() {
                 <span className="tab-txt">Lamaran</span>
                 {mine.length > 0 && <span className="menu-dot menu-dot-calm">{mine.length}</span>}
               </button>
-              {!me.verified && (
-                <button type="button" className="menu-btn verify-btn" onClick={() => setVerify(true)} title="Beli centang biru">
-                  <span className="tab-ico">✔</span>
-                  <span className="tab-txt">Verified</span>
-                </button>
-              )}
               <button type="button" className="menu-btn mission-btn" onClick={() => setMissions(true)} title="Misi harian">
                 <span className="tab-ico">🎯</span>
                 <span className="tab-txt">Misi</span>
@@ -1240,6 +1255,45 @@ export function JobFair() {
               setPsych(false);
               const best = fair.bestPsych();
               if (best != null) fair.say(roomStaffId("psikotes"), `Nilai terbaikmu ${best}. Semangat melamar!`, 3000);
+            }}
+          />
+        )}
+
+        {session && notifs && (
+          <Modal
+            title="🔔 Notifikasi"
+            className="nt-modal"
+            onClose={() => setNotifs(false)}
+            foot={
+              fair.unreadFor(PLAYER_ID) > 0 ? (
+                <button type="button" className="small-btn ghost" onClick={() => fair.markRead(PLAYER_ID)}>
+                  Tandai semua dibaca
+                </button>
+              ) : undefined
+            }
+          >
+            <NotifList
+              items={fair.notifsFor(PLAYER_ID)}
+              empty="Belum ada notifikasi. Balasan chat, panggilan, dan undangan interview dari HR muncul di sini."
+              onPick={(n) => {
+                fair.markRead(PLAYER_ID, n.id);
+                setNotifs(false);
+                const app = n.appId ? fair.applications.find((x) => x.id === n.appId) : undefined;
+                if (n.kind === "interview" && app?.interview) setInviteId(app.id);
+                else setPanel("applications");
+              }}
+            />
+          </Modal>
+        )}
+
+        {session && aula && (
+          <AulaBoard
+            tab={aula}
+            stops={fair.stops}
+            onClose={() => setAula(null)}
+            onGo={(st) => {
+              setAula(null);
+              pickFloor(st.floorId);
             }}
           />
         )}
