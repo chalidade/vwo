@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COIN_STAND_SPOTS, DEMO_JOB_FAIR, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
+import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
 import { BOOTH_SLOTS, DemoJobFair, type FairSaved, PLAYER_ID, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
@@ -529,5 +529,37 @@ describe("DemoJobFair", () => {
     fair.setWalkerLimit(99);
     expect(walking()).toBe(all);
     expect(fair.walkerLimit()).toBe(all);
+  });
+  it("makes VIP stands wider with a gate and a video wall, and every booth stays reachable", () => {
+    const c = clock();
+    let stored: FairSaved | null = null;
+    const storage = { load: () => stored, save: (d: FairSaved) => (stored = JSON.parse(JSON.stringify(d))), clear: () => (stored = null) };
+    const fair = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    // Turn every booth into a VIP stand: the wider frames still fit side by side and leave the aisles open.
+    for (const b of fair.fair.booths) fair.configureBooth(b.id, { tier: "premium" });
+    for (const b of fair.fair.booths) {
+      const f = fair.floors[b.floor]!;
+      const frame = boothFrame(b);
+      expect(frame.width, b.id).toBeGreaterThan(BOOTH_W);
+      // The banner wings block their tiles, and the gate posts stand at the entrance.
+      expect(isBlocked(f, frame.x + 0.5, b.y + 0.5), b.id).toBe(true);
+      expect(isBlocked(f, frame.x + 0.25, b.y + 3.35), `${b.id} gate`).toBe(true);
+      const start = b.floor === 0 ? fair.fair.spawn : LIFT_FRONT;
+      for (const spot of ["talk", "banner"] as const) expect(findPath(f, start, boothSpot(b, spot)), `${b.id} ${spot}`).not.toBeNull();
+      expect(fair.useAccessory(b.id, "tv").ok, b.id).toBe(true);
+    }
+
+    // A regular booth gets the gate as an add-on, with the organiser's video and gate settings.
+    const id = fair.fair.booths[0]!.id;
+    fair.configureBooth(id, { tier: "regular", theme: "wood", accessories: ["gapura", "tv", "plant"], media: { videoUrl: "https://video.example/a.mp4", gate: "balon", gateText: "Ayo masuk" } });
+    const b = fair.booth(id)!;
+    expect(boothFrame(b).width).toBe(BOOTH_W);
+    expect(isBlocked(fair.floors[b.floor]!, b.x + 0.25, b.y + 3.35)).toBe(true);
+    expect([fair.owns(id, "gapura"), fair.owns(id, "tv"), fair.owns(id, "vip")]).toEqual([true, true, false]);
+    fair.flush();
+    const again = new DemoJobFair(() => 0.5, c.now, DEMO_JOB_FAIR, storage);
+    const b2 = again.booth(id)!;
+    expect([b2.tier, b2.theme, [...b2.accessories!].sort(), b2.media?.gate, b2.media?.gateText, b2.media?.videoUrl]).toEqual(["regular", "wood", ["gapura", "plant", "tv"], "balon", "Ayo masuk", "https://video.example/a.mp4"]);
+    expect(isBlocked(again.floors[b2.floor]!, b2.x + 0.25, b2.y + 3.35)).toBe(true);
   });
 });

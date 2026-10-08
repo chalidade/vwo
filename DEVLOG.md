@@ -4,6 +4,22 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · Job fair: lebih ringan, stand VIP lebih lebar dengan gapura dan layar video, perbaikan cocokan logo, pengaturan add-on
+
+**Konteks:** owner merasa beberapa kondisi agak lemot, minta stand VIP lebih besar dengan tema seperti gapura, layar video besar untuk VIP yang bisa diputar, perbaikan bug mini game cocokan logo, dan halaman pengaturan untuk semua itu (link video, add-on booth).
+
+**Yang berubah**
+- **Performa:** peta hanya menggambar benda yang terlihat di layar, simulasi cafe dan job fair berhenti saat halamannya tidak dibuka, bagian stand tidak digambar ulang tiap frame, dan efek kilau karpet VIP memakai animasi yang ringan. Di HP dengan CPU diperlambat 4×, fps naik dari ±25 ke ±43.
+- **Stand VIP:** 1 petak lebih lebar di kiri dan kanan, dengan umbul-umbul tinggi warna brand (logo, VIP, WE'RE HIRING), layar video besar menggantikan TV kecil, dan gapura bawaan.
+- **Gapura:** papan nama di atas stand dan dua tiang di sudut depan karpet, dengan 4 model: Klasik, Janur & bambu, Lengkung balon, Neon. Tulisan papan bisa diubah. Stand reguler bisa membeli add-on Gapura (Rp 400.000).
+- **Layar video VIP:** ketuk layar besar untuk memutar video perusahaan (YouTube atau .mp4, tanpa link tampil slideshow profil).
+- **Cocokan logo:** kartu dulu teracak ulang setiap frame karena aula digambar ulang terus, jadi pasangan tidak pernah cocok. Sekarang diacak sekali per ronde, dan logo kembar antarperusahaan tidak lagi membuat pasangan rancu.
+- **Pengaturan:** panitia punya tombol "Atur" per stand di tab Stand: reguler/VIP, tema, add-on (dianggap lunas), link video, model dan tulisan gapura. Perusahaan mengatur model dan tulisan gapura serta link video VIP di portal (tab Booth).
+
+**Dicek:** typecheck, 35 tes (1 baru), build demo dan web, screenshot HP dan desktop di `/mnt/project-files/screenshots/jobfair-vip/`.
+
+---
+
 ## 2026-10-08 · Job fair: menu HP rapi, zoom peta, booking stand kosong, login perusahaan, kelola iklan, karakter semi 3D
 
 **Konteks:** owner minta 9 hal: menu bawah di HP lebih rapi, karakter semi 3D, zoom peta, login per perusahaan, stand kosong di peta yang bisa dibooking, jumlah NPC promotor bisa diatur, halaman kelola iklan, variasi karakter lebih banyak, dan rekomendasi monetisasi.

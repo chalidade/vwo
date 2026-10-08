@@ -1022,8 +1022,8 @@
 
 /* Premium booths: gold carpet edge with a slow shine, a crown, and spotlights. */
 .jb-carpet[data-premium] { border: 4px double #eab308; box-shadow: 0 0 0 3px rgb(234 179 8 / 0.25), inset 0 0 18px rgb(250 204 21 / 0.35); position: relative; overflow: hidden; }
-.jb-carpet[data-premium]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%); background-size: 250% 100%; animation: jb-shine 5s ease-in-out infinite; }
-@keyframes jb-shine { 0%, 40% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
+.jb-carpet[data-premium]::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 60%; background: linear-gradient(110deg, transparent 20%, rgb(255 255 255 / 0.35) 50%, transparent 80%); animation: jb-shine 5s ease-in-out infinite; will-change: transform; }
+@keyframes jb-shine { 0%, 40% { transform: translateX(0); } 100% { transform: translateX(270%); } }
 .jb-crown { animation: jb-crown 2.6s ease-in-out infinite; }
 @keyframes jb-crown { 50% { transform: translateY(-3px); } }
 .jb-spot { animation: jb-spot 3.2s ease-in-out infinite; }

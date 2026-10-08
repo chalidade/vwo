@@ -448,6 +448,14 @@ export function CafeScene({
 
   ents.sort((a, b) => a.z - b.z);
 
+  // Draw only what is on screen (plus a margin for wide things that start off it): on a phone most
+  // of a hall is outside the view, and every drawn sprite costs style, layout and paint each frame.
+  const viewL = camX - 8 * TILE;
+  const viewR = camX + view.w / scale + 2 * TILE;
+  const viewT = camY - 6 * TILE;
+  const viewB = camY + view.h / scale + 2 * TILE;
+  const onScreen = (e: Ent) => !follow || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
+
   // Doors in the bottom wall; doors standing inside a room (spriteKey "room:…") are drawn by the room.
   const doors = (floor.objects ?? []).filter((o) => o.type === "door" && !o.spriteKey?.startsWith("room:"));
   const counter = floor.theme === "indoor" || !floor.theme ? floor.objects?.find((o) => o.type === "counter") : undefined;
@@ -535,7 +543,7 @@ export function CafeScene({
           <div key={d.id} style={{ position: "absolute", left: px(d.x), top: worldH - EDGE, width: d.width * TILE, height: EDGE, background: "#fef3c7", boxShadow: "inset 0 4px 0 rgb(0 0 0 / 0.25)" }} />
         ))}
 
-        {ground.map((e) => (
+        {ground.filter(onScreen).map((e) => (
           <div
             key={e.key}
             className="rpg-ent"
@@ -548,7 +556,7 @@ export function CafeScene({
             {e.node}
           </div>
         ))}
-        {ents.map((e) => (
+        {ents.filter(onScreen).map((e) => (
           <div
             key={e.key}
             className="rpg-ent"

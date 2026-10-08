@@ -4,7 +4,7 @@ import { BOOTH_THEMES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo
 import { staffLook } from "../JobFair";
 import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
 import { fair } from "../useFair";
-import { MediaEditor } from "./MediaEditor";
+import { GateEditor, MediaEditor } from "./MediaEditor";
 import { PromoterEditor } from "./PromoterEditor";
 import type { PortalTab } from "./Portal";
 
@@ -106,7 +106,9 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
                   <b>{p.name}</b>
                   <span className="muted small">{p.about}</span>
                 </span>
-                {owned ? (
+                {p.id === "gapura" && booth.tier === "premium" ? (
+                  <span className="cp-price">👑 Termasuk VIP</span>
+                ) : owned ? (
                   <button
                     type="button"
                     className="small-btn"
@@ -134,6 +136,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
           </button>
         )}
       </div>
+      <GateEditor booth={booth} />
       <MediaEditor booth={booth} />
       <PromoterEditor booth={booth} onTab={onTab} />
       <div className="card">

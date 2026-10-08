@@ -38,6 +38,7 @@ const ACCESSORY_PRICES: Record<string, number> = {
   photobooth: 750_000,
   balloons: 150_000,
   neon: 350_000,
+  gapura: 400_000,
 };
 
 export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_ACCESSORIES.map((a) => ({
@@ -47,8 +48,11 @@ export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_A
   slot: a.slot,
   price: ACCESSORY_PRICES[a.id] ?? 0,
   about:
-    a.slot === "floor" ? "Diletakkan di depan stand (maks. 4 barang lantai)." : a.slot === "air" ? "Melayang di dua sudut atas stand." : a.slot === "wall" ? "Menyala di dinding stand." : "Di sudut belakang stand.",
+    a.slot === "floor" ? "Diletakkan di depan stand (maks. 4 barang lantai)." : a.slot === "air" ? "Melayang di dua sudut atas stand." : a.slot === "wall" ? "Menyala di dinding stand." : a.slot === "gate" ? "Gerbang di pintu masuk stand; gaya dan tulisannya bisa diatur. Gratis untuk stand VIP." : "Di sudut belakang stand.",
 }));
+
+/** VIP booths get these add-ons without buying them (they also have a big video wall built in). */
+export const VIP_INCLUDED = ["gapura"];
 
 export const productOf = (id: string) => (id === VIP_PRODUCT.id ? VIP_PRODUCT : id === PROMOTER_PRODUCT.id ? PROMOTER_PRODUCT : ACCESSORY_PRODUCTS.find((p) => p.id === id));
 
