@@ -4,6 +4,7 @@ import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
+import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 
@@ -28,43 +29,93 @@ const loadTab = (): PortalTab => {
   }
 };
 
-/** The company portal: a company manages its booth, vacancies and applicants. */
+/** The company portal: a company signs in with its code and PIN, then manages its booth, vacancies and applicants. */
 export function CompanyPortal({ boothId }: { boothId?: string }) {
   useFair();
-  const booth = boothId ? fair.booth(boothId) : undefined;
-  if (!booth) return <CompanyPicker />;
-  return <Portal key={booth.id} booth={booth} />;
+  const [who, setWho] = useState(signedInCompany);
+  const booth = who ? fair.booth(who) : undefined;
+  if (!booth || (boothId && boothId !== booth.id)) return <CompanyLogin code={boothId ?? ""} onIn={setWho} />;
+  return (
+    <Portal
+      key={booth.id}
+      booth={booth}
+      onOut={() => {
+        sessionLogin(null);
+        setWho(null);
+        location.hash = "#/jobfair/company";
+      }}
+    />
+  );
 }
 
-/** Demo sign-in: pick which company you are. */
-function CompanyPicker() {
+/** Company sign-in: company code and PIN from the organiser or from booking a stand. */
+function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) => void }) {
+  const [code, setCode] = useState(start);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
   const booths = [...fair.fair.booths].sort((a, b) => a.company.localeCompare(b.company));
   return (
-    <main className="cp">
-      <div className="card">
-        <h1 className="cp-h1">🏢 Portal perusahaan</h1>
-        <p className="muted">Kelola stand, lowongan, dan pelamar di {fair.fair.name}. Di demo ini kamu bisa masuk sebagai perusahaan mana saja; versi asli memakai akun dan login perusahaan.</p>
-        <div className="cp-pick">
-          {booths.map((b) => (
-            <a key={b.id} className="cp-pick-item" href={`#/jobfair/company/${b.id}`} style={{ ["--c" as string]: b.color }}>
-              <span className="cp-logo">{b.logo}</span>
-              <span>
-                <b>
-                  {b.company} {b.tier === "premium" && "👑"}
-                </b>
-                <span className="muted small">
-                  {b.industry} · {fair.fair.floors[b.floor]?.name} · {fair.applications.filter((a) => a.boothId === b.id).length} pelamar
+    <main className="cp cp-login">
+      <form
+        className="card cp-login-card"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const b = fair.companyLogin(code, pin);
+          if (!b) return setError(true);
+          sessionLogin(b.id);
+          location.hash = `#/jobfair/company/${b.id}`;
+          onIn(b.id);
+        }}
+      >
+        <h1 className="cp-h1">🏢 Masuk portal perusahaan</h1>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Kelola stand, lowongan, dan pelamar di {fair.fair.name}. Kode dan PIN dikirim panitia, atau kamu dapat saat booking stand kosong di peta.
+        </p>
+        <label>
+          Kode perusahaan
+          <input value={code} onChange={(e) => (setCode(e.target.value), setError(false))} autoComplete="username" autoCapitalize="none" required placeholder="contoh: nusantara-tech" />
+        </label>
+        <label>
+          PIN
+          <input value={pin} onChange={(e) => (setPin(e.target.value.replace(/\D/g, "")), setError(false))} inputMode="numeric" autoComplete="current-password" type="password" required maxLength={6} placeholder="4–6 angka" />
+        </label>
+        {error && <p className="bk-err">Kode atau PIN salah. Tanyakan ke panitia kalau lupa.</p>}
+        <button type="submit">Masuk</button>
+        <details className="cp-demo-accounts">
+          <summary>Akun demo</summary>
+          <p className="muted small">Hanya ada di demo. Ketuk untuk mengisi otomatis.</p>
+          <div className="cp-pick">
+            {booths.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className="cp-pick-item"
+                style={{ ["--c" as string]: b.color }}
+                onClick={() => {
+                  setCode(b.id);
+                  setPin(fair.companyPin(b.id));
+                  setError(false);
+                }}
+              >
+                <span className="cp-logo">{b.logo}</span>
+                <span>
+                  <b>
+                    {b.company} {b.tier === "premium" && "👑"}
+                  </b>
+                  <span className="muted small">
+                    {b.id} · PIN {fair.companyPin(b.id)}
+                  </span>
                 </span>
-              </span>
-            </a>
-          ))}
-        </div>
-      </div>
+              </button>
+            ))}
+          </div>
+        </details>
+      </form>
     </main>
   );
 }
 
-function Portal({ booth }: { booth: CompanyBooth }) {
+function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
   const [tab, setTabState] = useState<PortalTab>(loadTab);
   const setTab = (t: PortalTab) => {
     setTabState(t);
@@ -93,9 +144,9 @@ function Portal({ booth }: { booth: CompanyBooth }) {
           <a className="small-btn cp-link" href="#/jobfair">
             🎪 Lihat di job fair
           </a>
-          <a className="small-btn ghost cp-link" href="#/jobfair/company">
-            Ganti perusahaan
-          </a>
+          <button type="button" className="small-btn ghost" onClick={onOut}>
+            Keluar
+          </button>
         </div>
       </header>
       <nav className="cp-tabs" role="tablist">

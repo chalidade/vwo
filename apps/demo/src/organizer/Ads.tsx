@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Promoter, SponsorView } from "@vwo/shared";
+import { ACCESSORY_PRODUCTS, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
+import { STAND_PRICES } from "../jobfair-engine";
 import { fair } from "../useFair";
 
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
@@ -21,10 +23,76 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const stalls = fair.fair.rooms.flatMap((r) => r.stalls ?? []);
   const decor = [...fair.ads.entries()].filter(([k]) => k.startsWith("acc:"));
   const decorTotal = decor.reduce((n, [, a]) => ({ views: n.views + a.views, clicks: n.clicks + a.clicks, sold: n.sold + a.sold }), { views: 0, clicks: 0, sold: 0 });
+  const allAds = [...fair.ads.values()];
+  const views = allAds.reduce((n, a) => n + a.views, 0) + [...fair.sponsorViews.values()].reduce((n, v) => n + v, 0);
+  const clicks = allAds.reduce((n, a) => n + a.clicks, 0);
+  const paid = [...fair.company.values()].flatMap((c) => c.invoices).filter((i) => i.status === "Lunas");
+  const revenue = paid.reduce((n, i) => n + i.total, 0) + fair.bookings().reduce((n, b) => n + b.price, 0);
+  const walkers = promoters.filter((p) => p.walks && p.active !== false).length;
+  const limit = fair.walkerLimit();
+  const owners = (id: string) => [...fair.company.values()].filter((c) => c.owned.includes(id)).length;
+  const rates = [
+    { name: "🏬 Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium").length, note: `${fair.freeSlots().length} stand kosong` },
+    { name: "👑 Stand VIP", price: STAND_PRICES.premium, sold: fair.fair.booths.filter((b) => b.tier === "premium").length + owners(VIP_PRODUCT.id) },
+    { name: `${PROMOTER_PRODUCT.emoji} ${PROMOTER_PRODUCT.name}`, price: PROMOTER_PRODUCT.price, sold: owners(PROMOTER_PRODUCT.id) },
+    ...ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => ({ name: `${p.emoji} ${p.name}`, price: p.price, sold: owners(p.id) })),
+  ];
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="org">
-      <div className="card">
+      <div className="cp-kpis org-ad-kpis">
+        {[
+          ["Tayangan iklan", views.toLocaleString("id-ID")],
+          ["Interaksi", clicks.toLocaleString("id-ID")],
+          ["CTR", pct(clicks, views)],
+          ["Promotor aktif", `${fair.fair.promoters.length}`],
+          ["Pendapatan (demo)", `Rp ${revenue.toLocaleString("id-ID")}`],
+        ].map(([label, n]) => (
+          <div key={label} className="card cp-kpi">
+            <span className="muted small">{label}</span>
+            <span className="stat">{n}</span>
+          </div>
+        ))}
+      </div>
+      <nav className="org-jump" aria-label="Bagian halaman iklan">
+        {[
+          ["ad-walkers", "🚶 Jumlah keliling"],
+          ["ad-promoters", "🧑‍💼 Promotor"],
+          ["ad-sponsors", "🏷️ Sponsor"],
+          ["ad-rates", "💰 Tarif"],
+          ["ad-report", "📊 Laporan"],
+          ["ad-announce", "📢 Pengumuman"],
+        ].map(([id, label]) => (
+          <button key={id} type="button" className="small-btn ghost" onClick={() => jump(id!)}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="card" id="ad-walkers">
+        <h2 className="cp-h2">🚶 Promotor keliling di peta</h2>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Atur berapa promotor panitia yang berjalan dan menawari pengunjung sekaligus. Promotor milik perusahaan (berbayar) selalu ikut keliling dan tidak dihitung di sini.
+        </p>
+        <div className="org-walkers">
+          <button type="button" className="small-btn" disabled={limit <= 0} onClick={() => fair.setWalkerLimit(limit - 1)} aria-label="Kurangi promotor keliling">
+            −
+          </button>
+          <input type="range" min={0} max={walkers} value={limit} onChange={(e) => fair.setWalkerLimit(Number(e.target.value))} aria-label="Jumlah promotor keliling" />
+          <button type="button" className="small-btn" disabled={limit >= walkers} onClick={() => fair.setWalkerLimit(limit + 1)} aria-label="Tambah promotor keliling">
+            ＋
+          </button>
+          <b className="org-walkers-n">
+            {limit} <span className="muted small">dari {walkers}</span>
+          </b>
+        </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          Yang keliling: {promoters.filter((p) => p.walks && p.active !== false).slice(0, limit).map((p) => p.brand).join(", ") || "tidak ada"}
+          {companyPromoters.length > 0 && ` · plus ${companyPromoters.length} promotor perusahaan`}. Urutan mengikuti daftar promotor di bawah.
+        </p>
+      </div>
+      <div className="card" id="ad-announce">
         <h2 className="cp-h2">📢 Pengumuman ke semua pengunjung</h2>
         {ann && (
           <p className="org-ann">
@@ -53,7 +121,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card" id="ad-promoters">
         <div className="org-row org-row-head">
           <h2 className="cp-h2" style={{ margin: 0 }}>
             🧑‍💼 NPC promotor
@@ -123,7 +191,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
         </div>
       )}
 
-      <div className="card">
+      <div className="card" id="ad-sponsors">
         <h2 className="cp-h2">🏷️ Banner sponsor</h2>
         <ul className="org-cards">
           {fair.fair.sponsors.map((sp) => (
@@ -148,7 +216,36 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
         </ul>
       </div>
 
-      <div className="card">
+      <div className="card" id="ad-rates">
+        <h2 className="cp-h2">💰 Tarif dan slot terjual</h2>
+        <div className="org-scroll">
+          <table className="list cp-table">
+            <thead>
+              <tr>
+                <th>Produk</th>
+                <th>Harga</th>
+                <th>Terjual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rates.map((r) => (
+                <tr key={r.name}>
+                  <td>
+                    {r.name} {r.note && <span className="muted small">· {r.note}</span>}
+                  </td>
+                  <td>{rupiah(r.price)}</td>
+                  <td>{r.sold}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          Perusahaan membeli dari portal perusahaan; stand kosong dibooking langsung dari peta. {paid.length + fair.bookings().length} transaksi lunas.
+        </p>
+      </div>
+
+      <div className="card" id="ad-report">
         <h2 className="cp-h2">📊 Laporan iklan lain</h2>
         <div className="org-scroll">
           <table className="list cp-table">

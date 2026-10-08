@@ -118,6 +118,10 @@ export interface CafeSceneProps {
   hallTitle?: string;
   /** Hide the hall banner and sponsor plates (rooms hang their own screen). */
   hallBanner?: boolean;
+  /** Screen pixels the bottom HUD covers: the camera may scroll that far past the floor's edge. */
+  hudBottom?: number;
+  /** Zoom buttons, mouse wheel and pinch while following the player. On by default. */
+  zoomable?: boolean;
   className?: string;
   style?: CSSProperties;
   /** HUD drawn over the scene. */
@@ -133,6 +137,9 @@ interface Ent {
   onClick?: () => void;
   title?: string;
 }
+
+const ZOOM_MIN = 0.4;
+const ZOOM_MAX = 2;
 
 export function CafeScene({
   floor,
@@ -158,6 +165,8 @@ export function CafeScene({
   hallSponsors,
   hallTitle,
   hallBanner = true,
+  zoomable = true,
+  hudBottom = 0,
   className,
   style,
   children,
@@ -182,18 +191,41 @@ export function CafeScene({
   const px = (x: number) => ox + x * TILE;
   const py = (y: number) => oy + y * TILE;
 
+  // --- Zoom: a multiplier on the camera's own scale, from the buttons, the wheel or a pinch.
+  const [zoom, setZoomRaw] = useState(1);
+  const setZoom = (z: number) => setZoomRaw(Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 100) / 100);
+  const canZoom = zoomable && !!follow;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const pinch = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ d: number; z: number } | null>(null);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || !canZoom) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom(zoomRef.current * Math.exp(-e.deltaY * 0.0015));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [canZoom]);
+  const spread = () => {
+    const [a, b] = [...pinch.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+
   // --- Camera.
   let scale: number;
   let camX: number;
   let camY: number;
   const cam = useRef<{ x: number; y: number; floor: string; at: number } | null>(null);
   if (follow) {
-    scale = view.w < 640 ? Math.min(1, Math.max(0.72, view.h / worldH)) : 1;
+    scale = (view.w < 640 ? Math.min(1, Math.max(0.72, view.h / worldH)) : 1) * (canZoom ? zoom : 1);
     const vw = view.w / scale;
     const vh = view.h / scale;
     const fit = (pos: number, v: number, size: number) => (size <= v ? (size - v) / 2 : Math.min(Math.max(pos - v / 2, 0), size - v));
     const tx = fit(px(follow.x), vw, worldW);
-    const ty = fit(py(follow.y) - 20, vh, worldH);
+    const ty = fit(py(follow.y) - 20 + hudBottom / scale / 2, vh, worldH + hudBottom / scale);
     // Ease toward the target while rendering every frame; snap after a pause or a floor change.
     const prev = cam.current;
     const t = performance.now();
@@ -441,9 +473,30 @@ export function CafeScene({
       className={`rpg-viewport${className ? ` ${className}` : ""}`}
       style={style}
       onPointerDown={(e) => {
+        if (canZoom && e.pointerType === "touch") {
+          pinch.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pinch.current.size === 2) {
+            pinchStart.current = { d: spread(), z: zoom };
+            return;
+          }
+        }
         if (!onTileClick || (e.target as HTMLElement).closest("[data-hit]")) return;
         const t = toTile(e.clientX, e.clientY);
         if (t.x >= 0 && t.y >= 0 && t.x <= floor.width && t.y <= floor.height) onTileClick(t.x, t.y);
+      }}
+      onPointerMove={(e) => {
+        if (!pinch.current.has(e.pointerId)) return;
+        pinch.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const p = pinchStart.current;
+        if (p && p.d > 0 && pinch.current.size === 2) setZoom(p.z * (spread() / p.d));
+      }}
+      onPointerUp={(e) => {
+        pinch.current.delete(e.pointerId);
+        if (pinch.current.size < 2) pinchStart.current = null;
+      }}
+      onPointerCancel={(e) => {
+        pinch.current.delete(e.pointerId);
+        if (pinch.current.size < 2) pinchStart.current = null;
       }}
     >
       <div
@@ -510,6 +563,16 @@ export function CafeScene({
         ))}
       </div>
       <div className="rpg-vignette" />
+      {canZoom && (
+        <div className="rpg-zoom" data-hit="" onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" aria-label="Perbesar peta" disabled={zoom >= ZOOM_MAX} onClick={() => setZoom(zoom * 1.25)}>
+            +
+          </button>
+          <button type="button" aria-label="Perkecil peta" disabled={zoom <= ZOOM_MIN} onClick={() => setZoom(zoom / 1.25)}>
+            −
+          </button>
+        </div>
+      )}
       {children}
     </div>
   );

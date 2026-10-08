@@ -31,7 +31,8 @@ export function App() {
         <a href={`#/${DEMO_VENUE.slug}`} className={route === DEMO_VENUE.slug ? "active" : ""}>Masuk {DEMO_VENUE.name}</a>
         <a href="#/admin" className={route === "admin" ? "active" : ""}>Live view admin</a>
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
-        <a href="#/jobfair/admin" className={route === "jobfair/admin" ? "active" : ""}>Panitia job fair</a>
+        <a href="#/jobfair/admin" className={route.startsWith("jobfair/admin") && route !== "jobfair/admin/ads" ? "active" : ""}>Panitia job fair</a>
+        <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>
         <a href="#/jobfair/company" className={route.startsWith("jobfair/company") ? "active" : ""}>🏢 Portal perusahaan</a>
         <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>
         <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelanggan lain adalah bot. Versi lengkap butuh server.">
@@ -45,8 +46,8 @@ export function App() {
         <AdminLive />
       ) : route === "jobfair" ? (
         <JobFair />
-      ) : route === "jobfair/admin" ? (
-        <JobFairAdmin />
+      ) : route.startsWith("jobfair/admin") ? (
+        <JobFairAdmin tab={route.split("/")[2]} />
       ) : route === "jobfair/speaker" ? (
         <SpeakerStage />
       ) : route.startsWith("jobfair/company") ? (

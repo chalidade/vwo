@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { BOOTH_SLOTS } from "../jobfair-engine";
+import { sessionLogin } from "../company/login";
+import { rupiah } from "../fair/company";
 import { fair } from "../useFair";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#334155"];
@@ -20,7 +22,7 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
       <div className="card">
         <h2 className="cp-h2">Denah stand</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Tiap lantai aula punya {BOOTH_SLOTS.length} tempat stand. Lepas stand untuk mengosongkan tempat, lalu isi dengan perusahaan baru. {free.length} tempat kosong.
+          Tiap lantai aula punya {BOOTH_SLOTS.length} tempat stand. Lepas stand untuk mengosongkan tempat: di peta muncul stand kosong yang bisa dibooking perusahaan sendiri, atau isi langsung di sini. {free.length} tempat kosong.
         </p>
         {floors.map((fl, floor) => (
           <section key={floor} className="org-floor">
@@ -46,10 +48,24 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                     <span className="muted small">
                       {slotName(sl.x, sl.y)} · {apps} pelamar · {fair.peopleAt(b.id)} di stand
                     </span>
+                    <span className="small org-login">
+                      🔑 <code>{b.id}</code> · PIN <code>{fair.companyPin(b.id)}</code>
+                    </span>
                     <span className="org-slot-tools">
-                      <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`}>
+                      <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`} onClick={() => sessionLogin(b.id)}>
                         Portal
                       </a>
+                      <button
+                        type="button"
+                        className="small-btn ghost"
+                        onClick={() => {
+                          const pin = prompt(`PIN baru untuk ${b.company} (4–6 angka)`, fair.companyPin(b.id));
+                          if (pin == null) return;
+                          onToast(fair.setCompanyPin(b.id, pin.trim()) ? `PIN ${b.company} diganti` : "PIN harus 4–6 angka");
+                        }}
+                      >
+                        PIN
+                      </button>
                       <button
                         type="button"
                         className="small-btn ghost"
@@ -69,6 +85,25 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
           </section>
         ))}
       </div>
+      {fair.bookings().length > 0 && (
+        <div className="card">
+          <h2 className="cp-h2">Booking dari peta</h2>
+          <ul className="cp-jobs">
+            {fair.bookings().map((bk) => (
+              <li key={bk.id}>
+                <span className="cp-job-main">
+                  <b>
+                    {bk.company} {bk.tier === "premium" && "👑"}
+                  </b>
+                  <span className="muted small">
+                    {bk.contact} · {bk.email} · {rupiah(bk.price)} lunas via {bk.method} · {new Date(bk.at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {removed.length > 0 && (
         <div className="card">
           <h2 className="cp-h2">Stand yang dilepas</h2>

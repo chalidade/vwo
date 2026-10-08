@@ -4,6 +4,23 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · Job fair: menu HP rapi, zoom peta, booking stand kosong, login perusahaan, kelola iklan, karakter semi 3D
+
+**Konteks:** owner minta 9 hal: menu bawah di HP lebih rapi, karakter semi 3D, zoom peta, login per perusahaan, stand kosong di peta yang bisa dibooking, jumlah NPC promotor bisa diatur, halaman kelola iklan, variasi karakter lebih banyak, dan rekomendasi monetisasi.
+
+**Yang berubah**
+- **Menu bawah:** jadi tab bar dengan ikon di atas label dan lebar sama di HP. Jumlah lamaran dan misi tampil sebagai badge. Berlaku di job fair dan cafe. Kamera bisa bergeser sedikit melewati tepi bawah agar karakter tidak tertutup menu.
+- **Zoom peta:** tombol + dan −, scroll mouse, dan pinch dua jari (0,4× sampai 2×). Di HP zoom terkecil memperlihatkan seluruh lebar aula.
+- **Stand kosong dan booking:** tempat stand yang kosong (misalnya setelah panitia melepas stand) tampil di peta dengan garis putus-putus dan papan "Stand kosong". Ketuk untuk booking: pilih reguler (Rp 7.500.000) atau VIP (Rp 15.000.000), isi data perusahaan, bayar (simulasi), lalu stand langsung berdiri dan perusahaan dapat kode + PIN portal. Panitia melihat daftar booking di tab Stand.
+- **Login perusahaan:** portal perusahaan sekarang minta kode perusahaan dan PIN. Panitia melihat dan bisa mengganti PIN tiap perusahaan di tab Stand. Daftar "Akun demo" tetap ada supaya demo mudah dicoba.
+- **Kelola iklan:** halaman sendiri di `#/jobfair/admin/ads` (menu "Kelola iklan") dengan ringkasan tayangan, interaksi, CTR, promotor aktif, dan pendapatan demo; pengatur jumlah promotor keliling (slider); tabel tarif dan slot terjual; lalu promotor, sponsor, laporan, dan pengumuman.
+- **Karakter:** pencahayaan lembut (highlight dan bayangan di kepala, badan, tangan, kaki, kilau rambut) supaya terlihat semi 3D. Pilihan baru: hijab, peci, bandana, batik, blazer, kemeja + dasi, rambut kepang dan cepol dua, warna aksen, warna celana, warna topi, ekspresi, aksesori (kacamata/ransel), dan tombol 🎲 Acak. NPC acak juga memakai pilihan baru.
+- **Rekomendasi monetisasi:** ditulis sebagai Claude Doc "Rekomendasi Monetisasi VWO Job Fair & Cafe".
+
+**Dicek:** typecheck, 34 tes (2 baru), build demo dan web, screenshot HP di `/mnt/project-files/screenshots/jobfair-booking/`.
+
+---
+
 ## 2026-10-07 · Job fair: maskot baru, lebih banyak promotor, promotor milik perusahaan
 
 **Konteks:** owner menilai standee maskot terlihat aneh dan minta maskot gaya monster lucu ala Pokémon. NPC iklan juga diminta lebih banyak, dan perusahaan bisa menambah sendiri.

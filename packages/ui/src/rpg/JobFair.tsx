@@ -393,6 +393,53 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
   ];
 }
 
+/** A free booth place: a taped-out floor and a sign inviting a company to book it. */
+export function emptyBoothExtras(slot: { floor: number; x: number; y: number }, onClick?: () => void): SceneExtra[] {
+  const { x, y } = slot;
+  const key = `empty-${slot.floor}-${x}-${y}`;
+  const title = onClick ? "Stand kosong: booking stand" : "Stand kosong";
+  return [
+    {
+      key: `${key}-floor`,
+      x: x + 0.1,
+      y: y + 0.5,
+      z: 0,
+      ground: true,
+      onClick,
+      title,
+      node: (
+        <div className="jb-empty" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T }}>
+          <span>{onClick ? "＋ BOOKING STAND" : "STAND KOSONG"}</span>
+        </div>
+      ),
+    },
+    {
+      key: `${key}-sign`,
+      x: x + BOOTH_W / 2 - 1.1,
+      y: y + 0.2,
+      z: y + 1.6,
+      onClick,
+      title,
+      node: (
+        <svg width={2.2 * T} height={1.5 * T} viewBox="0 0 70 48" style={{ display: "block", overflow: "visible" }}>
+          <path d="M14 46l6-20M56 46l-6-20" stroke="#3b2a20" strokeWidth={3} strokeLinecap="round" />
+          <rect x={4} y={2} width={62} height={30} rx={5} fill="#fff" stroke="#3b2a20" strokeWidth={2.5} />
+          <rect x={4} y={2} width={62} height={10} rx={5} fill="#16a34a" stroke="#3b2a20" strokeWidth={2.5} />
+          <text x={35} y={10} textAnchor="middle" fontSize={7.5} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif">
+            TERSEDIA
+          </text>
+          <text x={35} y={22.5} textAnchor="middle" fontSize={8.5} fontWeight={900} fill="#3b2a20" fontFamily="system-ui, sans-serif">
+            Stand kosong
+          </text>
+          <text x={35} y={30} textAnchor="middle" fontSize={6} fontWeight={700} fill="#16a34a" fontFamily="system-ui, sans-serif">
+            ketuk untuk booking
+          </text>
+        </svg>
+      ),
+    },
+  ];
+}
+
 /** The organisers' desk near the entrance. */
 export function infoDeskExtras(desk: { x: number; y: number; width: number; height: number }, onClick?: () => void): SceneExtra[] {
   const w = desk.width * T;

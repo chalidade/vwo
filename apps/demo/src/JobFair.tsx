@@ -29,6 +29,7 @@ import {
   SponsorCard,
   type NpcView,
   boothExtras,
+  emptyBoothExtras,
   coinStandExtras,
   foodStallExtras,
   infoDeskExtras,
@@ -60,6 +61,7 @@ import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
 import { WalletPanel } from "./fair/Wallet";
+import { BookStand } from "./fair/BookStand";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./useCafe";
@@ -123,6 +125,7 @@ export function JobFair() {
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
   const [media, setMedia] = useState<{ boothId: string; acc: string } | null>(null);
+  const [booking, setBooking] = useState<{ floor: number; x: number; y: number } | null>(null);
   const [games, setGames] = useState(false);
   const [missions, setMissions] = useState(false);
   const [ring, setRing] = useState<RingSignal | null>(null);
@@ -761,6 +764,7 @@ export function JobFair() {
 
   // --- Scene.
   const extras = [
+    ...(room ? [] : fair.freeSlots().filter((sl) => sl.floor === level)).flatMap((sl) => emptyBoothExtras(sl, () => setBooking(sl))),
     ...booths.flatMap((b) =>
       boothExtras(b, {
         onBanner: () => setBoard({ boothId: b.id }),
@@ -801,6 +805,7 @@ export function JobFair() {
     <div className="game game-fair">
       <CafeScene
         className="game-scene"
+        hudBottom={session ? 72 : 0}
         floor={floor}
         floorName={shortName}
         hallTitle={room ? undefined : fair.fair.name}
@@ -949,27 +954,34 @@ export function JobFair() {
 
         {session && (
           <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="rpg-box actions">
+            <div className="rpg-box actions tabbar">
               <button type="button" className="menu-btn" onClick={() => setPanel("profile")} title="Profil, lamaran, dan stempel stand">
-                🎒 Profil
+                <span className="tab-ico">🎒</span>
+                <span className="tab-txt">Profil</span>
               </button>
               <button type="button" className="menu-btn" onClick={() => setPanel("applications")} title="Lamaran yang sudah kamu kirim">
-                📋 Lamaran ({mine.length})
+                <span className="tab-ico">📋</span>
+                <span className="tab-txt">Lamaran</span>
+                {mine.length > 0 && <span className="menu-dot menu-dot-calm">{mine.length}</span>}
               </button>
               {!me.verified && (
                 <button type="button" className="menu-btn verify-btn" onClick={() => setVerify(true)} title="Beli centang biru">
-                  ✔<span className="menu-label"> Verified</span>
+                  <span className="tab-ico">✔</span>
+                  <span className="tab-txt">Verified</span>
                 </button>
               )}
               <button type="button" className="menu-btn mission-btn" onClick={() => setMissions(true)} title="Misi harian">
-                🎯<span className="menu-label"> Misi</span>
+                <span className="tab-ico">🎯</span>
+                <span className="tab-txt">Misi</span>
                 {fair.claimable() + (fair.canClaimDaily() ? 1 : 0) > 0 && <span className="menu-dot">{fair.claimable() + (fair.canClaimDaily() ? 1 : 0)}</span>}
               </button>
               <button type="button" className="menu-btn coin-btn" onClick={() => setWallet(true)} title="Dompet koin dan voucher">
-                🪙 {me.coins}
+                <span className="tab-ico">🪙</span>
+                <span className="tab-txt">{me.coins}</span>
               </button>
               <button type="button" className="leave" onClick={leave} title="Keluar dari job fair">
-                🚪 Keluar
+                <span className="tab-ico">🚪</span>
+                <span className="tab-txt">Keluar</span>
               </button>
             </div>
           </div>
@@ -1122,6 +1134,8 @@ export function JobFair() {
         )}
 
         {sponsor && <SponsorCard sponsor={sponsor} onClose={() => setSponsor(null)} />}
+
+        {booking && <BookStand slot={booking} onClose={() => setBooking(null)} />}
 
         {session && wallet && (
           <WalletPanel

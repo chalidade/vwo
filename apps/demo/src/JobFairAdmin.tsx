@@ -26,12 +26,14 @@ const loadTab = (): OrgTab => {
 };
 
 /** The organiser's hub: the hall live, the booths, every ad, the psikotes and the seminar programme. */
-export function JobFairAdmin() {
+export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
   useFair();
-  const [tab, setTabState] = useState<OrgTab>(loadTab);
+  const [saved, setTabState] = useState<OrgTab>(loadTab);
+  const tab = TABS.some(([id]) => id === fromRoute) ? (fromRoute as OrgTab) : saved;
   const [toast, setToast] = useState<string | null>(null);
   const setTab = (t: OrgTab) => {
     setTabState(t);
+    location.hash = `#/jobfair/admin/${t}`;
     try {
       localStorage.setItem(TAB_KEY, t);
     } catch {
