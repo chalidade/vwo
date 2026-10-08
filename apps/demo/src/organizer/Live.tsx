@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fairFloorIndex } from "@vwo/shared";
 import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, liftExtras, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "../jobfair-engine";
 import { staffLook } from "../JobFair";
@@ -57,7 +58,8 @@ export function OrgLive() {
           className="admin-scene"
           floor={floor}
           floorName={(id) => fair.stopOf(id).name}
-          hallTitle={room ? undefined : fair.fair.name}
+          hallTitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).title}
+          hallSubtitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).subtitle}
           hallBanner={!room}
           occupiedSeatIds={fair.occupiedSeats()}
           avatars={[...fair.visitors.values()]}

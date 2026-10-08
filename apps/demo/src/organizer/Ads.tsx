@@ -63,6 +63,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
           ["ad-rates", "💰 Tarif"],
           ["ad-report", "📊 Laporan"],
           ["ad-announce", "📢 Pengumuman"],
+          ["ad-banner", "🎪 Banner aula"],
         ].map(([id, label]) => (
           <button key={id} type="button" className="small-btn ghost" onClick={() => jump(id!)}>
             {label}
@@ -120,6 +121,8 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
           )}
         </form>
       </div>
+
+      <HallBannerCard onToast={onToast} />
 
       <div className="card" id="ad-promoters">
         <div className="org-row org-row-head">
@@ -480,6 +483,43 @@ function SponsorForm({ sp, onClose, onSave }: { sp: SponsorView; onClose: () => 
           <button type="button" className="ghost" onClick={onClose}>
             Batal
           </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** The banner on each hall's back wall: the event's name, and one line per floor. */
+function HallBannerCard({ onToast }: { onToast: (t: string) => void }) {
+  const floors = fair.fair.floors;
+  const [title, setTitle] = useState(fair.org.banner?.title ?? "");
+  const [subs, setSubs] = useState(floors.map((_, i) => fair.org.banner?.subtitles?.[i] ?? ""));
+  return (
+    <div className="card" id="ad-banner">
+      <h2 className="cp-h2">🎪 Banner aula</h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Spanduk besar di dinding belakang tiap lantai aula. Kosongkan untuk memakai nama acara dan nama lantai.
+      </p>
+      <form
+        className="cp-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          fair.setHallBanner(title, subs);
+          onToast("Banner aula diperbarui");
+        }}
+      >
+        <label className="cp-span">
+          Judul banner
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={34} placeholder={fair.fair.name} />
+        </label>
+        {floors.map((f, i) => (
+          <label key={i}>
+            Baris kedua · {f.name.split("·")[0]!.trim()}
+            <input value={subs[i] ?? ""} onChange={(e) => setSubs(subs.map((x, j) => (j === i ? e.target.value : x)))} maxLength={70} placeholder={fair.floors[i]?.name ?? f.name} />
+          </label>
+        ))}
+        <div className="row cp-span">
+          <button type="submit">Simpan banner</button>
         </div>
       </form>
     </div>

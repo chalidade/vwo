@@ -1,7 +1,7 @@
 "use client";
 // Decorations a company can place in its job fair booth from the company portal.
 // Floor items fill four spots along the booth's front edge, keeping the middle free for visitors.
-import { BOOTH_W, type CompanyBooth } from "@vwo/shared";
+import { BOOTH_W, type CompanyBooth, boothHasGate } from "@vwo/shared";
 import { Mascot, mascotFor } from "./Mascot";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -199,6 +199,7 @@ export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) =
       out.push({ key, x: x - 0.55, y: y - 2.6, z: y + 0.6, node: <Balloons color={booth.color} /> });
       out.push({ key: `${key}-2`, x: x + BOOTH_W - 0.4, y: y - 2.6, z: y + 0.6, node: <Balloons color={booth.color} /> });
     } else if (a.slot === "wall") {
+      if (boothHasGate(booth)) continue; // hung on the gate's beam instead, see GateBeam
       out.push({ key, x: x + 1.6, y: y - 2.35, z: y + 0.62, node: <NeonSign color={booth.color} /> });
     } else {
       const s = SLOTS[slot++];
