@@ -153,7 +153,7 @@ export const BOOTH_SPOTS = {
 };
 
 /** How far a VIP booth's side wings reach past a regular booth on each side, in tiles. */
-export const VIP_WING = 1;
+export const VIP_WING = 2.5;
 
 type BoothShape = { x: number; y: number; tier?: "premium" | "regular"; accessories?: string[] };
 
@@ -166,10 +166,24 @@ export function boothFrame(b: BoothShape) {
   return { x: b.x - wing, width: BOOTH_W + 2 * wing };
 }
 
-/** Solid parts of a booth: the back wall, the desk, the roll-up banner, and the gate's posts. */
+/** Where a VIP booth's lounge sofas stand: at the back of the right wing. */
+export function vipLounge(b: BoothShape) {
+  return { x: b.x + BOOTH_W + 0.3, y: b.y + 0.55, width: VIP_WING - 0.6, height: 0.95 };
+}
+
+/** Solid parts of a booth: the back wall, the desk, the roll-up banner, and the gate's posts.
+ *  VIP booths add the lounge and velvet ropes across the front of both wings. */
 export function boothParts(b: BoothShape) {
   const f = boothFrame(b);
+  const vip = b.tier === "premium";
   return [
+    ...(vip
+      ? [
+          { part: "lounge", ...vipLounge(b) },
+          { part: "rope", x: f.x + 0.5, y: b.y + BOOTH_H - 0.35, width: b.x - 0.2 - (f.x + 0.5), height: 0.25 },
+          { part: "rope", x: b.x + BOOTH_W + 0.2, y: b.y + BOOTH_H - 0.35, width: f.x + f.width - 0.5 - (b.x + BOOTH_W + 0.2), height: 0.25 },
+        ]
+      : []),
     { part: "wall", x: f.x, y: b.y, width: f.width, height: 0.5 },
     { part: "desk", x: b.x + 1.2, y: b.y + 2.0, width: 3, height: 0.7 },
     { part: "rollup", x: b.x + 4.95, y: b.y + 1.65, width: 0.75, height: 0.45 },
@@ -243,7 +257,7 @@ export interface Promoter {
   boothId?: string;
 }
 
-export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
+export type FairRoomKind = "psikotes" | "seminar" | "foodcourt" | "aula";
 
 /** A whole floor of its own, reached by lift. Premium floors cost coins to enter. */
 export interface FairRoom {
@@ -314,9 +328,9 @@ export const COIN_STAND_SPOTS = { staff: { x: 2.7, y: 1.0 }, front: { x: 2.7, y:
 export const fairRoomFloorId = (fair: { slug: string }, roomId: string) => `${fair.slug}-room-${roomId}`;
 
 /** The lift lobby in the bottom-right corner of every floor: a wall with the lift doors. */
-export const FAIR_LIFT = { x: 32.2, y: 16.6, width: 4.4, height: 1 };
+export const FAIR_LIFT = { x: 40.2, y: 16.6, width: 4.4, height: 1 };
 /** Where you wait for the lift, and where you step out of it. */
-export const LIFT_FRONT = { x: 34.4, y: 18.5 };
+export const LIFT_FRONT = { x: 42.4, y: 18.5 };
 
 /** One stop of the lift: a hall floor with booths, or a floor that is a room. */
 export interface FairStop {
@@ -340,7 +354,32 @@ export function fairStops(fair: JobFairView): FairStop[] {
 
 /** Stall geometry in the food court: four stalls spread along the back wall. */
 export function stallRect(i: number) {
-  return { x: 2.2 + i * 9.2, y: 0.3, width: 5.4, height: 2.4 };
+  return { x: 3 + i * 11, y: 0.3, width: 5.4, height: 2.4 };
+}
+
+/** The Aula: a stage across the back wall, rows of chairs, a meeting point, and standing boards for the
+ *  rundown and event info. Shared by the floor plan and the drawings. */
+export const AULA = {
+  stage: { x: 12, y: 0.3, width: 22, height: 3.2 },
+  /** Standing boards visitors walk up to: the rundown on the left, event info on the right. */
+  rundown: { x: 2.6, y: 5.4, width: 2.6, height: 0.5 },
+  info: { x: 40.4, y: 5.4, width: 2.6, height: 0.5 },
+  /** The meeting point marker, bottom left. */
+  meet: { x: 3.2, y: 15.2, width: 6, height: 4.6 },
+  pole: { x: 5.85, y: 16.9, width: 0.7, height: 0.4 },
+  /** Chair rows facing the stage: two blocks with an aisle in the middle. */
+  rows: 5,
+  rowY: 5.6,
+  rowGap: 1.6,
+  blocks: [8.4, 25.6],
+  perRow: 11,
+  chairGap: 1.1,
+} as const;
+
+/** Where to stand to read an Aula board. */
+export function aulaSpot(board: "rundown" | "info") {
+  const b = AULA[board];
+  return { x: b.x + b.width / 2, y: b.y + b.height + 0.7 };
 }
 export function stallSpot(i: number, spot: "vendor" | "order") {
   const s = stallRect(i);
@@ -359,28 +398,40 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
   };
   const seat = (t: TableView, i: number, x: number, y: number) =>
     seats.push({ id: `${t.id}-${String.fromCharCode(65 + i)}`, label: `${t.label}-${String.fromCharCode(65 + i)}`, tableId: t.id, x, y, isActive: true });
+  // Layouts were drawn for a 38-tile floor; wider floors keep them centred.
+  const ox = (room.width - 38) / 2;
   if (room.kind === "psikotes") {
     blocked.push({ x: room.width / 2 - 2, y: 1.2, width: 4, height: 0.8 });
     for (let r = 0; r < 4; r++)
       for (let c = 0; c < 7; c++) {
-        const t = table(`P${r * 7 + c + 1}`, "square", 3.6 + c * 4.6, 4 + r * 2.9, 1.4, 0.8);
+        const t = table(`P${r * 7 + c + 1}`, "square", ox + 3.6 + c * 4.6, 4 + r * 2.9, 1.4, 0.8);
         seat(t, 0, t.x + 0.7, t.y + 1.35);
       }
   } else if (room.kind === "seminar") {
     blocked.push({ x: 4, y: 0.3, width: room.width - 8, height: 2.6 });
     for (let r = 0; r < 5; r++)
-      for (const [side, x0] of [["L", 3.5], ["R", room.width / 2 + 2.5]] as const) {
+      for (const [side, x0] of [["L", ox + 3.5], ["R", room.width / 2 + 2.5]] as const) {
         const t = table(`${String.fromCharCode(65 + r)}${side}`, "rect", x0, 4.6 + r * 2.3, 10.6, 0.5);
         for (let i = 0; i < 7; i++) seat(t, i, t.x + 0.8 + i * 1.5, t.y + 1.0);
       }
+  } else if (room.kind === "aula") {
+    blocked.push(AULA.stage, AULA.rundown, AULA.info, AULA.pole);
+    // Rows of loose chairs facing the stage, no tables.
+    for (let r = 0; r < AULA.rows; r++)
+      AULA.blocks.forEach((x0, k) => {
+        for (let i = 0; i < AULA.perRow; i++) {
+          const label = `${String.fromCharCode(65 + r)}${k * AULA.perRow + i + 1}`;
+          seats.push({ id: `${room.id}-${label}`, label: `Kursi ${label}`, tableId: null, x: x0 + 0.5 + i * AULA.chairGap, y: AULA.rowY + r * AULA.rowGap, isActive: true, facing: "back" });
+        }
+      });
   } else {
     (room.stalls ?? []).forEach((_, i) => {
       const s = stallRect(i);
       blocked.push({ x: s.x, y: s.y, width: s.width, height: 0.5 }, { x: s.x + 0.3, y: s.y + 1.45, width: s.width - 0.6, height: 0.7 });
     });
     for (let r = 0; r < 3; r++)
-      for (let c = 0; c < 5; c++) {
-        const t = table(`T${r * 5 + c + 1}`, "round", 2.6 + c * 6.6, 5.4 + r * 4.6, 1.8, 1.8);
+      for (let c = 0; c < 6; c++) {
+        const t = table(`T${r * 6 + c + 1}`, "round", 3.2 + c * 6.8, 5.4 + r * 4.6, 1.8, 1.8);
         seatPositionsAround(t, 4).forEach((p, i) => seat(t, i, p.x, p.y));
       }
   }
@@ -402,7 +453,7 @@ export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
     ...[
       { key: "plant-a", spriteKey: "plant-big", x: 0.2, y: room.height - 1.6, width: 1.2, height: 1 },
       { key: "plant-b", spriteKey: "plant", x: room.width - 1.3, y: 13.4, width: 1, height: 1 },
-      { key: "plant-c", spriteKey: "plant", x: 30.6, y: room.height - 1.3, width: 1, height: 1 },
+      { key: "plant-c", spriteKey: "plant", x: FAIR_LIFT.x - 1.6, y: room.height - 1.3, width: 1, height: 1 },
     ].map(({ key, ...o }): MapObjectView => ({ id: `${id}-${key}`, type: "decor", ...o, isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
   ];
   return { id, name: room.name, width: room.width, height: room.height, tables, seats, objects, theme: "hall" };
@@ -487,15 +538,15 @@ function company(c: Omit<CompanyBooth, "website" | "email" | "socials" | "faq"> 
 export const DEMO_JOB_FAIR: JobFairView = {
   slug: "jobfair",
   name: "Job Fair VWO 2026",
-  width: 38,
+  width: 46,
   height: 22,
   floors: [
     { name: "Lantai 1", theme: "Teknologi & Keuangan" },
     { name: "Lantai 2", theme: "Kreatif, Kuliner & Ritel" },
     { name: "Lantai 3", theme: "Industri, Energi & Kesehatan" },
   ],
-  spawn: { x: 19, y: 21.2 },
-  infoDesk: { x: 16.6, y: 17.2, width: 4.8, height: 0.7, staff: "Dewi" },
+  spawn: { x: 23, y: 21.2 },
+  infoDesk: { x: 20.6, y: 17.2, width: 4.8, height: 0.7, staff: "Dewi" },
   sponsors: [
     {
       id: "telko-nusa",
@@ -508,7 +559,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       website: "https://telkonusa.example",
       promo: "Kuota 20 GB gratis untuk pengunjung: kode JOBFAIR26",
       floor: 0,
-      x: 11.05,
+      x: 14.05,
       y: 1.2,
     },
     {
@@ -522,7 +573,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       website: "https://kampusdigital.example",
       promo: "Diskon 50% kelas persiapan interview",
       floor: 0,
-      x: 26.05,
+      x: 31.05,
       y: 1.2,
     },
     {
@@ -536,7 +587,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       website: "https://ojekkita.example",
       promo: "Potongan Rp10.000 dengan kode INTERVIEW",
       floor: 1,
-      x: 11.05,
+      x: 14.05,
       y: 1.2,
     },
     {
@@ -549,7 +600,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       about: "Portal berita karier dan lowongan kerja. Media partner resmi job fair ini.",
       website: "https://mediakarier.example",
       floor: 1,
-      x: 26.05,
+      x: 31.05,
       y: 1.2,
     },
     {
@@ -563,33 +614,33 @@ export const DEMO_JOB_FAIR: JobFairView = {
       website: "https://asuransiaman.example",
       promo: "Gratis 3 bulan pertama untuk pengunjung job fair",
       floor: 2,
-      x: 11.05,
+      x: 14.05,
       y: 1.2,
     },
   ],
   decor: [
     // Ground floor: the coin stand on the left of the entrance, a lounge on the right.
     { floor: 0, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
-    { floor: 0, spriteKey: "plant-big", x: 36.6, y: 5.6, width: 1.2, height: 1 },
+    { floor: 0, spriteKey: "plant-big", x: 44.6, y: 5.6, width: 1.2, height: 1 },
     { floor: 0, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
-    { floor: 0, spriteKey: "plant", x: 36.7, y: 13.8, width: 1, height: 1 },
-    { floor: 0, spriteKey: "rug-plain", x: 23.6, y: 16.2, width: 6, height: 3.6, isWalkable: true },
-    { floor: 0, spriteKey: "sofa", x: 23.9, y: 16.6, width: 1, height: 2.4 },
-    { floor: 0, spriteKey: "sofa-left", x: 28.3, y: 16.6, width: 1, height: 2.4 },
-    { floor: 0, spriteKey: "plant", x: 26.1, y: 16.4, width: 1, height: 1 },
-    { floor: 0, spriteKey: "lamp", x: 13.4, y: 20.4, width: 0.8, height: 0.8 },
-    { floor: 0, spriteKey: "lamp", x: 22.4, y: 20.4, width: 0.8, height: 0.8 },
+    { floor: 0, spriteKey: "plant", x: 44.7, y: 13.8, width: 1, height: 1 },
+    { floor: 0, spriteKey: "rug-plain", x: 29.6, y: 16.2, width: 6, height: 3.6, isWalkable: true },
+    { floor: 0, spriteKey: "sofa", x: 29.9, y: 16.6, width: 1, height: 2.4 },
+    { floor: 0, spriteKey: "sofa-left", x: 34.3, y: 16.6, width: 1, height: 2.4 },
+    { floor: 0, spriteKey: "plant", x: 32.1, y: 16.4, width: 1, height: 1 },
+    { floor: 0, spriteKey: "lamp", x: 17.4, y: 20.4, width: 0.8, height: 0.8 },
+    { floor: 0, spriteKey: "lamp", x: 27.4, y: 20.4, width: 0.8, height: 0.8 },
     // Upper floors: one big lounge in the middle.
     ...[1, 2].flatMap((floor) => [
       { floor, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
-      { floor, spriteKey: "plant-big", x: 36.6, y: 5.6, width: 1.2, height: 1 },
+      { floor, spriteKey: "plant-big", x: 44.6, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
-      { floor, spriteKey: "plant", x: 36.7, y: 13.8, width: 1, height: 1 },
-      { floor, spriteKey: "rug-plain", x: 13, y: 16.2, width: 12, height: 3.6, isWalkable: true },
-      { floor, spriteKey: "sofa", x: 13.3, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "sofa-left", x: 23.7, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "plant", x: 18.5, y: 16.4, width: 1, height: 1 },
-      { floor, spriteKey: "lamp", x: 27.6, y: 20.4, width: 0.8, height: 0.8 },
+      { floor, spriteKey: "plant", x: 44.7, y: 13.8, width: 1, height: 1 },
+      { floor, spriteKey: "rug-plain", x: 17, y: 16.2, width: 12, height: 3.6, isWalkable: true },
+      { floor, spriteKey: "sofa", x: 17.3, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "sofa-left", x: 27.7, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "plant", x: 22.5, y: 16.4, width: 1, height: 1 },
+      { floor, spriteKey: "lamp", x: 33.6, y: 20.4, width: 0.8, height: 0.8 },
     ]),
   ],
 
@@ -601,7 +652,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "👞",
       color: "#78350f",
       level: 0,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Sepatu kerja diskon 35%",
       offer: "Sepatu pantofel dan sneakers kantor, nyaman dipakai seharian. Diskon 35% untuk pengunjung job fair.",
@@ -618,7 +669,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "📄",
       color: "#0284c7",
       level: 0,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Cek CV gratis oleh HR",
       offer: "Unggah CV-mu, HR berpengalaman memberi catatan dalam 24 jam. Template CV ATS-friendly gratis.",
@@ -635,7 +686,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "💻",
       color: "#475569",
       level: 1,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Sewa laptop mulai Rp99 ribu/minggu",
       offer: "Butuh laptop untuk tes online atau kerja pertama? Sewa harian, mingguan, atau bulanan, bisa diantar.",
@@ -652,7 +703,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "💇",
       color: "#db2777",
       level: 2,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Potong rambut rapi Rp30 ribu",
       offer: "Tampil rapi sebelum interview. Potong dan styling di cabang mana pun, cukup tunjukkan kode.",
@@ -669,7 +720,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "🛵",
       color: "#ea580c",
       level: 2,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Gratis ongkir 5x makan siang",
       offer: "Pesan makan siang dari kantor baru dengan gratis ongkir lima kali selama sebulan.",
@@ -686,7 +737,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "🛵",
       color: "#16a34a",
       level: 0,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Diskon 50% ojek ke lokasi interview",
       offer: "Pulang dari job fair atau berangkat interview? Pakai kode ini untuk diskon 50% dua kali perjalanan.",
@@ -703,7 +754,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "📷",
       color: "#7c3aed",
       level: 1,
-      x: 24,
+      x: 28,
       y: 13,
       headline: "Pas foto CV profesional Rp15 ribu",
       offer: "Foto CV latar polos, langsung jadi digital 5 menit. Tunjukkan kode di studio kami.",
@@ -720,7 +771,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "📶",
       color: "#e11d48",
       level: 0,
-      x: 10.5,
+      x: 12.5,
       y: 19.4,
       headline: "Kuota 30 GB cuma Rp25 ribu",
       offer: "Khusus pengunjung job fair: paket internet 30 GB 30 hari, plus gratis 5 GB untuk video call interview.",
@@ -736,7 +787,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "💻",
       color: "#2563eb",
       level: 0,
-      x: 12,
+      x: 14.5,
       y: 7.4,
       headline: "Bootcamp coding, bayar setelah kerja",
       offer: "Belajar web developer 12 minggu dengan mentor industri. Daftar hari ini dapat potongan 40% dan kelas persiapan interview gratis.",
@@ -752,7 +803,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "🏦",
       color: "#0f766e",
       level: 1,
-      x: 27,
+      x: 31.5,
       y: 7.4,
       headline: "Buka rekening gaji online, gratis admin",
       offer: "Rekening untuk karyawan baru: gratis biaya admin 12 bulan, kartu debit langsung jadi, bonus saldo Rp50.000.",
@@ -767,7 +818,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "🏠",
       color: "#9333ea",
       level: 2,
-      x: 12,
+      x: 14.5,
       y: 7.4,
       headline: "Kos dekat kantor barumu",
       offer: "Cari kos dan apartemen dekat kantor, bisa bayar bulanan. Diskon sewa bulan pertama 20% untuk pencari kerja.",
@@ -782,9 +833,9 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Segar Botol",
       emoji: "🥤",
       color: "#f59e0b",
-      level: 3,
-      x: 34.5,
-      y: 8,
+      level: 4,
+      x: 43,
+      y: 9,
       headline: "Sampling gratis minuman isotonik",
       offer: "Coba rasa baru Segar Botol Lemon. Tunjukkan kode di minimarket mana pun untuk beli 2 gratis 1.",
       cta: "Lokasi minimarket",
@@ -795,7 +846,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
   ],
   coinStand: {
     floor: 0,
-    x: 2.4,
+    x: 3.4,
     y: 16,
     staff: "Mbak Koin",
     packages: [
@@ -806,15 +857,28 @@ export const DEMO_JOB_FAIR: JobFairView = {
   },
   rooms: [
     {
+      id: "aula",
+      kind: "aula",
+      name: "Aula Utama",
+      tagline: "Panggung acara, jadwal hari ini, dan meeting point",
+      emoji: "🏛️",
+      color: "#9f1239",
+      level: 3,
+      price: 0,
+      width: 46,
+      height: 22,
+      staff: { name: "MC Rara", role: "Pembawa acara" },
+    },
+    {
       id: "foodcourt",
       kind: "foodcourt",
       name: "Food Court",
       tagline: "Promo cafe dan tempat makan, beli voucher pakai koin",
       emoji: "🍜",
       color: "#ea580c",
-      level: 3,
+      level: 4,
       price: 0,
-      width: 38,
+      width: 46,
       height: 22,
       staff: { name: "Bang Ucok", role: "Pengelola food court" },
       stalls: [
@@ -911,9 +975,9 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Latihan psikotes, hasilnya dilihat recruiter",
       emoji: "🧠",
       color: "#7c3aed",
-      level: 5,
+      level: 6,
       price: 20,
-      width: 38,
+      width: 46,
       height: 22,
       staff: { name: "Bu Psikolog Rina", role: "Pengawas psikotes" },
     },
@@ -924,9 +988,9 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Seminar karier bersertifikat",
       emoji: "🎤",
       color: "#0e7490",
-      level: 4,
+      level: 5,
       price: 15,
-      width: 38,
+      width: 46,
       height: 22,
       staff: { name: "Pak Arif", role: "Pembicara" },
     },
@@ -941,7 +1005,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#2563eb",
       floor: 0,
       tier: "premium",
-      x: 1,
+      x: 3,
       y: 0.4,
       recruiter: "Bima",
       website: "https://nusantaratech.example",
@@ -975,7 +1039,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#b45309",
       floor: 1,
       tier: "premium",
-      x: 1,
+      x: 3,
       y: 0.4,
       recruiter: "Sinta",
       website: "https://kopikita.example",
@@ -1009,7 +1073,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#0f766e",
       floor: 0,
       tier: "premium",
-      x: 16,
+      x: 20,
       y: 0.4,
       recruiter: "Hendra",
       website: "https://banksejahtera.example",
@@ -1043,7 +1107,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#ea580c",
       floor: 2,
       tier: "premium",
-      x: 1,
+      x: 3,
       y: 0.4,
       recruiter: "Agus",
       website: "https://geraklogistik.example",
@@ -1077,7 +1141,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#16a34a",
       floor: 2,
       tier: "premium",
-      x: 16,
+      x: 20,
       y: 0.4,
       recruiter: "Laila",
       website: "https://hijauenergi.example",
@@ -1111,7 +1175,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       color: "#db2777",
       floor: 1,
       tier: "premium",
-      x: 16,
+      x: 20,
       y: 0.4,
       recruiter: "Rara",
       website: "https://kreatifstudio.example",
@@ -1144,7 +1208,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "SM",
       color: "#0891b2",
       floor: 2,
-      x: 31,
+      x: 37,
       y: 0.4,
       recruiter: "Dokter Ayu",
       website: "https://sehatmedika.example",
@@ -1177,7 +1241,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "PE",
       color: "#ca8a04",
       floor: 0,
-      x: 1,
+      x: 3,
       y: 9.4,
       recruiter: "Kak Dian",
       website: "https://pintaredu.example",
@@ -1211,7 +1275,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "DK",
       color: "#4f46e5",
       floor: 0,
-      x: 31,
+      x: 37,
       y: 0.4,
       recruiter: "Kevin",
       domain: "dompetkita",
@@ -1237,7 +1301,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "DR",
       color: "#0f766e",
       floor: 0,
-      x: 16,
+      x: 20,
       y: 9.4,
       recruiter: "Nadia",
       domain: "dataraya",
@@ -1263,7 +1327,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "TK",
       color: "#ea580c",
       floor: 0,
-      x: 31,
+      x: 37,
       y: 9.4,
       recruiter: "Sinta",
       domain: "tokokita",
@@ -1290,7 +1354,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "ML",
       color: "#be185d",
       floor: 1,
-      x: 31,
+      x: 37,
       y: 0.4,
       recruiter: "Bella",
       domain: "modelokal",
@@ -1316,7 +1380,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "PS",
       color: "#16a34a",
       floor: 1,
-      x: 1,
+      x: 3,
       y: 9.4,
       recruiter: "Pak Joko",
       domain: "pasarsegar",
@@ -1342,7 +1406,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "HN",
       color: "#b45309",
       floor: 1,
-      x: 16,
+      x: 20,
       y: 9.4,
       recruiter: "Bu Ratna",
       domain: "hotelnusaindah",
@@ -1368,7 +1432,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "GN",
       color: "#9333ea",
       floor: 1,
-      x: 31,
+      x: 37,
       y: 9.4,
       recruiter: "Arya",
       domain: "gimnusantara",
@@ -1395,7 +1459,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "BP",
       color: "#475569",
       floor: 2,
-      x: 1,
+      x: 3,
       y: 9.4,
       recruiter: "Pak Hendra",
       domain: "bajaprima",
@@ -1421,7 +1485,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "BJ",
       color: "#f59e0b",
       floor: 2,
-      x: 16,
+      x: 20,
       y: 9.4,
       recruiter: "Bu Wulan",
       domain: "bangunjaya",
@@ -1447,7 +1511,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "AT",
       color: "#65a30d",
       floor: 2,
-      x: 31,
+      x: 37,
       y: 9.4,
       recruiter: "Mas Wahyu",
       domain: "agrotani",

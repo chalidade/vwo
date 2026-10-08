@@ -13,13 +13,13 @@ const waNumber = (phone: string) => phone.replace(/\D/g, "").replace(/^0/, "62")
 type Sort = "new" | "match" | "psych" | "rating";
 
 /** Review applications: filter, read, rate, move through the pipeline, chat, call and invite to interview. */
-export function Applicants({ booth }: { booth: CompanyBooth }) {
+export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: string }) {
   const apps = fair.applications.filter((a) => a.boothId === booth.id);
   const [job, setJob] = useState("all");
   const [status, setStatus] = useState<string>("all");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("new");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(focusId ?? null);
   const jobOf = (a: FairApplication) => booth.jobs.find((j) => j.id === a.jobId);
   const score = (a: FairApplication) => matchScore(a, jobOf(a));
 
@@ -272,6 +272,12 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
       </div>
 
       <h3 className="cp-h3">Jadwalkan interview</h3>
+      {a.interview && (
+        <p className="cp-iv-reply" data-reply={a.interview.reply ?? "menunggu"}>
+          {a.interview.reply === "hadir" ? "✅ Pelamar konfirmasi hadir" : a.interview.reply === "jadwal-ulang" ? "🕑 Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
+          {new Date(a.interview.at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+        </p>
+      )}
       <form
         className="cp-form cp-iv"
         onSubmit={(e) => {

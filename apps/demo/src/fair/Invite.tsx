@@ -60,6 +60,22 @@ export function InviteCard({ application: a, onOpen, onClose }: { application: F
       )}
       {iv.note && <p className="iv-line iv-note">“{iv.note}”</p>}
       <p className="sp-muted iv-tip">{online ? "Saat jadwalnya tiba, recruiter akan menelepon kamu di sini. Pastikan halaman ini tetap terbuka." : "Datang 10 menit lebih awal dan bawa CV."}</p>
+      <div className="iv-reply">
+        {iv.reply === "hadir" ? (
+          <span className="iv-replied">✅ Kamu sudah konfirmasi hadir. HR mendapat notifikasinya.</span>
+        ) : iv.reply === "jadwal-ulang" ? (
+          <span className="iv-replied">🕑 Kamu minta jadwal ulang. Tunggu HR mengirim jadwal baru.</span>
+        ) : (
+          <>
+            <button type="button" className="small-btn" onClick={() => fair.answerInterview(a.id, "hadir")}>
+              ✅ Konfirmasi hadir
+            </button>
+            <button type="button" className="small-btn ghost" onClick={() => fair.answerInterview(a.id, "jadwal-ulang")}>
+              🕑 Minta jadwal ulang
+            </button>
+          </>
+        )}
+      </div>
       <div className="iv-actions">
         <a className="small-btn ghost" href={calendarHref(a)} download={`interview-${a.company}.ics`}>
           🗓️ Simpan ke kalender

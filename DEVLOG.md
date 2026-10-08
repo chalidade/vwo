@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · VWO - Virtual World Job: notifikasi pelamar ⇄ HRD, stand VIP jauh lebih lebar, layar LED seminar, lantai Aula
+
+**Konteks:** owner minta (1) notifikasi antara pelamar dan HRD, (2) stand VIP lebih lebar ke samping supaya bisa taruh TV di depan atau samping kiri, lebih besar dan mewah, (3) layar besar di ruang seminar, (4) satu lantai penuh untuk Aula dengan panggung, jadwal acara, info, dan meeting point, (5) nama aplikasi jadi "VWO - Virtual World Job".
+
+**Yang berubah**
+- **Notifikasi dua arah:** lonceng 🔔 di bar bawah job fair (pelamar) dan di header portal perusahaan (HRD), lengkap dengan angka belum dibaca. Pelamar diberi tahu saat HRD chat, mengundang atau mengubah jadwal interview, menelepon tapi tidak diangkat, mengubah status, atau memberi rating. HRD diberi tahu saat ada lamaran baru, pelamar membalas chat, pelamar konfirmasi hadir atau minta jadwal ulang, dan saat panggilan tidak diangkat. Kartu undangan interview kini punya tombol "Konfirmasi hadir" dan "Minta jadwal ulang"; status jawabannya tampil di detail pelamar HRD. Notifikasi disimpan bersama data demo, jadi tersinkron antar tab, termasuk tanda sudah dibaca.
+- **Stand VIP:** semua lantai hall dilebarkan dari 38 ke 46 petak. Sayap VIP sekarang 2,5 petak tiap sisi (sebelumnya 1). Sayap kiri berisi video wall LED besar di atas truss (bisa diketuk untuk video), sayap kanan backdrop "WE'RE HIRING" dengan jumlah lowongan dan lounge (dua kursi + meja kopi). Ada karpet merah dari gapura ke meja recruiter dan tali beludru bertiang emas di depan kedua sayap. TV aksesori pada stand VIP berdiri di depan sayap kiri, di bawah video wall. Posisi stand, sponsor, dan promotor yang tersimpan dari denah lama dipindahkan otomatis ke denah baru.
+- **Ruang seminar:** proyektor kecil diganti layar LED 20 petak: slide yang sedang dibawakan (berganti tiap beberapa detik), kamera pembicara dengan nama dan jabatan, badge LIVE saat pembicara siaran, ticker berjalan, plus dua layar samping "Sesi berikutnya" dan "Tanya jawab". Nama NPC di panggung mengikuti pembicara di layar.
+- **Aula Utama (Lantai 4):** lantai baru dengan panggung lebar (tirai, podium MC, rangkaian bunga), layar LED yang menampilkan acara yang sedang berlangsung atau berikutnya sesuai jam, papan jadwal di kiri, papan info dan denah di kanan, 110 kursi menghadap panggung, dan lingkaran meeting point. Papan membuka jendela dengan tab Jadwal, Info & denah (tombol "Ke sana" per lantai, FAQ, kontak panitia), dan Meeting point. Panitia mengatur rundown di tab baru "🏛️ Aula", dan halaman pembicara bisa siaran ke "Panggung Aula" untuk sambutan atau talkshow. Food Court, Seminar, dan Psikotes naik satu lantai (5, 6, 7).
+- **Nama baru:** judul halaman, manifest PWA, beranda, logo nav, aplikasi web, dan README sekarang "VWO - Virtual World Job".
+
+**Cek:** typecheck semua paket, 38 tes demo (tambahan: notifikasi lintas tab, Aula dan rundown, migrasi denah lama), build web, dan screenshot HP + desktop di `screenshots/jobfair-aula/`.
+
+---
+
 ## 2026-10-08 · Job fair: undangan interview untuk pelamar, tagihan rapi, VIP tanpa tumpang tindih, banner aula bisa diatur, pengumuman tampil
 
 **Konteks:** owner menanyakan tampilan pelamar saat HR menelepon atau menjadwalkan interview, menilai tagihan kurang rapi, stand VIP masih tumpang tindih (neon dengan gapura, tulisan umbul-umbul terpotong), banner aula tertutup dan tidak bisa diatur, serta pengumuman panitia tidak muncul di halaman pengunjung. Owner juga minta kesimpulan apa yang kurang untuk live.

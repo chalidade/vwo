@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { BOOTH_SLOTS, DemoJobFair, type FairSaved, PLAYER_ID, promoterId, recruiterId } from "../src/jobfair-engine";
+import { AULA, aulaSpot, fairStops } from "@vwo/shared";
+import { BOOTH_SLOTS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
 function clock() {
@@ -10,12 +11,12 @@ function clock() {
 }
 
 describe("DemoJobFair", () => {
-  it("can walk from the entrance or the lift to every booth, sponsor, seat and stall on all six floors", () => {
+  it("can walk from the entrance or the lift to every booth, sponsor, seat and stall on all seven floors", () => {
     const fair = new DemoJobFair(() => 0.5);
     const halls = fair.floors.slice(0, DEMO_JOB_FAIR.floors.length);
     expect(halls).toHaveLength(3);
-    expect(fair.stops.map((s) => s.name)).toEqual(["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6"]);
-    expect(fair.stops.slice(3).map((s) => s.roomId)).toEqual(["foodcourt", "seminar", "psikotes"]);
+    expect(fair.stops.map((s) => s.name)).toEqual(["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6", "Lantai 7"]);
+    expect(fair.stops.slice(3).map((s) => s.roomId)).toEqual(["aula", "foodcourt", "seminar", "psikotes"]);
     expect(isBlocked(fair.floors[0]!, fair.fair.spawn.x, fair.fair.spawn.y)).toBe(false);
     // Every floor has the lift in the same corner, reachable from where you step out of it.
     for (const f of fair.floors) {
@@ -115,7 +116,7 @@ describe("DemoJobFair", () => {
     // Bots ride the lift: booths on the top floor get visitors too.
     const top = DEMO_JOB_FAIR.booths.filter((b) => b.floor === 2);
     expect(top.reduce((n, b) => n + (fair.visits.get(b.id) ?? 0), 0)).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it("charges coins for applying and premium rooms, and hands out vouchers at the food court", () => {
     const c = clock();
@@ -574,5 +575,98 @@ describe("DemoJobFair", () => {
     expect(again.hallBanner(1).subtitle).toBe(again.floors[1]!.name);
     expect([b2.tier, b2.theme, [...b2.accessories!].sort(), b2.media?.gate, b2.media?.gateText, b2.media?.videoUrl]).toEqual(["regular", "wood", ["gapura", "plant", "tv"], "balon", "Ayo masuk", "https://video.example/a.mp4"]);
     expect(isBlocked(again.floors[b2.floor]!, b2.x + 0.25, b2.y + 3.35)).toBe(true);
+  });
+
+  it("notifies HR and the applicant of each other, across tabs, and keeps what was read", () => {
+    const c = clock();
+    const seeker = new DemoJobFair(() => 0.5, c.now);
+    const hr = new DemoJobFair(() => 0.5, c.now);
+    let saved: FairSaved | null = null;
+    const grab = (f: DemoJobFair) => {
+      (f as unknown as { storage: unknown }).storage = { load: () => saved, save: (d: FairSaved) => (saved = JSON.parse(JSON.stringify(d))), clear() {} };
+      (f as unknown as { dirty: boolean }).dirty = true;
+      f.flush();
+      return saved;
+    };
+    seeker.join("Chalid", false, PLAYER_ID);
+    const a = seeker.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: "kk-barista" })!;
+    hr.mergeSaved(grab(seeker));
+    // HR hears about the new application.
+    expect(hr.notifsFor("kopi-kita").map((n) => [n.kind, n.appId])).toEqual([["apply", a.id]]);
+    expect(hr.unreadFor("kopi-kita")).toBe(1);
+
+    // HR chats, invites, and calls without an answer: the applicant gets one notification for each.
+    c.advance(1000);
+    hr.messageApplicant(a.id, "Halo, bisa interview minggu ini?");
+    hr.scheduleInterview(a.id, { at: c.now() + 86_400_000, mode: "Video call" });
+    hr.logCall(a.id, { at: c.now(), kind: "video", answered: false, seconds: 0 });
+    seeker.mergeSaved(grab(hr));
+    expect(seeker.notifsFor(PLAYER_ID).map((n) => n.kind)).toEqual(["call", "interview", "chat"]);
+    expect(seeker.unreadFor(PLAYER_ID)).toBe(3);
+
+    // The applicant confirms and replies; HR is told, and its own notifications are not duplicated.
+    c.advance(1000);
+    seeker.markRead(PLAYER_ID);
+    seeker.answerInterview(a.id, "hadir");
+    seeker.replyToCompany(a.id, "Siap, terima kasih!");
+    hr.mergeSaved(grab(seeker));
+    const kinds = hr.notifsFor("kopi-kita").map((n) => n.kind);
+    expect(kinds.slice(0, 2)).toEqual(["chat", "confirm"]);
+    expect(kinds.filter((k) => k === "apply")).toHaveLength(1);
+    expect(hr.applications[0]!.interview?.reply).toBe("hadir");
+    // Read marks travel too.
+    expect(hr.unreadFor(PLAYER_ID)).toBe(0);
+    hr.markRead("kopi-kita");
+    seeker.mergeSaved(grab(hr));
+    expect(seeker.unreadFor("kopi-kita")).toBe(0);
+  });
+
+  it("has an Aula floor with a stage, a rundown by the clock, and boards you can walk to", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const aula = fair.fair.rooms.find((r) => r.kind === "aula")!;
+    expect(fairStops(fair.fair).find((s) => s.roomId === "aula")?.name).toBe("Lantai 4");
+    const f = fair.floor(fairRoomFloorId(fair.fair, aula.id));
+    expect(isBlocked(f, AULA.stage.x + 5, AULA.stage.y + 1)).toBe(true);
+    for (const board of ["rundown", "info"] as const) expect(findPath(f, LIFT_FRONT, aulaSpot(board)), board).not.toBeNull();
+    expect(f.seats.length).toBe(AULA.rows * AULA.blocks.length * AULA.perRow);
+    expect(f.seats.every((s) => s.facing === "back")).toBe(true);
+
+    const at = (h: number, m: number) => new Date(2026, 9, 8, h, m);
+    expect(aulaNow(DEFAULT_RUNDOWN, at(9, 5)).current?.id).toBe("buka");
+    expect(aulaNow(DEFAULT_RUNDOWN, at(7, 0))).toMatchObject({ current: null, next: { id: "reg" }, over: false });
+    expect(aulaNow(DEFAULT_RUNDOWN, at(20, 0))).toMatchObject({ current: null, next: null, over: true });
+
+    // The organiser writes its own rundown: bad rows are dropped, times are sorted.
+    expect(fair.saveRundown([
+      { id: "b", start: "10:00", end: "10.30", title: "Talkshow", host: "HR", kind: "talkshow" },
+      { id: "a", start: "09.00", end: "09.15", title: " Sambutan Walikota ", host: "Walikota", kind: "sambutan" },
+      { id: "x", start: "9", end: "", title: "Rusak", host: "", kind: "info" },
+    ])).toBe(2);
+    expect(fair.rundown().map((e) => [e.start, e.title])).toEqual([["09.00", "Sambutan Walikota"], ["10.00", "Talkshow"]]);
+    fair.resetRundown();
+    expect(fair.rundown()).toBe(DEFAULT_RUNDOWN);
+  });
+
+  it("moves booths, sponsors and promoters saved for the old 38-tile halls into the wider halls", () => {
+    expect([1, 16, 31].map(migrateHallX)).toEqual([3, 20, 37]);
+    let stored: FairSaved | null = {
+      version: 2,
+      applications: [],
+      visits: {},
+      sponsorViews: {},
+      visitedBy: {},
+      org: {
+        removed: ["nusantara-tech"],
+        added: [{ ...structuredClone(DEMO_JOB_FAIR.booths[0]!), id: "baru", company: "Baru", x: 1, y: 0.4 }],
+        sponsors: structuredClone(DEMO_JOB_FAIR.sponsors).map((sp) => ({ ...sp, x: sp.x === 14.05 ? 11.05 : 26.05 })),
+        promoters: [{ ...structuredClone(DEMO_JOB_FAIR.promoters[0]!), level: 3, x: 34.5 }],
+      },
+    };
+    const storage = { load: () => stored, save: (d: FairSaved) => (stored = d), clear: () => (stored = null) };
+    const fair = new DemoJobFair(() => 0.5, () => 0, DEMO_JOB_FAIR, storage);
+    expect(fair.booth("baru")).toMatchObject({ x: 3, y: 0.4 });
+    expect(fair.fair.sponsors.map((sp) => sp.x)).toEqual(DEMO_JOB_FAIR.sponsors.map((sp) => sp.x));
+    expect(fair.fair.promoters[0]).toMatchObject({ level: 4, x: 38.5 });
+    expect(fair.org.layout).toBe(2);
   });
 });

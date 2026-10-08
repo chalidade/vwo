@@ -219,7 +219,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
                 </li>
               ))}
             </ul>
-            <div className="sx-brand">Ruang Seminar · Lantai 5</div>
+            <div className="sx-brand">Ruang Seminar · Lantai 6</div>
           </div>
           <div className="sx-cam" data-talking={paused ? undefined : ""}>
             <div className="sx-cam-person">

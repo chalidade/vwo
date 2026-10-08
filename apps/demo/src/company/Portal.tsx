@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CompanyBooth } from "@vwo/shared";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
+import { NotifList } from "../fair/Notifs";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
@@ -127,6 +128,9 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
   };
   const apps = fair.applications.filter((a) => a.boothId === booth.id);
   const fresh = apps.filter((a) => a.status === "Terkirim" || a.status === "Dilihat").length;
+  const [bell, setBell] = useState(false);
+  const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+  const unread = fair.unreadFor(booth.id);
 
   return (
     <main className="cp">
@@ -141,6 +145,33 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
           </span>
         </div>
         <div className="cp-head-links">
+          <span className="nt-bell-wrap">
+            <button type="button" className="small-btn ghost nt-bell" onClick={() => setBell((b) => !b)} aria-expanded={bell} aria-label={`Notifikasi${unread ? `, ${unread} belum dibaca` : ""}`}>
+              🔔{unread > 0 && <span className="cp-count">{unread}</span>}
+            </button>
+            {bell && (
+              <div className="card nt-pop" role="dialog" aria-label="Notifikasi">
+                <div className="nt-pop-head">
+                  <b>Notifikasi</b>
+                  {unread > 0 && (
+                    <button type="button" className="small-btn ghost" onClick={() => fair.markRead(booth.id)}>
+                      Tandai semua dibaca
+                    </button>
+                  )}
+                </div>
+                <NotifList
+                  items={fair.notifsFor(booth.id)}
+                  empty="Belum ada notifikasi. Lamaran baru, balasan chat, dan konfirmasi interview dari pelamar muncul di sini."
+                  onPick={(n) => {
+                    fair.markRead(booth.id, n.id);
+                    setBell(false);
+                    if (n.appId) setFocus({ id: n.appId, n: Date.now() });
+                    setTab("applicants");
+                  }}
+                />
+              </div>
+            )}
+          </span>
           <a className="small-btn cp-link" href="#/jobfair">
             🎪 Lihat di job fair
           </a>
@@ -158,7 +189,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
         ))}
       </nav>
       {tab === "overview" && <Overview booth={booth} onTab={setTab} />}
-      {tab === "applicants" && <Applicants booth={booth} />}
+      {tab === "applicants" && <Applicants key={focus?.n} booth={booth} focusId={focus?.id} />}
       {tab === "jobs" && <JobsEditor booth={booth} />}
       {tab === "booth" && <BoothEditor booth={booth} onTab={setTab} />}
       {tab === "profile" && <ProfileEditor booth={booth} />}

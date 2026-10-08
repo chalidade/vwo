@@ -1,4 +1,6 @@
-# VWO: Virtual Cafe World
+# VWO - Virtual World Job
+
+Dunia virtual untuk mencari kerja: job fair dengan stand perusahaan, aula acara, seminar, dan psikotes, plus cafe virtual untuk nongkrong.
 
 Cermin virtual dari cafe sungguhan. Setiap cafe punya link sendiri (`/vwo/{slug}`), denah dengan meja dan kursi, daftar siapa yang sedang ada di dalam secara live, menu dan order yang tersambung ke kasir, serta karakter dan interaksi antar pelanggan.
 

@@ -34,7 +34,7 @@ export function StageSlide({ session, slide }: { session: SeminarSession; slide:
           </li>
         ))}
       </ul>
-      <div className="sx-brand">Ruang Seminar · {session.speaker}</div>
+      <div className="sx-brand">{session.role === "Panggung Aula" ? "Panggung Aula" : "Ruang Seminar"} · {session.speaker}</div>
     </div>
   );
 }
@@ -47,7 +47,14 @@ export function SpeakerStage() {
   useFair();
   const sessions = fair.seminars();
   const [sessionId, setSessionId] = useState(sessions[0]!.id);
-  const session = sessions.find((s) => s.id === sessionId) ?? sessions[0]!;
+  const picked = sessions.find((s) => s.id === sessionId) ?? sessions[0]!;
+  // On the Aula stage the speaker opens an item of the rundown (a speech, a talk show) instead of a seminar.
+  const [venue, setVenue] = useState<"seminar" | "aula">("seminar");
+  const rundown = fair.rundown();
+  const [eventId, setEventId] = useState(() => (rundown.find((e) => e.kind === "sambutan") ?? rundown[0])?.id ?? "");
+  const ev = rundown.find((e) => e.id === eventId) ?? rundown[0];
+  const session: SeminarSession =
+    venue === "aula" && ev ? { id: `aula-${ev.id}`, title: ev.title, speaker: ev.host, role: "Panggung Aula", slides: [{ title: ev.title, points: [`${ev.start}–${ev.end}`, ev.host], say: "" }] } : picked;
   const [live, setLive] = useState(false);
   const [screen, setScreen] = useState<MediaStream | null>(null);
   const [mic, setMic] = useState<MediaStream | null>(null);
@@ -63,8 +70,8 @@ export function SpeakerStage() {
   const peers = useRef(new Map<string, { close(): void }>());
   const out = useRef<MediaStream | null>(null);
   const startedAt = useRef(0);
-  const now = useRef({ live, session, slide, screen, chat, viewers, bots });
-  now.current = { live, session, slide, screen, chat, viewers, bots };
+  const now = useRef({ live, session, slide, screen, chat, viewers, bots, venue });
+  now.current = { live, session, slide, screen, chat, viewers, bots, venue };
   const botCrowd = bots ? 14 + (Math.floor(seconds / 20) % 7) : 0;
 
   const beat = () => {
@@ -80,6 +87,7 @@ export function SpeakerStage() {
       screen: !!c.screen,
       slide: c.slide,
       viewers: Object.keys(c.viewers).length + (c.bots ? 14 : 0),
+      venue: c.venue,
     });
   };
 
@@ -141,7 +149,7 @@ export function SpeakerStage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, bots]);
-  useEffect(beat, [slide, sessionId, screen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(beat, [slide, sessionId, screen, venue, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A new screen or microphone: every viewer reconnects to get it.
   useEffect(() => {
@@ -225,7 +233,7 @@ export function SpeakerStage() {
           <h1 className="cp-h1">Panggung pembicara</h1>
           {live && <span className="st-live st-live-head">● LIVE {mmss(seconds)}</span>}
           <span className="muted small">
-            Ruang Seminar · {fair.fair.name}. Penonton menonton dari kursi di lantai seminar.
+            {venue === "aula" ? "Panggung Aula" : "Ruang Seminar"} · {fair.fair.name}. Penonton menonton dari kursi di lantai {venue === "aula" ? "Aula" : "seminar"}.
           </span>
         </div>
         <div className="cp-head-links">
@@ -239,6 +247,25 @@ export function SpeakerStage() {
         <section className="card st-main">
           <div className="st-pick">
             <label>
+              Tempat
+              <select value={venue} disabled={live} onChange={(e) => (setVenue(e.target.value as "seminar" | "aula"), setSlide(0))}>
+                <option value="seminar">🎤 Ruang Seminar</option>
+                <option value="aula">🏛️ Panggung Aula (sambutan, talkshow)</option>
+              </select>
+            </label>
+            {venue === "aula" ? (
+              <label>
+                Acara
+                <select value={ev?.id ?? ""} disabled={live} onChange={(e) => setEventId(e.target.value)}>
+                  {rundown.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.start} · {e.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+            <label>
               Sesi
               <select value={sessionId} disabled={live} onChange={(e) => (setSessionId(e.target.value), setSlide(0))}>
                 {sessions.map((s) => (
@@ -248,6 +275,7 @@ export function SpeakerStage() {
                 ))}
               </select>
             </label>
+            )}
           </div>
           <div className="st-stage">
             {screen ? <Video stream={screen} /> : <StageSlide session={session} slide={slide} />}
@@ -297,7 +325,7 @@ export function SpeakerStage() {
             <a href="#/jobfair" target="_blank" rel="noreferrer">
               job fair
             </a>{" "}
-            di tab baru, naik lift ke Lantai 5, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
+            di tab baru, naik lift ke Lantai 6 untuk seminar atau Lantai 4 untuk Aula, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
           </p>
           <label className="st-bots small">
             <input type="checkbox" checked={bots} onChange={(e) => setBots(e.target.checked)} /> Penonton bot (chat dan pertanyaan simulasi)

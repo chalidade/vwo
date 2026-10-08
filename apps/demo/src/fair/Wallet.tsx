@@ -121,7 +121,7 @@ export function WalletPanel({
       )}
       {tab === "vouchers" &&
         (player.vouchers.length === 0 ? (
-          <p className="sp-empty">Belum ada voucher. Beli voucher cafe dan tempat makan di Food Court (Lantai 4, naik lift), tiap pembelian juga dapat bonus job fair.</p>
+          <p className="sp-empty">Belum ada voucher. Beli voucher cafe dan tempat makan di Food Court (Lantai 5, naik lift), tiap pembelian juga dapat bonus job fair.</p>
         ) : (
           <ul className="fx-vouchers">
             {player.vouchers.map((v) => (

@@ -101,7 +101,24 @@ export interface Interview {
   /** Where, or the call link. */
   place?: string;
   note?: string;
+  /** The applicant's answer to the invitation. */
+  reply?: "hadir" | "jadwal-ulang";
 }
+
+/** A notification between an applicant and a company's HR, kept with the saved state so the
+ *  portal and the job fair see each other's in any open tab. */
+export interface FairNotif {
+  id: string;
+  at: number;
+  /** PLAYER_ID for the job seeker, or a booth id for that company's HR. */
+  to: string;
+  appId?: string;
+  kind: "apply" | "chat" | "status" | "interview" | "call" | "confirm" | "rating";
+  text: string;
+  read?: boolean;
+}
+
+export const NOTIF_ICON: Record<FairNotif["kind"], string> = { apply: "📨", chat: "💬", status: "📋", interview: "📅", call: "📞", confirm: "✅", rating: "⭐" };
 
 /** A chat message between the company and the applicant about one application. */
 export interface AppMessage {
@@ -138,6 +155,91 @@ export interface OrgState {
   bookings?: StandBooking[];
   /** The banner on each hall's back wall: one title for the event, a second line per floor. */
   banner?: { title?: string; subtitles?: string[] };
+  /** The Aula's rundown, when the organiser edited it. */
+  rundown?: AulaEvent[];
+  /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. */
+  layout?: number;
+}
+
+/** One item on the Aula's rundown: an opening speech, a talk show, a door prize. */
+export interface AulaEvent {
+  id: string;
+  /** "09.00" */
+  start: string;
+  end: string;
+  title: string;
+  /** Who is on stage. */
+  host: string;
+  /** Where, when it is not the Aula stage itself (e.g. "Ruang Seminar · Lantai 6"). */
+  place?: string;
+  kind: "sambutan" | "talkshow" | "hiburan" | "doorprize" | "info";
+}
+
+/** How many notifications the demo keeps for each person or company. */
+const INBOX_PER = 40;
+
+/** Keep the newest notifications of everyone, so busy companies don't push out the seeker's. */
+function trimInbox(list: FairNotif[]) {
+  const seen = new Map<string, number>();
+  const keep = list.filter((n) => {
+    const k = (seen.get(n.to) ?? 0) + 1;
+    seen.set(n.to, k);
+    return k <= INBOX_PER;
+  });
+  list.splice(0, list.length, ...keep);
+}
+
+/** The day's programme in the Aula until the organiser writes its own. */
+export const DEFAULT_RUNDOWN: AulaEvent[] = [
+  { id: "reg", start: "08.00", end: "09.00", title: "Registrasi & pembukaan pintu", host: "Panitia", kind: "info" },
+  { id: "buka", start: "09.00", end: "09.20", title: "Sambutan Ketua Panitia", host: "Ibu Ratna Wijaya", kind: "sambutan" },
+  { id: "sponsor", start: "09.20", end: "09.40", title: "Sambutan Sponsor Utama Telko Nusa", host: "Bapak Hendra", kind: "sambutan" },
+  { id: "pita", start: "09.40", end: "10.00", title: "Pembukaan resmi & potong pita", host: "Panitia & sponsor", kind: "sambutan" },
+  { id: "talk1", start: "10.00", end: "11.00", title: "Talkshow: Karier Pertama di 2026", host: "HR Nusantara Tech & Kopi Kita", kind: "talkshow" },
+  { id: "seminar", start: "11.00", end: "12.00", title: "Seminar CV & interview", host: "Pak Arif", place: "Ruang Seminar · Lantai 6", kind: "info" },
+  { id: "rehat", start: "12.00", end: "13.00", title: "Istirahat, makan siang di Food Court", host: "Lantai 5", kind: "info" },
+  { id: "musik", start: "13.00", end: "13.45", title: "Hiburan akustik", host: "Band Kampus", kind: "hiburan" },
+  { id: "talk2", start: "13.45", end: "15.00", title: "Talkshow: Kerja Remote dan Freelance", host: "Komunitas Kerja Jarak Jauh", kind: "talkshow" },
+  { id: "dp", start: "15.00", end: "15.45", title: "Undian door prize", host: "MC Rara", kind: "doorprize" },
+  { id: "tutup", start: "15.45", end: "16.30", title: "Penutupan & foto bersama", host: "Panitia", kind: "sambutan" },
+];
+
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(/[.:]/).map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
+
+/** The item on stage at `now`, the one after it, and whether the day is over. */
+export function aulaNow(list: AulaEvent[], now = new Date()) {
+  const t = now.getHours() * 60 + now.getMinutes();
+  const current = list.find((e) => minutesOf(e.start) <= t && t < minutesOf(e.end)) ?? null;
+  const next = list.find((e) => minutesOf(e.start) > t) ?? null;
+  return { current, next, over: !current && !next && list.length > 0 };
+}
+
+/** The halls grew from 38 to 46 tiles so VIP stands have room for their wings: move positions saved
+ *  for the old halls to the same place in the new ones. Booth slots map exactly; anything else keeps
+ *  its place relative to the booths around it. */
+export function migrateHallX(x: number) {
+  const exact: Record<number, number> = { 1: 3, 16: 20, 31: 37, 11.05: 14.05, 26.05: 31.05 };
+  if (x in exact) return exact[x]!;
+  if (x < 7) return x + 2;
+  if (x < 16) return 9 + ((x - 7) * 11) / 9;
+  if (x < 22) return x + 4;
+  if (x < 31) return 26 + ((x - 22) * 11) / 9;
+  return x + 6;
+}
+
+function migrateOrg(org: OrgState): OrgState {
+  if (org.layout === 2) return org;
+  return {
+    ...org,
+    layout: 2,
+    added: org.added.map((b) => ({ ...b, x: migrateHallX(b.x) })),
+    ...(org.sponsors ? { sponsors: org.sponsors.map((sp) => ({ ...sp, x: migrateHallX(sp.x) })) } : {}),
+    // Rooms moved up a floor for the Aula and grew by 8 tiles, 4 on each side.
+    ...(org.promoters ? { promoters: org.promoters.map((p) => (p.level >= 3 ? { ...p, level: p.level + 1, x: p.x + 4 } : { ...p, x: migrateHallX(p.x) })) } : {}),
+  };
 }
 
 /** A company booking an empty stand from the hall map. Payment is a demo. */
@@ -171,7 +273,7 @@ export interface PsychConfig {
 }
 
 /** Where a booth can stand on a hall floor: three columns, two rows. */
-export const BOOTH_SLOTS = [1, 16, 31].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
+export const BOOTH_SLOTS = [3, 20, 37].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
 
 /** Paid booth decorations visitors can use, and what happened. */
 export type AccessoryResult = { ok: true; text: string; voucher?: Voucher; coins?: number } | { ok: false; text: string };
@@ -343,6 +445,8 @@ export interface FairSaved {
   company?: Record<string, CompanyState>;
   /** The organiser's changes. */
   org?: OrgState;
+  /** Notifications between applicants and HR. */
+  inbox?: FairNotif[];
 }
 
 export interface FairStorage {
@@ -385,6 +489,7 @@ const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
   foodcourt: ["Nyam 😋", "Baksonya enak!", "Dapat voucher lamar gratis!", "Istirahat dulu ah", "Abis ini ke Lantai 3"],
   psikotes: ["Hmm... 2, 4, 8, 16...", "Soal logikanya tricky", "Fokus, fokus...", "Semoga lulus 🙏", "✏️"],
   seminar: ["Catat 📝", "Wah, insightful!", "Setuju!", "👏", "Metode STAR ya..."],
+  aula: ["👏👏👏", "Seru acaranya!", "Semoga dapat door prize 🎁", "Ketemu di meeting point ya", "Abis ini talkshow"],
 };
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
 const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
@@ -464,6 +569,7 @@ export class DemoJobFair {
     for (const [k, n] of Object.entries(saved.sponsorViews ?? {})) this.sponsorViews.set(k, n);
     for (const [k, a] of Object.entries(saved.ads ?? {})) this.ads.set(k, a);
     for (const [k, ids] of Object.entries(saved.visitedBy ?? {})) this.visitedBy.set(k, new Set(ids));
+    this.inbox.splice(0, this.inbox.length, ...(saved.inbox ?? []));
   }
 
   /** Everyone who stands at a fixed spot or walks for the organiser: recruiters, desk staff, room hosts, promoters. */
@@ -491,6 +597,7 @@ export class DemoJobFair {
             { ...host, x: 3, y: room.height - 2.4 },
             ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(i, "vendor"), facing: "front" as Facing })),
           ];
+        if (room.kind === "aula") return [{ ...host, x: room.width / 2 - 4, y: 2.3 }];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
       ...fair.promoters.map((p) => {
@@ -507,7 +614,7 @@ export class DemoJobFair {
 
   /** Apply the organiser's changes: which booths stand where, the ads, the sponsors. */
   private loadOrg(org: OrgState | undefined) {
-    this.org = org ? structuredClone(org) : { removed: [], added: [] };
+    this.org = org ? migrateOrg(structuredClone(org)) : { removed: [], added: [], layout: 2 };
     const before = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
     const base = [...[...this.original.values()].filter((b) => !this.org.removed.includes(b.id)), ...this.org.added];
     const byId = new Map(this.fair.booths.map((b) => [b.id, b]));
@@ -740,6 +847,32 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
+  // ---- The Aula's rundown -------------------------------------------------------------
+
+  rundown(): AulaEvent[] {
+    return this.org.rundown ?? DEFAULT_RUNDOWN;
+  }
+
+  saveRundown(list: AulaEvent[]) {
+    const clean = list
+      .filter((e) => e.title.trim() && /^\d{2}[.:]\d{2}$/.test(e.start) && /^\d{2}[.:]\d{2}$/.test(e.end))
+      .map((e) => ({ ...e, start: e.start.replace(":", "."), end: e.end.replace(":", "."), title: e.title.trim(), host: e.host.trim() }))
+      .sort((a, b) => a.start.localeCompare(b.start));
+    this.org.rundown = clean;
+    this.saveOrg();
+    return clean.length;
+  }
+
+  resetRundown() {
+    delete this.org.rundown;
+    this.saveOrg();
+  }
+
+  /** What is on the Aula stage now and what comes next, by the clock. */
+  aulaNow(now = new Date()) {
+    return aulaNow(this.rundown(), now);
+  }
+
   // ---- Booth decorations visitors can use ------------------------------------------------
 
   /** A visitor uses a booth's paid decoration: watch the video, take a brochure, claim merch, pop a balloon... */
@@ -922,6 +1055,15 @@ export class DemoJobFair {
       }
     }
     this.applications.sort((x, y) => y.at - x.at);
+    // Notifications from the other tab, and what it marked read.
+    const byId = new Map(this.inbox.map((n) => [n.id, n]));
+    for (const n of saved.inbox ?? []) {
+      const mine = byId.get(n.id);
+      if (mine) mine.read ||= n.read;
+      else this.inbox.push(n);
+    }
+    this.inbox.sort((x, y) => y.at - x.at);
+    trimInbox(this.inbox);
     this.emit();
   }
 
@@ -945,6 +1087,7 @@ export class DemoJobFair {
       ads: Object.fromEntries(this.ads),
       company: Object.fromEntries(this.company),
       org: this.org,
+      inbox: this.inbox,
       visitedBy: Object.fromEntries([...this.visitedBy].filter(([id]) => real.has(id)).map(([id, set]) => [id, [...set]])),
     });
   }
@@ -952,6 +1095,7 @@ export class DemoJobFair {
   /** Forget everything saved: applications, stamps and counters. */
   reset() {
     this.applications.length = 0;
+    this.inbox.length = 0;
     this.loadOrg(undefined);
     this.loadCompany(undefined);
     this.visits.clear();
@@ -1020,6 +1164,7 @@ export class DemoJobFair {
       this.log({ type: "room", name: v.displayName, company: room.name });
       if (room.kind === "foodcourt") this.say(roomStaffId(room.id), `Selamat makan, ${v.displayName}! Tiap pesanan dapat voucher 🎟️`, 3000);
       else if (room.kind === "psikotes") this.say(roomStaffId(room.id), "Silakan duduk di meja yang kosong, lalu mulai tesnya.", 3000);
+      else if (room.kind === "aula") this.say(roomStaffId(room.id), `Selamat datang di Aula, ${v.displayName}! Jadwal acara ada di papan kiri.`, 3000);
       else this.say(roomStaffId(room.id), `Selamat datang! Silakan duduk, seminar segera dimulai.`, 3000);
     }
     this.emit();
@@ -1539,6 +1684,7 @@ export class DemoJobFair {
       updatedAt: this.now(),
     };
     this.applications.unshift(a);
+    this.notify(b.id, "apply", `${a.name} melamar ${job.title}`, a.id);
     if (visitorId === PLAYER_ID) this.track("apply");
     this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
     this.persist();
@@ -1560,7 +1706,10 @@ export class DemoJobFair {
       // Bot companies decide by themselves; a company that has opened its portal decides by hand.
       if (!this.company.has(a.boothId) && (a.status === "Dilihat" || a.status === "Terkirim")) a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
       a.updatedAt = this.now();
-      if (a.visitorId === PLAYER_ID) this.notices.push(`${a.company} memberi kamu ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`);
+      if (a.visitorId === PLAYER_ID) {
+        this.notices.push(`${a.company} memberi kamu ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`);
+        this.notify(PLAYER_ID, "rating", `${a.company} memberi ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`, a.id);
+      }
       this.persist();
       this.emit();
     });
@@ -1569,12 +1718,15 @@ export class DemoJobFair {
   }
 
   /** The recruiter's decision, from the admin view. */
-  setStatus(applicationId: string, status: ApplicationStatus) {
+  setStatus(applicationId: string, status: ApplicationStatus, quiet = false) {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a || a.status === status) return;
     a.status = status;
     a.updatedAt = this.now();
-    if (a.visitorId === PLAYER_ID && status !== "Dilihat") this.notices.push(`📋 ${a.company}: lamaran ${a.jobTitle} kamu sekarang "${status}"`);
+    if (a.visitorId === PLAYER_ID && status !== "Dilihat" && !quiet) {
+      this.notices.push(`📋 ${a.company}: lamaran ${a.jobTitle} kamu sekarang "${status}"`);
+      this.notify(PLAYER_ID, "status", `${a.company}: lamaran ${a.jobTitle} sekarang "${status}"`, a.id);
+    }
     this.persist();
     this.emit();
   }
@@ -1726,22 +1878,31 @@ export class DemoJobFair {
   scheduleInterview(applicationId: string, iv: Interview) {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
-    a.interview = iv;
+    const moved = !!a.interview;
+    a.interview = { ...iv, reply: undefined };
     if (a.visitorId === PLAYER_ID && !this.interviewAlerts.includes(a.id)) this.interviewAlerts.push(a.id);
-    this.setStatus(a.id, "Diundang interview");
+    this.setStatus(a.id, "Diundang interview", true);
     const when = new Date(iv.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`);
+    if (a.visitorId === PLAYER_ID) this.notify(PLAYER_ID, "interview", `${a.company} ${moved ? "mengubah jadwal" : "mengundang"} interview ${a.jobTitle}: ${when}`, a.id);
+    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`, true);
+    // Bots answer the invitation by themselves.
+    if (a.isBot) this.after(4000 + this.rand() * 4000, () => this.answerInterview(a.id, this.rand() < 0.85 ? "hadir" : "jadwal-ulang"));
   }
 
   /** A chat message from the company. Bots answer a moment later. */
-  messageApplicant(applicationId: string, text: string) {
+  messageApplicant(applicationId: string, text: string, quiet = false) {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a || !text.trim()) return;
     (a.messages ??= []).push({ at: this.now(), from: "company", text: text.trim().slice(0, 600) });
-    if (a.visitorId === PLAYER_ID) this.notices.push(`💬 ${a.company}: ${text.trim().slice(0, 80)}`);
-    if (a.isBot)
+    if (a.visitorId === PLAYER_ID) {
+      this.notices.push(`💬 ${a.company}: ${text.trim().slice(0, 80)}`);
+      if (!quiet) this.notify(PLAYER_ID, "chat", `${a.company}: ${text.trim().slice(0, 120)}`, a.id);
+    }
+    if (a.isBot && !quiet)
       this.after(2500 + this.rand() * 2500, () => {
-        (a.messages ??= []).push({ at: this.now(), from: "seeker", text: this.pick(BOT_REPLIES) });
+        const reply = this.pick(BOT_REPLIES);
+        (a.messages ??= []).push({ at: this.now(), from: "seeker", text: reply });
+        this.notify(a.boothId, "chat", `${a.name}: ${reply}`, a.id);
         this.touch(a);
       });
     this.touch(a);
@@ -1752,6 +1913,18 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a || !text.trim()) return;
     (a.messages ??= []).push({ at: this.now(), from: "seeker", text: text.trim().slice(0, 600) });
+    this.notify(a.boothId, "chat", `${a.name} membalas: ${text.trim().slice(0, 120)}`, a.id);
+    this.touch(a);
+  }
+
+  /** The applicant answers an interview invitation: coming, or asking for another time. */
+  answerInterview(applicationId: string, reply: "hadir" | "jadwal-ulang", note = "") {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a?.interview || a.interview.reply === reply) return;
+    a.interview.reply = reply;
+    const text = reply === "hadir" ? "Terima kasih, saya konfirmasi hadir di interview." : `Mohon maaf, bisakah jadwal interview diganti?${note.trim() ? ` ${note.trim()}` : ""}`;
+    (a.messages ??= []).push({ at: this.now(), from: "seeker", text });
+    this.notify(a.boothId, "confirm", reply === "hadir" ? `${a.name} konfirmasi hadir interview ${a.jobTitle}` : `${a.name} minta jadwal ulang interview ${a.jobTitle}`, a.id);
     this.touch(a);
   }
 
@@ -1759,8 +1932,46 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
     (a.calls ??= []).unshift(log);
-    if (!log.answered && a.visitorId === PLAYER_ID) this.notices.push(`📞 Panggilan tak terjawab dari ${a.company}`);
+    if (!log.answered && a.visitorId === PLAYER_ID) {
+      this.notices.push(`📞 Panggilan tak terjawab dari ${a.company}`);
+      this.notify(PLAYER_ID, "call", `Panggilan ${log.kind === "video" ? "video" : "telepon"} tak terjawab dari ${a.company}`, a.id);
+    }
+    if (!log.answered) this.notify(a.boothId, "call", `${a.name} tidak mengangkat panggilan ${log.kind === "video" ? "video" : "telepon"}`, a.id);
     this.touch(a);
+  }
+
+  // ---- Notifications between applicants and HR ------------------------------------------
+
+  /** Notifications for the job seeker (PLAYER_ID) or one company (its booth id), newest first. */
+  readonly inbox: FairNotif[] = [];
+
+  private notify(to: string, kind: FairNotif["kind"], text: string, appId?: string) {
+    // Another tab numbers its notifications too: add the time and a random tail so ids never clash.
+    const id = `ntf-${this.now().toString(36)}-${++this.seq}-${Math.random().toString(36).slice(2, 6)}`;
+    this.inbox.unshift({ id, at: this.now(), to, kind, text, appId });
+    trimInbox(this.inbox);
+    this.persist();
+  }
+
+  notifsFor(to: string) {
+    return this.inbox.filter((n) => n.to === to);
+  }
+
+  unreadFor(to: string) {
+    return this.inbox.reduce((k, n) => k + (n.to === to && !n.read ? 1 : 0), 0);
+  }
+
+  /** Mark one notification, or all of them for someone, as read. */
+  markRead(to: string, id?: string) {
+    let changed = false;
+    for (const n of this.inbox)
+      if (n.to === to && !n.read && (!id || n.id === id)) {
+        n.read = true;
+        changed = true;
+      }
+    if (!changed) return;
+    this.persist();
+    this.emit();
   }
 
   /** Messages for the player that the UI shows as toasts, oldest first. */

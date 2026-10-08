@@ -27,6 +27,8 @@ export interface StageLive {
   screen: boolean;
   slide: number;
   viewers: number;
+  /** Where the broadcast plays: the seminar room (default) or the Aula stage, e.g. for opening speeches. */
+  venue?: "seminar" | "aula";
 }
 
 export type StageMsg =

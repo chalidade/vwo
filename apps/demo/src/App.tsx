@@ -27,7 +27,7 @@ export function App() {
     <div className={game ? "app app-game" : "app"}>
       {!game && (
       <nav className="top">
-        <a href="#/" className="brand">☕ VWO</a>
+        <a href="#/" className="brand">🌐 VWO</a>
         <a href={`#/${DEMO_VENUE.slug}`} className={route === DEMO_VENUE.slug ? "active" : ""}>Masuk {DEMO_VENUE.name}</a>
         <a href="#/admin" className={route === "admin" ? "active" : ""}>Live view admin</a>
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
@@ -63,7 +63,7 @@ function Home() {
   return (
     <main className="home">
       <div className="rpg-box home-card">
-        <h1>VWO Virtual Cafe</h1>
+        <h1>VWO - Virtual World Job</h1>
         <InstallButton className="home-install" />
         <p>Cermin virtual dari cafe sungguhan. Buat karaktermu, check-in, jalan keliling cafe, dan duduk di kursi yang benar-benar kosong.</p>
         <div className="home-actions">

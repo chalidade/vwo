@@ -36,9 +36,9 @@ function wallTiles(floor: FloorView) {
   return floor.theme === "rooftop" ? 2.2 : floor.theme === "hall" ? 3.6 : 2.6;
 }
 
-/** Which side of its table a chair stands on. Chairs without a table count as "n". */
+/** Which side of its table a chair stands on. Chairs without a table count as "n", or "s" when they face the back wall. */
 export function chairSide(seat: SeatView, table: TableView | undefined): ChairSide {
-  if (!table) return "n";
+  if (!table) return seat.facing === "back" ? "s" : "n";
   const dx = seat.x - (table.x + table.width / 2);
   const dy = seat.y - (table.y + table.height / 2);
   if (Math.abs(dx) / table.width > Math.abs(dy) / table.height) return dx < 0 ? "w" : "e";

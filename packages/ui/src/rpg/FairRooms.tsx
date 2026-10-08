@@ -1,7 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
+import { AULA, COIN_STAND_H, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -211,9 +211,47 @@ export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => v
   });
 }
 
-/** The seminar stage with a projector screen showing the current slide. */
-export function seminarStageExtras(room: FairRoom, slide: { title: string; session: string } | null): SceneExtra[] {
+/** What the seminar's LED wall shows: the session, the slide being presented, and the speaker. */
+export interface StageScreen {
+  /** "LIVE" or "Sedang berlangsung" */
+  badge: string;
+  live?: boolean;
+  title: string;
+  speaker: string;
+  role: string;
+  slideTitle?: string;
+  points?: string[];
+  /** "2/4" */
+  page?: string;
+  next?: string;
+}
+
+/** The speaker on the LED wall's camera panel: a simple bust in front of a backdrop. */
+function SpeakerCam({ color, name, role }: { color: string; name: string; role: string }) {
+  return (
+    <div className="fr-cam">
+      <svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMax meet" className="fr-cam-bust">
+        <path d="M14 80c2-20 16-30 36-30s34 10 36 30Z" fill={color} />
+        <path d="M42 50l8 12 8-12" fill="#fff" />
+        <circle cx={50} cy={33} r={15} fill="#f2c7a5" />
+        <path d="M35 30c0-12 8-17 15-17s15 5 15 17c-4-6-9-8-15-8s-11 2-15 8Z" fill="#3b2a20" />
+        <rect x={64} y={56} width={4} height={14} rx={2} fill="#1f2937" />
+        <circle cx={66} cy={55} r={4} fill="#334155" />
+      </svg>
+      <div className="fr-cam-tag">
+        <b>{name}</b>
+        <span>{role}</span>
+      </div>
+    </div>
+  );
+}
+
+/** The seminar stage with a big LED wall: the slide on the left, the speaker's camera on the right,
+ *  a ticker below, and two side screens. */
+export function seminarStageExtras(room: FairRoom, screen: StageScreen | null): SceneExtra[] {
   const w = (room.width - 8) * T;
+  const ledW = 20;
+  const sc = screen ?? { badge: "Seminar", title: room.name, speaker: room.staff.name, role: room.staff.role };
   return [
     {
       key: "stage",
@@ -227,19 +265,255 @@ export function seminarStageExtras(room: FairRoom, slide: { title: string; sessi
           <path d={`M0 ${0.9 * T}H${w}`} stroke="#fbbf24" strokeWidth={3} />
           {/* Lectern. */}
           <path d={`M${w / 2 + 70} ${1.25 * T}h40l-6 ${0.95 * T}h-28Z`} fill="#a16207" {...ink} strokeWidth={1.6} />
+          {/* Floor lights along the stage edge. */}
+          {Array.from({ length: Math.floor(w / 90) }, (_, i) => (
+            <circle key={i} cx={45 + i * 90} cy={0.9 * T + 6} r={3} className="jb-bulb" data-odd={i % 2 ? "" : undefined} />
+          ))}
         </svg>
       ),
     },
     {
       key: "screen",
-      x: room.width / 2 - 4.5,
-      y: -2.6,
+      x: room.width / 2 - ledW / 2,
+      y: -3.4,
       z: 0.2,
       node: (
-        <div className="fr-screen" style={{ width: 9 * T, height: 2.3 * T }}>
-          <div className="fr-screen-session">{slide?.session ?? room.name}</div>
-          <div className="fr-screen-title">{slide?.title ?? "Seminar karier"}</div>
+        <div className="fr-led" style={{ width: ledW * T, height: 3.05 * T, ["--c" as string]: room.color }}>
+          <div className="fr-led-top">
+            <span className="fr-led-badge" data-live={sc.live ? "" : undefined}>
+              {sc.live ? "● LIVE" : "● " + sc.badge}
+            </span>
+            <span className="fr-led-title">{sc.title}</span>
+            {sc.page && <span className="fr-led-page">{sc.page}</span>}
+          </div>
+          <div className="fr-led-body">
+            <div className="fr-led-slide" key={sc.slideTitle}>
+              <b>{sc.slideTitle ?? sc.title}</b>
+              {sc.points?.length ? (
+                <ul>
+                  {sc.points.slice(0, 3).map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="fr-led-sub">Seminar karier bersertifikat · duduk di kursi untuk menonton</span>
+              )}
+            </div>
+            <SpeakerCam color={room.color} name={sc.speaker} role={sc.role} />
+          </div>
+          <div className="fr-led-ticker">
+            <span>
+              🎤 {sc.title} · bersama {sc.speaker} · E-sertifikat untuk peserta yang menonton sampai selesai · Tanya jawab di akhir sesi
+              {sc.next ? ` · Berikutnya: ${sc.next}` : ""} · #VWOJobFair
+            </span>
+          </div>
         </div>
+      ),
+    },
+    ...[0, 1].map((i) => ({
+      key: `side-screen-${i}`,
+      x: i === 0 ? 4.4 : room.width - 4.4 - 4.6,
+      y: -2.9,
+      z: 0.2,
+      node: (
+        <div className="fr-led fr-led-side" style={{ width: 4.6 * T, height: 2.1 * T, ["--c" as string]: room.color }}>
+          {i === 0 ? (
+            <>
+              <span className="fr-led-badge">SESI BERIKUTNYA</span>
+              <b>{sc.next ?? "Cek jadwal di Aula"}</b>
+            </>
+          ) : (
+            <>
+              <span className="fr-led-badge">TANYA JAWAB</span>
+              <b>Tulis pertanyaanmu di kolom chat 💬</b>
+            </>
+          )}
+        </div>
+      ),
+    })),
+  ];
+}
+
+/** What the Aula's screen and boards show. */
+export interface AulaScreen {
+  now: { title: string; host: string; start: string; end: string; place?: string } | null;
+  next: { title: string; host: string; start: string; end: string; place?: string } | null;
+  over: boolean;
+  /** Someone is speaking live on the Aula stage. */
+  live?: { title: string; speaker: string } | null;
+  /** The first items of the rundown, for the standing board. */
+  rundown: { start: string; title: string; on?: boolean }[];
+  announcement?: string;
+}
+
+/** The Aula: a wide stage with a podium and an LED wall, a rundown board, an info board, and the meeting point. */
+export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[], on: { rundown?: () => void; info?: () => void; meet?: () => void } = {}): SceneExtra[] {
+  const st = AULA.stage;
+  const w = st.width * T;
+  const h = (st.height + 0.3) * T;
+  const ledW = 18;
+  const headline = screen.live ? { tag: "● LIVE", title: screen.live.title, sub: screen.live.speaker } : screen.now ? { tag: `● SEDANG BERLANGSUNG · ${screen.now.start}–${screen.now.end}`, title: screen.now.title, sub: screen.now.host } : screen.over ? { tag: "ACARA HARI INI SELESAI", title: "Terima kasih sudah datang!", sub: "Sampai jumpa di VWO berikutnya" } : { tag: "SEGERA", title: screen.next?.title ?? room.name, sub: screen.next ? `${screen.next.start} · ${screen.next.host}` : room.tagline };
+  return [
+    {
+      key: "aula-stage",
+      x: st.x,
+      y: st.y,
+      z: st.y + st.height,
+      node: (
+        <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
+          {/* Backdrop curtain, the stage floor, and steps in the middle. */}
+          <rect x={0} y={0} width={w} height={0.9 * T} fill="#7f1d1d" {...ink} />
+          {Array.from({ length: Math.floor(w / 24) }, (_, i) => (
+            <path key={i} d={`M${12 + i * 24} 2V${0.9 * T - 2}`} stroke="#991b1b" strokeWidth={6} />
+          ))}
+          <rect x={0} y={0.9 * T} width={w} height={st.height * T - 0.9 * T} rx={4} fill="#57301b" {...ink} />
+          {Array.from({ length: 8 }, (_, i) => (
+            <path key={i} d={`M0 ${0.9 * T + 14 + i * 14}H${w}`} stroke="#6b3a20" strokeWidth={1.4} />
+          ))}
+          <path d={`M0 ${0.9 * T}H${w}`} stroke="#fbbf24" strokeWidth={3} />
+          <rect x={0} y={st.height * T - 10} width={w} height={10} fill="#000" opacity={0.3} />
+          <rect x={w / 2 - 1.4 * T} y={st.height * T - 6} width={2.8 * T} height={0.4 * T} rx={3} fill="#7c2d12" {...ink} strokeWidth={1.6} />
+          {/* Podium with the event logo, where the MC stands. */}
+          <g transform={`translate(${(room.width / 2 - 4 - st.x) * T - 26}, ${1.55 * T})`}>
+            <path d="M0 0h52l-6 58h-40Z" fill="#1e3a8a" {...ink} strokeWidth={1.8} />
+            <rect x={-4} y={-6} width={60} height={10} rx={3} fill="#93c5fd" {...ink} strokeWidth={1.4} />
+            <text x={26} y={34} textAnchor="middle" fontSize={13} fontWeight={900} fill="#facc15" fontFamily={font}>
+              VWO
+            </text>
+            <path d="M40 -6l8 -18" stroke="#1f2937" strokeWidth={2.5} />
+            <circle cx={49} cy={-25} r={4} fill="#1f2937" />
+          </g>
+          {/* Flower arrangements at the front corners and lights along the edge. */}
+          {[0.25 * T, w - 0.95 * T].map((x) => (
+            <g key={x} transform={`translate(${x}, ${st.height * T - 40})`}>
+              <path d="M6 34h22l-4 -16h-14Z" fill="#a16207" {...ink} strokeWidth={1.4} />
+              {[[10, 12], [22, 10], [16, 4], [6, 6], [28, 4]].map(([cx, cy], i) => (
+                <circle key={i} cx={cx} cy={cy} r={6} fill={["#f43f5e", "#facc15", "#fb7185", "#fde047", "#f472b6"][i]} {...ink} strokeWidth={1} />
+              ))}
+            </g>
+          ))}
+          {Array.from({ length: Math.floor(w / 80) }, (_, i) => (
+            <circle key={i} cx={40 + i * 80} cy={0.9 * T + 6} r={3} className="jb-bulb" data-odd={i % 2 ? "" : undefined} />
+          ))}
+        </svg>
+      ),
+    },
+    {
+      key: "aula-led",
+      x: room.width / 2 - ledW / 2,
+      y: -3.4,
+      z: 0.2,
+      onClick: on.rundown,
+      title: on.rundown ? "Jadwal acara Aula" : undefined,
+      node: (
+        <div className="fr-led fr-led-aula" style={{ width: ledW * T, height: 3.05 * T, ["--c" as string]: room.color }}>
+          <div className="fr-led-top">
+            <span className="fr-led-badge" data-live={screen.live || screen.now ? "" : undefined}>
+              {headline.tag}
+            </span>
+            <span className="fr-led-title">AULA UTAMA · VWO - Virtual World Job</span>
+          </div>
+          <div className="fr-led-hero">
+            <b>{headline.title}</b>
+            <span>{headline.sub}</span>
+          </div>
+          <div className="fr-led-ticker">
+            <span>
+              {screen.next ? `⏭ Berikutnya ${screen.next.start}: ${screen.next.title} · ` : ""}
+              {screen.announcement ? `📢 ${screen.announcement} · ` : ""}📍 Meeting point di pojok kiri bawah · 🗓️ Jadwal lengkap di papan kiri · ℹ️ Info & denah di papan kanan
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    // Hanging banners on both sides of the screen.
+    ...[0, 1].map((i) => ({
+      key: `aula-flag-${i}`,
+      x: i === 0 ? room.width / 2 - ledW / 2 - 2.6 : room.width / 2 + ledW / 2 + 0.6,
+      y: -3.3,
+      z: 0.2,
+      node: (
+        <div className="fr-aula-flag" style={{ width: 2 * T, height: 2.7 * T, ["--c" as string]: room.color }}>
+          <b>{i === 0 ? "SELAMAT DATANG" : "RAIH KARIER"}</b>
+          <span>{i === 0 ? "🏛️" : "🚀"}</span>
+        </div>
+      ),
+    })),
+    {
+      key: "aula-rundown",
+      x: AULA.rundown.x - 0.1,
+      y: AULA.rundown.y + AULA.rundown.height - 3.7,
+      z: AULA.rundown.y + AULA.rundown.height,
+      onClick: on.rundown,
+      title: on.rundown ? "Jadwal acara" : undefined,
+      node: (
+        <div className="fr-board" style={{ width: (AULA.rundown.width + 0.2) * T, height: 3.7 * T, ["--c" as string]: room.color }}>
+          <div className="fr-board-head">🗓️ JADWAL ACARA</div>
+          <ul>
+            {screen.rundown.slice(0, 7).map((e) => (
+              <li key={e.start + e.title} data-on={e.on ? "" : undefined}>
+                <i>{e.start}</i> {e.title}
+              </li>
+            ))}
+          </ul>
+          <div className="fr-board-foot">ketuk untuk jadwal lengkap</div>
+        </div>
+      ),
+    },
+    {
+      key: "aula-info",
+      x: AULA.info.x - 0.1,
+      y: AULA.info.y + AULA.info.height - 3.7,
+      z: AULA.info.y + AULA.info.height,
+      onClick: on.info,
+      title: on.info ? "Info & denah" : undefined,
+      node: (
+        <div className="fr-board" style={{ width: (AULA.info.width + 0.2) * T, height: 3.7 * T, ["--c" as string]: "#1e3a8a" }}>
+          <div className="fr-board-head">ℹ️ INFO & DENAH</div>
+          <ul>
+            {[...stops].reverse().map((s) => (
+              <li key={s.floorId}>
+                <i>{s.level + 1}</i> {s.emoji} {s.label}
+              </li>
+            ))}
+          </ul>
+          <div className="fr-board-foot">FAQ · kontak panitia</div>
+        </div>
+      ),
+    },
+    {
+      key: "aula-meet",
+      x: AULA.meet.x,
+      y: AULA.meet.y,
+      z: 0.4,
+      ground: true,
+      onClick: on.meet,
+      title: on.meet ? "Meeting point" : undefined,
+      node: (
+        <div className="fr-meet" style={{ width: AULA.meet.width * T, height: AULA.meet.height * T }}>
+          <span>MEETING POINT</span>
+        </div>
+      ),
+    },
+    {
+      key: "aula-meet-pole",
+      x: AULA.pole.x + AULA.pole.width / 2 - 1.1,
+      y: AULA.pole.y + AULA.pole.height - 2.9,
+      z: AULA.pole.y + AULA.pole.height,
+      onClick: on.meet,
+      title: on.meet ? "Meeting point" : undefined,
+      node: (
+        <svg width={2.2 * T} height={2.9 * T} style={{ display: "block", overflow: "visible" }}>
+          <rect x={1.1 * T - 4} y={34} width={8} height={2.9 * T - 40} fill="#64748b" {...ink} strokeWidth={1.4} />
+          <ellipse cx={1.1 * T} cy={2.9 * T - 5} rx={18} ry={5} fill="#475569" {...ink} strokeWidth={1.2} />
+          <rect x={4} y={0} width={2.2 * T - 8} height={40} rx={8} fill="#16a34a" {...ink} />
+          <text x={1.1 * T} y={17} textAnchor="middle" fontSize={11} fontWeight={900} fill="#fff" fontFamily={font}>
+            📍 MEETING
+          </text>
+          <text x={1.1 * T} y={32} textAnchor="middle" fontSize={11} fontWeight={900} fill="#fff" fontFamily={font}>
+            POINT
+          </text>
+        </svg>
       ),
     },
   ];
