@@ -412,8 +412,7 @@ export function CafeScene({
           style={breath(a.memberId)}
         >
           {!seat && <div className="rpg-shadow" />}
-          {/* Keyed by facing: a turn snaps to the new side with a small hop instead of squashing flat. */}
-          <div key={facing} className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
+          <div className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
             <Person look={lookOf(a)} />
           </div>
           {(self || !npc) && (
@@ -451,7 +450,7 @@ export function CafeScene({
           style={breath(n.id)}
         >
           <div className="rpg-shadow" />
-          <div key={n.facing} className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
+          <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
             <Person look={n.look} />
           </div>
           {n.carrying && n.facing !== "back" && <div className="rpg-tray" />}

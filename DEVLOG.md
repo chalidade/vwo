@@ -4,6 +4,18 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · VWO: gerakan karakter dihaluskan lagi, tanpa condong
+
+**Konteks:** setelah rilis karakter 2.5D, owner melihat gerakannya agak patah-patah, dan karakter tidak perlu menunduk/condong saat berjalan.
+
+**Yang berubah**
+- Condong ke depan saat berjalan ke samping dihapus.
+- Langkah kembali memakai ayunan halus yang lama (naik 2 px). Efek squash & stretch yang terlalu kuat dibuang.
+- Lompatan kecil saat berbalik dihapus. Sebelumnya setiap kali arah berubah gambar karakter dipasang ulang, sehingga animasi langkah mulai dari awal dan terlihat tersendat. Karakter sekarang tetap berbalik seketika tanpa gepeng.
+- Bayangan lantai yang lembut, shading yang lebih dalam, dan napas saat diam tetap dipertahankan.
+
+---
+
 ## 2026-10-08 · VWO: karakter tidak lagi "kertas tipis", lebih bervolume dan hidup
 
 **Konteks:** owner mengirim rekaman layar: saat karakter berbalik kiri/kanan, badannya menipis jadi satu garis seperti kertas. Owner bertanya apakah karakter bisa lebih hidup, lebih real, mungkin 3D.
