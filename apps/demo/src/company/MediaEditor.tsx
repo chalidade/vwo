@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { CompanyBooth } from "@vwo/shared";
-import { MASCOT_KINDS, Mascot } from "@vwo/ui";
+import { type CompanyBooth, type GateStyle, boothHasGate } from "@vwo/shared";
+import { GATE_STYLES, MASCOT_KINDS, Mascot } from "@vwo/ui";
 import { mediaOf } from "../fair/BoothMedia";
 import { ACCESSORY_PRODUCTS } from "../fair/company";
 import { fair } from "../useFair";
@@ -14,7 +14,8 @@ const lines = (s: string) =>
 /** What each paid decoration shows to visitors, and how many used it. */
 export function MediaEditor({ booth }: { booth: CompanyBooth }) {
   const m = mediaOf(booth);
-  const has = (id: string) => fair.owns(booth.id, id);
+  // A VIP booth's big video wall plays the same video as the TV add-on.
+  const has = (id: string) => fair.owns(booth.id, id) || (id === "tv" && booth.tier === "premium");
   const [videoUrl, setVideoUrl] = useState(m.videoUrl);
   const [mascot, setMascot] = useState(m.mascot);
   const [mascotName, setMascotName] = useState(booth.media?.mascotName ?? "");
@@ -69,6 +70,7 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
             e.preventDefault();
             fair.editBooth(booth.id, {
               media: {
+                ...booth.media,
                 videoUrl: videoUrl.trim(),
                 mascot,
                 mascotName: mascotName.trim(),
@@ -98,7 +100,7 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
         >
           {has("tv") && (
             <label className="cp-span">
-              📺 Link video perusahaan (YouTube atau .mp4)
+              📺 Link video perusahaan (YouTube atau .mp4){booth.tier === "premium" && " · diputar di layar besar VIP"}
               <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://youtu.be/... (kosong = slideshow profil)" />
             </label>
           )}
@@ -165,6 +167,44 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/** The gate across the booth's entrance: VIP booths have one, others buy the Gapura add-on. */
+export function GateEditor({ booth }: { booth: CompanyBooth }) {
+  const [text, setText] = useState(booth.media?.gateText ?? "");
+  const [saved, setSaved] = useState(false);
+  if (!boothHasGate(booth)) return null;
+  const current: GateStyle = booth.media?.gate ?? (booth.tier === "premium" ? "klasik" : "janur");
+  return (
+    <div className="card">
+      <h2 className="cp-h2">🎋 Gapura stand</h2>
+      <div className="cp-themes">
+        {(Object.keys(GATE_STYLES) as GateStyle[]).map((g) => (
+          <button key={g} type="button" className="cp-theme" data-active={current === g ? "" : undefined} onClick={() => fair.configureBooth(booth.id, { media: { gate: g } })}>
+            {GATE_STYLES[g]}
+          </button>
+        ))}
+      </div>
+      <form
+        className="cp-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          fair.configureBooth(booth.id, { media: { gateText: text.trim() } });
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2500);
+        }}
+      >
+        <label className="cp-span">
+          Tulisan di papan gapura
+          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={40} placeholder={`Selamat datang di ${booth.company}`} />
+        </label>
+        <div className="row cp-span">
+          <button type="submit">Simpan</button>
+          {saved && <span className="cp-saved">✓ Tersimpan, langsung tampil di job fair</span>}
+        </div>
+      </form>
     </div>
   );
 }

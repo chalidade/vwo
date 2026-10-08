@@ -27,6 +27,8 @@ export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.c
 
 /** Looks a company can pick for its booth in the company portal. */
 export type BoothTheme = "classic" | "modern" | "wood" | "pastel" | "neon";
+/** Look of the gate (gapura) at a booth's entrance. */
+export type GateStyle = "klasik" | "janur" | "balon" | "neon";
 
 export interface BoothFaq {
   q: string;
@@ -107,6 +109,9 @@ export interface BoothMedia {
   hashtag?: string;
   /** Employee stories told on the bean bags. */
   stories?: { name: string; role: string; text: string }[];
+  /** The entrance gate's look and the words on its name plate. */
+  gate?: GateStyle;
+  gateText?: string;
 }
 
 /** A sponsor of the event: its logo on the hall wall and a standing banner on the floor. */
@@ -147,12 +152,33 @@ export const BOOTH_SPOTS = {
   banner: { x: 5.3, y: 2.85 },
 };
 
-/** Solid parts of a booth: the back wall, the desk and the roll-up banner. */
-export function boothParts(b: { x: number; y: number }) {
+/** How far a VIP booth's side wings reach past a regular booth on each side, in tiles. */
+export const VIP_WING = 1;
+
+type BoothShape = { x: number; y: number; tier?: "premium" | "regular"; accessories?: string[] };
+
+/** VIP booths come with an entrance gate; others can add one. */
+export const boothHasGate = (b: BoothShape) => b.tier === "premium" || !!b.accessories?.includes("gapura");
+
+/** The booth's full width on the floor: VIP booths are wider by a wing on each side. */
+export function boothFrame(b: BoothShape) {
+  const wing = b.tier === "premium" ? VIP_WING : 0;
+  return { x: b.x - wing, width: BOOTH_W + 2 * wing };
+}
+
+/** Solid parts of a booth: the back wall, the desk, the roll-up banner, and the gate's posts. */
+export function boothParts(b: BoothShape) {
+  const f = boothFrame(b);
   return [
-    { part: "wall", x: b.x, y: b.y, width: BOOTH_W, height: 0.5 },
+    { part: "wall", x: f.x, y: b.y, width: f.width, height: 0.5 },
     { part: "desk", x: b.x + 1.2, y: b.y + 2.0, width: 3, height: 0.7 },
     { part: "rollup", x: b.x + 4.95, y: b.y + 1.65, width: 0.75, height: 0.45 },
+    ...(boothHasGate(b)
+      ? [
+          { part: "gate", x: f.x + 0.05, y: b.y + BOOTH_H - 0.45, width: 0.45, height: 0.4 },
+          { part: "gate", x: f.x + f.width - 0.5, y: b.y + BOOTH_H - 0.45, width: 0.45, height: 0.4 },
+        ]
+      : []),
   ];
 }
 

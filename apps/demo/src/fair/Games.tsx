@@ -278,10 +278,14 @@ function CatchCoins({ onDone }: { onDone: (score: number) => void }) {
 }
 
 function Memory({ logos, onDone }: { logos: { logo: string; color: string }[]; onDone: (moves: number) => void }) {
-  const cards = useMemo(() => {
-    const six = shuffle(logos).slice(0, 6);
+  // Shuffle once per round: the hall re-renders every frame with a fresh `logos` array,
+  // and two companies can share the same initials, so pairs are built from unique logos.
+  const [cards] = useState(() => {
+    const unique = [...new Map(logos.map((l) => [l.logo, l])).values()];
+    const six = shuffle(unique).slice(0, 6);
     return shuffle([...six, ...six].map((l, i) => ({ key: i, ...l })));
-  }, [logos]);
+  });
+  const pairs = cards.length / 2;
   const [open, setOpen] = useState<number[]>([]);
   const [done, setDone] = useState<Set<string>>(new Set());
   const [moves, setMoves] = useState(0);
@@ -294,7 +298,7 @@ function Memory({ logos, onDone }: { logos: { logo: string; color: string }[]; o
         if (a!.logo === b!.logo) {
           const next = new Set(done).add(a!.logo);
           setDone(next);
-          if (next.size === 6) onDone(moves);
+          if (next.size === pairs) onDone(moves);
         }
         setOpen([]);
       },
@@ -306,7 +310,7 @@ function Memory({ logos, onDone }: { logos: { logo: string; color: string }[]; o
   return (
     <div>
       <div className="gm-progress">
-        Langkah {moves} · Pasangan {done.size}/6
+        Langkah {moves} · Pasangan {done.size}/{pairs}
       </div>
       <div className="gm-memory">
         {cards.map((c, i) => {

@@ -1,8 +1,8 @@
 "use client";
 // The job fair room: the hall's back wall, company booths (back panel, desk, roll-up banner),
 // the organisers' info desk, and the popups for reading vacancies and applying.
-import { type CSSProperties, type FormEvent, useEffect, useId, useState } from "react";
-import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, openJobs } from "@vwo/shared";
+import { type CSSProperties, type FormEvent, memo, useEffect, useId, useState } from "react";
+import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, boothFrame, boothHasGate, openJobs } from "@vwo/shared";
 import { boothAccessoryExtras } from "./BoothDecor";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -188,7 +188,52 @@ export const BOOTH_THEMES: Record<BoothTheme, { name: string; wall: string; base
   neon: { name: "Neon", wall: "#0b1020", base: "#1e1b4b", post: "#312e81", dark: true },
 };
 
-function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
+/** The parts of a booth redraw only when the booth or its rating really changed, not every frame. */
+const sameProps = (a: object, b: object) => JSON.stringify(a) === JSON.stringify(b);
+
+/** VIP side wings: tall banners in the company colour with gold trim, framing the wider booth. */
+function VipWing({ booth, side }: { booth: CompanyBooth; side: "l" | "r" }) {
+  const w = VIP_WING * T;
+  const h = 2.2 * T + 26;
+  return (
+    <g transform={`translate(${side === "l" ? 0 : 0}, -26)`}>
+      <rect x={2} y={0} width={w - 4} height={h} rx={5} fill={booth.color} {...ink} strokeWidth={1.8} />
+      <rect x={7} y={5} width={w - 14} height={h - 10} rx={3} fill="none" stroke={GOLD} strokeWidth={2} />
+      <g transform={`translate(${w / 2}, 22)`}>
+        <Logo booth={booth} r={11} />
+      </g>
+      <text x={w / 2} y={52} textAnchor="middle" fontSize={10} fontWeight={900} fill={GOLD} letterSpacing={1} fontFamily="system-ui, sans-serif">
+        VIP
+      </text>
+      {(side === "l" ? ["W", "E", "\u2019", "R", "E"] : ["H", "I", "R", "I", "N", "G"]).map((ch, i) => (
+        <text key={i} x={w / 2} y={72 + i * 13} textAnchor="middle" fontSize={11} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif">
+          {ch}
+        </text>
+      ))}
+      <rect x={-2} y={h - 8} width={w + 4} height={8} rx={2} fill={GOLD} {...ink} strokeWidth={1.2} />
+    </g>
+  );
+}
+
+const BoothPanel = memo(function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
+  const premium = booth.tier === "premium";
+  const wing = premium ? VIP_WING * T : 0;
+  return (
+    <svg width={BOOTH_W * T + 2 * wing} height={2.2 * T} style={{ display: "block", overflow: "visible" }}>
+      {premium && <VipWing booth={booth} side="l" />}
+      {premium && (
+        <g transform={`translate(${BOOTH_W * T + wing}, 0)`}>
+          <VipWing booth={booth} side="r" />
+        </g>
+      )}
+      <g transform={`translate(${wing}, 0)`}>
+        <BoothWall booth={booth} rating={rating} />
+      </g>
+    </svg>
+  );
+}, sameProps);
+
+function BoothWall({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
   const w = BOOTH_W * T;
   const h = 2.2 * T;
   const premium = booth.tier === "premium";
@@ -198,7 +243,7 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
   const classicVip = premium && themeId === "classic";
   const open = openJobs(booth);
   return (
-    <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
+    <g>
       {/* Side posts. */}
       <rect x={0} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
       <rect x={w - 8} y={4} width={8} height={h - 4} fill={post} {...ink} strokeWidth={1.6} />
@@ -282,7 +327,8 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
           <div className="jb-poster">{booth.tagline}</div>
         </foreignObject>
       </g>
-      <g transform={`translate(134, ${premium ? 56 : 42})`}>
+      {!premium && (
+      <g transform="translate(134, 42)">
         <rect width={96} height={50} rx={4} fill="#fef3c7" {...ink} strokeWidth={1.4} />
         <text x={48} y={22} textAnchor="middle" fontSize={13} fontWeight={900} fill={INK} fontFamily="system-ui, sans-serif">
           {open.length ? "KAMI" : "TERIMA"}
@@ -291,18 +337,143 @@ function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRati
           {open.length ? "MEREKRUT!" : "KASIH!"}
         </text>
       </g>
-      {/* A small screen. */}
-      <g transform={`translate(${w - 50}, ${premium ? 58 : 46})`}>
-        <rect width={34} height={24} rx={3} fill="#1f2937" {...ink} strokeWidth={1.4} />
-        <rect x={3} y={3} width={28} height={18} rx={2} fill={booth.color} opacity={0.7} />
-        <path d="M13 8l8 4-8 4Z" fill="#fff" />
-        <rect x={15} y={24} width={4} height={10} fill="#64748b" />
-      </g>
-    </svg>
+      )}
+      {/* A small screen; VIP booths have a big video wall instead. */}
+      {!premium && (
+        <g transform={`translate(${w - 50}, 46)`}>
+          <rect width={34} height={24} rx={3} fill="#1f2937" {...ink} strokeWidth={1.4} />
+          <rect x={3} y={3} width={28} height={18} rx={2} fill={booth.color} opacity={0.7} />
+          <path d="M13 8l8 4-8 4Z" fill="#fff" />
+          <rect x={15} y={24} width={4} height={10} fill="#64748b" />
+        </g>
+      )}
+    </g>
   );
 }
 
-function BoothDesk({ booth }: { booth: CompanyBooth }) {
+/** A VIP booth's big screen on the wall; tapping it plays the company video. */
+const VideoWall = memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
+  const w = 150;
+  const h = 66;
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <linearGradient id={`${id}s`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={booth.color} />
+          <stop offset="1" stopColor="#0b1020" />
+        </linearGradient>
+      </defs>
+      <rect x={0} y={0} width={w} height={h} rx={5} fill="#0b0f19" {...ink} strokeWidth={1.8} />
+      <rect x={5} y={5} width={w - 10} height={h - 10} rx={3} fill={`url(#${id}s)`} />
+      <text x={12} y={20} fontSize={9} fontWeight={900} fill="#fff" opacity={0.85} fontFamily="system-ui, sans-serif">
+        {booth.company.toUpperCase().slice(0, 22)}
+      </text>
+      <g transform={`translate(${w / 2}, ${h / 2 + 4})`}>
+        <circle r={14} fill="#fff" opacity={0.92} {...ink} strokeWidth={1.4} />
+        <path d="M-4 -7L8 0L-4 7Z" fill={booth.color} />
+      </g>
+      <rect x={w - 44} y={h - 18} width={36} height={11} rx={5.5} fill="#dc2626" />
+      <text x={w - 26} y={h - 9.6} textAnchor="middle" fontSize={7.5} fontWeight={900} fill="#fff" fontFamily="system-ui, sans-serif">
+        VIDEO
+      </text>
+      <rect x={w / 2 - 3} y={h} width={6} height={6} fill="#475569" />
+    </svg>
+  );
+}, sameProps);
+
+/** Gate styles a booth can pick, with their names. */
+export const GATE_STYLES: Record<GateStyle, string> = { klasik: "Klasik", janur: "Janur & bambu", balon: "Lengkung balon", neon: "Neon" };
+
+/** The beam sits just above the booth's header; the posts stand at the front corners of the carpet. */
+const BEAM_H = 44;
+const POST_H = 62;
+
+const gateLook = (booth: CompanyBooth) => {
+  const style: GateStyle = booth.media?.gate ?? (booth.tier === "premium" ? "klasik" : "janur");
+  const dark = style === "neon";
+  const fill = style === "janur" ? "#d9a441" : dark ? "#0b1020" : booth.color;
+  return { style, dark, fill };
+};
+
+/** The gate's beam with its name plate, drawn behind the booth so it never hides the booth itself. */
+const GateBeam = memo(function GateBeam({ booth, width }: { booth: CompanyBooth; width: number }) {
+  const w = width * T;
+  const { style, dark, fill } = gateLook(booth);
+  const text = (booth.media?.gateText?.trim() || `Selamat datang di ${booth.company}`).slice(0, Math.floor((w - 70) / 6.6));
+  const plateW = Math.min(w - 60, text.length * 6.6 + 26);
+  const leg = 18;
+  return (
+    <svg width={w} height={BEAM_H} style={{ display: "block", overflow: "visible" }}>
+      {style === "balon" ? (
+        Array.from({ length: Math.floor(w / 15) + 1 }, (_, i) => i / Math.floor(w / 15)).map((t, i) => (
+          <circle key={i} cx={6 + t * (w - 12)} cy={14 - Math.sin(t * Math.PI) * 8} r={9} fill={i % 3 === 0 ? "#facc15" : i % 2 ? "#fff" : booth.color} {...ink} strokeWidth={1.2} />
+        ))
+      ) : (
+        <g>
+          <rect x={2} y={10} width={leg} height={BEAM_H - 10} fill={fill} {...ink} strokeWidth={1.6} />
+          <rect x={w - leg - 2} y={10} width={leg} height={BEAM_H - 10} fill={fill} {...ink} strokeWidth={1.6} />
+          <rect x={-6} y={4} width={w + 12} height={16} rx={4} fill={style === "janur" ? "#b45309" : dark ? "#0b1020" : booth.color} {...ink} strokeWidth={1.8} />
+          {style === "klasik" && <rect x={-6} y={18} width={w + 12} height={4} fill={GOLD} />}
+          {style === "neon" && <rect x={-2} y={8} width={w + 4} height={8} rx={4} fill="none" stroke={booth.color} strokeWidth={2.5} className="jb-neon-edge" />}
+          {style === "janur" && (
+            <g fill="none" strokeWidth={2.5} strokeLinecap="round">
+              {Array.from({ length: Math.floor(w / 28) }, (_, i) => (
+                <path key={i} d={`M${14 + i * 28} 20q6 10 0 18`} stroke={i % 2 ? "#facc15" : "#84cc16"} />
+              ))}
+            </g>
+          )}
+        </g>
+      )}
+      <g transform={`translate(${w / 2}, 12)`}>
+        <rect x={-plateW / 2} y={-12} width={plateW} height={24} rx={6} fill={dark ? "#0b1020" : "#fff"} stroke={dark ? booth.color : INK} strokeWidth={dark ? 2.5 : 1.8} />
+        <text y={4} textAnchor="middle" fontSize={11} fontWeight={900} fill={dark ? "#fff" : booth.color} fontFamily="system-ui, sans-serif">
+          {text}
+        </text>
+      </g>
+    </svg>
+  );
+}, sameProps);
+
+/** The gate's two posts at the front corners of the booth: short enough to keep the desk and screen in view. */
+const GatePosts = memo(function GatePosts({ booth, width }: { booth: CompanyBooth; width: number }) {
+  const w = width * T;
+  const { style, fill } = gateLook(booth);
+  const post = 20;
+  return (
+    <svg width={w} height={POST_H} style={{ display: "block", overflow: "visible" }}>
+      {[3, w - post - 3].map((px) => (
+        <g key={px} transform={`translate(${px}, 0)`}>
+          {style === "balon" ? (
+            [0, 1, 2, 3].map((i) => <circle key={i} cx={post / 2} cy={POST_H - 9 - i * 15} r={9} fill={i % 2 ? "#fff" : booth.color} {...ink} strokeWidth={1.2} />)
+          ) : (
+            <>
+              <rect x={0} y={8} width={post} height={POST_H - 8} rx={3} fill={fill} {...ink} strokeWidth={1.8} />
+              {style === "klasik" && (
+                <>
+                  <rect x={-3} y={POST_H - 10} width={post + 6} height={10} rx={2} fill={GOLD} {...ink} strokeWidth={1.4} />
+                  <circle cx={post / 2} cy={6} r={7} fill={GOLD} {...ink} strokeWidth={1.4} />
+                </>
+              )}
+              {style === "janur" && (
+                <>
+                  {[22, 38].map((py) => (
+                    <path key={py} d={`M1 ${py}h${post - 2}`} stroke="#92400e" strokeWidth={2} />
+                  ))}
+                  <path d={`M${post / 2} 8q-12 -14 -4 -30`} fill="none" stroke="#65a30d" strokeWidth={3} strokeLinecap="round" />
+                  <path d={`M${post / 2} 8q10 -16 2 -34`} fill="none" stroke="#facc15" strokeWidth={3} strokeLinecap="round" />
+                </>
+              )}
+              {style === "neon" && <rect x={5} y={13} width={post - 10} height={POST_H - 18} rx={4} fill="none" stroke={booth.color} strokeWidth={3} className="jb-neon-edge" />}
+            </>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}, sameProps);
+
+const BoothDesk = memo(function BoothDesk({ booth }: { booth: CompanyBooth }) {
   const w = 3 * T;
   const top = 22;
   const h = 1.55 * T;
@@ -323,9 +494,9 @@ function BoothDesk({ booth }: { booth: CompanyBooth }) {
       </g>
     </svg>
   );
-}
+}, sameProps);
 
-function RollUp({ booth }: { booth: CompanyBooth }) {
+const RollUp = memo(function RollUp({ booth }: { booth: CompanyBooth }) {
   const w = 50;
   const h = 2.5 * T;
   return (
@@ -339,30 +510,33 @@ function RollUp({ booth }: { booth: CompanyBooth }) {
       <div className="jb-rollup-foot">{booth.logo}</div>
     </div>
   );
-}
+}, sameProps);
 
 /** Everything that draws one booth, in scene coordinates. */
 export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; onDesk?: () => void; onAccessory?: (id: string) => void; visitors?: number; rating?: BoothRating } = {}): SceneExtra[] {
   const { x, y } = booth;
+  const f = boothFrame(booth);
+  const premium = booth.tier === "premium";
+  const onTv = opts.onAccessory ? () => opts.onAccessory!("tv") : undefined;
   return [
     {
       key: `${booth.id}-carpet`,
-      x: x + 0.1,
+      x: f.x + 0.1,
       y: y + 0.5,
       z: 0,
       ground: true,
-      node: <div className="jb-carpet" data-premium={booth.tier === "premium" ? "" : undefined} data-theme={booth.theme ?? "classic"} style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
+      node: <div className="jb-carpet" data-premium={premium ? "" : undefined} data-theme={booth.theme ?? "classic"} style={{ width: (f.width - 0.2) * T, height: (BOOTH_H - 0.5) * T, ["--c" as string]: booth.color }} />,
     },
     ...(booth.tier === "premium"
       ? [
           {
             key: `${booth.id}-pool`,
-            x: x + 0.1,
+            x: f.x + 0.1,
             y: y + 0.5,
             z: 0.5,
             ground: true,
             node: (
-              <div className="jb-pools" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T }}>
+              <div className="jb-pools" style={{ width: (f.width - 0.2) * T, height: (BOOTH_H - 0.5) * T }}>
                 <span />
                 <span />
               </div>
@@ -370,7 +544,16 @@ export function boothExtras(booth: CompanyBooth, opts: { onBanner?: () => void; 
           },
         ]
       : []),
-    { key: `${booth.id}-panel`, x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} rating={opts.rating} /> },
+    { key: `${booth.id}-panel`, x: f.x, y: y - 1.7, z: y + 0.5, node: <BoothPanel booth={booth} rating={opts.rating} /> },
+    ...(premium
+      ? [{ key: `${booth.id}-videowall`, x: x + 134 / T, y: y - 1.7 + 40 / T, z: y + 0.55, node: <VideoWall booth={booth} />, onClick: onTv, title: onTv ? `Tonton video ${booth.company}` : undefined }]
+      : []),
+    ...(boothHasGate(booth)
+      ? [
+          { key: `${booth.id}-gate`, x: f.x, y: y - 1.7 - (BEAM_H - 4) / T, z: y + 0.45, node: <GateBeam booth={booth} width={f.width} /> },
+          { key: `${booth.id}-gateposts`, x: f.x, y: y + BOOTH_H - POST_H / T, z: y + BOOTH_H, node: <GatePosts booth={booth} width={f.width} /> },
+        ]
+      : []),
     {
       key: `${booth.id}-desk`,
       x: x + 1.2 - 4 / T,

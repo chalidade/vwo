@@ -9,7 +9,7 @@ import { INK } from "./Furniture";
 const ink = { stroke: INK, strokeWidth: 2, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 const T = 48;
 
-export type AccessorySlot = "floor" | "corner" | "air" | "wall";
+export type AccessorySlot = "floor" | "corner" | "air" | "wall" | "gate";
 
 export interface BoothAccessory {
   id: string;
@@ -29,6 +29,7 @@ export const BOOTH_ACCESSORIES: BoothAccessory[] = [
   { id: "photobooth", name: "Photo booth", emoji: "📸", slot: "floor" },
   { id: "balloons", name: "Balon", emoji: "🎈", slot: "air" },
   { id: "neon", name: "Neon \"We're hiring\"", emoji: "💡", slot: "wall" },
+  { id: "gapura", name: "Gapura", emoji: "🎋", slot: "gate" },
 ];
 
 /** At most this many floor items fit in a booth. */
@@ -191,6 +192,7 @@ export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) =
   let slot = 0;
   for (const a of items) {
     const key = `${booth.id}-acc-${a.id}`;
+    if (a.slot === "gate") continue; // drawn with the booth itself, see gateExtras
     if (a.slot === "corner") {
       out.push({ key, x: x + 0.15, y: y - 0.25, z: y + 0.95, node: <Plant /> });
     } else if (a.slot === "air") {

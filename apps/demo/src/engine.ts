@@ -166,6 +166,11 @@ export class DemoCafe {
     return this.floors.find((f) => f.id === floorId)!;
   }
 
+  /** Whether any screen is showing this right now; nobody watching, nobody needs it to move. */
+  get watched() {
+    return this.listeners.size > 0;
+  }
+
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

@@ -23,7 +23,7 @@ const step = () => {
   const dt = Math.min(now - last, 250);
   last = now;
   hooks.forEach((fn) => fn(dt));
-  cafe.tick(dt);
+  if (cafe.watched) cafe.tick(dt);
 };
 const frame = () => {
   step();

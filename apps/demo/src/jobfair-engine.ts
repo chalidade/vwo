@@ -14,8 +14,11 @@ import {
   SPONSOR_H,
   SPONSOR_W,
   boothSpot,
+  boothHasGate,
   buildJobFairFloor,
   buildJobFairFloors,
+  type BoothMedia,
+  type BoothTheme,
   type Promoter,
   type SponsorView,
   fairFloorId,
@@ -51,7 +54,7 @@ import {
   type PsychQuestion,
   type SeminarSession,
 } from "./fair/content";
-import { ACCESSORY_PRODUCTS, BOT_REPLIES, productOf } from "./fair/company";
+import { ACCESSORY_PRODUCTS, BOT_REPLIES, VIP_INCLUDED, productOf } from "./fair/company";
 import { FLOOR_SLOTS } from "@vwo/ui";
 
 type Point = { x: number; y: number };
@@ -521,7 +524,10 @@ export class DemoJobFair {
     this.fair.promoters.splice(0, this.fair.promoters.length, ...active.filter((p) => !p.walks || walking++ < cap));
     this.fair.sponsors.splice(0, this.fair.sponsors.length, ...structuredClone(this.org.sponsors ?? this.originalSponsors));
     const after = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
-    if (before !== after) this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
+    if (before !== after) {
+      this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
+      this.floorSig = "";
+    }
     this.rebuildStaff();
   }
 
@@ -726,7 +732,7 @@ export class DemoJobFair {
   /** A visitor uses a booth's paid decoration: watch the video, take a brochure, claim merch, pop a balloon... */
   useAccessory(boothId: string, acc: string, action: "view" | "claim" | "share" = "view"): AccessoryResult {
     const b = this.booth(boothId);
-    if (!b || !(b.accessories ?? []).includes(acc)) return { ok: false, text: "Aksesoris tidak ada" };
+    if (!b || !((b.accessories ?? []).includes(acc) || (acc === "tv" && b.tier === "premium"))) return { ok: false, text: "Aksesoris tidak ada" };
     const key = `acc:${boothId}:${acc}`;
     if (action === "view") {
       this.ad(key, "view");
@@ -801,6 +807,51 @@ export class DemoJobFair {
       if (rec) rec.name = b.recruiter;
     }
     this.syncCompanyPromoters();
+    this.refreshFloors();
+  }
+
+  /** What the hall floors were last built from: where booths stand, and which are wide or gated. */
+  private floorSig = "";
+
+  /** Rebuild the hall floors' walls when a booth became VIP (wider) or got a gate. */
+  private refreshFloors() {
+    const sig = this.fair.booths.map((b) => `${b.id}:${b.floor}:${b.x}:${b.y}:${b.tier}:${boothHasGate(b)}`).join() + this.fair.sponsors.map((x) => x.id).join();
+    if (sig === this.floorSig) return;
+    this.floorSig = sig;
+    this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
+  }
+
+  /**
+   * The organiser sets a booth up directly: VIP or regular, theme, add-ons (given for free) and
+   * their content such as the video link and the gate. Stored with the company's own changes.
+   */
+  configureBooth(boothId: string, cfg: { tier?: "premium" | "regular"; theme?: BoothTheme; accessories?: string[]; media?: Partial<BoothMedia> }) {
+    const b = this.booth(boothId);
+    if (!b) return;
+    const st = this.companyOf(boothId);
+    if (cfg.tier) {
+      st.edits.tier = cfg.tier;
+      b.tier = cfg.tier;
+      if (cfg.tier === "regular") st.owned = st.owned.filter((x) => x !== "vip");
+    }
+    if (cfg.theme) {
+      st.edits.theme = cfg.theme;
+      b.theme = cfg.theme;
+    }
+    if (cfg.accessories) {
+      const list = ACCESSORY_PRODUCTS.filter((p) => cfg.accessories!.includes(p.id)).map((p) => p.id);
+      for (const id of list) if (!st.owned.includes(id) && (productOf(id)?.price ?? 0) > 0) st.owned.push(id);
+      st.edits.accessories = list;
+      b.accessories = [...list];
+    }
+    if (cfg.media) {
+      const media = { ...b.media, ...structuredClone(cfg.media) };
+      st.edits.media = media;
+      b.media = media;
+    }
+    this.refreshFloors();
+    this.persist();
+    this.emit();
   }
 
   /** Companies that bought a walking promoter get one on their booth's floor. */
@@ -1312,6 +1363,11 @@ export class DemoJobFair {
     this.emit();
   }
 
+  /** Whether any screen is showing this right now; nobody watching, nobody needs it to move. */
+  get watched() {
+    return this.listeners.size > 0;
+  }
+
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -1521,6 +1577,7 @@ export class DemoJobFair {
     Object.assign(b, clean);
     Object.assign(this.companyOf(boothId).edits, clean);
     if ("promoter" in clean || "color" in clean || "company" in clean || "jobs" in clean) this.syncCompanyPromoters();
+    if ("accessories" in clean) this.refreshFloors();
     const rec = this.staff.find((x) => x.id === recruiterId(boothId));
     if (rec) rec.name = b.recruiter;
     this.persist();
@@ -1557,6 +1614,7 @@ export class DemoJobFair {
     const p = productOf(productId);
     if (!p) return false;
     if (productId === "vip") return this.booth(boothId)?.tier === "premium";
+    if (VIP_INCLUDED.includes(productId) && this.booth(boothId)?.tier === "premium") return true;
     return p.price === 0 || !!this.company.get(boothId)?.owned.includes(productId);
   }
 
@@ -1612,6 +1670,7 @@ export class DemoJobFair {
     if (inv.items.some((i) => i.id === "vip")) b.tier = "premium";
     for (const it of inv.items) if (it.id !== "vip" && it.id !== "promoter" && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
     this.syncCompanyPromoters();
+    this.refreshFloors();
     this.persist();
     this.emit();
     return true;
