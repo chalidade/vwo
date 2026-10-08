@@ -1089,3 +1089,11 @@
 @media (prefers-reduced-motion: reduce) {
   .jb-neon-edge, .jb-neon-sign, .jb-sway, .jb-flag, .jb-wave, .jb-steam, .jb-tv rect, .jb-float { animation: none; }
 }
+/* Booth mascots. */
+.jb-hop { transform-origin: 24px 52px; animation: jb-hop 1.8s ease-in-out infinite; }
+@keyframes jb-hop { 0%, 60%, 100% { transform: translateY(0) scale(1, 1); } 70% { transform: translateY(0) scale(1.06, 0.94); } 82% { transform: translateY(-5px) scale(0.97, 1.04); } 92% { transform: translateY(0) scale(1.03, 0.97); } }
+.jb-blink { transform-box: fill-box; transform-origin: center; animation: jb-blink 4.2s infinite; }
+@keyframes jb-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+.jb-flap { transform-box: fill-box; transform-origin: 0% 50%; animation: jb-flap 0.9s ease-in-out infinite alternate; }
+@keyframes jb-flap { to { transform: rotate(-18deg); } }
+@media (prefers-reduced-motion: reduce) { .jb-hop, .jb-blink, .jb-flap { animation: none; } }

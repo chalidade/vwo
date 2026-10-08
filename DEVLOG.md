@@ -4,6 +4,19 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-07 · Job fair: maskot baru, lebih banyak promotor, promotor milik perusahaan
+
+**Konteks:** owner menilai standee maskot terlihat aneh dan minta maskot gaya monster lucu ala Pokémon. NPC iklan juga diminta lebih banyak, dan perusahaan bisa menambah sendiri.
+
+**Yang berubah**
+- **Maskot baru:** 5 makhluk orisinal yang bisa dipilih perusahaan di portal (tab Booth): Bolo, Kitsu, Piyo, Tunas, dan Momo. Tiap maskot memakai syal warna brand dan lencana logo perusahaan, melompat pelan, dan berkedip. Perusahaan juga bisa memberi nama maskotnya. Popup brosur menampilkan maskot besar.
+- **5 promotor keliling baru:** Langkah Rapi (sepatu kerja), CV Kilat (cek CV), SewaLaptop, Rapi Salon, dan Antar Makan. Totalnya sekarang 12 NPC iklan.
+- **Promotor milik perusahaan:** produk baru "NPC promotor keliling" seharga Rp 1.000.000 di tab VIP & tagihan. Setelah dibayar, promotor berbaju warna brand berkeliling di lantai stand, mendatangi pelamar, dan tombolnya membuka lowongan perusahaan. Nama, emoji, ajakan, kode, dan sapaannya diatur di tab Booth, lengkap dengan statistik. Panitia melihatnya di tab Iklan.
+
+**Dicek:** typecheck, 32 tes (1 baru), build, screenshot HP di `/mnt/project-files/screenshots/jobfair-mascot/`.
+
+---
+
 ## 2026-10-07 · Job fair: dashboard panitia (mobile), aksesoris interaktif, promotor keliling, panggung pembicara, HUD cafe
 
 **Konteks:** owner minta 10 hal: halaman panitia ramah HP, aksesoris premium yang bisa diklik, tambah/kurangi stand, halaman pembicara seminar dengan share screen dan komunikasi, pengaturan psikotes, pengaturan semua iklan, NPC promotor yang mendatangi pelamar, perbaikan overlap detail iklan, info job fair yang lebih ringkas, dan fitur pelengkap. Setelah itu menyusul: HUD cafe dibuat sama dengan job fair.

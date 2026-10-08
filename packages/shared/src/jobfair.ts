@@ -74,14 +74,29 @@ export interface CompanyBooth {
   callouts?: string[];
   /** What visitors get when they tap the booth's paid decorations. */
   media?: BoothMedia;
+  /** The company's walking promoter, once it bought one. */
+  promoter?: BoothPromoter;
 }
 
 /** Content behind a booth's decorations, set in the company portal. */
+/** The walking promoter a company pays for: who walks the hall for it and what they say. */
+export interface BoothPromoter {
+  name?: string;
+  emoji?: string;
+  headline?: string;
+  offer?: string;
+  code?: string;
+  callouts?: string[];
+}
+
 export interface BoothMedia {
   /** Company video for the TV: a YouTube link or a video file URL. Without it the TV plays a slideshow. */
   videoUrl?: string;
   /** Brochure pages the mascot hands out. */
   brochure?: { title: string; text: string }[];
+  /** Which mascot creature stands at the booth (see MASCOT_KINDS in the ui package), and its name. */
+  mascot?: string;
+  mascotName?: string;
   /** What the mascot says to people walking by. */
   mascotLine?: string;
   /** Free merchandise at the giveaway shelf, and how many are left. */
@@ -198,6 +213,8 @@ export interface Promoter {
   walks?: boolean;
   /** Switched off by the organiser: not shown. */
   active?: boolean;
+  /** A company's own promoter: the button opens the booth's vacancies instead of a link. */
+  boothId?: string;
 }
 
 export type FairRoomKind = "psikotes" | "seminar" | "foodcourt";
@@ -551,6 +568,91 @@ export const DEMO_JOB_FAIR: JobFairView = {
   ],
 
   promoters: [
+    {
+      id: "promo-sepatu",
+      name: "Dodi",
+      brand: "Langkah Rapi",
+      emoji: "👞",
+      color: "#78350f",
+      level: 0,
+      x: 24,
+      y: 13,
+      headline: "Sepatu kerja diskon 35%",
+      offer: "Sepatu pantofel dan sneakers kantor, nyaman dipakai seharian. Diskon 35% untuk pengunjung job fair.",
+      cta: "Lihat sepatu",
+      url: "https://langkahrapi.example/jobfair",
+      code: "RAPI35",
+      callouts: ["Interview pakai sepatu rapi yuk 👞", "Diskon 35% hari ini!"],
+      walks: true,
+    },
+    {
+      id: "promo-cv",
+      name: "Wulan",
+      brand: "CV Kilat",
+      emoji: "📄",
+      color: "#0284c7",
+      level: 0,
+      x: 24,
+      y: 13,
+      headline: "Cek CV gratis oleh HR",
+      offer: "Unggah CV-mu, HR berpengalaman memberi catatan dalam 24 jam. Template CV ATS-friendly gratis.",
+      cta: "Cek CV",
+      url: "https://cvkilat.example",
+      code: "CVGRATIS",
+      callouts: ["CV-mu sudah lolos ATS? 📄", "Cek CV gratis, kak!"],
+      walks: true,
+    },
+    {
+      id: "promo-laptop",
+      name: "Andre",
+      brand: "SewaLaptop",
+      emoji: "💻",
+      color: "#475569",
+      level: 1,
+      x: 24,
+      y: 13,
+      headline: "Sewa laptop mulai Rp99 ribu/minggu",
+      offer: "Butuh laptop untuk tes online atau kerja pertama? Sewa harian, mingguan, atau bulanan, bisa diantar.",
+      cta: "Sewa laptop",
+      url: "https://sewalaptop.example",
+      code: "TESONLINE",
+      callouts: ["Tes online tanpa laptop? Sewa aja 💻", "Diantar ke rumah!"],
+      walks: true,
+    },
+    {
+      id: "promo-salon",
+      name: "Mira",
+      brand: "Rapi Salon",
+      emoji: "💇",
+      color: "#db2777",
+      level: 2,
+      x: 24,
+      y: 13,
+      headline: "Potong rambut rapi Rp30 ribu",
+      offer: "Tampil rapi sebelum interview. Potong dan styling di cabang mana pun, cukup tunjukkan kode.",
+      cta: "Cari cabang",
+      url: "https://rapisalon.example",
+      code: "SIAPINTERVIEW",
+      callouts: ["Rapiin rambut sebelum interview 💇", "Cuma Rp30 ribu!"],
+      walks: true,
+    },
+    {
+      id: "promo-ojol",
+      name: "Fikri",
+      brand: "Antar Makan",
+      emoji: "🛵",
+      color: "#ea580c",
+      level: 2,
+      x: 24,
+      y: 13,
+      headline: "Gratis ongkir 5x makan siang",
+      offer: "Pesan makan siang dari kantor baru dengan gratis ongkir lima kali selama sebulan.",
+      cta: "Pesan makan",
+      url: "https://antarmakan.example",
+      code: "MAKANSIANG",
+      callouts: ["Lapar habis antre? Gratis ongkir! 🛵"],
+      walks: true,
+    },
     {
       id: "promo-ojek",
       name: "Gilang",

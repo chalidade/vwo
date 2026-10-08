@@ -2,6 +2,7 @@
 // Decorations a company can place in its job fair booth from the company portal.
 // Floor items fill four spots along the booth's front edge, keeping the middle free for visitors.
 import { BOOTH_W, type CompanyBooth } from "@vwo/shared";
+import { Mascot, mascotFor } from "./Mascot";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
 
@@ -20,7 +21,7 @@ export interface BoothAccessory {
 export const BOOTH_ACCESSORIES: BoothAccessory[] = [
   { id: "plant", name: "Tanaman pot", emoji: "🪴", slot: "corner" },
   { id: "flag", name: "Umbul-umbul", emoji: "🚩", slot: "floor" },
-  { id: "standee", name: "Standee maskot", emoji: "🧍", slot: "floor" },
+  { id: "standee", name: "Maskot", emoji: "🐣", slot: "floor" },
   { id: "giveaway", name: "Rak merchandise", emoji: "🎁", slot: "floor" },
   { id: "coffee", name: "Coffee cart", emoji: "☕", slot: "floor" },
   { id: "beanbag", name: "Bean bag", emoji: "🛋️", slot: "floor" },
@@ -65,23 +66,7 @@ function Flag({ color }: { color: string }) {
 }
 
 function Standee({ booth }: { booth: CompanyBooth }) {
-  return (
-    <svg width={42} height={74} style={{ display: "block", overflow: "visible" }}>
-      <g className="jb-wave">
-        <circle cx={21} cy={14} r={10} fill="#fde68a" {...ink} />
-        <path d="M17 13h1M24 13h1" {...ink} />
-        <path d="M17 18q4 3 8 0" fill="none" {...ink} strokeWidth={1.4} />
-        <path d="M9 50V34q0-8 12-8t12 8v16Z" fill={booth.color} {...ink} />
-        <path d="M33 32l7-12" {...ink} strokeWidth={4} stroke={booth.color} />
-        <path d="M33 32l7-12" fill="none" stroke={INK} strokeWidth={1} />
-      </g>
-      <rect x={4} y={46} width={34} height={14} rx={2} fill="#fff" {...ink} strokeWidth={1.4} />
-      <text x={21} y={56} textAnchor="middle" fontSize={7.5} fontWeight={900} fill={booth.color} fontFamily="system-ui, sans-serif">
-        JOIN US!
-      </text>
-      <path d="M12 60l-4 12M30 60l4 12" {...ink} strokeWidth={1.6} />
-    </svg>
-  );
+  return <Mascot kind={booth.media?.mascot ?? mascotFor(booth.id)} color={booth.color} logo={booth.logo} size={1.25} />;
 }
 
 function Giveaway({ booth }: { booth: CompanyBooth }) {
@@ -233,7 +218,7 @@ export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) =
           <PhotoBooth booth={booth} />
         );
       // Stand every item on the same line near the booth's front edge, whatever its height.
-      const h = a.id === "flag" ? 84 : a.id === "tv" ? 70 : a.id === "standee" ? 74 : a.id === "photobooth" ? 72 : a.id === "beanbag" ? 34 : 56;
+      const h = a.id === "flag" ? 84 : a.id === "tv" ? 70 : a.id === "standee" ? 70 : a.id === "photobooth" ? 72 : a.id === "beanbag" ? 34 : 56;
       out.push({ key, x: x + s.x, y: y + s.y + 1.15 - h / T, z: y + 3.45, node });
     }
   }

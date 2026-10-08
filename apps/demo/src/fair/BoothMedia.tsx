@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type CompanyBooth, openJobs } from "@vwo/shared";
+import { MASCOT_KINDS, Mascot, mascotFor } from "@vwo/ui";
 import type { AccessoryResult } from "../jobfair-engine";
 import { Modal } from "./Modal";
 
@@ -8,7 +9,10 @@ const youTubeId = (url: string) => /(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11
 /** What a booth's decorations show when nobody filled them in yet, made from the booth's profile. */
 export function mediaOf(b: CompanyBooth) {
   const m = b.media ?? {};
+  const mascot = m.mascot && MASCOT_KINDS.some((k) => k.id === m.mascot) ? m.mascot : mascotFor(b.id);
   return {
+    mascot,
+    mascotName: m.mascotName?.trim() || MASCOT_KINDS.find((k) => k.id === mascot)!.name,
     videoUrl: m.videoUrl?.trim() || "",
     brochure: m.brochure?.length
       ? m.brochure
@@ -62,7 +66,7 @@ export function BoothMediaPanel({
     acc === "tv"
       ? `📺 Video ${booth.company}`
       : acc === "standee"
-        ? `🧍 Brosur ${booth.company}`
+        ? `🐣 ${m.mascotName} dari ${booth.company}`
         : acc === "giveaway"
           ? "🎁 Merchandise gratis"
           : acc === "coffee"
@@ -174,7 +178,9 @@ function Brochure({ booth, m, onShare, onJobs, onToast }: { booth: CompanyBooth;
   return (
     <div className="bm-brochure">
       <div className="bm-mascot">
-        <span className="bm-mascot-face">🧍</span>
+        <span className="bm-mascot-face">
+          <Mascot kind={m.mascot} color={booth.color} logo={booth.logo} size={1.6} />
+        </span>
         <p className="bm-say">{m.mascotLine}</p>
       </div>
       <div className="bm-page">

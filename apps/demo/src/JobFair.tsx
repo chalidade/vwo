@@ -1094,6 +1094,14 @@ export function JobFair() {
             saved={fair.hasPromo(promo.id)}
             onSave={() => fair.savePromo(promo.id) && setToast(`🎟️ Kode ${promo.code} disimpan di dompet`)}
             onVisit={() => fair.ad(`promo:${promo.id}`, "click")}
+            onJobs={
+              promo.boothId
+                ? () => {
+                    setPromo(null);
+                    setBoard({ boothId: promo.boothId! });
+                  }
+                : undefined
+            }
             onClose={() => setPromo(null)}
           />
         )}

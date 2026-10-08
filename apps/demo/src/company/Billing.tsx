@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CompanyBooth } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
-import { ACCESSORY_PRODUCTS, PAY_METHODS, VIP_PRODUCT, rupiah } from "../fair/company";
+import { ACCESSORY_PRODUCTS, PAY_METHODS, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
 import { fair } from "../useFair";
 
 const day = (at: number) => new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -19,7 +19,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
     else next.add(id);
     setCart(next);
   };
-  const items = [VIP_PRODUCT, ...ACCESSORY_PRODUCTS].filter((p) => cart.has(p.id));
+  const items = [VIP_PRODUCT, PROMOTER_PRODUCT, ...ACCESSORY_PRODUCTS].filter((p) => cart.has(p.id));
   const total = items.reduce((n, p) => n + p.price, 0);
   const checkout = () => {
     const inv = fair.createInvoice(booth.id, [...cart]);
@@ -47,6 +47,22 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
           <label className="cp-check">
             <input type="checkbox" checked={cart.has("vip")} onChange={() => toggle("vip")} />
             <b>{rupiah(VIP_PRODUCT.price)}</b> / acara
+          </label>
+        )}
+      </div>
+      <div className="card">
+        <h2 className="cp-h2">📣 {PROMOTER_PRODUCT.name}</h2>
+        <p className="small" style={{ marginTop: 0 }}>
+          {PROMOTER_PRODUCT.about}
+        </p>
+        {fair.owns(booth.id, PROMOTER_PRODUCT.id) ? (
+          <p className="cp-saved">✓ Promotor kamu sedang berkeliling. Atur sapaannya di tab Booth.</p>
+        ) : pending.has(PROMOTER_PRODUCT.id) ? (
+          <p className="muted">Menunggu pembayaran tagihan di bawah.</p>
+        ) : (
+          <label className="cp-check">
+            <input type="checkbox" checked={cart.has(PROMOTER_PRODUCT.id)} onChange={() => toggle(PROMOTER_PRODUCT.id)} />
+            <b>{rupiah(PROMOTER_PRODUCT.price)}</b> / acara
           </label>
         )}
       </div>

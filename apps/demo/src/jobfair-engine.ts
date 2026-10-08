@@ -163,7 +163,7 @@ export interface CompanyInvoice {
 }
 
 /** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
-const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts", "media"] as const;
+const EDITABLE = ["company", "tagline", "industry", "logo", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "callouts", "media", "promoter"] as const;
 export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
@@ -717,7 +717,40 @@ export class DemoJobFair {
       const rec = this.staff.find((x) => x.id === recruiterId(b.id));
       if (rec) rec.name = b.recruiter;
     }
+    this.syncCompanyPromoters();
   }
+
+  /** Companies that bought a walking promoter get one on their booth's floor. */
+  private syncCompanyPromoters() {
+    const list = this.fair.promoters;
+    const before = list.filter((p) => p.boothId).map((p) => JSON.stringify(p)).join();
+    for (let n = list.length - 1; n >= 0; n--) if (list[n]!.boothId) list.splice(n, 1);
+    for (const b of this.fair.booths) {
+      if (!this.company.get(b.id)?.owned.includes("promoter")) continue;
+      const c = b.promoter ?? {};
+      const jobs = openJobs(b);
+      list.push({
+        id: `co-${b.id}`,
+        boothId: b.id,
+        name: c.name?.trim() || `Tim ${b.company}`,
+        brand: b.company,
+        emoji: c.emoji?.trim() || "💼",
+        color: b.color,
+        level: b.floor,
+        x: 24,
+        y: 13,
+        headline: c.headline?.trim() || `${b.company} buka ${jobs.length} lowongan`,
+        offer: c.offer?.trim() || `Kami sedang mencari ${jobs.slice(0, 2).map((j) => j.title).join(" dan ") || "talenta baru"}. Mampir ke stand kami di ${this.fair.floors[b.floor]?.name ?? "aula"} ya!`,
+        cta: "Lihat lowongan",
+        url: b.website ?? "",
+        code: c.code?.trim() || undefined,
+        callouts: c.callouts?.length ? c.callouts : [`${b.company} lagi buka lowongan! 💼`, "Mampir ke stand kami yuk!"],
+        walks: true,
+      });
+    }
+    if (before !== list.filter((p) => p.boothId).map((p) => JSON.stringify(p)).join()) this.rebuildStaff();
+  }
+
 
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
@@ -1404,6 +1437,7 @@ export class DemoJobFair {
     if (clean.logo !== undefined) clean.logo = clean.logo.trim().slice(0, 3) || b.logo;
     Object.assign(b, clean);
     Object.assign(this.companyOf(boothId).edits, clean);
+    if ("promoter" in clean || "color" in clean || "company" in clean || "jobs" in clean) this.syncCompanyPromoters();
     const rec = this.staff.find((x) => x.id === recruiterId(boothId));
     if (rec) rec.name = b.recruiter;
     this.persist();
@@ -1493,7 +1527,8 @@ export class DemoJobFair {
     inv.paidAt = this.now();
     for (const it of inv.items) if (!st.owned.includes(it.id)) st.owned.push(it.id);
     if (inv.items.some((i) => i.id === "vip")) b.tier = "premium";
-    for (const it of inv.items) if (it.id !== "vip" && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
+    for (const it of inv.items) if (it.id !== "vip" && it.id !== "promoter" && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
+    this.syncCompanyPromoters();
     this.persist();
     this.emit();
     return true;
