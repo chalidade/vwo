@@ -4,6 +4,22 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · VWO: karakter tidak lagi "kertas tipis", lebih bervolume dan hidup
+
+**Konteks:** owner mengirim rekaman layar: saat karakter berbalik kiri/kanan, badannya menipis jadi satu garis seperti kertas. Owner bertanya apakah karakter bisa lebih hidup, lebih real, mungkin 3D.
+
+**Penyebab:** sprite menghadap kiri dibuat dengan mencerminkan gambar (`scaleX(-1)`), dan cerminan itu diberi transisi 140 ms. Di tengah transisi skalanya melewati 0, jadi karakter sesaat gepeng jadi garis tipis.
+
+**Yang berubah**
+- **Berbalik tanpa gepeng:** arah hadap berganti seketika, ditemani lompatan kecil 4 px. Saat diukur di browser, lebar karakter selama berbalik tetap 55–58 px (sebelumnya turun sampai 0).
+- **Lebih bervolume:** bayangan inti di kepala, badan, dan tangan/kaki dibuat sedikit lebih gelap, jadi bentuknya lebih bulat. Bayangan di lantai sekarang bergradasi (gelap di bawah kaki, lembut di pinggir) dan mengecil saat badan terangkat ketika melangkah.
+- **Lebih hidup:** karakter yang berdiri diam bernapas pelan, masing-masing dengan ritme sendiri supaya kerumunan tidak bergerak serempak. Saat berjalan ke samping badan condong ke depan, dan langkahnya punya efek squash & stretch.
+- Semua gerakan mati bila perangkat memakai pengaturan "kurangi gerakan".
+
+**Catatan 3D penuh:** dunia sekarang digambar dengan SVG 2D. 3D penuh (three.js dengan model karakter) berarti menulis ulang semua lantai, stand, dan karakter, serta lebih berat di HP. Langkah ini "2.5D": tetap ringan, tapi terasa lebih bervolume.
+
+---
+
 ## 2026-10-08 · VWO: login pelamar, logo perusahaan, 5 gaya stand VIP, foto profil, Lounge Konsultasi, siaran Aula tersambung
 
 **Konteks:** owner minta (1) login pelamar yang sebelum launch disimpan di local storage, (2) pengaturan logo perusahaan, (3) variasi desain VIP supaya perusahaan tertarik upgrade dan stand tidak sama semua, (4) foto profil pelamar, (5) satu lantai konsultasi dengan sofa besar, telepon ke HR atau sesama pelamar dengan potongan koin dan durasi terbatas. Di tengah pengerjaan owner melapor siaran dari halaman pembicara tidak tampil di Aula: tidak ada layar, suara, atau MC.

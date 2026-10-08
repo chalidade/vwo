@@ -86,6 +86,13 @@ export interface NpcView {
 
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
 
+/** Each sprite breathes on its own beat, so a crowd standing still doesn't move in lockstep. */
+function breath(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return { ["--breath" as string]: `${-((h >>> 0) % 3200)}ms` };
+}
+
 export interface CafeSceneProps {
   floor: FloorView;
   /** Name of another floor, for stair signs. */
@@ -402,9 +409,11 @@ export function CafeScene({
           data-walking={walking.has(a.memberId) && !seat ? "" : undefined}
           data-seated={seat ? "" : undefined}
           data-clickable={onAvatarClick ? "" : undefined}
+          style={breath(a.memberId)}
         >
           {!seat && <div className="rpg-shadow" />}
-          <div className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
+          {/* Keyed by facing: a turn snaps to the new side with a small hop instead of squashing flat. */}
+          <div key={facing} className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
             <Person look={lookOf(a)} />
           </div>
           {(self || !npc) && (
@@ -434,9 +443,15 @@ export function CafeScene({
       title: n.name,
       onClick: onNpcClick ? () => onNpcClick(n.id) : undefined,
       node: (
-        <div className="rpg-sprite" data-dir={DIR[n.facing]} data-walking={walking.has(n.id) ? "" : undefined} data-clickable={onNpcClick ? "" : undefined}>
+        <div
+          className="rpg-sprite"
+          data-dir={DIR[n.facing]}
+          data-walking={walking.has(n.id) ? "" : undefined}
+          data-clickable={onNpcClick ? "" : undefined}
+          style={breath(n.id)}
+        >
           <div className="rpg-shadow" />
-          <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
+          <div key={n.facing} className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
             <Person look={n.look} />
           </div>
           {n.carrying && n.facing !== "back" && <div className="rpg-tray" />}

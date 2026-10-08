@@ -247,18 +247,18 @@ function LightDefs({ id }: { id: string }) {
         <stop offset="0" stopColor="white" stopOpacity="0.55" />
         <stop offset="0.32" stopColor="white" stopOpacity="0" />
         <stop offset="0.7" stopColor="black" stopOpacity="0" />
-        <stop offset="1" stopColor="black" stopOpacity="0.26" />
+        <stop offset="1" stopColor="black" stopOpacity="0.34" />
       </radialGradient>
       <linearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="0.35">
         <stop offset="0" stopColor="white" stopOpacity="0.28" />
         <stop offset="0.35" stopColor="white" stopOpacity="0" />
         <stop offset="0.65" stopColor="black" stopOpacity="0" />
-        <stop offset="1" stopColor="black" stopOpacity="0.26" />
+        <stop offset="1" stopColor="black" stopOpacity="0.32" />
       </linearGradient>
       <linearGradient id={`${id}l`} x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stopColor="white" stopOpacity="0.32" />
         <stop offset="0.45" stopColor="white" stopOpacity="0" />
-        <stop offset="1" stopColor="black" stopOpacity="0.24" />
+        <stop offset="1" stopColor="black" stopOpacity="0.3" />
       </linearGradient>
     </defs>
   )
