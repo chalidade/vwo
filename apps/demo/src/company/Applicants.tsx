@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CompanyBooth } from "@vwo/shared";
+import { type CompanyBooth, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
 import { CallScreen, type CallResult } from "../fair/Call";
@@ -208,7 +208,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
             </a>
           </>
         )}
-        {a.email && (
+        {/^[^\s@?&#]+@[^\s@?&#]+$/.test(a.email) && (
           <a className="small-btn ghost cp-link" href={`mailto:${a.email}?subject=${encodeURIComponent(`Lamaran ${a.jobTitle} - ${booth.company}`)}`}>
             ✉️ Email
           </a>
@@ -247,7 +247,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         <dt>CV</dt>
         <dd>
           {a.cvUrl ? (
-            <a href={a.cvUrl} target="_blank" rel="noopener noreferrer">
+            <a href={safeUrl(a.cvUrl)} target="_blank" rel="noopener noreferrer">
               Buka CV ↗
             </a>
           ) : (

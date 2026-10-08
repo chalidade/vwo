@@ -13,7 +13,7 @@
     "@vwo/db": "workspace:*",
     "@vwo/shared": "workspace:*",
     "@vwo/ui": "workspace:*",
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.45.2",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

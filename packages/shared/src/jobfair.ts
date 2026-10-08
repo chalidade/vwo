@@ -1531,3 +1531,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
     }),
   ],
 };
+
+/** A link someone else typed (an applicant's CV, a company's website, an ad's button), or undefined
+ *  when it is not a plain web, mail or phone link: never let a `javascript:` or `data:` URL into an href. */
+export function safeUrl(url: string | undefined | null) {
+  const u = url?.trim();
+  return u && /^(https?:\/\/|mailto:|tel:)/i.test(u) ? u : undefined;
+}

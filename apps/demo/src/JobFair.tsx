@@ -974,38 +974,11 @@ export function JobFair() {
           )}
         </div>
 
-        {hud.map ? (
-        <div className="hud hud-tr rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Sembunyikan denah" role="button">
-          <svg aria-hidden viewBox={`-0.5 -0.5 ${floor.width + 1} ${floor.height + 1}`} className="minimap">
-            <rect x={0} y={0} width={floor.width} height={floor.height} rx={0.6} fill="#cfd6df" />
-            {booths.map((b) => (
-              <g key={b.id}>
-                <rect x={b.x} y={b.y} width={6} height={3.6} rx={0.3} fill={b.color} opacity={0.35} />
-                <rect x={b.x} y={b.y} width={6} height={0.6} fill={b.color} />
-              </g>
-            ))}
-            {sponsors.map((sp) => (
-              <rect key={sp.id} x={sp.x} y={sp.y} width={0.9} height={0.9} fill={sp.color} />
-            ))}
-            {(floor.tables ?? []).map((t) => (
-              <rect key={t.id} x={t.x} y={t.y} width={t.width} height={t.height} rx={0.2} fill="#a8a29e" />
-            ))}
-            {coinHere && <rect x={fair.fair.coinStand.x} y={fair.fair.coinStand.y} width={5.4} height={2.2} rx={0.2} fill="#ca8a04" opacity={0.7} />}
-            {!room && level === 0 && <rect x={fair.fair.infoDesk.x} y={fair.fair.infoDesk.y} width={fair.fair.infoDesk.width} height={0.7} fill="#1e3a8a" />}
-            {(floor.objects ?? [])
-              .filter((o) => o.type === "elevator")
-              .map((o) => (
-                <rect key={o.id} x={o.x} y={o.y} width={o.width} height={o.height} rx={0.2} fill="#facc15" />
-              ))}
-            {avatars.filter((a) => a.floorId === floor.id).map((a) => (
-              <circle key={a.memberId} cx={a.x} cy={a.y} r={a.memberId === session?.visitorId ? 0.55 : 0.32} fill={a.memberId === session?.visitorId ? "#f97316" : "#fff"} stroke="#2b1e19" strokeWidth={0.12} />
-            ))}
-          </svg>
-          <div className="minimap-legend">Denah {stop.name} · 🟨 lift</div>
-        </div>
-        ) : (
-          <button type="button" className="hud hud-tr-btn rpg-box" onPointerDown={(e) => e.stopPropagation()} onClick={hud.toggleMap} title="Tampilkan denah">
-            🗺️
+        {session && (
+          // The bell sits where the mini map used to be: one less button in the bottom bar.
+          <button type="button" className="hud hud-tr-btn rpg-box notif-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setNotifs(true)} title="Notifikasi dari HR" aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}>
+            🔔
+            {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
           </button>
         )}
 
@@ -1053,17 +1026,6 @@ export function JobFair() {
                 <span className="tab-txt">Lamaran</span>
                 {mine.length > 0 && <span className="menu-dot menu-dot-calm">{mine.length}</span>}
               </button>
-              <button type="button" className="menu-btn notif-btn" onClick={() => setNotifs(true)} title="Notifikasi dari HR">
-                <span className="tab-ico">🔔</span>
-                <span className="tab-txt">Notif</span>
-                {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
-              </button>
-              {!me.verified && (
-                <button type="button" className="menu-btn verify-btn" onClick={() => setVerify(true)} title="Beli centang biru">
-                  <span className="tab-ico">✔</span>
-                  <span className="tab-txt">Verified</span>
-                </button>
-              )}
               <button type="button" className="menu-btn mission-btn" onClick={() => setMissions(true)} title="Misi harian">
                 <span className="tab-ico">🎯</span>
                 <span className="tab-txt">Misi</span>

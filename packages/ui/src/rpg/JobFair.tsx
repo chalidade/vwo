@@ -2,7 +2,7 @@
 // The job fair room: the hall's back wall, company booths (back panel, desk, roll-up banner),
 // the organisers' info desk, and the popups for reading vacancies and applying.
 import { type CSSProperties, type FormEvent, memo, useEffect, useId, useState } from "react";
-import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, boothFrame, boothHasGate, openJobs, vipLounge } from "@vwo/shared";
+import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, boothFrame, boothHasGate, openJobs, safeUrl, vipLounge } from "@vwo/shared";
 import { boothAccessoryExtras } from "./BoothDecor";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -150,7 +150,7 @@ export function SponsorCard({ sponsor, onClose }: { sponsor: SponsorView; onClos
             <p className="jb-about">{sponsor.about}</p>
             {sponsor.promo && <div className="jb-promo">🎁 {sponsor.promo}</div>}
             <div className="jb-job-foot">
-              <a className="mb-order jb-apply jb-link" href={sponsor.website} target="_blank" rel="noopener noreferrer">
+              <a className="mb-order jb-apply jb-link" href={safeUrl(sponsor.website)} target="_blank" rel="noopener noreferrer">
                 Kunjungi website ↗
               </a>
             </div>
@@ -892,7 +892,7 @@ export function JobBoard({
                   <>
                     <dt>🌐 Website</dt>
                     <dd>
-                      <a href={booth.website} target="_blank" rel="noopener noreferrer">
+                      <a href={safeUrl(booth.website)} target="_blank" rel="noopener noreferrer">
                         {booth.website.replace(/^https?:\/\//, "")}
                       </a>
                     </dd>
@@ -939,7 +939,7 @@ export function JobBoard({
                       {booth.socials.map((so, i) => (
                         <span key={so.url}>
                           {i > 0 && " · "}
-                          <a href={so.url} target="_blank" rel="noopener noreferrer">
+                          <a href={safeUrl(so.url)} target="_blank" rel="noopener noreferrer">
                             {so.label}
                           </a>
                         </span>
