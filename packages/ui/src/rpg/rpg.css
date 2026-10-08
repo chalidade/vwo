@@ -467,6 +467,12 @@
     transform: translateY(-5px);
   }
 }
+/* Crowd mode (CafeScene sets data-crowd): only the bob is left on other people, since animating
+   parts inside an SVG repaints the whole sprite each frame. The player keeps every animation. */
+[data-crowd] .rpg-sprite:not([data-self]) :is(.pg-eye, .pg-leg-a, .pg-leg-b, .pg-arm-a, .pg-arm-b, .rpg-shadow),
+[data-crowd] .rpg-sprite:not([data-self]):not([data-walking]) .pg-body {
+  animation: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .rpg-seat-ring,
   .rpg-arrow,

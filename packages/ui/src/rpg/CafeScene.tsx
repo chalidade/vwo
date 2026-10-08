@@ -86,6 +86,11 @@ export interface NpcView {
 
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
 
+/** With more people than this on screen, the scene goes into crowd mode: everyone but the player
+ *  drops the small animations (breathing, blinking, swinging arms and legs) that repaint each sprite
+ *  every frame. Measured at 150 visitors on a phone-sized view: 31 → 58 fps. */
+const CROWD = 16;
+
 /** Each sprite breathes on its own beat, so a crowd standing still doesn't move in lockstep. */
 function breath(id: string) {
   let h = 0;
@@ -272,6 +277,8 @@ export function CafeScene({
 
   const tables = new Map(floor.tables.map((t) => [t.id, t]));
   const ents: Ent[] = [];
+  /** Keys of the entities that are people, to count how many are on screen. */
+  const people = new Set<string>();
   const ground: Ent[] = [];
 
   // --- Map objects.
@@ -395,6 +402,7 @@ export function CafeScene({
     const self = a.memberId === selfMemberId;
     const npc = a.memberType === "companion";
     const emote = emotes[a.memberId];
+    people.add(a.memberId);
     ents.push({
       key: a.memberId,
       z: py(a.y) + (seat ? 1 : 0),
@@ -408,6 +416,7 @@ export function CafeScene({
           data-dir={DIR[facing]}
           data-walking={walking.has(a.memberId) && !seat ? "" : undefined}
           data-seated={seat ? "" : undefined}
+          data-self={self ? "" : undefined}
           data-clickable={onAvatarClick ? "" : undefined}
           style={breath(a.memberId)}
         >
@@ -434,6 +443,7 @@ export function CafeScene({
   // --- Staff walking the floor.
   for (const n of npcs) {
     if (n.floorId !== floor.id) continue;
+    people.add(n.id);
     ents.push({
       key: n.id,
       z: py(n.y),
@@ -472,6 +482,8 @@ export function CafeScene({
   const viewT = camY - 6 * TILE;
   const viewB = camY + view.h / scale + 2 * TILE;
   const onScreen = (e: Ent) => !follow || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
+  const shown = ents.filter(onScreen);
+  const crowd = shown.filter((e) => people.has(e.key)).length > CROWD;
 
   // Doors in the bottom wall; doors standing inside a room (spriteKey "room:…") are drawn by the room.
   const doors = (floor.objects ?? []).filter((o) => o.type === "door" && !o.spriteKey?.startsWith("room:"));
@@ -497,6 +509,7 @@ export function CafeScene({
       ref={viewportRef}
       className={`rpg-viewport${className ? ` ${className}` : ""}`}
       style={style}
+      data-crowd={crowd ? "" : undefined}
       onPointerDown={(e) => {
         if (canZoom && e.pointerType === "touch") {
           pinch.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -573,7 +586,7 @@ export function CafeScene({
             {e.node}
           </div>
         ))}
-        {ents.filter(onScreen).map((e) => (
+        {shown.map((e) => (
           <div
             key={e.key}
             className="rpg-ent"

@@ -4,6 +4,27 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-08 · VWO: mode ramai supaya halaman tidak lag saat banyak pengunjung
+
+**Konteks:** owner bertanya apakah halaman akan lag kalau orangnya makin banyak.
+
+**Hasil ukur (build produksi, layar seukuran HP, mesin uji tanpa GPU):**
+
+| Pengunjung | Sebelum | Sesudah |
+|---|---|---|
+| 10–40 | 60 FPS | 60 FPS |
+| 80 | 53 FPS | 60 FPS |
+| 150 | 31 FPS | 58 FPS |
+| 150, CPU 4× lebih lambat | 2–3 FPS | 8 FPS |
+
+Bagian yang paling berat adalah animasi kecil di dalam gambar karakter (napas, kedip, ayunan tangan dan kaki). Animasi itu memaksa browser menggambar ulang setiap karakter di setiap frame. Gambar untuk karakter di luar layar memang sudah tidak dibuat sejak sebelumnya.
+
+**Yang berubah**
+- **Mode ramai:** begitu ada lebih dari 16 orang di layar, karakter lain hanya memakai ayunan naik-turun saat berjalan. Napas, kedip, ayunan tangan dan kaki, serta denyut bayangan dimatikan. Karakter pemain sendiri tetap memakai semua animasi.
+- **Untuk versi online:** server sebaiknya hanya mengirim posisi orang di sekitar pemain (area of interest), supaya satu lantai bisa ramai tanpa membebani HP dan jaringan.
+
+---
+
 ## 2026-10-08 · VWO: gerakan karakter dihaluskan lagi, tanpa condong
 
 **Konteks:** setelah rilis karakter 2.5D, owner melihat gerakannya agak patah-patah, dan karakter tidak perlu menunduk/condong saat berjalan.
