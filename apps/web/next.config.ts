@@ -15,6 +15,17 @@ const config: NextConfig = {
   transpilePackages: ["@vwo/db", "@vwo/shared", "@vwo/ui"],
   serverExternalPackages: ["postgres"],
   poweredByHeader: false,
+  // The game lives in public/play as a static app; its service worker needs the trailing slash.
+  skipTrailingSlashRedirect: true,
+  async redirects() {
+    return [{ source: "/", destination: "/play/", permanent: false }];
+  },
+  async rewrites() {
+    return [
+      { source: "/play", destination: "/play/index.html" },
+      { source: "/play/", destination: "/play/index.html" },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

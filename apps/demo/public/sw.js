@@ -1,6 +1,6 @@
 // Lets the demo install as an app and open offline: pages come from the network when there is
 // one (so a new deploy shows up), everything else from the cache first.
-const CACHE = "vwo-v1";
+const CACHE = "vwo-v2";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"])));
@@ -14,7 +14,9 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
-  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  // Accounts and other server answers must always come fresh from the server.
+  if (req.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   if (req.mode === "navigate") {
     e.respondWith(
       fetch(req)

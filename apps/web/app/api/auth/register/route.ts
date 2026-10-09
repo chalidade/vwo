@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const { userId, verifyToken } = await register(db, { email, password, name });
     const session = await createSession(db, userId, req.headers.get("user-agent"));
     // The account exists either way; a mail outage must not leave the new seeker signed out.
-    await sendMail(email, "Verifikasi email VWO Job Fair", `Halo ${name},\n\nKlik link ini untuk memverifikasi email kamu (berlaku 48 jam):\n${appUrl()}/verify?token=${verifyToken}\n`).catch((e) =>
+    await sendMail(email, "Verifikasi email jobfair", `Halo ${name},\n\nKlik link ini untuk memverifikasi email kamu (berlaku 48 jam):\n${appUrl()}/verify?token=${verifyToken}\n`).catch((e) =>
       console.error("[mail] verification email failed", e),
     );
     const res = NextResponse.json({ ok: true, user: { id: userId, email, name, emailVerified: false } }, { status: 201 });
