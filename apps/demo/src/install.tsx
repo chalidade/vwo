@@ -33,6 +33,9 @@ export function setupInstall() {
 
 const standalone = () =>
   matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+/** Opened inside WhatsApp, Instagram, Facebook, LINE, TikTok and the like: those can't install apps. */
+const inApp = () => /FBAN|FBAV|Instagram|Line\/|WhatsApp|TikTok|Twitter|; wv\)/i.test(navigator.userAgent);
+const samsung = () => /SamsungBrowser/i.test(navigator.userAgent);
 const ios = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 /** A button that installs the app, or explains how when the browser has no prompt. Hidden once installed. */
@@ -70,17 +73,31 @@ export function InstallButton({ className = "" }: { className?: string }) {
               </button>
             </div>
             <div className="mb-page">
-              {ios() ? (
+              {inApp() ? (
+                <ol>
+                  <li>Halaman ini terbuka di dalam aplikasi lain (misalnya WhatsApp atau Instagram), yang tidak bisa memasang aplikasi.</li>
+                  <li>Tap menu <b>⋮</b> atau <b>…</b> lalu pilih <b>Buka di browser</b> / <b>Buka di Chrome</b>{ios() ? " (atau Safari)" : ""}.</li>
+                  <li>Di browser, tap lagi tombol <b>📲 Install aplikasi</b>.</li>
+                </ol>
+              ) : ios() ? (
                 <ol>
                   <li>Buka halaman ini di <b>Safari</b>.</li>
                   <li>Tap tombol <b>Bagikan</b> (kotak dengan panah ke atas).</li>
-                  <li>Pilih <b>Tambah ke Layar Utama</b>, lalu <b>Tambah</b>.</li>
+                  <li>Pilih <b>Tambah ke Layar Utama</b>, lalu <b>Tambah</b>. jobfair akan terbuka layar penuh tanpa bilah browser.</li>
+                </ol>
+              ) : samsung() ? (
+                <ol>
+                  <li>Tap menu <b>≡</b> di bawah.</li>
+                  <li>Pilih <b>Tambahkan halaman ke</b> → <b>Layar utama</b> (atau ikon <b>Install</b> di bilah alamat).</li>
                 </ol>
               ) : (
                 <ol>
                   <li>Buka halaman ini di <b>Chrome</b> atau <b>Edge</b>.</li>
-                  <li>Buka menu browser <b>⋮</b>.</li>
-                  <li>Pilih <b>Install aplikasi</b> atau <b>Tambahkan ke layar utama</b>.</li>
+                  <li>Buka menu browser <b>⋮</b>, pilih <b>Instal aplikasi</b>.</li>
+                  <li>
+                    Kalau yang ada hanya <b>Tambahkan ke layar utama</b>, pilih itu lalu tekan <b>Instal</b>, bukan <b>Buat pintasan</b>.
+                  </li>
+                  <li>Pernah membuat pintasan sebelumnya? Hapus dulu ikon lamanya dari layar utama, lalu ulangi.</li>
                 </ol>
               )}
               <p className="muted small">Setelah terpasang, jobfair terbuka layar penuh seperti aplikasi biasa, lengkap dengan ikonnya.</p>
