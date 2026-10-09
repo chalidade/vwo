@@ -1,6 +1,6 @@
 // Lets the demo install as an app and open offline: pages come from the network when there is
 // one (so a new deploy shows up), everything else from the cache first.
-const CACHE = "vwo-v3";
+const CACHE = "vwo-v4";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"])));

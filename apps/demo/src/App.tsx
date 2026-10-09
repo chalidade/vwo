@@ -53,34 +53,13 @@ export function App() {
   const home = !route.startsWith("jobfair");
   return (
     <div className={game ? "app app-game" : home ? "app app-home" : "app"}>
-      {!game && !home && (
-      <nav className="top">
-        <a href="#/" className="brand"><img src={`${import.meta.env.BASE_URL}brand/jobfair-logo.png`} alt="jobfair" className="brand-logo" /></a>
-        <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
-        {organizer && (
-          <>
-            <a href="#/jobfair/admin" className={route.startsWith("jobfair/admin") && route !== "jobfair/admin/ads" ? "active" : ""}>Panitia job fair</a>
-            <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>
-          </>
-        )}
-        <a href="#/jobfair/company" className={route.startsWith("jobfair/company") ? "active" : ""}>🏢 Portal perusahaan</a>
-        {organizer && <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>}
-        {LIVE ? (
-          <span className="demo-tag" title="Akun dan lamaran tersimpan di server. Fitur lain masih disambungkan bertahap.">
-            Trial
-          </span>
-        ) : (
-          <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelamar lain adalah bot. Versi lengkap butuh server.">
-            Demo · pengunjung lain bot
-          </span>
-        )}
-      </nav>
-      )}
       {route === "jobfair" ? (
         <JobFair />
       ) : (route.startsWith("jobfair/admin") || route === "jobfair/speaker") && !organizer ? (
         <main className="cp">
-          <p className="card cp-server-note">Halaman ini khusus panitia. Masuk dengan akun panitia di halaman Job Fair, lalu buka lagi.</p>
+          <p className="card cp-server-note">
+            Halaman ini khusus panitia. Masuk dengan akun panitia di halaman Job Fair, lalu buka lagi. <a href="#/jobfair">Ke Job Fair</a>
+          </p>
         </main>
       ) : route.startsWith("jobfair/admin") ? (
         <JobFairAdmin tab={route.split("/")[2]} />

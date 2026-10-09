@@ -4,6 +4,19 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · ikon aplikasi, menu atas dihapus, laporan error otomatis
+
+**Konteks:** owner melaporkan ikon aplikasi terpasang dengan logo Chrome kecil di pojok dan logo jobfair terlalu besar, meminta menu atas di halaman perusahaan dan panitia dihapus, dan kadang aplikasi hang di halaman pelamar.
+
+**Yang berubah**
+- Ikon aplikasi dibuat ulang: latar penuh tanpa sudut transparan, logo jobfair lebih kecil (sekitar 56% untuk ikon biasa, 46% untuk ikon adaptif Android) supaya proporsional. Cache service worker dinaikkan versinya.
+- Menu atas (Job Fair, Panitia, Kelola iklan, Portal perusahaan, Pembicara) dihapus. Halaman panitia sekarang punya tombol ke Portal perusahaan dan Pembicara di kepala halamannya; tombol "Hapus data demo" dan tulisan "data demo" tidak tampil lagi di versi live.
+- Kalau halaman error, yang muncul sekarang pesan dengan tombol Muat ulang, bukan layar kosong. Error dan halaman yang macet lebih dari 4 detik dilaporkan ke log server (`[client-error]`) supaya penyebab hang bisa ditemukan.
+
+**Dicek:** alur undang interview dan kirim pesan di portal perusahaan dicoba di emulasi HP dengan CPU diperlambat 4x, termasuk saat panitia melamar ke stand sendiri; halaman tetap responsif (di bawah 15 ms), jadi hang belum bisa direproduksi dan laporan otomatis ditambahkan untuk menangkapnya di HP asli.
+
+---
+
 ## 2026-10-09 · tabel harga yang diatur panitia
 
 **Konteks:** owner ingin satu tabel keuangan untuk mengatur harga tiap fitur: harga koin, paket VIP, printilan booth, sewa stand, daftar booth, harga telepon, dan lainnya.
