@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 export interface DialogChoice {
   label: string;
+  /** A short muted note on the right, such as "6 stand" or "20 koin". */
+  hint?: string;
   onPick: () => void;
 }
 
@@ -102,7 +104,8 @@ export function DialogBox({
                 c.onPick();
               }}
             >
-              {c.label}
+              <span className="rpg-choice-label">{c.label}</span>
+              {c.hint && <span className="rpg-choice-hint">{c.hint}</span>}
             </button>
           ))}
         </div>

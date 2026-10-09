@@ -4,6 +4,19 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair: nama dan logo baru, dialog lebih rapi, landing page profesional
+
+**Konteks:** owner memberi logo dan nama aplikasi "jobfair", meminta pilihan di semua dialog dirapikan, dan landing page yang lebih profesional untuk pencari kerja dengan warna logo.
+
+**Yang berubah**
+- Nama aplikasi jadi jobfair. Logo dipakai di navigasi, landing, ikon aplikasi (PWA, favicon, apple-touch), manifest, dan teks di dalam game.
+- Pilihan di semua dialog berpilihan sekarang berupa daftar baris yang rata kiri dengan keterangan kecil di kanan (misalnya "Lt 4 · 6 stand" atau "N lowongan"), bukan tombol-tombol yang bertumpuk. Daftar panjang bisa di-scroll.
+- Menu meja informasi disusun ulang: semua lantai berurutan seperti lift, lalu pilih stand di lantai booth.
+- Tulisan tombol "Ubah karakter" di profil sebelumnya tidak terlihat (putih di atas putih); sekarang terbaca.
+- Landing page baru dengan warna logo (hitam, putih, kuning #FFF000): hero dua kolom dengan sorotan kuning seperti kotak "Fair" di logo, preview live lantai dengan kartu notifikasi melayang (lamaran terkirim, undangan interview, kecocokan profil), angka yang menghitung naik, marquee perusahaan, daftar lowongan yang bisa difilter per jenis, cara kerja, fitur dengan ikon garis, dan ajakan akhir berlatar kuning. Gerakan dimatikan untuk pengguna yang memilih reduced motion.
+
+---
+
 ## 2026-10-09 · VWO: meja info di tiap lantai, karakter di profil, atur lantai, landing page baru
 
 **Konteks:** empat permintaan owner untuk job fair.

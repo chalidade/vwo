@@ -364,7 +364,7 @@ export function seminarStageExtras(room: FairRoom, screen: StageScreen | null): 
           <div className="fr-led-ticker">
             <span>
               🎤 {sc.title} · bersama {sc.speaker} · E-sertifikat untuk peserta yang menonton sampai selesai · Tanya jawab di akhir sesi
-              {sc.next ? ` · Berikutnya: ${sc.next}` : ""} · #VWOJobFair
+              {sc.next ? ` · Berikutnya: ${sc.next}` : ""} · #jobfair2026
             </span>
           </div>
         </div>
@@ -412,7 +412,7 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
   const w = st.width * T;
   const h = (st.height + 0.3) * T;
   const ledW = 18;
-  const headline = screen.live ? { tag: "● LIVE", title: screen.live.title, sub: screen.live.speaker } : screen.now ? { tag: `● SEDANG BERLANGSUNG · ${screen.now.start}–${screen.now.end}`, title: screen.now.title, sub: screen.now.host } : screen.over ? { tag: "ACARA HARI INI SELESAI", title: "Terima kasih sudah datang!", sub: "Sampai jumpa di VWO berikutnya" } : { tag: "SEGERA", title: screen.next?.title ?? room.name, sub: screen.next ? `${screen.next.start} · ${screen.next.host}` : room.tagline };
+  const headline = screen.live ? { tag: "● LIVE", title: screen.live.title, sub: screen.live.speaker } : screen.now ? { tag: `● SEDANG BERLANGSUNG · ${screen.now.start}–${screen.now.end}`, title: screen.now.title, sub: screen.now.host } : screen.over ? { tag: "ACARA HARI INI SELESAI", title: "Terima kasih sudah datang!", sub: "Sampai jumpa di jobfair berikutnya" } : { tag: "SEGERA", title: screen.next?.title ?? room.name, sub: screen.next ? `${screen.next.start} · ${screen.next.host}` : room.tagline };
   return [
     {
       key: "aula-stage",
@@ -460,8 +460,8 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
           <g transform="translate(0, 30)">
             <path d="M0 0h52l-6 58h-40Z" fill="#1e3a8a" {...ink} strokeWidth={1.8} />
             <rect x={-4} y={-6} width={60} height={10} rx={3} fill="#93c5fd" {...ink} strokeWidth={1.4} />
-            <text x={26} y={34} textAnchor="middle" fontSize={13} fontWeight={900} fill="#facc15" fontFamily={font}>
-              VWO
+            <text x={26} y={33} textAnchor="middle" fontSize={10} fontWeight={900} fill="#facc15" fontFamily={font}>
+              jobfair
             </text>
             <path d="M40 -6l8 -18" stroke="#1f2937" strokeWidth={2.5} />
             <circle cx={49} cy={-25} r={4} fill="#1f2937" />
@@ -482,7 +482,7 @@ export function aulaExtras(room: FairRoom, screen: AulaScreen, stops: FairStop[]
             <span className="fr-led-badge" data-live={screen.live || screen.now ? "" : undefined}>
               {headline.tag}
             </span>
-            <span className="fr-led-title">AULA UTAMA · VWO - Virtual World Job</span>
+            <span className="fr-led-title">AULA UTAMA · jobfair</span>
           </div>
           {hasVideo(screen.live?.stream) ? (
             <div className="fr-led-feedrow">

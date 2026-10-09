@@ -64,7 +64,7 @@ export function InstallButton({ className = "" }: { className?: string }) {
         <div className="mb-backdrop" onPointerDown={(e) => e.stopPropagation()} onClick={() => setHelp(false)}>
           <div className="rpg-box mb install-help" role="dialog" onClick={(e) => e.stopPropagation()}>
             <div className="mb-head">
-              <span className="mb-title">📲 Install VWO</span>
+              <span className="mb-title">📲 Install jobfair</span>
               <button type="button" className="mb-close" onClick={() => setHelp(false)} aria-label="Tutup">
                 ✕
               </button>
@@ -83,7 +83,7 @@ export function InstallButton({ className = "" }: { className?: string }) {
                   <li>Pilih <b>Install aplikasi</b> atau <b>Tambahkan ke layar utama</b>.</li>
                 </ol>
               )}
-              <p className="muted small">Setelah terpasang, VWO terbuka layar penuh seperti aplikasi biasa, lengkap dengan ikonnya.</p>
+              <p className="muted small">Setelah terpasang, jobfair terbuka layar penuh seperti aplikasi biasa, lengkap dengan ikonnya.</p>
             </div>
           </div>
         </div>

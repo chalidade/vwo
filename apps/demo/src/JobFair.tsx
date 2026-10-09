@@ -758,33 +758,39 @@ export function JobFair() {
         ...fair.fair.booths
           .filter((b) => b.floor === i)
           .map((b) => ({
-            label: `${b.tier === "premium" ? "👑 " : ""}${b.company} · ${openJobs(b).length} lowongan`,
+            label: `${b.tier === "premium" ? "👑 " : ""}${b.company}`,
+            hint: `${openJobs(b).length} lowongan`,
             onPick: () => {
               setTalk(null);
               goToBooth(b);
               setToast(i === hall ? `Menuju stand ${b.company}` : `Menuju stand ${b.company} di ${fair.fair.floors[i]!.name}`);
             },
           })),
-        { label: "Kembali", onPick: () => setTalk(main) },
+        { label: "← Kembali", onPick: () => setTalk(main) },
       ],
     });
     const main: Talk = {
       speaker: `${staff} · Panitia`,
-      pages: ["Ada yang bisa dibantu? Pilih lantainya: Aula, food court, seminar, psikotes, atau Stand Koin. Nanti aku antar."],
+      pages: ["Ada yang bisa dibantu? Pilih tujuanmu, nanti aku antar."],
       choices: [
-        ...fair.fair.floors.map((f, i) => ({
-          label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand${fair.floorPrice(fairFloorId(fair.fair, i)) ? ` · ${fair.floorPrice(fairFloorId(fair.fair, i))} koin` : ""})`,
-          onPick: () => setTalk(floorChoice(i)),
-        })),
-        ...fair.fair.rooms.map((r) => ({
-          label: `${r.emoji} ${r.name} (Lantai ${r.level + 1}${r.price ? ` · ${r.price} koin` : ""})`,
-          onPick: () => {
-            setTalk(null);
-            goToRoom(r);
-            setToast(`Menuju ${r.name}`);
-          },
-        })),
-        { label: "🪙 Stand Koin", onPick: () => { setTalk(null); goToCoinStand(); } },
+        // Every floor in lift order, the same way the lift lists them.
+        ...fair.stops.map((st) => {
+          const price = fair.floorPrice(st.floorId);
+          const r = st.roomId ? fair.room(st.roomId) : undefined;
+          const i = fairFloorIndex(st.floorId);
+          const count = r ? "" : `${fair.fair.booths.filter((b) => b.floor === i).length} stand`;
+          return {
+            label: `${st.emoji} ${st.label}`,
+            hint: [`Lt ${st.level + 1}`, count, price ? `${price} koin` : ""].filter(Boolean).join(" · "),
+            onPick: () => {
+              if (!r) return setTalk(floorChoice(i));
+              setTalk(null);
+              goToRoom(r);
+              setToast(`Menuju ${r.name}`);
+            },
+          };
+        }),
+        { label: "🪙 Stand Koin", hint: "beli koin", onPick: () => { setTalk(null); goToCoinStand(); } },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     };

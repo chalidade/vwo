@@ -302,7 +302,7 @@ function PhotoBooth({ booth, hashtag, onTaken, onShare, onToast }: { booth: Comp
     g.font = "900 44px system-ui, sans-serif";
     g.fillText(hashtag, 40, size - 66);
     g.font = "700 26px system-ui, sans-serif";
-    g.fillText(`${booth.company} · Job Fair VWO 2026`, 40, size - 28);
+    g.fillText(`${booth.company} · jobfair 2026`, 40, size - 28);
     g.beginPath();
     g.arc(size - 80, 80, 52, 0, Math.PI * 2);
     g.fillStyle = "#fff";

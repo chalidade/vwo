@@ -11,7 +11,7 @@ function calendarHref(a: FairApplication) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//VWO Job Fair//ID",
+    "PRODID:-//jobfair//ID",
     "BEGIN:VEVENT",
     `UID:${a.id}@vwo.example`,
     `DTSTAMP:${ics(Date.now())}`,
