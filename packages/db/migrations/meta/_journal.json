@@ -64,6 +64,13 @@
       "when": 1791549680123,
       "tag": "0008_player_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791553457722,
+      "tag": "0009_company_accounts",
+      "breakpoints": true
     }
   ]
 }

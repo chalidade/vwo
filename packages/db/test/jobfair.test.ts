@@ -7,6 +7,11 @@ import {
   AlreadyAppliedError,
   JobClosedError,
   NotEnoughCoinsError,
+  addBoothMember,
+  boothMembers,
+  boothsOf,
+  isBoothMember,
+  removeBoothMember,
   applyToJob,
   boothFairApplications,
   coinBalance,
@@ -157,5 +162,20 @@ describe("live game progress", () => {
     expect(await writeFairPlayer(db, { userId: seeker, rev: 1, data: { coins: 20 } })).toBe(2);
     expect(await writeFairPlayer(db, { userId: seeker, rev: 1, data: { coins: 99 } })).toBeNull();
     expect(await readFairPlayer(db, seeker)).toEqual({ data: { coins: 20 }, rev: 2 });
+  });
+});
+
+describe("company accounts", () => {
+  it("lets an account join a booth once, list it, and be taken off it", async () => {
+    expect(await boothsOf(db, seeker)).toEqual([]);
+    await addBoothMember(db, "nusantara-tech", seeker);
+    await addBoothMember(db, "nusantara-tech", seeker);
+    expect(await boothsOf(db, seeker)).toEqual(["nusantara-tech"]);
+    expect(await isBoothMember(db, seeker, "nusantara-tech")).toBe(true);
+    expect(await isBoothMember(db, seeker, "other-booth")).toBe(false);
+    expect((await boothMembers(db, "nusantara-tech")).map((m) => m.email)).toEqual(["sari@mail.example"]);
+    expect(await removeBoothMember(db, "nusantara-tech", seeker)).toBe(true);
+    expect(await removeBoothMember(db, "nusantara-tech", seeker)).toBe(false);
+    expect(await boothsOf(db, seeker)).toEqual([]);
   });
 });

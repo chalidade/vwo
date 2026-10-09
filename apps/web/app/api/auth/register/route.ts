@@ -2,6 +2,7 @@ import { EmailTakenError, createSession, register } from "@vwo/db";
 import { registerSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { sendVerifyMail } from "@/lib/mail";
 import { allow } from "@/lib/ratelimit";
@@ -10,6 +11,7 @@ import { isHuman } from "@/lib/turnstile";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
+  if (!passwordLogin()) return fail(403, "password_login_off");
   const ip = clientIp(req);
   if (!(await allow(`register:${ip}`, 10, 3600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, registerSchema);

@@ -5,7 +5,9 @@ import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { NotifList } from "../fair/Notifs";
 import { LIVE } from "../mode";
-import { boothApplications } from "../server-fair";
+import { ACCOUNT_EVENT, checkSession, currentAccount } from "../account";
+import { AccountGate } from "../AccountGate";
+import { boothApplications, claimBooth, claimErrorText } from "../server-fair";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
@@ -35,6 +37,10 @@ const loadTab = (): PortalTab => {
 
 /** The company portal: a company signs in with its code and PIN, then manages its booth, vacancies and applicants. */
 export function CompanyPortal({ boothId }: { boothId?: string }) {
+  return LIVE ? <LivePortal boothId={boothId} /> : <DemoPortal boothId={boothId} />;
+}
+
+function DemoPortal({ boothId }: { boothId?: string }) {
   useFair();
   const [who, setWho] = useState(signedInCompany);
   const booth = who ? fair.booth(who) : undefined;
@@ -49,6 +55,100 @@ export function CompanyPortal({ boothId }: { boothId?: string }) {
         location.hash = "#/jobfair/company";
       }}
     />
+  );
+}
+
+function useAccount() {
+  const [account, setAccount] = useState(currentAccount);
+  useEffect(() => {
+    const on = () => setAccount(currentAccount());
+    window.addEventListener(ACCOUNT_EVENT, on);
+    return () => window.removeEventListener(ACCOUNT_EVENT, on);
+  }, []);
+  return account;
+}
+
+/** Live site: a company signs in with Google; its account runs the booths it joined with a code and PIN. */
+function LivePortal({ boothId }: { boothId?: string }) {
+  useFair();
+  const account = useAccount();
+  if (!account)
+    return (
+      <main className="cp cp-login">
+        <div className="cp-login-card">
+          <p className="muted small">Masuk dulu dengan akun Google kantor kamu untuk membuka portal perusahaan.</p>
+          <AccountGate onIn={() => undefined} />
+        </div>
+      </main>
+    );
+  const mine = account.fairAdmin ? fair.fair.booths.map((b) => b.id) : (account.booths ?? []).filter((id) => fair.booth(id));
+  const pick = boothId ?? (mine.length === 1 ? mine[0] : undefined);
+  const booth = pick && mine.includes(pick) ? fair.booth(pick) : undefined;
+  if (!booth) return <ClaimBooth code={boothId ?? ""} mine={mine} admin={!!account.fairAdmin} />;
+  return <Portal key={booth.id} booth={booth} onOut={mine.length > 1 ? () => (location.hash = "#/jobfair/company") : undefined} />;
+}
+
+/** Live site: join a booth with the code and PIN from the organiser, or open one this account already runs. */
+function ClaimBooth({ code: start, mine, admin }: { code: string; mine: string[]; admin: boolean }) {
+  const [code, setCode] = useState(start);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const booths = mine.map((id) => fair.booth(id)!).sort((a, b) => a.company.localeCompare(b.company));
+  return (
+    <main className="cp cp-login">
+      <form
+        className="card cp-login-card"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const id = code.trim().toLowerCase();
+          setBusy(true);
+          const r = await claimBooth(id, pin.trim());
+          setBusy(false);
+          if (!r.ok) return setError(claimErrorText(r.error));
+          await checkSession();
+          location.hash = `#/jobfair/company/${id}`;
+        }}
+      >
+        <h1 className="cp-h1">🏢 Portal perusahaan</h1>
+        {booths.length > 0 && (
+          <>
+            <p className="muted small" style={{ marginTop: 0 }}>
+              {admin ? "Kamu panitia: pilih stand yang mau dibuka." : "Stand yang dikelola akunmu:"}
+            </p>
+            <div className="cp-pick">
+              {booths.map((b) => (
+                <a key={b.id} className="cp-pick-item" style={{ ["--c" as string]: b.color }} href={`#/jobfair/company/${b.id}`}>
+                  <BoothLogo booth={b} className="cp-logo" />
+                  <span>
+                    <b>
+                      {b.company} {b.tier === "premium" && "👑"}
+                    </b>
+                    <span className="muted small">{b.id}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+            <h2 className="cp-h2">Gabung ke stand lain</h2>
+          </>
+        )}
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Masukkan kode perusahaan dan PIN dari panitia sekali saja. Setelah itu akun ini langsung membuka portal stand tersebut.
+        </p>
+        <label>
+          Kode perusahaan
+          <input value={code} onChange={(e) => (setCode(e.target.value), setError(""))} autoCapitalize="none" required placeholder="contoh: nusantara-tech" />
+        </label>
+        <label>
+          PIN
+          <input value={pin} onChange={(e) => (setPin(e.target.value.replace(/\D/g, "")), setError(""))} inputMode="numeric" autoComplete="one-time-code" type="password" required maxLength={6} placeholder="4–6 angka" />
+        </label>
+        {error && <p className="bk-err">{error}</p>}
+        <button type="submit" disabled={busy}>
+          {busy ? "Memeriksa…" : "Gabung ke stand"}
+        </button>
+      </form>
+    </main>
   );
 }
 
@@ -119,7 +219,7 @@ function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) 
   );
 }
 
-function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
+function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
   const [tab, setTabState] = useState<PortalTab>(loadTab);
   const setTab = (t: PortalTab) => {
     setTabState(t);
@@ -179,9 +279,11 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
           <a className="small-btn cp-link" href="#/jobfair">
             🎪 Lihat di job fair
           </a>
-          <button type="button" className="small-btn ghost" onClick={onOut}>
-            Keluar
-          </button>
+          {onOut && (
+            <button type="button" className="small-btn ghost" onClick={onOut}>
+              {LIVE ? "Ganti stand" : "Keluar"}
+            </button>
+          )}
         </div>
       </header>
       <nav className="cp-tabs" role="tablist">
@@ -197,7 +299,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
           {server === "signin"
             ? "Masuk dengan akun jobfair di halaman Job Fair dulu untuk melihat pelamar dari server."
             : server === "denied"
-              ? "Selama trial, daftar pelamar dan perubahan stand hanya tersimpan di server untuk akun panitia. Minta panitia menambahkan email akunmu."
+              ? "Akun ini belum terdaftar di stand ini. Buka portal perusahaan lalu gabung dengan kode dan PIN dari panitia."
               : "Tidak tersambung ke server. Daftar pelamar mungkin belum yang terbaru."}
         </p>
       )}

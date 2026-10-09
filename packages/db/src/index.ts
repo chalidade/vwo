@@ -8,3 +8,4 @@ export * from "./ratelimit";
 export * from "./fair-applications";
 export * from "./fair-state";
 export * from "./fair-players";
+export * from "./fair-booths";

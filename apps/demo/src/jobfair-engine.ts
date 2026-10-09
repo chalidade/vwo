@@ -284,6 +284,13 @@ export interface StandBooking {
   at: number;
 }
 
+/** Live: a stand a company booked through the server. The booking and PIN come only to the organiser. */
+export interface BookedBooth {
+  booth: CompanyBooth;
+  booking?: StandBooking;
+  pin?: string;
+}
+
 /** Stand prices for a booking, in rupiah. */
 /** What renting an empty food court stand costs a business, per event (demo payment). */
 export const STALL_PRICE = 750_000;
@@ -621,6 +628,8 @@ export class DemoJobFair {
   private readonly originalHallBase: number;
   /** The organiser's changes. */
   org: OrgState = { removed: [], added: [] };
+  /** Live: booths that came from a server booking. */
+  private booked = new Set<string>();
   /** Walking promoters: where they are heading and who they last talked to. */
   private walkers = new Map<string, { path: Point[] | null; target: Goal | null; until: number; met: Map<string, number>; pitching: string | null }>();
   readonly events: FairEvent[] = [];
@@ -1057,6 +1066,8 @@ export class DemoJobFair {
     if (!this.booth(id)) return;
     if (this.org.added.some((b) => b.id === id)) this.org.added = this.org.added.filter((b) => b.id !== id);
     else this.org.removed.push(id);
+    // A booking lives on the server on its own: mark it taken out so the next pull doesn't bring it back.
+    if (this.booked.has(id) && !this.org.removed.includes(id)) this.org.removed.push(id);
     if (this.org.bookings) this.org.bookings = this.org.bookings.filter((x) => x.boothId !== id);
     this.company.delete(id);
     for (let i = this.applications.length - 1; i >= 0; i--) if (this.applications[i]!.boothId === id) this.applications.splice(i, 1);
@@ -1108,6 +1119,11 @@ export class DemoJobFair {
 
   companyPin(boothId: string) {
     return this.org.pins?.[boothId] ?? defaultPin(boothId);
+  }
+
+  /** Whether the organiser or a booking set this booth's PIN. The live server never takes a default PIN. */
+  hasCompanyPin(boothId: string) {
+    return !!this.org.pins?.[boothId];
   }
 
   setCompanyPin(boothId: string, pin: string) {
@@ -1524,8 +1540,21 @@ export class DemoJobFair {
   }
 
   /** Live: take the setup from the server. Missing parts keep what this browser has. */
-  applyShared(org: OrgState | null, companies: Record<string, CompanyState>) {
-    if (org) this.loadOrg(org);
+  applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = []) {
+    const base = org ?? (bookings.length ? this.org : null);
+    if (base) {
+      const next = structuredClone(base);
+      next.added ??= [];
+      next.removed ??= [];
+      for (const b of bookings) {
+        this.booked.add(b.booth.id);
+        if (next.removed.includes(b.booth.id)) continue;
+        if (!next.added.some((x) => x.id === b.booth.id)) next.added.push(b.booth);
+        if (b.pin && !next.pins?.[b.booth.id]) next.pins = { ...next.pins, [b.booth.id]: b.pin };
+        if (b.booking && !next.bookings?.some((x) => x.id === b.booking!.id)) next.bookings = [b.booking, ...(next.bookings ?? [])];
+      }
+      this.loadOrg(next);
+    }
     this.loadCompany({ ...Object.fromEntries(this.company), ...companies });
     this.persist();
     this.emit();

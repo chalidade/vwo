@@ -14,8 +14,11 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
    - `MIGRATE_DATABASE_URL`: session pooler URL (migrations need a session)
    - `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (publishable key): players see each other through
      Supabase Realtime. Read at build time, so redeploy after changing them.
-   - `ADMIN_EMAILS`: comma-separated accounts that may read and update applicants in the company
-     portal during the trial (until companies have their own accounts)
+   - `ADMIN_EMAILS`: comma-separated accounts of the organisers. They run the organiser pages and
+     every booth. Companies run only their own booth: an organiser sets the booth's PIN (Panitia →
+     Stand → PIN) and gives it to the company with the booth code; the company signs in with
+     Google and joins once in the company portal. A company that books an empty stand runs it
+     straight away and gets a PIN for colleagues. Panitia → Stand → Akun lists and removes them.
    - `RESEND_API_KEY`, `MAIL_FROM`: verification and password reset emails. Once set, an account
      must verify its email before applying.
    - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
@@ -25,7 +28,10 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      between networks where direct WebRTC fails (public STUN is used either way)
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: "Masuk dengan Google". Google Cloud Console →
      OAuth client (Web application) with redirect URI `https://<domain>/api/auth/google/callback`
-     for every domain the site is served on; publish the consent screen.
+     for every domain the site is served on; publish the consent screen. Google is the only way
+     to sign up and sign in; an older email-and-password account signs in with Google on the
+     same email and keeps its data.
+   - optional `PASSWORD_LOGIN=1`: brings back the email-and-password forms (local testing).
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 

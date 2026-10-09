@@ -4,6 +4,22 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · akun perusahaan per stand, booking ke server, login hanya Google
+
+**Konteks:** owner meminta akun perusahaan dikerjakan (poin 1 dan 2 dari daftar fitur yang belum terintegrasi) dan form daftar/login email dihapus sehingga masuk hanya lewat Google.
+
+**Yang berubah**
+- Masuk dan daftar hanya lewat Google. Endpoint daftar, login, lupa password, dan reset password menolak permintaan kecuali `PASSWORD_LOGIN=1` (untuk uji lokal). Akun lama berbasis password masuk dengan Google memakai email yang sama dan datanya tetap.
+- Tabel baru `fair_booth_members` (migrasi 0009) mencatat akun mana yang mengelola stand mana. Akun perusahaan hanya bisa melihat pelamar, membalas chat/interview, dan mengubah stand miliknya sendiri; panitia tetap bisa semua.
+- Portal perusahaan di versi live: masuk dengan Google, lalu sekali saja masukkan kode perusahaan dan PIN dari panitia. Daftar "Akun demo" yang menampilkan PIN disembunyikan di live. PIN bawaan tidak pernah berlaku di server; panitia wajib mengatur PIN per stand. Percobaan PIN dibatasi 6 kali per 15 menit.
+- Booking stand kosong dikirim ke server: server memeriksa slot masih kosong, membuat booth dan PIN acak, dan akun yang booking langsung jadi pengelola. Booth baru terlihat oleh semua pengunjung; data booking dan PIN hanya untuk panitia. Tagihan stand hanya terlihat oleh panitia dan pengelola stand itu.
+- Halaman panitia → Stand: PIN tampil "belum diatur" bila belum dibuat, tombol Akun menampilkan daftar akun pengelola stand dan bisa mengeluarkannya.
+- Login Google dari portal perusahaan kembali ke portal perusahaan.
+
+**Dicek:** tes database dan engine lulus; uji lokal tiga akun (panitia, perusahaan, pelamar): PIN bawaan ditolak, PIN salah ditolak, PIN dari panitia membuka portal dan pelamar terlihat, perusahaan tidak bisa mengubah stand lain atau pengaturan panitia, booking membuat stand yang terlihat pelamar, slot yang sama ditolak, dan stand booking yang dilepas panitia tidak muncul lagi.
+
+---
+
 ## 2026-10-09 · landing lebih lancar dan panduan install aplikasi
 
 **Konteks:** owner melaporkan landing terasa lag saat di-scroll ke bagian live, dan HP hanya menawarkan "add shortcut", bukan install aplikasi.

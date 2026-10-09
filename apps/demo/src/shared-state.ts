@@ -1,26 +1,34 @@
 // Live site: the event setup (organiser's changes, every company's booth) is kept on the server,
 // so the panitia, the companies and the job seekers all see the same event on every device.
-// Everyone pulls it; event admins also push what they change here.
-import type { CompanyState, OrgState } from "./jobfair-engine";
+// Everyone pulls it; event admins push what they change here, and company accounts their own booth.
+import type { BookedBooth, CompanyState, OrgState } from "./jobfair-engine";
 import { fair } from "./useFair";
 
-type Shared = { org: OrgState | null; companies: Record<string, CompanyState>; version: number };
+type Shared = { org: OrgState | null; companies: Record<string, CompanyState>; bookings?: BookedBooth[]; version: number };
 
 let started = false;
 let admin = false;
+/** Company booths this account runs: their `company:<id>` documents are pushed too. */
+const mine = new Set<string>();
 let pushing: (() => void) | null = null;
+/** The server setup's version this browser has applied; -1 takes the next pull whatever it says. */
+let version = -1;
+const mayPush = (key: string) => admin || (key.startsWith("company:") && mine.has(key.slice("company:".length)));
 
-/** Start pulling the setup; with `asAdmin`, also push this browser's changes. Safe to call again. */
-export function startSharedSync(asAdmin: boolean) {
-  if (asAdmin && !admin) {
-    admin = true;
+/** Start pulling the setup; event admins and company accounts also push their changes. Safe to call again. */
+export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
+  const more = booths.some((b) => !mine.has(b));
+  booths.forEach((b) => mine.add(b));
+  if ((asAdmin && !admin) || more) {
+    admin ||= asAdmin;
+    // What the server shows this account just widened (booth invoices, PINs): take it on the next pull.
+    version = -1;
     pushing?.();
   }
   if (started) return;
   started = true;
   // What the server has, as this browser last saw or sent it, per key.
   const synced = new Map<string, string>();
-  let version = -1;
   let busy = false;
 
   const local = () => {
@@ -29,7 +37,7 @@ export function startSharedSync(asAdmin: boolean) {
     for (const [id, c] of Object.entries(s.companies)) m.set(`company:${id}`, JSON.stringify(c));
     return m;
   };
-  const unsent = () => admin && version >= 0 && [...local()].some(([k, v]) => synced.get(k) !== v);
+  const unsent = () => version >= 0 && [...local()].some(([k, v]) => mayPush(k) && synced.get(k) !== v);
 
   const pull = async () => {
     if (busy) return;
@@ -41,7 +49,7 @@ export function startSharedSync(asAdmin: boolean) {
       // After the first pull, an admin's unsent edits win; they go up on the next push.
       if (d.version === version || unsent()) return;
       version = d.version;
-      fair.applyShared(d.org, d.companies);
+      fair.applyShared(d.org, d.companies, d.bookings ?? []);
       const now = local();
       if (d.org) synced.set("org", now.get("org")!);
       for (const id of Object.keys(d.companies)) {
@@ -60,7 +68,7 @@ export function startSharedSync(asAdmin: boolean) {
     busy = true;
     try {
       for (const [key, json] of local()) {
-        if (synced.get(key) === json) continue;
+        if (!mayPush(key) || synced.get(key) === json) continue;
         const r = await fetch("/api/jobfair/state", {
           method: "PUT",
           credentials: "same-origin",
@@ -81,6 +89,6 @@ export function startSharedSync(asAdmin: boolean) {
   pushing = () => {
     pushTimer ??= setInterval(() => void push(), 3_000);
   };
-  void pull().then(() => admin && pushing?.());
+  void pull().then(() => (admin || mine.size > 0) && pushing?.());
   setInterval(() => void pull(), 30_000);
 }

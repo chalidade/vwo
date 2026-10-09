@@ -10,7 +10,9 @@ export async function GET(req: Request) {
   const back = new URL("/play/#/jobfair", req.url);
   if (!googleEnabled() || !(await allow(`google:${clientIp(req)}`, 30, 600_000))) return NextResponse.redirect(back);
   const { url, cookie } = startGoogle(req);
+  // Where to land after signing in: only known pages, never a URL from the query.
+  const to = new URL(req.url).searchParams.get("to") === "company" ? "company" : "fair";
   const res = NextResponse.redirect(url);
-  res.cookies.set(GOOGLE_COOKIE, cookie, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/auth/google", maxAge: 600 });
+  res.cookies.set(GOOGLE_COOKIE, `${cookie}.${to}`, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/auth/google", maxAge: 600 });
   return res;
 }
