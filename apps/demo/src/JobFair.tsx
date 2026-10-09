@@ -17,6 +17,7 @@ import {
   findPath,
   openJobs,
   slide,
+  LOUNGE_PLANS,
   stallSlot,
   stallSpot,
   aulaSpot,
@@ -58,7 +59,7 @@ import { type Account, currentAccount, logout } from "./account";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
-import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
+import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, VERIFY_COST, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, onSignal, sendSignal } from "./fair/call";
@@ -80,6 +81,7 @@ import { VerifyPanel } from "./fair/Verify";
 import { WalletPanel } from "./fair/Wallet";
 import { BookStand } from "./fair/BookStand";
 import { RentStall } from "./fair/RentStall";
+import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
 import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
@@ -174,6 +176,8 @@ export function JobFair() {
   const [media, setMedia] = useState<{ boothId: string; acc: string } | null>(null);
   const [booking, setBooking] = useState<{ floor: number; x: number; y: number } | null>(null);
   const [renting, setRenting] = useState<number | null>(null);
+  /** Coins about to be spent, waiting for a yes. */
+  const [coinAsk, setCoinAsk] = useState<CoinAsk | null>(null);
   const [games, setGames] = useState(false);
   const [missions, setMissions] = useState(false);
   const [ring, setRing] = useState<RingSignal | null>(null);
@@ -818,6 +822,11 @@ export function JobFair() {
   /** Pay for a lounge call, then ring the consultant or the other job seeker. */
   function startLoungeCall(c: LoungeCallStart) {
     const who = c.consultant?.name ?? c.peer?.name ?? "";
+    const plan = LOUNGE_PLANS.find((p) => p.minutes === c.minutes) ?? LOUNGE_PLANS[0]!;
+    setCoinAsk({ price: c.consultant ? plan.consultCoins : plan.coins, what: `${c.kind === "video" ? "video call" : "telepon"} ${c.minutes} menit dengan ${who}`, run: () => placeLoungeCall(c, who) });
+  }
+
+  function placeLoungeCall(c: LoungeCallStart, who: string) {
     if (!fair.startLoungeCall(c.consultant ? "consult" : "peer", c.minutes, who)) {
       setLounge(null);
       setWallet(true);
@@ -842,6 +851,16 @@ export function JobFair() {
       setWallet(true);
       return;
     }
+    const free = fair.player.vouchers.some((x) => !x.used && x.kind === "free-apply");
+    const send = () => sendApplication(boothId, input);
+    if (free) return send();
+    const b = fair.booth(boothId);
+    const job = b?.jobs.find((j) => j.id === input.jobId);
+    setCoinAsk({ price: APPLY_COST, what: `melamar ${job?.title ?? "lowongan ini"}${b ? ` di ${b.company}` : ""}`, run: send });
+  };
+
+  const sendApplication = (boothId: string, input: ApplicationInput) => {
+    if (!session) return;
     const a = fair.apply(session.visitorId, { boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
@@ -1244,9 +1263,9 @@ export function JobFair() {
             name={profile.name || session.name}
             coins={me.coins}
             verified={!!me.verified}
-            onBuy={() => {
-              if (fair.buyVerified()) setToast("✔ Akunmu sekarang terverifikasi");
-            }}
+            onBuy={() =>
+              setCoinAsk({ price: VERIFY_COST, what: "centang biru (akun terverifikasi)", run: () => fair.buyVerified() && setToast("✔ Akunmu sekarang terverifikasi") })
+            }
             onTopUp={() => {
               setVerify(false);
               setWallet(true);
@@ -1293,6 +1312,7 @@ export function JobFair() {
 
         {booking && <BookStand slot={booking} onClose={() => setBooking(null)} />}
         {renting !== null && <RentStall slot={renting} onClose={() => setRenting(null)} />}
+        {coinAsk && <CoinConfirmModal ask={coinAsk} coins={me.coins} onCancel={() => setCoinAsk(null)} />}
 
         {session && wallet && (
           <WalletPanel

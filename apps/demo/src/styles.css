@@ -1053,3 +1053,12 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .lg-prices { width: 100%; border-collapse: collapse; font-size: 13px; }
 .lg-prices th, .lg-prices td { padding: 6px; border-bottom: 1px solid #ead2bd; text-align: left; }
 .lg-rules { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+
+/* Asking before coins are spent. */
+.cc-ask-back { z-index: 80; }
+.cc-ask { display: grid; gap: 8px; max-width: 340px; padding: 4px; }
+.cc-ask-q { margin: 0; font-size: 15px; line-height: 1.4; }
+.cc-ask-left { margin: 0; color: #64748b; font-size: 13px; }
+.cc-ask-row { display: flex; gap: 8px; justify-content: flex-end; }
+.cc-ask-yes { background: #16a34a; color: #fff; font-weight: 800; }
+.fx-food .cc-ask { margin: 8px 0; padding: 10px; border-radius: 10px; background: #fef3c7; border: 2px solid #f59e0b; max-width: none; }
