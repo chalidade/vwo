@@ -4,6 +4,23 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · VWO: akun job fair di server (daftar, login, verifikasi, reset password)
+
+**Konteks:** langkah kedua checklist go-live. Owner menyetujui launch 18 Oktober dengan koin gratis.
+
+**Yang berubah**
+- API `/api/auth/register`, `login`, `logout`, `me`, `verify`, `forgot`, dan `reset` di `apps/web`.
+- Password di-hash dengan scrypt. Token sesi dan link email adalah 32 byte acak, dan yang disimpan di database hanya hash SHA-256-nya.
+- Cookie sesi `HttpOnly`, `Secure` (di production), `SameSite=Lax`, berlaku 30 hari. Setiap POST harus berasal dari origin yang sama (perlindungan CSRF).
+- Input dicek dengan zod. Aturannya di `packages/shared/src/auth.ts`, jadi form dan API memakai aturan yang sama. Pendaftaran wajib mencentang syarat dan kebijakan privasi.
+- Login dibatasi 30 kali per 10 menit per IP dan 10 kali per akun. Login yang salah selalu dijawab sama, termasuk untuk email yang tidak terdaftar. Lupa password juga selalu dijawab sama.
+- Reset password mengeluarkan semua sesi lama. Email dikirim lewat Resend. Tanpa kunci API, email dicetak ke log saat development.
+- 6 tes integrasi baru untuk akun. Seluruh alur juga diuji lewat HTTP: daftar, verifikasi, lupa password, reset, login, dan pembatasan percobaan (percobaan ke-11 ditolak 429).
+
+**Catatan:** pembatas percobaan masih disimpan di memori satu server. Akan dipindah ke Redis bersama tugas multi-instance.
+
+---
+
 ## 2026-10-09 · VWO: skema database job fair (langkah pertama go-live)
 
 **Konteks:** owner menargetkan job fair live di minggu ke-2 sampai ke-3 Oktober. Checklist go-live sekarang dilacak di Notion.
