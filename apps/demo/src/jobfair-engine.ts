@@ -517,6 +517,46 @@ const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
   aula: ["👏👏👏", "Seru acaranya!", "Semoga dapat door prize 🎁", "Ketemu di meeting point ya", "Abis ini talkshow"],
   konsultasi: ["Sofanya empuk 😌", "Nunggu giliran konsultasi", "📞 Halo?", "Tadi dapat tips CV bagus", "Ngobrol yuk!", "Pak Hendra baik banget"],
 };
+/** Short exchanges between two job seekers standing or sitting near each other, per kind of floor. */
+const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
+  hall: [
+    ["Kamu udah lamar ke mana aja?", "Baru dua stand, kamu?", "Aku tiga, semoga ada yang nyangkut 🤞"],
+    ["Stand yang VIP itu keren ya", "Iya, ada layar videonya!"],
+    ["CV-mu satu halaman?", "Iya, katanya recruiter suka yang ringkas"],
+    ["Ada lowongan remote nggak sih?", "Coba cek stand Kreatif di Lantai 3"],
+    ["Fresh graduate bisa lamar di sini?", "Bisa, banyak yang program management trainee"],
+    ["Antre di stand sebelah panjang banget", "Lamar online di HP aja, lebih cepat"],
+    ["Gaji yang ditulis itu nett atau gross?", "Tanya langsung ke recruiternya aja"],
+    ["Habis ini mau ke seminar?", "Iya, Lantai 5 jam sebelas", "Bareng yuk!"],
+  ],
+  aula: [
+    ["Acaranya mulai jam berapa?", "Lihat papan rundown di kiri", "Oh iya, makasih!"],
+    ["Kamu dari kampus mana?", "Dari Bandung, kamu?", "Bekasi 👋"],
+    ["Semoga dapat door prize ya", "Amin! Hadiahnya laptop katanya 😮"],
+    ["Ketemu teman di meeting point ya", "Oke, aku tunggu di tiang hijau"],
+  ],
+  seminar: [
+    ["Metode STAR itu apa sih?", "Situation, Task, Action, Result", "Oh, buat jawab interview ya"],
+    ["Slide-nya bisa diminta nggak?", "Katanya dibagi setelah sesi"],
+    ["Pembicaranya enak jelasinnya", "Iya, praktis banget"],
+  ],
+  psikotes: [
+    ["Soal deret angkanya susah", "Pola kali dua kayaknya", "Ooh iya!"],
+    ["Waktunya cukup nggak?", "Kerjakan yang gampang dulu"],
+  ],
+  foodcourt: [
+    ["Enak baksonya?", "Enak, kuahnya mantap", "Aku pesan juga deh"],
+    ["Pakai voucher dapat diskon lho", "Serius? Beli pakai koin ya?"],
+    ["Habis makan lanjut lamar lagi", "Semangat! Aku mau ke psikotes"],
+    ["Kopi susunya manis pas", "Buat begadang revisi CV 😅"],
+  ],
+  konsultasi: [
+    ["Tadi konsultasi sama siapa?", "Kak Maya, soal portofolio", "Bagus nggak?", "Bagus, langsung dikasih contoh"],
+    ["Teleponnya bayar berapa koin?", "Sepuluh menit sepuluh koin"],
+    ["Sofanya nyaman ya", "Iya, betah nunggu di sini 😌"],
+  ],
+};
+
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
 const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
 
@@ -2197,6 +2237,10 @@ export class DemoJobFair {
       this.tickRooms();
       changed = true;
     }
+    if (now >= this.nextChatAt) {
+      this.nextChatAt = now + 1800 + this.rand() * 2400;
+      if (this.startChat()) changed = true;
+    }
 
     const step = (WALK_SPEED * Math.min(dtMs, 250)) / 1000;
     for (const bot of [...this.bots]) if (this.tickBot(bot, now, step)) changed = true;
@@ -2205,6 +2249,41 @@ export class DemoJobFair {
   }
 
   private nextRoomAt = 0;
+  private nextChatAt = 0;
+  /** Until when each floor's current conversation runs, so one floor never has two at once. */
+  private chatUntil = new Map<string, number>();
+
+  /**
+   * Two job seekers near each other start a short conversation: one asks, the other answers, in turns.
+   * One floor at a time, picked at random among the floors where people are close enough to talk.
+   */
+  private startChat() {
+    const now = this.now();
+    const free = (v: FairVisitor) => v.isBot && !v.remote && !this.bubbles.has(v.memberId);
+    const byFloor = new Map<string, FairVisitor[]>();
+    for (const v of this.visitors.values()) if (free(v)) byFloor.set(v.floorId, [...(byFloor.get(v.floorId) ?? []), v]);
+    const floors = [...byFloor].filter(([id, list]) => list.length >= 2 && (this.chatUntil.get(id) ?? 0) <= now);
+    if (!floors.length) return false;
+    const [floorId, list] = this.pick(floors);
+    const a = this.pick(list);
+    const near = list.filter((b) => b !== a && Math.hypot(b.x - a.x, b.y - a.y) < 4.5);
+    if (!near.length) return false;
+    const b = this.pick(near);
+    const room = this.roomOf(floorId);
+    const lines = this.pick(CONVOS[room?.kind ?? "hall"]);
+    // Face each other when standing; seated people keep facing their table or the stage.
+    if (!a.seatId) a.facing = facingFor(b.x - a.x, b.y - a.y, a.facing);
+    if (!b.seatId) b.facing = facingFor(a.x - b.x, a.y - b.y, b.facing);
+    const gap = 2400;
+    lines.forEach((line, i) =>
+      this.after(i * gap, () => {
+        const who = i % 2 ? b : a;
+        if (this.visitors.get(who.memberId) === who && who.floorId === floorId) this.say(who.memberId, line, gap - 200);
+      }),
+    );
+    this.chatUntil.set(floorId, now + lines.length * gap + 1500);
+    return true;
+  }
   private speakerLine = 0;
 
   /** Rooms fill and empty on their own: people sit down, eat, take tests, and leave. */
