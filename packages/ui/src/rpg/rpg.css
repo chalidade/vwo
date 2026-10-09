@@ -29,6 +29,8 @@
   left: 0;
   top: 0;
   transform-origin: 0 0;
+  /* The camera moves every frame: keep the painted floor as one layer and just slide it. */
+  will-change: transform;
 }
 .rpg-layer {
   position: absolute;
@@ -40,6 +42,7 @@
   left: 0;
   top: 0;
 }
+
 .rpg-vignette {
   pointer-events: none;
   position: absolute;
@@ -467,8 +470,13 @@
     transform: translateY(-5px);
   }
 }
-/* Crowd mode (CafeScene sets data-crowd): only the bob is left on other people, since animating
-   parts inside an SVG repaints the whole sprite each frame. The player keeps every animation. */
+/* Crowd mode (CafeScene sets data-crowd): other people become a cached picture (FlatPerson.tsx)
+   that only bobs while walking, since animating parts inside an SVG repaints the whole sprite each
+   frame. The player keeps every animation. */
+.pg-flat {
+  display: block;
+  user-select: none;
+}
 [data-crowd] .rpg-sprite:not([data-self]) :is(.pg-eye, .pg-leg-a, .pg-leg-b, .pg-arm-a, .pg-arm-b, .rpg-shadow),
 [data-crowd] .rpg-sprite:not([data-self]):not([data-walking]) .pg-body {
   animation: none;
