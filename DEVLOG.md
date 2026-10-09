@@ -4,6 +4,18 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair: skrip server DigitalOcean
+
+**Konteks:** owner memilih DigitalOcean dan ingin saya yang menyiapkan server lewat API DO.
+
+**Yang berubah**
+- `deploy/setup.sh` menyiapkan droplet Ubuntu 24.04 baru dalam satu kali jalan: swap 2 GB, PostgreSQL di localhost, Node 22, aplikasi web dan server realtime sebagai service systemd, Caddy dengan HTTPS otomatis, firewall (hanya SSH, 80, 443), dan backup database tiap malam yang disimpan 14 hari. Password database dibuat acak di server dan tidak pernah masuk repo.
+- `deploy/update.sh` (terpasang sebagai `jobfair-update`) menarik kode terbaru, menjalankan migrasi, build, lalu restart.
+- `deploy/do.sh` membuat droplet, melihat statusnya, dan mengubah ukurannya lewat API DO. Ukuran bisa dinaikkan sebelum event dan diturunkan lagi sesudahnya, karena disk tidak ikut diperbesar.
+- Diuji di sini: migrasi ke PostgreSQL 16 baru, build production, web dan realtime berjalan, dan daftar akun berhasil tersimpan. Membuat droplet sungguhan menunggu akses ke API DO.
+
+---
+
 ## 2026-10-09 · jobfair: nama dan logo baru, dialog lebih rapi, landing page profesional
 
 **Konteks:** owner memberi logo dan nama aplikasi "jobfair", meminta pilihan di semua dialog dirapikan, dan landing page yang lebih profesional untuk pencari kerja dengan warna logo.
