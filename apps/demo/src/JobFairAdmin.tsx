@@ -8,6 +8,7 @@ import { OrgLive } from "./organizer/Live";
 import { OrgPrices } from "./organizer/Prices";
 import { OrgPsych } from "./organizer/Psych";
 import { OrgSeminars } from "./organizer/Seminars";
+import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
 
 const TABS = [
@@ -60,12 +61,19 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         <span className="cp-logo cp-logo-big">🎪</span>
         <div className="cp-head-text">
           <h1 className="cp-h1">Panitia · {fair.fair.name}</h1>
-          <span className="muted small">Data demo tersimpan di browser ini. Perubahan langsung tampil di job fair.</span>
+          <span className="muted small">{LIVE ? "Perubahan tersimpan di server dan langsung tampil untuk semua pengunjung." : "Data demo tersimpan di browser ini. Perubahan langsung tampil di job fair."}</span>
         </div>
         <div className="cp-head-links">
           <a className="small-btn cp-link" href="#/jobfair">
             🎪 Buka job fair
           </a>
+          <a className="small-btn ghost cp-link" href="#/jobfair/company">
+            🏢 Portal perusahaan
+          </a>
+          <a className="small-btn ghost cp-link" href="#/jobfair/speaker">
+            🎤 Pembicara
+          </a>
+          {!LIVE && (
           <button
             type="button"
             className="small-btn ghost"
@@ -75,6 +83,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
           >
             Hapus data demo
           </button>
+          )}
         </div>
       </header>
       <nav className="cp-tabs" role="tablist">
