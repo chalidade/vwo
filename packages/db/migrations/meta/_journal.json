@@ -8,6 +8,13 @@
       "when": 1791349400851,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791512121500,
+      "tag": "0001_jobfair",
+      "breakpoints": true
     }
   ]
 }
