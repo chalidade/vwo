@@ -28,7 +28,7 @@ if ! swapon --show | grep -q /swapfile; then
 fi
 
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg git ufw postgresql postgresql-contrib debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y ca-certificates curl gnupg git ufw fail2ban unattended-upgrades postgresql postgresql-contrib debian-keyring debian-archive-keyring apt-transport-https
 
 # Node 22 and pnpm.
 if ! command -v node >/dev/null || ! node -v | grep -q '^v22'; then
@@ -46,6 +46,17 @@ fi
 
 # Firewall: SSH and web only. Postgres listens on localhost only.
 ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
+
+# SSH by key only, fail2ban against password guessing, and security updates installed daily.
+cat > /etc/ssh/sshd_config.d/10-jobfair.conf <<'SSHD'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+SSHD
+systemctl reload ssh || systemctl reload sshd || true
+systemctl enable --now fail2ban
+echo 'APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";' > /etc/apt/apt.conf.d/20auto-upgrades
 
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/home/$APP_USER" --shell /usr/sbin/nologin "$APP_USER"
 
@@ -88,6 +99,9 @@ Description=jobfair web (Next.js)
 After=network.target postgresql.service
 [Service]
 User=$APP_USER
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
 WorkingDirectory=$APP_DIR/apps/web
 EnvironmentFile=$ENV_FILE
 ExecStart=/usr/bin/env pnpm start
@@ -102,6 +116,9 @@ Description=jobfair realtime (Socket.IO)
 After=network.target postgresql.service
 [Service]
 User=$APP_USER
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
 WorkingDirectory=$APP_DIR/apps/realtime
 EnvironmentFile=$ENV_FILE
 ExecStart=/usr/bin/env pnpm start
