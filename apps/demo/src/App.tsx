@@ -27,12 +27,12 @@ function useLiveAccount() {
     const on = () => {
       const a = currentAccount();
       setAccount(a);
-      startSharedSync(!!a?.fairAdmin);
+      startSharedSync(!!a?.fairAdmin, a?.booths ?? []);
       syncPlayer(a);
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
-      startSharedSync(!!a?.fairAdmin);
+      startSharedSync(!!a?.fairAdmin, a?.booths ?? []);
       syncPlayer(a);
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);

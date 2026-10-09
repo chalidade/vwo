@@ -317,3 +317,16 @@ export const fairPlayers = pgTable("fair_players", {
   rev: integer("rev").notNull().default(1),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Which accounts run which company's booth in the live game: they see its applicants and edit it. */
+export const fairBoothMembers = pgTable(
+  "fair_booth_members",
+  {
+    boothKey: text("booth_key").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.boothKey, t.userId] }), index("fair_booth_members_user_idx").on(t.userId)],
+);

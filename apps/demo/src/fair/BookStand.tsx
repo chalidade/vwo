@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { STAND_PRICES } from "../jobfair-engine";
+import { checkSession } from "../account";
 import { sessionLogin } from "../company/login";
+import { LIVE } from "../mode";
+import { bookStandOnServer } from "../server-fair";
 import { fair } from "../useFair";
 import { PAY_METHODS, rupiah } from "./company";
 import { Modal } from "./Modal";
@@ -19,6 +22,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
   const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [done, setDone] = useState<{ id: string; company: string; pin: string } | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const floorName = fair.fair.floors[slot.floor]?.name ?? "Aula";
   const place = `${floorName}, ${slot.y < 5 ? "baris belakang" : "baris depan"} ${slot.x < 10 ? "kiri" : slot.x < 25 ? "tengah" : "kanan"}`;
 
@@ -105,14 +109,26 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             <button
               type="button"
               className="bk-go"
-              onClick={() => {
+              disabled={busy}
+              onClick={async () => {
+                if (LIVE) {
+                  setBusy(true);
+                  const r = await bookStandOnServer({ company: company.trim(), industry: industry.trim(), color, contact: contact.trim(), email: email.trim(), tier, method, ...slot });
+                  setBusy(false);
+                  if (!r.ok) return setError(bookErrorText(r.error));
+                  // The booth stands for everyone on the next pull; show it here straight away.
+                  fair.applyShared(null, {}, [{ booth: r.data.booth }]);
+                  void checkSession();
+                  setDone({ id: r.data.booth.id, company: r.data.booth.company, pin: r.data.pin });
+                  return setStep("done");
+                }
                 const r = fair.bookStand({ company, industry, color, contact, email, tier, method, ...slot });
                 if (!r) return setError("Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.");
                 setDone({ id: r.booth.id, company: r.booth.company, pin: r.pin });
                 setStep("done");
               }}
             >
-              Bayar {rupiah(STAND_PRICES[tier])}
+              {busy ? "Memproses…" : `Bayar ${rupiah(STAND_PRICES[tier])}`}
             </button>
           </div>
         </div>
@@ -121,7 +137,11 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
       {step === "done" && done && (
         <div className="bk-form bk-done">
           <p className="bk-ok">✓ Pembayaran diterima. Stand {done.company} sudah berdiri di {floorName}.</p>
-          <p className="small">Masuk ke portal perusahaan untuk mengisi lowongan, profil, dan dekorasi stand:</p>
+          <p className="small">
+            {LIVE
+              ? "Akunmu sudah jadi pengelola stand ini. Bagikan kode dan PIN ke rekan kerja supaya mereka bisa ikut mengelola dengan akun Google masing-masing:"
+              : "Masuk ke portal perusahaan untuk mengisi lowongan, profil, dan dekorasi stand:"}
+          </p>
           <dl className="bk-cred">
             <dt>Kode perusahaan</dt>
             <dd>{done.id}</dd>
@@ -129,7 +149,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             <dd>{done.pin}</dd>
           </dl>
           <div className="row">
-            <a className="small-btn cp-link" href={`#/jobfair/company/${done.id}`} onClick={() => sessionLogin(done.id)}>
+            <a className="small-btn cp-link" href={`#/jobfair/company/${done.id}`} onClick={() => !LIVE && sessionLogin(done.id)}>
               Buka portal perusahaan →
             </a>
             <button type="button" className="ghost" onClick={onClose}>
@@ -140,4 +160,21 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
       )}
     </Modal>
   );
+}
+
+function bookErrorText(error: string) {
+  switch (error) {
+    case "slot_taken":
+      return "Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.";
+    case "not_signed_in":
+      return "Masuk dulu dengan akun Google di halaman Job Fair, lalu booking lagi.";
+    case "too_many_requests":
+      return "Terlalu banyak booking dari akun ini. Coba lagi nanti.";
+    case "invalid_input":
+      return "Periksa lagi data perusahaan dan email PIC.";
+    case "offline":
+      return "Tidak tersambung ke server. Periksa internet lalu coba lagi.";
+    default:
+      return "Booking gagal. Coba lagi sebentar lagi.";
+  }
 }

@@ -533,6 +533,30 @@ describe("DemoJobFair", () => {
     expect(fair.companyLogin(other.id, "246810")?.id).toBe(other.id);
   });
 
+  it("shows stands booked on the live server, and keeps one the organiser took out gone", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const gone = fair.fair.booths.find((x) => x.floor === 0)!;
+    const org = { removed: [gone.id], added: [] };
+    const booth = { ...structuredClone(gone), id: "kopi-nusa", company: "Kopi Nusa" };
+    const booking = { id: "book-1", boothId: "kopi-nusa", company: "Kopi Nusa", contact: "Dewi", email: "hr@kopinusa.example", tier: "regular" as const, price: 7_500_000, method: "QRIS", at: 1 };
+    // A visitor gets only the booth.
+    fair.applyShared(org, {}, [{ booth }]);
+    expect(fair.booth("kopi-nusa")?.company).toBe("Kopi Nusa");
+    expect(fair.hasCompanyPin("kopi-nusa")).toBe(false);
+    expect(fair.bookings()).toEqual([]);
+    // The organiser also gets the booking and its PIN, once however often it pulls.
+    fair.applyShared(org, {}, [{ booth, booking, pin: "4821" }]);
+    fair.applyShared(org, {}, [{ booth, booking, pin: "4821" }]);
+    expect(fair.companyPin("kopi-nusa")).toBe("4821");
+    expect(fair.bookings()).toHaveLength(1);
+    expect(fair.fair.booths.filter((b) => b.id === "kopi-nusa")).toHaveLength(1);
+    // Taking it out marks it removed, so the booking still on the server doesn't bring it back.
+    fair.removeBooth("kopi-nusa");
+    expect(fair.org.removed).toContain("kopi-nusa");
+    fair.applyShared(fair.org, {}, [{ booth, booking, pin: "4821" }]);
+    expect(fair.booth("kopi-nusa")).toBeUndefined();
+  });
+
   it("lets the organiser cap how many of its walking promoters are out", () => {
     const fair = new DemoJobFair(() => 0.5);
     const walking = () => fair.fair.promoters.filter((p) => p.walks && !p.boothId).length;

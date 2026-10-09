@@ -1,8 +1,9 @@
 import "server-only";
-import type { FairApplicationRow } from "@vwo/db";
+import { type FairApplicationRow, isBoothMember } from "@vwo/db";
+import { db } from "./db";
 import type { FairApplicationOut } from "@vwo/shared";
 
-/** Accounts that run the event. Until companies have their own accounts, only they see applicants. */
+/** Accounts that run the event: they see and change everything. */
 export function isFairAdmin(user: { email: string; role: string } | null) {
   if (!user) return false;
   if (user.role === "super_admin") return true;
@@ -23,4 +24,10 @@ export function applicationOut(row: FairApplicationRow): FairApplicationOut {
     at: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
   };
+}
+
+/** Event admins, and the company accounts that run this booth. */
+export async function canManageBooth(user: { id: string; email: string; role: string } | null, boothKey: string) {
+  if (!user) return false;
+  return isFairAdmin(user) || isBoothMember(db, user.id, boothKey);
 }

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type BoothTheme, type CompanyBooth, type GateStyle } from "@vwo/shared";
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
 import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
+import { LIVE } from "../mode";
+import { boothMembers, removeBoothMember } from "../server-fair";
 import { fair } from "../useFair";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#334155"];
@@ -16,6 +18,7 @@ type Slot = { floor: number; x: number; y: number };
 export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
   const [adding, setAdding] = useState<Slot | null>(null);
   const [config, setConfig] = useState<string | null>(null);
+  const [people, setPeople] = useState<string | null>(null);
   const configuring = config ? fair.booth(config) : undefined;
   const floors = fair.fair.floors;
   const removed = fair.removedBooths();
@@ -53,20 +56,28 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                       {slotName(sl.x, sl.y)} · {apps} pelamar · {fair.peopleAt(b.id)} di stand
                     </span>
                     <span className="small org-login">
-                      🔑 <code>{b.id}</code> · PIN <code>{fair.companyPin(b.id)}</code>
+                      🔑 <code>{b.id}</code> · PIN {LIVE && !fair.hasCompanyPin(b.id) ? <span className="muted">belum diatur</span> : <code>{fair.companyPin(b.id)}</code>}
                     </span>
                     <span className="org-slot-tools">
                       <button type="button" className="small-btn" onClick={() => setConfig(b.id)}>
                         Atur
                       </button>
-                      <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`} onClick={() => sessionLogin(b.id)}>
+                      <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`} onClick={() => !LIVE && sessionLogin(b.id)}>
                         Portal
                       </a>
+                      {LIVE && (
+                        <button type="button" className="small-btn ghost" aria-expanded={people === b.id} onClick={() => setPeople(people === b.id ? null : b.id)}>
+                          Akun
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="small-btn ghost"
                         onClick={() => {
-                          const pin = prompt(`PIN baru untuk ${b.company} (4–6 angka)`, fair.companyPin(b.id));
+                          const pin = prompt(
+                            `PIN baru untuk ${b.company} (4–6 angka). Berikan ke perusahaan bersama kode ${b.id}.`,
+                            LIVE && !fair.hasCompanyPin(b.id) ? String(100000 + Math.floor(Math.random() * 900000)) : fair.companyPin(b.id),
+                          );
                           if (pin == null) return;
                           onToast(fair.setCompanyPin(b.id, pin.trim()) ? `PIN ${b.company} diganti` : "PIN harus 4–6 angka");
                         }}
@@ -85,6 +96,7 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                         Lepas
                       </button>
                     </span>
+                    {people === b.id && <BoothPeople boothId={b.id} onToast={onToast} />}
                   </div>
                 );
               })}
@@ -337,5 +349,37 @@ function ConfigureBooth({ booth, onClose, onDone }: { booth: CompanyBooth; onClo
         </div>
       </form>
     </div>
+  );
+}
+
+/** Live site: the Google accounts that run a booth, and taking one off it. */
+function BoothPeople({ boothId, onToast }: { boothId: string; onToast: (t: string) => void }) {
+  const [list, setList] = useState<{ id: string; email: string; name: string | null }[] | null>(null);
+  const [error, setError] = useState(false);
+  const load = () => void boothMembers(boothId).then((r) => (r.ok ? setList(r.data.members) : setError(true)));
+  useEffect(load, [boothId]);
+  if (error) return <p className="muted small">Daftar akun gagal dimuat.</p>;
+  if (!list) return <p className="muted small">Memuat akun…</p>;
+  if (!list.length) return <p className="muted small">Belum ada akun. Perusahaan bergabung dengan kode dan PIN di portal perusahaan.</p>;
+  return (
+    <ul className="cp-ul small">
+      {list.map((m) => (
+        <li key={m.id}>
+          {m.name ?? m.email} <span className="muted">{m.email}</span>{" "}
+          <button
+            type="button"
+            className="cp-linkbtn"
+            onClick={async () => {
+              if (!confirm(`Keluarkan ${m.email} dari stand ini?`)) return;
+              const r = await removeBoothMember(boothId, m.id);
+              onToast(r.ok ? `${m.email} dikeluarkan` : "Gagal mengeluarkan akun");
+              load();
+            }}
+          >
+            Keluarkan
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

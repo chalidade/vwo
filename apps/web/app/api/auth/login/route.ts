@@ -2,12 +2,14 @@ import { InvalidLoginError, checkLogin, createSession } from "@vwo/db";
 import { loginSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { setSessionCookie } from "@/lib/session";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
+  if (!passwordLogin()) return fail(403, "password_login_off");
   const body = await readBody(req, loginSchema);
   if ("error" in body) return body.error;
   const { email, password } = body.data;

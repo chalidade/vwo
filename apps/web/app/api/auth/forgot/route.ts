@@ -2,6 +2,7 @@ import { requestPasswordReset } from "@vwo/db";
 import { forgotSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { appUrl, sendMail } from "@/lib/mail";
 import { allow } from "@/lib/ratelimit";
@@ -9,6 +10,7 @@ import { allow } from "@/lib/ratelimit";
 /** Always answers the same, so the form can't be used to find out which emails have accounts. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
+  if (!passwordLogin()) return fail(403, "password_login_off");
   const body = await readBody(req, forgotSchema);
   if ("error" in body) return body.error;
   const { email } = body.data;

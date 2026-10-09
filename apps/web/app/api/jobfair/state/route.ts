@@ -1,7 +1,7 @@
-import { readFairState, writeFairState } from "@vwo/db";
+import { boothsOf, readFairState, writeFairState } from "@vwo/db";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { isFairAdmin } from "@/lib/fair";
+import { canManageBooth, isFairAdmin } from "@/lib/fair";
 import { fail, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
@@ -16,34 +16,41 @@ type Doc = Record<string, unknown>;
 
 /**
  * The event as the organiser and the companies set it up, for every visitor's game.
- * Company PINs, stand bookings (contact details) and invoices go to event admins only.
+ * Company PINs and stand bookings (contact details) go to event admins only, and a company's
+ * invoices to that company's accounts and the admins.
  */
 export async function GET() {
-  const admin = isFairAdmin(await currentUser());
+  const user = await currentUser();
+  const admin = isFairAdmin(user);
+  const mine = new Set(user ? await boothsOf(db, user.id) : []);
   const rows = await readFairState(db);
   let org: Doc | null = null;
   const companies: Record<string, Doc> = {};
+  const bookings: Doc[] = [];
   let version = 0;
   for (const r of rows) {
     version = Math.max(version, r.updatedAt.getTime());
     const data = r.data as Doc;
     if (r.key === "org") {
-      const { pins, bookings, ...rest } = data;
+      const { pins, bookings: _b, ...rest } = data;
       org = admin ? data : rest;
-    } else {
+    } else if (r.key.startsWith("booking:")) {
+      // A stand a company booked itself: everyone sees the booth, admins also the booking and PIN.
+      bookings.push(admin ? { booth: data.booth, booking: data.booking, pin: data.pin } : { booth: data.booth });
+    } else if (r.key.startsWith("company:")) {
+      const id = r.key.slice("company:".length);
       const { invoices, ...rest } = data;
-      companies[r.key.slice("company:".length)] = admin ? data : { ...rest, invoices: [] };
+      companies[id] = admin || mine.has(id) ? data : { ...rest, invoices: [] };
     }
   }
-  return NextResponse.json({ org, companies, version, admin }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ org, companies, bookings, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
 }
 
-/** Save the organiser's setup or one company's booth. Event admins only during the trial. */
+/** Save the organiser's setup (event admins) or one company's booth (its accounts, or admins). */
 export async function PUT(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
-  if (!isFairAdmin(user)) return fail(403, "not_allowed");
   if (!(await allow(`state:${user.id}`, 120, 600_000))) return fail(429, "too_many_requests");
   const text = await req.text();
   if (text.length > MAX_BYTES) return fail(413, "too_large");
@@ -54,6 +61,8 @@ export async function PUT(req: Request) {
     return fail(400, "invalid_input");
   }
   if (typeof body.key !== "string" || !KEY.test(body.key) || !body.data || typeof body.data !== "object" || Array.isArray(body.data)) return fail(400, "invalid_input");
+  const allowed = isFairAdmin(user) || (body.key.startsWith("company:") && (await canManageBooth(user, body.key.slice("company:".length))));
+  if (!allowed) return fail(403, "not_allowed");
   await writeFairState(db, { key: body.key, data: body.data, userId: user.id });
   return NextResponse.json({ ok: true });
 }

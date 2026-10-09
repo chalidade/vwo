@@ -16,7 +16,8 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
   // Bots fill every field, people never see this one.
   const [website, setWebsite] = useState("");
   const captcha = useTurnstile(LIVE && mode === "register");
-  const google = useGoogle();
+  const cfg = useAuthConfig();
+  const google = !!cfg?.google;
   // Back from Google without an account (cancelled or refused): say so once.
   useEffect(() => {
     const q = new URLSearchParams(location.search);
@@ -43,6 +44,24 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
     }
   };
 
+  // Live site: Google only. Google has already checked the address, so no fake or mistyped emails.
+  if (LIVE && cfg && !cfg.password)
+    return (
+      <div className="rpg-box ag">
+        <div className="ag-head">
+          <span className="ag-logo">🌐</span>
+          <div>
+            <h2 className="cc-title">Masuk ke jobfair</h2>
+            <p className="cc-note">Pakai akun Google kamu. Profil, CV, dan foto kamu tersimpan di akun ini.</p>
+          </div>
+        </div>
+        {google ? <GoogleButton /> : <p className="ag-error">Login sedang disiapkan panitia. Coba lagi sebentar lagi.</p>}
+        {error && <p className="ag-error">{error}</p>}
+        <p className="cc-note ag-google-note">Dengan masuk lewat Google, kamu setuju dengan syarat penggunaan dan kebijakan privasi jobfair.</p>
+      </div>
+    );
+  if (LIVE && !cfg) return <div className="rpg-box ag ag-wait" aria-busy="true" />;
+
   return (
     <form
       className="rpg-box ag"
@@ -60,15 +79,7 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
       </div>
       {google && (
         <>
-          <a className="ag-google" href="/api/auth/google/start">
-            <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden>
-              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.7 17.7 9.5 24 9.5z" />
-              <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z" />
-              <path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.9-6.1z" />
-              <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.8-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-10l-7.9 6.1C6.6 42.6 14.6 48 24 48z" />
-            </svg>
-            Masuk dengan Google
-          </a>
+          <GoogleButton />
           <p className="cc-note ag-google-note">Dengan masuk lewat Google, kamu setuju dengan syarat penggunaan dan kebijakan privasi jobfair.</p>
           <div className="ag-or">
             <span>atau pakai email</span>
@@ -199,15 +210,31 @@ function useTurnstile(on: boolean) {
   };
 }
 
-/** Live site: whether the server has Google sign-in set up. */
-function useGoogle() {
-  const [on, setOn] = useState(false);
+/** Live site: which sign-in options the server offers. The live site normally offers Google only. */
+function useAuthConfig() {
+  const [cfg, setCfg] = useState<{ google: boolean; password: boolean } | null>(LIVE ? null : { google: false, password: true });
   useEffect(() => {
     if (!LIVE) return;
     void fetch("/api/auth/config")
       .then((r) => (r.ok ? r.json() : null))
-      .then((c: { google?: boolean } | null) => setOn(c?.google === true))
-      .catch(() => {});
+      .then((c: { google?: boolean; password?: boolean } | null) => setCfg({ google: c?.google === true, password: c?.password === true }))
+      .catch(() => setCfg({ google: true, password: false }));
   }, []);
-  return on;
+  return cfg;
+}
+
+function GoogleButton() {
+  // Signing in from the company portal comes back to the portal.
+  const to = location.hash.startsWith("#/jobfair/company") ? "?to=company" : "";
+  return (
+    <a className="ag-google" href={`/api/auth/google/start${to}`}>
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden>
+        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.7 17.7 9.5 24 9.5z" />
+        <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z" />
+        <path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.9-6.1z" />
+        <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.8-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-10l-7.9 6.1C6.6 42.6 14.6 48 24 48z" />
+      </svg>
+      Masuk dengan Google
+    </a>
+  );
 }

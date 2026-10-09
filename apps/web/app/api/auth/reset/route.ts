@@ -2,12 +2,14 @@ import { InvalidTokenError, resetPassword } from "@vwo/db";
 import { resetSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { clearSessionCookie } from "@/lib/session";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
+  if (!passwordLogin()) return fail(403, "password_login_off");
   if (!(await allow(`reset:${clientIp(req)}`, 20, 3600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, resetSchema);
   if ("error" in body) return body.error;

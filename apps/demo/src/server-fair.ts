@@ -1,6 +1,6 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
-import type { ApplicationShared, FairApplicationInput, FairApplicationOut } from "@vwo/shared";
+import type { ApplicationShared, CompanyBooth, FairApplicationInput, FairApplicationOut } from "@vwo/shared";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -53,3 +53,35 @@ export function applyErrorText(error: string) {
 /** One side's part of an application's conversation: chat, interview, rating and call log. */
 export const sendShared = (id: string, as: "company" | "seeker", shared: ApplicationShared) =>
   call<{ ok: true }>(`applications/${encodeURIComponent(id)}/shared`, { method: "PUT", body: { as, shared } });
+
+/** A company account joins its booth with the code and PIN from the organiser. */
+export const claimBooth = (boothId: string, pin: string) => call<{ ok: true; boothId: string }>("company/claim", { method: "POST", body: { boothId, pin } });
+
+/** A company books an empty stand. The server builds the booth and the PIN for colleagues. */
+export const bookStandOnServer = (input: { company: string; industry: string; color: string; contact: string; email: string; tier: "premium" | "regular"; method: string; floor: number; x: number; y: number }) =>
+  call<{ booth: CompanyBooth; pin: string }>("bookings", { method: "POST", body: input });
+
+/** Event admins: the accounts that run a booth, and taking one out. */
+export const boothMembers = (boothId: string) => call<{ members: { id: string; email: string; name: string | null; since: number }[] }>(`booths/${encodeURIComponent(boothId)}/members`);
+export const removeBoothMember = (boothId: string, userId: string) =>
+  call<{ ok: true }>(`booths/${encodeURIComponent(boothId)}/members?user=${encodeURIComponent(userId)}`, { method: "DELETE", body: {} });
+
+/** What to tell a company when joining its booth failed. */
+export function claimErrorText(error: string) {
+  switch (error) {
+    case "no_pin":
+      return "Panitia belum membuat PIN untuk stand ini. Minta PIN ke panitia.";
+    case "wrong_pin":
+      return "Kode perusahaan atau PIN salah. Tanyakan ke panitia kalau lupa.";
+    case "too_many_requests":
+      return "Terlalu banyak percobaan. Tunggu 15 menit lalu coba lagi.";
+    case "not_signed_in":
+      return "Sesi login habis. Masuk lagi dengan Google.";
+    case "invalid_input":
+      return "Periksa lagi kode perusahaan dan PIN.";
+    case "offline":
+      return "Tidak tersambung ke server. Periksa internet lalu coba lagi.";
+    default:
+      return "Gagal masuk ke stand. Coba lagi sebentar lagi.";
+  }
+}

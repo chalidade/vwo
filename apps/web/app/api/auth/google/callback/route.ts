@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
 /** Google sends the person back here: check the state, sign them in, and return to the fair. */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const done = (ok: boolean) => NextResponse.redirect(new URL(ok ? "/play/#/jobfair" : "/play/?login=google_failed#/jobfair", req.url));
   const saved = (await cookies()).get(GOOGLE_COOKIE)?.value ?? "";
-  const [state, verifier] = saved.split(".");
+  const [state, verifier, to] = saved.split(".");
+  const page = to === "company" ? "#/jobfair/company" : "#/jobfair";
+  const done = (ok: boolean) => NextResponse.redirect(new URL(ok ? `/play/${page}` : `/play/?login=google_failed${page}`, req.url));
   const code = url.searchParams.get("code");
   if (!googleEnabled() || !code || !state || !verifier || url.searchParams.get("state") !== state) return clear(done(false));
   const person = await finishGoogle(req, code, verifier).catch(() => null);
