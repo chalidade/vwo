@@ -226,8 +226,8 @@ export interface JobFairView {
   hallBase?: number;
   /** Where visitors come in: on the lowest floor, a room or the first hall. */
   spawn: { x: number; y: number };
-  /** The organisers' info desk near the entrance, on the ground floor. */
-  infoDesk: { x: number; y: number; width: number; height: number; staff: string };
+  /** The organisers' info desk near the entrance, on the first hall. Every other floor has one too (see infoDeskOn). */
+  infoDesk: InfoDesk;
   booths: CompanyBooth[];
   sponsors: SponsorView[];
   decor: { floor: number; spriteKey: string; x: number; y: number; width: number; height: number; isWalkable?: boolean }[];
@@ -362,6 +362,29 @@ export const COIN_STAND_H = 2.9;
 export const COIN_STAND_SPOTS = { staff: { x: 2.7, y: 1.0 }, front: { x: 2.7, y: 2.75 } };
 
 export const fairRoomFloorId = (fair: { slug: string }, roomId: string) => `${fair.slug}-room-${roomId}`;
+
+/** An info desk with an organiser behind it. */
+export interface InfoDesk {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  staff: string;
+}
+
+/** Who staffs the info desks on the floors above the entrance, in lift order. */
+const DESK_STAFF = ["Rani", "Bayu", "Putri", "Fajar", "Wulan", "Yoga", "Sekar", "Dimas", "Laras", "Hendra", "Maya", "Galih"];
+
+/** The info desk on a floor: the entrance desk on the first hall, bottom left on every other floor,
+ *  clear of booth slots, seats, stalls and the lift. `n` numbers the floor among the others. */
+export function infoDeskOn(fair: JobFairView, floorId: string): InfoDesk {
+  if (floorId === fairFloorId(fair, 0)) return fair.infoDesk;
+  const others = [...fair.floors.map((_, i) => fairFloorId(fair, i)).slice(1), ...fair.rooms.map((r) => fairRoomFloorId(fair, r.id))];
+  const n = Math.max(0, others.indexOf(floorId));
+  const room = fair.rooms.find((r) => fairRoomFloorId(fair, r.id) === floorId);
+  const h = room?.height ?? fair.height;
+  return { x: room ? 13.5 : 9, y: room ? h - 2.9 : fair.infoDesk.y, width: fair.infoDesk.width, height: fair.infoDesk.height, staff: DESK_STAFF[n % DESK_STAFF.length]! };
+}
 
 /** The lift lobby in the bottom-right corner of every floor: a wall with the lift doors. */
 export const FAIR_LIFT = { x: 40.2, y: 16.6, width: 4.4, height: 1 };
@@ -551,6 +574,8 @@ function liftObject(floorId: string): MapObjectView {
 export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
   const id = fairRoomFloorId(fair, room.id);
   const { tables, seats, blocked } = roomFurniture(room);
+  const desk = infoDeskOn(fair, id);
+  blocked.push({ x: desk.x, y: desk.y, width: desk.width, height: desk.height });
   const objects: MapObjectView[] = [
     liftObject(id),
     ...blocked.map((b, i): MapObjectView => ({ id: `${id}-obj-${i}`, type: "blocked", ...b, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
@@ -599,11 +624,9 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     add({ type: "blocked", x: c.x, y: c.y, width: COIN_STAND_W, height: 0.5, spriteKey: "invisible", isWalkable: false });
     add({ type: "blocked", x: c.x + 0.4, y: c.y + 1.45, width: COIN_STAND_W - 0.8, height: 0.7, spriteKey: "invisible", isWalkable: false });
   }
-  if (floor === 0) {
-    const d = fair.infoDesk;
-    add({ type: "blocked", x: d.x, y: d.y, width: d.width, height: d.height, spriteKey: "invisible", isWalkable: false });
-    add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
-  }
+  const d = infoDeskOn(fair, id);
+  add({ type: "blocked", x: d.x, y: d.y, width: d.width, height: d.height, spriteKey: "invisible", isWalkable: false });
+  if (floor === 0) add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
   objects.push(liftObject(id));
   const seats: SeatView[] = [];
   for (const o of fair.decor) {

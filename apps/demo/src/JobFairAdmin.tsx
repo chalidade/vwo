@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { OrgAds } from "./organizer/Ads";
 import { OrgAula } from "./organizer/Aula";
 import { OrgBooths } from "./organizer/Booths";
+import { OrgFloors } from "./organizer/Floors";
 import { OrgLive } from "./organizer/Live";
 import { OrgPsych } from "./organizer/Psych";
 import { OrgSeminars } from "./organizer/Seminars";
@@ -10,6 +11,7 @@ import { fair, useFair } from "./useFair";
 
 const TABS = [
   ["live", "📡 Live"],
+  ["floors", "🏢 Lantai"],
   ["booths", "🏬 Stand"],
   ["ads", "📣 Iklan"],
   ["psych", "🧠 Psikotes"],
@@ -81,6 +83,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         ))}
       </nav>
       {tab === "live" && <OrgLive />}
+      {tab === "floors" && <OrgFloors onToast={setToast} />}
       {tab === "booths" && <OrgBooths onToast={setToast} />}
       {tab === "ads" && <OrgAds onToast={setToast} />}
       {tab === "psych" && <OrgPsych onToast={setToast} />}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { AULA, fairFloorId, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
+import { AULA, fairFloorId, infoDeskOn, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
 import { BOOTH_SLOTS, CONVOS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
@@ -755,5 +755,60 @@ describe("DemoJobFair", () => {
     expect(fair.booth(id)).toMatchObject({ logoImg: undefined, vipStyle: "cyber", vipHeadline: ["JOIN", "US"] });
     fair.editBooth(id, { logoImg: png });
     expect(fair.booth(id)?.logoImg).toBe(png);
+  });
+
+  it("has an info desk with someone behind it on every floor, reachable from the lift", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    for (const st of fair.stops) {
+      const d = infoDeskOn(fair.fair, st.floorId);
+      const floor = fair.floor(st.floorId);
+      expect(isBlocked(floor, d.x + d.width / 2, d.y + d.height / 2), st.floorId).toBe(true);
+      expect(findPath(floor, LIFT_FRONT, { x: d.x + d.width / 2, y: d.y + d.height + 0.6 }), st.floorId).not.toBeNull();
+      expect(fair.staff.some((x) => x.floorId === st.floorId && x.name === d.staff), st.floorId).toBe(true);
+    }
+  });
+
+  it("lets the organiser add and remove booth floors, switch rooms off, and charge for a floor", () => {
+    const store: { data: FairSaved | null } = { data: null };
+    const storage = { load: () => store.data, save: (d: FairSaved) => (store.data = structuredClone(d)), clear: () => (store.data = null) };
+    const fair = new DemoJobFair(() => 0.5, () => 1_000_000, DEMO_JOB_FAIR, storage);
+    fair.join("Chalid", false, PLAYER_ID);
+    const promo = fair.fair.promoters.find((p) => !p.walks && p.level === 7)!;
+    expect(fair.addHall("Startup & UMKM")).toBe(true);
+    expect(fair.stops.map((s) => s.label)).toEqual(["Aula Utama", "Teknologi & Keuangan", "Kreatif, Kuliner & Ritel", "Industri, Energi & Kesehatan", "Startup & UMKM", "Ruang Seminar", "Ruang Psikotes", "Lounge Konsultasi", "Food Court"]);
+    expect(fair.stops[4]).toMatchObject({ name: "Lantai 5", floorId: fairFloorId(fair.fair, 3) });
+    // Rooms above moved up a floor, with their promoters.
+    expect(fair.room("foodcourt")?.level).toBe(8);
+    if (promo) expect(fair.fair.promoters.find((p) => p.id === promo.id)?.level).toBe(8);
+    expect(fair.freeSlots().filter((sl) => sl.floor === 3)).toHaveLength(6);
+    // A booth floor with stands cannot go; the new empty one can.
+    expect(fair.removeHall()).toBe(true);
+    expect(fair.fair.floors).toHaveLength(3);
+    expect(fair.removeHallBlocker()).toMatch(/stand/);
+    expect(fair.removeHall()).toBe(false);
+    // Switch the psikotes floor off: the floors above close the gap.
+    fair.setRoomHidden("psikotes", true);
+    expect(fair.stops.map((s) => s.roomId ?? "hall")).toEqual(["aula", "hall", "hall", "hall", "seminar", "konsultasi", "foodcourt"]);
+    expect(fair.room("foodcourt")?.level).toBe(6);
+    // A booth floor can cost coins; the entrance stays free.
+    const hall3 = fairFloorId(fair.fair, 2);
+    fair.setFloorPrice(hall3, 15);
+    fair.setFloorPrice(fair.stops[0]!.floorId, 50);
+    expect(fair.floorPrice(fair.stops[0]!.floorId)).toBe(0);
+    expect(fair.passFor(hall3)).toMatchObject({ id: hall3, price: 15 });
+    expect(fair.hasTicket(hall3)).toBe(false);
+    const coins = fair.player.coins;
+    expect(fair.buyTicket(hall3)).toBe(true);
+    expect(fair.player.coins).toBe(coins - 15);
+    expect(fair.hasTicket(hall3)).toBe(true);
+    fair.setFloorPrice(fairRoomFloorId(fair.fair, "seminar"), 0);
+    expect(fair.passFor(fairRoomFloorId(fair.fair, "seminar"))).toBeNull();
+    // All of it survives a reload.
+    fair.flush();
+    const again = new DemoJobFair(() => 0.5, () => 1_000_000, DEMO_JOB_FAIR, storage);
+    expect(again.stops.map((s) => s.roomId ?? "hall")).toEqual(["aula", "hall", "hall", "hall", "seminar", "konsultasi", "foodcourt"]);
+    expect(again.floorPrice(hall3)).toBe(15);
+    again.setRoomHidden("psikotes", false);
+    expect(again.room("psikotes")?.level).toBe(5);
   });
 });

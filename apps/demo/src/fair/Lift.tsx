@@ -14,8 +14,8 @@ export function LiftPanel({
   here: string;
   /** Standing at the lift rides straight away; elsewhere you walk to it first. */
   atLift: boolean;
-  /** Coins still owed to enter a room floor, or null when free or already paid. */
-  ticket: (roomId: string) => number | null;
+  /** Coins still owed to enter a floor, or null when free or already paid. */
+  ticket: (floorId: string) => number | null;
   onPick: (floorId: string) => void;
   onClose: () => void;
 }) {
@@ -24,7 +24,7 @@ export function LiftPanel({
       <p className="sp-summary">{atLift ? "Mau ke lantai berapa?" : "Pilih lantai, nanti kamu diantar ke lift di pojok kanan bawah."}</p>
       <div className="fx-floors">
         {[...stops].reverse().map((st) => {
-          const owe = st.roomId ? ticket(st.roomId) : null;
+          const owe = ticket(st.floorId);
           const isHere = st.floorId === here;
           return (
             <button key={st.floorId} type="button" className="fx-floor" data-here={isHere ? "" : undefined} disabled={isHere} onClick={() => onPick(st.floorId)}>

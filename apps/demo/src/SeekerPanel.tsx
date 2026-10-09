@@ -42,9 +42,12 @@ export function SeekerPanel({
   onReset,
   onVerify,
   account,
+  onEditCharacter,
   onSignOut,
   onClose,
 }: {
+  /** Open the character editor (look and nickname). */
+  onEditCharacter?: () => void;
   tab?: SeekerTab;
   look: Look;
   profile: SeekerProfile;
@@ -138,6 +141,11 @@ export function SeekerPanel({
                   {photo && (
                     <button type="button" className="sp-photo-del" onClick={() => setPhoto(undefined)}>
                       Hapus foto
+                    </button>
+                  )}
+                  {onEditCharacter && (
+                    <button type="button" className="sp-photo-btn sp-look-btn" onClick={onEditCharacter}>
+                      🎨 Ubah karakter
                     </button>
                   )}
                 </div>
