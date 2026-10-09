@@ -6,6 +6,7 @@
 import type { MqttClient } from "mqtt";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { LIVE } from "./mode";
+import { hasRealtime, realtimeClient } from "./realtime";
 import type { Facing } from "@vwo/shared";
 import type { Look } from "@vwo/ui";
 import type { RemotePlayer } from "./jobfair-engine";
@@ -170,20 +171,15 @@ class SupabaseTransport implements Transport {
   private channel: RealtimeChannel | null = null;
   private ready = false;
   private stopped = false;
-  constructor(
-    private readonly room: string,
-    private readonly url: string,
-    private readonly key: string,
-  ) {}
+  constructor(private readonly room: string) {}
 
   get connected() {
     return this.ready;
   }
 
   async connect(on: { message: (id: string, text: string) => void; status: (s: LiveStatus) => void }) {
-    const { createClient } = await import("@supabase/supabase-js");
-    if (this.stopped) return;
-    const sb = createClient(this.url, this.key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const sb = await realtimeClient();
+    if (this.stopped || !sb) return;
     const ch = sb.channel(`jobfair:${this.room}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "p" }, (m: { payload?: { id?: unknown; t?: unknown } }) => {
       const { id, t } = m.payload ?? {};
@@ -212,10 +208,7 @@ class SupabaseTransport implements Transport {
 /** Picks the transport for this build: Supabase on the live trial, the public broker in the demo. */
 export function pickTransport(room: string, selfId: string): Transport | null {
   if (!LIVE) return new MqttTransport(room, selfId);
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const key = import.meta.env.VITE_SUPABASE_KEY as string | undefined;
-  if (url && key) return new SupabaseTransport(room, url, key);
-  return null;
+  return hasRealtime() ? new SupabaseTransport(room) : null;
 }
 
 export class LiveChannel {

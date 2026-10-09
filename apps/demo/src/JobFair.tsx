@@ -66,7 +66,7 @@ import { LiveChannel, type LiveStatus } from "./live";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, VERIFY_COST, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
-import { type RingSignal, onSignal, sendSignal } from "./fair/call";
+import { type RingSignal, canCallOtherTabs, listenForCalls, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard } from "./fair/Invite";
@@ -197,7 +197,7 @@ export function JobFair() {
   const [aula, setAula] = useState<AulaTab | null>(null);
   const [notifs, setNotifs] = useState(false);
   const [lounge, setLounge] = useState<LoungeView | null>(null);
-  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[] }) | null>(null);
+  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal }) | null>(null);
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
@@ -277,7 +277,8 @@ export function JobFair() {
   useEffect(
     () =>
       onSignal((s) => {
-        if (s.type !== "ring" || s.to !== PLAYER_ID) return;
+        // Live rings only reach this device through its own inboxes (see listenForCalls).
+        if (s.type !== "ring" || (!LIVE && s.to !== PLAYER_ID)) return;
         setRing((cur) => {
           if (cur) sendSignal({ type: "decline", callId: s.callId });
           return cur ?? s;
@@ -286,6 +287,9 @@ export function JobFair() {
       }),
     [],
   );
+
+  // Live: the company rings the account, wherever it is signed in.
+  useEffect(() => (LIVE && account?.id ? listenForCalls([`user:${account.id}`]) : undefined), [account?.id]);
 
   // --- What is within reach: a recruiter across the desk, a hiring banner, the info desk, a person.
   const reach: Reach | null = (() => {
@@ -436,8 +440,11 @@ export function JobFair() {
     );
     channel.start();
     const off = onFrame(() => channel.publish());
+    // Other job seekers ring this player from the lounge.
+    const stopCalls = listenForCalls([`peer:${channel.id}`]);
     return () => {
       off();
+      stopCalls();
       channel.stop();
     };
   }, [session]);
@@ -866,7 +873,10 @@ export function JobFair() {
 
   /** People the job seeker can call from the lounge: the others on this floor. */
   function loungePeers() {
-    return [...fair.visitors.values()].filter((x) => x.floorId === floor.id && x.memberId !== session?.visitorId && !x.remote).map((x) => ({ memberId: x.memberId, name: x.displayName }));
+    // Live: real people on other devices; the demo calls the bots on this floor.
+    return [...fair.visitors.values()]
+      .filter((x) => x.floorId === floor.id && x.memberId !== session?.visitorId && (LIVE ? x.remote && canCallOtherTabs() : !x.remote))
+      .map((x) => ({ memberId: x.memberId, name: x.displayName.replace(/^🌐 /, "") }));
   }
 
   /** Pay for a lounge call, then ring the consultant or the other job seeker. */
@@ -885,7 +895,33 @@ export function JobFair() {
     setLounge(null);
     if (c.consultant)
       setLoungeCall({ ...c, name: c.consultant.name, sub: `${c.consultant.role}${c.consultant.org ? ` · ${c.consultant.org}` : ""}`, color: c.consultant.color, look: staffLook(c.consultant.name, c.consultant.color), lines: c.consultant.lines });
-    else if (c.peer) setLoungeCall({ ...c, name: c.peer.name, sub: "Pencari kerja · Lounge Konsultasi", color: "#0f766e", look: lookFor(`${c.peer.name}:${c.peer.memberId}`), lines: PEER_LINES });
+    else if (c.peer) {
+      const live = c.peer.memberId.startsWith("net:");
+      setLoungeCall({
+        ...c,
+        name: c.peer.name,
+        sub: "Pencari kerja · Lounge Konsultasi",
+        color: "#0f766e",
+        look: live ? remoteLooks.current.get(c.peer.memberId) : lookFor(`${c.peer.name}:${c.peer.memberId}`),
+        lines: PEER_LINES,
+        ring: live
+          ? {
+              type: "ring",
+              callId: newCallId(),
+              to: `peer:${c.peer.memberId.slice(4)}`,
+              appId: "",
+              company: session?.name ?? "Pencari kerja",
+              recruiter: session?.name ?? "Pencari kerja",
+              logo: "",
+              color: "#0f766e",
+              jobTitle: "Lounge Konsultasi",
+              kind: c.kind,
+              from: "seeker",
+              minutes: c.minutes,
+            }
+          : undefined,
+      });
+    }
   }
 
   function appliedIdsNow() {
@@ -1128,7 +1164,7 @@ export function JobFair() {
               )}
               {session && (
                 <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
-                  {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : "⚪ Offline, hanya bot"}
+                  {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : LIVE ? "⚪ Offline, pemain lain belum terlihat" : "⚪ Offline, hanya bot"}
                 </div>
               )}
               <div className="hud-stats">
@@ -1339,10 +1375,12 @@ export function JobFair() {
         {ring && (
           <CallScreen
             kind={ring.kind}
-            peerName={`${ring.recruiter} · ${ring.company}`}
-            peerSub={`Tentang lamaran ${ring.jobTitle}`}
-            peerLogo={ring.logo}
+            peerName={ring.from === "seeker" ? ring.company : `${ring.recruiter} · ${ring.company}`}
+            peerSub={ring.from === "seeker" ? "Pencari kerja · Lounge Konsultasi" : `Tentang lamaran ${ring.jobTitle}`}
+            peerLogo={ring.logo || undefined}
+            peerLook={ring.from === "seeker" ? lookFor(ring.company) : undefined}
             peerColor={ring.color}
+            limit={ring.minutes ? ring.minutes * 60 : undefined}
             incoming={ring}
             onEnd={(r) => {
               setRing(null);
@@ -1570,7 +1608,8 @@ export function JobFair() {
             peerSub={loungeCall.sub}
             peerLook={loungeCall.look}
             peerColor={loungeCall.color}
-            bot
+            bot={!loungeCall.ring}
+            outgoing={loungeCall.ring}
             lines={loungeCall.lines}
             botNote="Demo: lawan bicara adalah bot. Versi live menyambungkan panggilan sungguhan lewat server."
             limit={loungeCall.minutes * 60}

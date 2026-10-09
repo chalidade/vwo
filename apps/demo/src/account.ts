@@ -6,6 +6,8 @@ import { LIVE } from "./mode";
 export interface Account {
   email: string;
   name: string;
+  /** Live site: the server's id for this account, which calls are addressed to. */
+  id?: string;
   /** Live site: email goes out and this address is not verified yet, so applying waits for it. */
   mustVerify?: boolean;
 }
@@ -68,7 +70,7 @@ export function currentAccount(): Account | null {
     if (LIVE) {
       const raw = localStorage.getItem(LIVE_ACCOUNT_KEY);
       const a = raw ? (JSON.parse(raw) as Partial<Account>) : null;
-      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name, mustVerify: a.mustVerify === true } : null;
+      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name, id: typeof a.id === "string" ? a.id : undefined, mustVerify: a.mustVerify === true } : null;
     }
     const email = localStorage.getItem(CURRENT_KEY);
     const a = email ? readAll()[email] : undefined;
@@ -128,9 +130,9 @@ export async function checkSession(): Promise<Account | null> {
   if (!LIVE) return currentAccount();
   try {
     const { status, data } = await api("me");
-    const user = data.user as { email?: string; name?: string; mustVerify?: boolean } | null | undefined;
+    const user = data.user as { id?: string; email?: string; name?: string; mustVerify?: boolean } | null | undefined;
     if (status === 200 && user?.email && user.name) {
-      const a = { email: user.email, name: user.name, mustVerify: user.mustVerify === true };
+      const a = { email: user.email, name: user.name, id: user.id, mustVerify: user.mustVerify === true };
       rememberLive(a);
       return a;
     }

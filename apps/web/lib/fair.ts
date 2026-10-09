@@ -15,8 +15,9 @@ export function isFairAdmin(user: { email: string; role: string } | null) {
 
 export function applicationOut(row: FairApplicationRow): FairApplicationOut {
   return {
-    ...(row.data as Omit<FairApplicationOut, "id" | "status" | "at" | "updatedAt">),
+    ...(row.data as Omit<FairApplicationOut, "id" | "seeker" | "status" | "at" | "updatedAt">),
     id: row.id,
+    seeker: row.userId,
     status: row.status as FairApplicationOut["status"],
     at: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
