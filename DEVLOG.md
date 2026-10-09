@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: telepon dan lounge antar-device
+
+**Konteks:** owner mencoba menelepon dari device A ke device B di lounge dan tidak tersambung. Sinyal panggilan sebelumnya hanya lewat BroadcastChannel, jadi hanya antar-tab di browser yang sama.
+
+**Yang berubah**
+- Di versi live, sinyal panggilan lewat Supabase Realtime. Dering dikirim ke "inbox" penerima (akun `user:<id>` untuk panggilan perusahaan ke pelamar, atau `peer:<id>` untuk sesama pencari kerja di lounge). Sinyal berikutnya (terima, tolak, offer/answer WebRTC, kandidat jaringan) lewat channel khusus panggilan itu, yang namanya memakai id acak yang tidak bisa ditebak. Suara dan video tetap langsung antar-device (WebRTC).
+- Lounge di versi live menampilkan orang sungguhan di lantai yang sama dan menelepon mereka, bukan bot. Penerima melihat nama penelepon dan batas waktu panggilan yang sama.
+- Portal perusahaan bisa menelepon pelamar yang punya akun, di device mana pun pelamar sedang login.
+- WebRTC memakai STUN publik (Google, Cloudflare), dan bisa ditambah server TURN lewat `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` untuk jaringan yang ketat.
+- Satu koneksi Supabase dipakai bersama untuk posisi pemain dan sinyal panggilan.
+
+**Diuji:** tes baru memastikan dering hanya ke inbox penerima, sisa panggilan lewat channel panggilan, dan sinyal yang tidak valid dibuang. Build live dibuka di Chromium sampai masuk job fair tanpa error. Panggilan antar-device sungguhan perlu dicoba di jobfair.co.id karena Supabase tidak bisa dijangkau dari lingkungan uji.
+
+---
+
 ## 2026-10-09 · jobfair live: lamaran ke database, tanpa bot, verifikasi email dan anti-bot
 
 **Konteks:** owner mencoba versi live di dua device. Lamaran dari device A tidak muncul di portal perusahaan di device B, bot masih berkeliaran, dialog koin berantakan, sambutan panjang muncul setiap kali masuk, dan perlu perlindungan dari pendaftaran bot.

@@ -44,6 +44,8 @@ export const fairApplicationStatusSchema = z.object({
 /** An application as the server sends it back to the game. */
 export interface FairApplicationOut extends FairApplicationInput {
   id: string;
+  /** The applicant's account id, so the company can call them. */
+  seeker: string;
   status: (typeof FAIR_APPLICATION_STATUSES)[number];
   at: number;
   updatedAt: number;

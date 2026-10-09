@@ -1399,6 +1399,7 @@ export class DemoJobFair {
     for (const s of list) {
       const have = this.applications.find((x) => x.id === s.id);
       if (have) {
+        if (!mine) have.visitorId = `user:${s.seeker}`;
         if (s.updatedAt > (have.updatedAt ?? 0) && s.status !== have.status) {
           const before = { ...have };
           have.status = s.status;
@@ -1411,7 +1412,7 @@ export class DemoJobFair {
       this.applications.push({
         id: s.id,
         at: s.at,
-        visitorId: mine ? PLAYER_ID : `user-${s.id}`,
+        visitorId: mine ? PLAYER_ID : `user:${s.seeker}`,
         name: s.name,
         boothId: s.boothId,
         company: s.company,

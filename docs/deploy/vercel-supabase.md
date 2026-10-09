@@ -21,6 +21,8 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
    - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
    - `TURNSTILE_SECRET_KEY` and `VITE_TURNSTILE_SITE_KEY` (Cloudflare Turnstile, free): human
      check on sign-up. Off while unset; sign-up also has a hidden honeypot field.
+   - optional `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`: a TURN relay for calls
+     between networks where direct WebRTC fails (public STUN is used either way)
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 

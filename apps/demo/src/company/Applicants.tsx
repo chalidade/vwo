@@ -3,7 +3,8 @@ import { type CompanyBooth, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
 import { CallScreen, type CallResult } from "../fair/Call";
-import { type CallKind, type RingSignal, canCallOtherTabs } from "../fair/call";
+import { type CallKind, type RingSignal, canCallOtherTabs, newCallId } from "../fair/call";
+import { LIVE } from "../mode";
 import { INTERVIEW_MODES, PIPELINE, applicantsCsv, matchScore } from "../fair/company";
 import { fair } from "../useFair";
 
@@ -142,14 +143,15 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
     setTimeout(() => setToast(null), 3000);
   };
 
-  const reachable = a.isBot || (a.visitorId === PLAYER_ID && canCallOtherTabs());
+  // Live: an applicant with an account is rung on whatever device they are signed in on.
+  const reachable = a.isBot || ((LIVE ? a.visitorId.startsWith("user:") : a.visitorId === PLAYER_ID) && canCallOtherTabs());
   const startCall = (kind: CallKind) => {
     if (a.isBot) return setCall({ kind });
     setCall({
       kind,
       ring: {
         type: "ring",
-        callId: `call-${Date.now().toString(36)}`,
+        callId: newCallId(),
         to: a.visitorId,
         appId: a.id,
         company: booth.company,
