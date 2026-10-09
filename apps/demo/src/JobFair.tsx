@@ -85,7 +85,7 @@ import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
 import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
-import { onFrame } from "./useCafe";
+import { onFrame } from "./loop";
 import { fair, useFair } from "./useFair";
 
 interface Session {
