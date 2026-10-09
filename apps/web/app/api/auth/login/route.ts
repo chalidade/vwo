@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   if ("error" in body) return body.error;
   const { email, password } = body.data;
   // Per address and per account, so one person can't guess passwords and one account can't be hammered.
-  if (!allow(`login:ip:${clientIp(req)}`, 30, 600_000) || !allow(`login:email:${email}`, 10, 600_000)) return fail(429, "too_many_requests");
+  if (!(await allow(`login:ip:${clientIp(req)}`, 30, 600_000)) || !(await allow(`login:email:${email}`, 10, 600_000))) return fail(429, "too_many_requests");
   try {
     const userId = await checkLogin(db, email, password);
     const session = await createSession(db, userId, req.headers.get("user-agent"));

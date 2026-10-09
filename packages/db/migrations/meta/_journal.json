@@ -15,6 +15,20 @@
       "when": 1791512121500,
       "tag": "0001_jobfair",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791539707849,
+      "tag": "0002_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791539708881,
+      "tag": "0003_lock_public_api",
+      "breakpoints": true
     }
   ]
 }

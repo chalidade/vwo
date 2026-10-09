@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const body = await readBody(req, forgotSchema);
   if ("error" in body) return body.error;
   const { email } = body.data;
-  if (!allow(`forgot:ip:${clientIp(req)}`, 10, 3600_000) || !allow(`forgot:email:${email}`, 3, 3600_000)) return fail(429, "too_many_requests");
+  if (!(await allow(`forgot:ip:${clientIp(req)}`, 10, 3600_000)) || !(await allow(`forgot:email:${email}`, 3, 3600_000))) return fail(429, "too_many_requests");
   const token = await requestPasswordReset(db, email);
   if (token) await sendMail(email, "Reset password VWO Job Fair", `Klik link ini untuk membuat password baru (berlaku 1 jam):\n${appUrl()}/reset?token=${token}\n\nAbaikan email ini kalau kamu tidak memintanya.`);
   return NextResponse.json({ ok: true });

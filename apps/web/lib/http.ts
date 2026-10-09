@@ -28,5 +28,9 @@ export async function readBody<T extends z.ZodTypeAny>(req: Request, schema: T):
   return { data: parsed.data };
 }
 
-/** The client's address as seen through the load balancer. */
-export const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+/**
+ * The client's address as our proxy saw it. Vercel and Caddy both set X-Forwarded-For themselves;
+ * if anything in front ever appends instead, the last entry is the one our proxy added, while the
+ * first could be typed by the client to dodge rate limits.
+ */
+export const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown";

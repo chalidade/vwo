@@ -8,7 +8,7 @@ import { clearSessionCookie } from "@/lib/session";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
-  if (!allow(`reset:${clientIp(req)}`, 20, 3600_000)) return fail(429, "too_many_requests");
+  if (!(await allow(`reset:${clientIp(req)}`, 20, 3600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, resetSchema);
   if ("error" in body) return body.error;
   try {

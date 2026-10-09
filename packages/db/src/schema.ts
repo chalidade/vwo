@@ -575,4 +575,12 @@ export const userReports = pgTable("user_reports", {
   createdAt: createdAt(),
 });
 
+// ---------------------------------------------------------------- rate limits
+/** Fixed-window counters shared by every app instance (serverless functions keep no memory). */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  resetAt: ts("reset_at").notNull(),
+});
+
 export * from "./jobfair-schema";

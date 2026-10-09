@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "buildCommand": "cd ../.. && if [ \"$VERCEL_ENV\" = production ]; then pnpm --filter @vwo/db migrate; fi && pnpm --filter @vwo/web build"
+}
