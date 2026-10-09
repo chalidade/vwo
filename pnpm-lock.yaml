@@ -112,6 +112,9 @@ importers:
       socket.io-client:
         specifier: ^4.8.0
         version: 4.8.4
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -155,6 +158,10 @@ importers:
         version: 2.1.9(@types/node@22.20.5)
 
   packages/shared:
+    dependencies:
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
     devDependencies:
       typescript:
         specifier: ^5.6.0
@@ -1936,6 +1943,9 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+
 snapshots:
 
   '@babel/code-frame@7.29.7':
@@ -3389,3 +3399,5 @@ snapshots:
   xmlhttprequest-ssl@2.1.2: {}
 
   yallist@3.1.1: {}
+
+  zod@3.23.8: {}
