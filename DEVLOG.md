@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: pengaturan panitia dan stand perusahaan di server
+
+**Konteks:** owner minta semua fitur saling terhubung antara panitia, perusahaan, dan pelamar. Sebelumnya pengaturan panitia (lantai, stand, iklan, pengumuman, jadwal Aula, psikotes) dan editan stand perusahaan hanya tersimpan di browser yang mengubahnya.
+
+**Yang berubah**
+- Tabel baru `fair_state` (migrasi 0006, terkunci RLS) menyimpan pengaturan panitia (`org`) dan setiap stand perusahaan (`company:<id>`).
+- Semua pengunjung mengambil pengaturan itu saat membuka game lalu setiap 30 detik. Akun panitia (`ADMIN_EMAILS`) mengirim perubahannya ke server dalam 3 detik.
+- PIN perusahaan, data booking stand (kontak), dan tagihan hanya dikirim ke akun panitia, tidak ke pengunjung biasa.
+- Di versi live, menu Panitia, Kelola iklan, dan Pembicara hanya muncul untuk akun panitia. Akun lain yang membuka halamannya melihat pesan "khusus panitia".
+
+**Diuji:** dua browser di server lokal: panitia mengirim pengumuman, server menyimpannya, dan pelamar di browser lain melihatnya di layar game. Pelamar tidak melihat menu panitia, PIN tidak ikut di data publik, dan percobaan pelamar mengubah pengaturan ditolak (403). Semua tes lulus.
+
+---
+
 ## 2026-10-09 · jobfair live: masuk dengan Google
 
 **Konteks:** owner bertanya cara memastikan email pendaftar benar-benar aktif, lalu memilih login dengan akun Google.

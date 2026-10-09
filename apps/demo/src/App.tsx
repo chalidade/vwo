@@ -5,6 +5,8 @@ import { JobFairAdmin } from "./JobFairAdmin";
 import { CompanyPortal } from "./company/Portal";
 import { SpeakerStage } from "./organizer/Speaker";
 import { LIVE } from "./mode";
+import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
+import { startSharedSync } from "./shared-state";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -16,8 +18,28 @@ function useHash() {
   return hash;
 }
 
+/** Live site: who is signed in, kept fresh, and the shared event setup synced for them. */
+function useLiveAccount() {
+  const [account, setAccount] = useState(currentAccount);
+  useEffect(() => {
+    if (!LIVE) return;
+    const on = () => {
+      const a = currentAccount();
+      setAccount(a);
+      startSharedSync(!!a?.fairAdmin);
+    };
+    window.addEventListener(ACCOUNT_EVENT, on);
+    void checkSession().then((a) => startSharedSync(!!a?.fairAdmin));
+    return () => window.removeEventListener(ACCOUNT_EVENT, on);
+  }, []);
+  return account;
+}
+
 export function App() {
   const hash = useHash();
+  const account = useLiveAccount();
+  // On the live site only event admins run the organiser pages; companies use their portal.
+  const organizer = !LIVE || !!account?.fairAdmin;
   const route = hash.replace(/^#\/?/, "");
   // In a room the game takes the whole screen; the way back home is on the title screen.
   const game = route === "jobfair";
@@ -28,10 +50,14 @@ export function App() {
       <nav className="top">
         <a href="#/" className="brand"><img src={`${import.meta.env.BASE_URL}brand/jobfair-logo.png`} alt="jobfair" className="brand-logo" /></a>
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
-        <a href="#/jobfair/admin" className={route.startsWith("jobfair/admin") && route !== "jobfair/admin/ads" ? "active" : ""}>Panitia job fair</a>
-        <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>
+        {organizer && (
+          <>
+            <a href="#/jobfair/admin" className={route.startsWith("jobfair/admin") && route !== "jobfair/admin/ads" ? "active" : ""}>Panitia job fair</a>
+            <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>
+          </>
+        )}
         <a href="#/jobfair/company" className={route.startsWith("jobfair/company") ? "active" : ""}>🏢 Portal perusahaan</a>
-        <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>
+        {organizer && <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>}
         {LIVE ? (
           <span className="demo-tag" title="Akun dan lamaran tersimpan di server. Fitur lain masih disambungkan bertahap.">
             Trial
@@ -45,6 +71,10 @@ export function App() {
       )}
       {route === "jobfair" ? (
         <JobFair />
+      ) : (route.startsWith("jobfair/admin") || route === "jobfair/speaker") && !organizer ? (
+        <main className="cp">
+          <p className="card cp-server-note">Halaman ini khusus panitia. Masuk dengan akun panitia di halaman Job Fair, lalu buka lagi.</p>
+        </main>
       ) : route.startsWith("jobfair/admin") ? (
         <JobFairAdmin tab={route.split("/")[2]} />
       ) : route === "jobfair/speaker" ? (
