@@ -4,6 +4,18 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · perbaikan crash "u is not a function" saat kirim pesan ke pelamar
+
+**Konteks:** dari screenshot layar error yang baru, owner mendapat pesan `TypeError: u is not a function` setiap kali mengirim pesan ke pelamar di portal perusahaan lewat Chrome di HP.
+
+**Penyebab:** efek React yang menggulir chat ke pesan terbaru ditulis sebagai `useEffect(() => el.scrollIntoView(...))`. Chrome versi baru mengembalikan promise dari `scrollIntoView`, lalu React menganggap nilai itu sebagai fungsi cleanup dan memanggilnya saat pesan berikutnya masuk. Hasilnya crash. Di Chrome lama nilainya `undefined`, jadi di laptop dan tes lokal tidak pernah muncul.
+
+**Yang berubah:** efeknya sekarang memakai kurung kurawal sehingga tidak mengembalikan apa-apa. Efek lain yang berbentuk sama sudah dicek, dan tidak ada yang mengembalikan nilai selain fungsi atau undefined.
+
+**Dicek:** error ditiru di lokal dengan `scrollIntoView` yang mengembalikan promise. Versi lama mengirim laporan `u is not a function` di lokasi yang persis sama dengan screenshot owner (`Ui ...:48:96060`), sedangkan versi baru mengirim pesan dan undangan interview tanpa error.
+
+---
+
 ## 2026-10-09 · layar masuk tidak terpotong di HP, dan error kini terlihat di layar
 
 **Konteks:** owner mengirim rekaman layar: setelah mengirim pesan ke pelamar di portal perusahaan, muncul layar "Maaf, halaman ini bermasalah". Owner juga mengirim screenshot layar masuk job fair yang terpotong ke kanan di HP.
