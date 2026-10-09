@@ -99,7 +99,7 @@ export function AulaBoard({ tab: start, stops, onClose, onGo }: { tab: AulaTab; 
           ))}
           <h4 className="au-h">Kontak panitia</h4>
           <p className="au-contact">
-            Meja Informasi di Lantai 1 dekat pintu masuk · <a href="mailto:panitia@vwo.example">panitia@vwo.example</a>
+            Meja Informasi di Lantai 2 dekat lift · <a href="mailto:panitia@vwo.example">panitia@vwo.example</a>
           </p>
         </>
       )}

@@ -67,7 +67,7 @@ export function WalletPanel({
           {!atStand ? (
             <div className="fx-callout">
               <span>
-                Beli koin di <b>Stand Koin</b>, Lantai 1 dekat pintu masuk.
+                Beli koin di <b>Stand Koin</b>, Lantai 2.
               </span>
               <button type="button" className="mb-order" onClick={onGoToStand}>
                 Antar ke Stand Koin
@@ -121,7 +121,7 @@ export function WalletPanel({
       )}
       {tab === "vouchers" &&
         (player.vouchers.length === 0 ? (
-          <p className="sp-empty">Belum ada voucher. Beli voucher cafe dan tempat makan di Food Court (Lantai 5, naik lift), tiap pembelian juga dapat bonus job fair.</p>
+          <p className="sp-empty">Belum ada voucher. Beli voucher cafe dan tempat makan di Food Court (Lantai 8, naik lift), tiap pembelian juga dapat bonus job fair.</p>
         ) : (
           <ul className="fx-vouchers">
             {player.vouchers.map((v) => (

@@ -1,7 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, stallRect } from "@vwo/shared";
+import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
 import { useEffect, useRef } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -157,10 +157,43 @@ export function coinStandExtras(stand: CoinStandView, onClick?: () => void): Sce
   ];
 }
 
-/** Food court stalls along the back wall: a business promoting its outlet, with vouchers for sale. */
+/** Free food court slots: an empty counter with a "for rent" sign, tappable to rent it. */
+export function emptyStallExtras(room: FairRoom, onRent?: (slot: number) => void): SceneExtra[] {
+  const taken = new Set((room.stalls ?? []).map((st, i) => stallSlot(st, i)));
+  return STALL_SLOTS.flatMap((_, slot): SceneExtra[] => {
+    if (taken.has(slot)) return [];
+    const r = stallRect(slot);
+    const w = r.width * T;
+    const title = onRent ? "Stan kosong: sewa stan" : "Stan kosong";
+    return [
+      {
+        key: `stall-free-${slot}`,
+        x: r.x,
+        y: r.y - 0.4,
+        z: r.y + 2.15,
+        onClick: onRent ? () => onRent(slot) : undefined,
+        title,
+        node: (
+          <svg width={w} height={2.8 * T} style={{ display: "block", overflow: "visible" }}>
+            <rect x={6} y={6} width={w - 12} height={1.4 * T} fill="#f5f5f4" {...ink} strokeWidth={1.6} strokeDasharray="6 5" />
+            <rect x={14} y={1.55 * T} width={w - 28} height={T - 6} rx={4} fill="#e7e5e4" {...ink} strokeWidth={1.6} />
+            <g transform={`translate(${w / 2}, ${0.75 * T})`}>
+              <rect x={-58} y={-13} width={116} height={26} rx={6} fill="#16a34a" {...ink} strokeWidth={1.6} />
+              <text x={0} y={5} textAnchor="middle" fontSize={12} fontWeight={900} fill="#fff" fontFamily={font}>
+                {onRent ? "＋ SEWA STAN" : "STAN KOSONG"}
+              </text>
+            </g>
+          </svg>
+        ),
+      },
+    ];
+  });
+}
+
+/** Food court stalls along the walls: a business promoting its outlet, with vouchers for sale. */
 export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => void): SceneExtra[] {
   return (room.stalls ?? []).flatMap((st, i): SceneExtra[] => {
-    const r = stallRect(i);
+    const r = stallRect(stallSlot(st, i));
     const w = r.width * T;
     return [
       {
@@ -184,7 +217,7 @@ export function foodStallExtras(room: FairRoom, onStall?: (stallId: string) => v
             <g transform={`translate(${w / 2}, 82)`}>
               <rect x={-62} y={-9} width={124} height={18} rx={9} fill="#facc15" {...ink} strokeWidth={1.4} className="fr-deal" />
               <text x={0} y={4} textAnchor="middle" fontSize={10.5} fontWeight={900} fill={INK} fontFamily={font}>
-                🎟️ VOUCHER mulai {Math.min(...st.deals.map((d) => d.price))}🪙
+                {st.deals.length ? `🎟️ VOUCHER mulai ${Math.min(...st.deals.map((d) => d.price))}🪙` : "🎟️ Segera hadir"}
               </text>
             </g>
           </svg>

@@ -144,7 +144,7 @@ export function SpeakerStage() {
       const q = Math.random() < 0.4;
       const pool = q ? BOT_QUESTIONS : BOT_CHAT;
       post({ name, text: pool[Math.floor(Math.random() * pool.length)]!, q, bot: true });
-      if (Math.random() < 0.5) setClaps((l) => [...l.slice(-6), { id: Date.now(), x: 10 + Math.random() * 75, e: ["👏", "🔥", "💡", "❤️"][Math.floor(Math.random() * 4)]! }]);
+      if (Math.random() < 0.5) setClaps((l) => [...l.slice(-6), { id: Date.now() + Math.random(), x: 10 + Math.random() * 75, e: ["👏", "🔥", "💡", "❤️"][Math.floor(Math.random() * 4)]! }]);
     }, 7000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -325,7 +325,7 @@ export function SpeakerStage() {
             <a href="#/jobfair" target="_blank" rel="noreferrer">
               job fair
             </a>{" "}
-            di tab baru, naik lift ke Lantai 6 untuk seminar atau Lantai 4 untuk Aula, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
+            di tab baru, naik lift ke Lantai 5 untuk seminar, atau tetap di Lantai 1 untuk Aula, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
           </p>
           <label className="st-bots small">
             <input type="checkbox" checked={bots} onChange={(e) => setBots(e.target.checked)} /> Penonton bot (chat dan pertanyaan simulasi)

@@ -25,8 +25,9 @@ import {
   StoolSprite,
   TableSprite,
 } from "./Furniture";
+import { CrowdMode, Figure } from "./FlatPerson";
 import { HallWall } from "./JobFair";
-import { type Look, Person, lookFor } from "./Person";
+import { type Look, lookFor } from "./Person";
 
 /** Pixels per tile. */
 export const TILE = 48;
@@ -87,9 +88,11 @@ export interface NpcView {
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
 
 /** With more people than this on screen, the scene goes into crowd mode: everyone but the player
- *  drops the small animations (breathing, blinking, swinging arms and legs) that repaint each sprite
- *  every frame. Measured at 150 visitors on a phone-sized view: 31 → 58 fps. */
+ *  is drawn as a cached picture of their character (FlatPerson.tsx) without the small animations
+ *  (breathing, blinking, swinging arms and legs) that repaint each sprite every frame. */
 const CROWD = 16;
+/** The most other people drawn at once; the rest of a packed floor is left out, farthest first. */
+const MAX_PEOPLE = 40;
 
 /** Each sprite breathes on its own beat, so a crowd standing still doesn't move in lockstep. */
 function breath(id: string) {
@@ -422,7 +425,7 @@ export function CafeScene({
         >
           {!seat && <div className="rpg-shadow" />}
           <div className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
-            <Person look={lookOf(a)} />
+            <Figure look={lookOf(a)} dir={DIR[facing]} seated={!!seat} flat={!self} />
           </div>
           {(self || !npc) && (
             <div className="rpg-name" data-self={self ? "" : undefined} data-npc={npc ? "" : undefined}>
@@ -461,7 +464,7 @@ export function CafeScene({
         >
           <div className="rpg-shadow" />
           <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
-            <Person look={n.look} />
+            <Figure look={n.look} dir={DIR[n.facing]} flat />
           </div>
           {n.carrying && n.facing !== "back" && <div className="rpg-tray" />}
           <div className="rpg-name" data-staff="">
@@ -482,8 +485,22 @@ export function CafeScene({
   const viewT = camY - 6 * TILE;
   const viewB = camY + view.h / scale + 2 * TILE;
   const onScreen = (e: Ent) => !follow || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
-  const shown = ents.filter(onScreen);
+  let shown = ents.filter(onScreen);
   const crowd = shown.filter((e) => people.has(e.key)).length > CROWD;
+  // A packed floor draws only the people nearest the player, so a frame costs the same with a
+  // hundred visitors in view as with thousands on the floor.
+  const near = shown.filter((e) => people.has(e.key) && e.key !== selfMemberId);
+  if (follow && near.length > MAX_PEOPLE) {
+    const fx = px(follow.x);
+    const fy = py(follow.y);
+    const far = new Set(
+      near
+        .sort((a, b) => Math.hypot(a.x - fx, a.y - fy) - Math.hypot(b.x - fx, b.y - fy))
+        .slice(MAX_PEOPLE)
+        .map((e) => e.key),
+    );
+    shown = shown.filter((e) => !far.has(e.key));
+  }
 
   // Doors in the bottom wall; doors standing inside a room (spriteKey "room:…") are drawn by the room.
   const doors = (floor.objects ?? []).filter((o) => o.type === "door" && !o.spriteKey?.startsWith("room:"));
@@ -586,19 +603,21 @@ export function CafeScene({
             {e.node}
           </div>
         ))}
-        {shown.map((e) => (
-          <div
-            key={e.key}
-            className="rpg-ent"
-            data-hit={e.onClick ? "" : undefined}
-            title={e.title}
-            onPointerDown={e.onClick ? (ev) => ev.stopPropagation() : undefined}
-            onClick={e.onClick}
-            style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: 10 + Math.round(e.z), cursor: e.onClick ? "pointer" : undefined }}
-          >
-            {e.node}
-          </div>
-        ))}
+        <CrowdMode.Provider value={crowd}>
+          {shown.map((e) => (
+            <div
+              key={e.key}
+              className="rpg-ent"
+              data-hit={e.onClick ? "" : undefined}
+              title={e.title}
+              onPointerDown={e.onClick ? (ev) => ev.stopPropagation() : undefined}
+              onClick={e.onClick}
+              style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: 10 + Math.round(e.z), cursor: e.onClick ? "pointer" : undefined }}
+            >
+              {e.node}
+            </div>
+          ))}
+        </CrowdMode.Provider>
       </div>
       <div className="rpg-vignette" />
       {canZoom && (

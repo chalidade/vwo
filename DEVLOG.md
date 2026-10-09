@@ -4,6 +4,31 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · VWO: lantai baru, food court 15 stan, konfirmasi koin, obrolan pelamar, keramaian lebih ringan
+
+**Konteks:** owner meminta urutan lantai yang baru, food court yang lebih ramai dan bisa disewa, konfirmasi sebelum koin terpakai, suasana yang lebih hidup, perbaikan seminar yang kadang error, dan kesiapan untuk 3.000–10.000 pengguna.
+
+**Yang berubah**
+- **Urutan lantai:** Lantai 1 Aula (pemain tiba di sini), Lantai 2–4 booth lowongan, Lantai 5 seminar, Lantai 6 psikotes, Lantai 7 lounge konsultasi, Lantai 8 food court. Data panitia yang tersimpan dipindahkan otomatis ke urutan baru (layout versi 3).
+- **Food court:** 15 slot stan di dinding belakang, kiri, dan kanan. 12 stan terisi, 3 kosong. Stan kosong bisa diklik untuk disewa (pembayaran masih demo). Admin punya tab "🍜 Food Court" untuk menambah, melepas, atau mengembalikan stan ke susunan awal.
+- **Konfirmasi koin:** melamar, menelepon di lounge, membeli badge terverifikasi, dan membeli voucher makanan sekarang menanyakan dulu "Pakai X koin?".
+- **Obrolan pelamar:** setiap beberapa detik, dua pelamar yang berdekatan saling menghadap dan bergantian bicara. Isi obrolannya sesuai ruangan masing-masing.
+- **Seminar:** slide kadang tampil dua sekaligus karena dua elemen memakai key React yang sama. Key-nya sekarang dibedakan, dan id tepuk tangan dibuat unik.
+- **Keramaian:** di mode ramai, orang lain digambar sebagai gambar cache dari karakternya, bukan lagi ±110 elemen SVG per orang. HP juga hanya menggambar maksimal 40 orang terdekat.
+
+**Hasil ukur** (build produksi, layar HP, CPU diperlambat 4×, mesin tanpa GPU):
+
+| Pengunjung | Sebelum | Sesudah |
+|---|---|---|
+| 150 | 8–11 FPS | 17–24 FPS |
+| 300 | belum diukur | 16 FPS |
+
+Di kecepatan CPU normal, angkanya 60 FPS. Angka di mesin uji ini lebih pesimis daripada HP sungguhan, karena HP menggambar dengan GPU.
+
+**Catatan go-live:** untuk 10.000 pengguna, beban utamanya ada di server. Rencananya adalah kanal per lantai berisi ±300 orang, posisi hanya dikirim untuk orang di sekitar pemain, ruang tunggu saat pembukaan, dan seminar besar lewat live stream. Rinciannya ada di panduan go-live.
+
+---
+
 ## 2026-10-08 · VWO: mode ramai supaya halaman tidak lag saat banyak pengunjung
 
 **Konteks:** owner bertanya apakah halaman akan lag kalau orangnya makin banyak.

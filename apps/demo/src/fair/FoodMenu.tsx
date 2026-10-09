@@ -1,3 +1,4 @@
+import { type CoinAsk, CoinConfirm } from "./CoinConfirm";
 import { useState } from "react";
 import { type FoodStall, safeUrl } from "@vwo/shared";
 import type { Voucher } from "../jobfair-engine";
@@ -23,6 +24,7 @@ export function FoodMenu({
   onClose: () => void;
 }) {
   const [got, setGot] = useState<Bought | null>(null);
+  const [ask, setAsk] = useState<CoinAsk | null>(null);
   return (
     <Modal title={`${stall.emoji} ${stall.name}`} onClose={onClose} className="fx-food">
       {got ? (
@@ -84,7 +86,7 @@ export function FoodMenu({
                   <span className="sp-muted"> · {d.terms}</span>
                 </span>
                 {coins >= d.price ? (
-                  <button type="button" className="mb-order" onClick={() => setGot(onBuy(d.id))}>
+                  <button type="button" className="mb-order" onClick={() => setAsk({ price: d.price, what: `${d.title} dari ${stall.name}`, run: () => setGot(onBuy(d.id)) })}>
                     {d.price} 🪙
                   </button>
                 ) : (
@@ -95,6 +97,7 @@ export function FoodMenu({
               </li>
             ))}
           </ul>
+          {ask && <CoinConfirm ask={ask} coins={coins} onCancel={() => setAsk(null)} />}
         </>
       )}
     </Modal>
