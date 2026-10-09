@@ -1,7 +1,8 @@
-import { myRegistrations, readPrices } from "@vwo/db";
+import { myPayments, myRegistrations, readPrices } from "@vwo/db";
 import { priceFrom } from "@vwo/shared";
 import { db } from "@/lib/db";
 import { googleEnabled } from "@/lib/google";
+import { provider, refresh } from "@/lib/payments";
 import { currentUser } from "@/lib/session";
 import { RegisterCompany, type RegistrationView } from "./RegisterCompany";
 import "../soon.css";
@@ -16,6 +17,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const prices = await readPrices(db);
   const regular = priceFrom(prices, "stand.regular");
   const premium = priceFrom(prices, "stand.premium");
+  // Back from the checkout page: ask Xendit straight away instead of waiting for its webhook.
+  if (user && q.bayar) {
+    const open = (await myPayments(db, user.id, ["registration"])).filter((p) => p.status === "pending");
+    await Promise.all(open.map((p) => refresh(p).catch(() => p)));
+  }
   const mine: RegistrationView[] = user
     ? (await myRegistrations(db, user.id)).map((r) => ({
         id: r.id,
@@ -54,7 +60,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           <li>Terima kode & PIN</li>
         </ol>
         {user ? (
-          <RegisterCompany email={user.email} name={user.name} prices={{ regular, premium }} initial={mine} />
+          <RegisterCompany email={user.email} name={user.name} prices={{ regular, premium }} initial={mine} gateway={provider()} back={q.bayar ?? null} />
         ) : (
           <div className="rg-card">
             <h2>Masuk dulu</h2>

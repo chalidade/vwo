@@ -11,6 +11,25 @@ let admin = false;
 /** Company booths this account runs: their `company:<id>` documents are pushed too. */
 const mine = new Set<string>();
 let pushing: (() => void) | null = null;
+let pushNow: (() => Promise<void>) | null = null;
+let pullNow: (() => Promise<void>) | null = null;
+
+/** Send this browser's unsent changes now (e.g. a new bill, before paying it). */
+export async function flushShared() {
+  for (let i = 0; i < 20 && pushNow; i++) {
+    await pushNow();
+    if (!pending()) return;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
+/** Take the server's setup on the next pull, whatever this browser last applied. */
+export function refreshShared() {
+  version = -1;
+  void pullNow?.();
+}
+
+let pending = () => false;
 /** The server setup's version this browser has applied; -1 takes the next pull whatever it says. */
 let version = -1;
 const mayPush = (key: string) => admin || (key.startsWith("company:") && mine.has(key.slice("company:".length)));
@@ -38,6 +57,7 @@ export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
     return m;
   };
   const unsent = () => version >= 0 && [...local()].some(([k, v]) => mayPush(k) && synced.get(k) !== v);
+  pending = () => [...local()].some(([k, v]) => mayPush(k) && synced.get(k) !== v);
 
   const pull = async () => {
     if (busy) return;
@@ -85,6 +105,8 @@ export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
     }
   };
 
+  pushNow = push;
+  pullNow = pull;
   let pushTimer: ReturnType<typeof setInterval> | null = null;
   pushing = () => {
     pushTimer ??= setInterval(() => void push(), 3_000);

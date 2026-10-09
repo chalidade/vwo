@@ -15,7 +15,6 @@ export interface RegistrationView {
 }
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
-const METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mandiri", "Kartu kredit", "Transfer bank"];
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
 const STATUS: Record<string, string> = { unpaid: "Menunggu pembayaran", paid: "Menunggu verifikasi panitia", verified: "Terverifikasi", rejected: "Ditolak" };
 
@@ -25,26 +24,43 @@ const ERRORS: Record<string, string> = {
   too_many_requests: "Terlalu banyak pendaftaran dari akun ini. Coba lagi besok.",
   not_signed_in: "Sesi login habis. Muat ulang halaman lalu masuk lagi.",
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+  not_payable: "Pendaftaran ini sudah dibayar atau tidak bisa dibayar lagi. Muat ulang halaman.",
+  gateway_error: "Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.",
 };
 
 async function post(path: string, body: unknown) {
   try {
     const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string } };
+    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string }; payment?: { status: string; checkoutUrl: string | null } };
     return r.ok ? { ok: true as const, data: d } : { ok: false as const, error: ERRORS[d.error ?? ""] ?? "Gagal. Coba lagi sebentar lagi." };
   } catch {
     return { ok: false as const, error: "Tidak tersambung ke server. Periksa internet lalu coba lagi." };
   }
 }
 
-export function RegisterCompany({ email, name, prices, initial }: { email: string; name: string; prices: { regular: number; premium: number }; initial: RegistrationView[] }) {
+export function RegisterCompany({
+  email,
+  name,
+  prices,
+  initial,
+  gateway,
+  back,
+}: {
+  email: string;
+  name: string;
+  prices: { regular: number; premium: number };
+  initial: RegistrationView[];
+  /** xendit: pay on Xendit's checkout page. demo: no gateway set up, nothing is charged. */
+  gateway: "xendit" | "demo";
+  /** Back from the checkout page: "ok" or "gagal". */
+  back: string | null;
+}) {
   const [list, setList] = useState(initial);
   const open = list.find((r) => r.status === "unpaid" || r.status === "paid");
   const [showForm, setShowForm] = useState(!list.length);
   const [f, setF] = useState({ company: "", industry: "", website: "", city: "", contactName: name, contactRole: "HR", email, phone: "", website2: "" });
   const [tier, setTier] = useState<"regular" | "premium">("regular");
   const [color, setColor] = useState(COLORS[0]!);
-  const [method, setMethod] = useState(METHODS[0]!);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => (setF({ ...f, [k]: e.target.value }), setError(""));
@@ -61,16 +77,12 @@ export function RegisterCompany({ email, name, prices, initial }: { email: strin
           </p>
           {r.status === "unpaid" && (
             <div style={{ marginTop: 14 }}>
-              <label style={{ maxWidth: 320 }}>
-                Metode pembayaran
-                <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                  {METHODS.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </label>
-              <p className="cs-sub" style={{ margin: "10px 0", fontSize: 13 }}>
-                Pembayaran saat ini masih simulasi: tidak ada uang yang ditarik.
+              {back === "gagal" && <p className="rg-err">Pembayaran belum selesai. Kamu bisa coba bayar lagi.</p>}
+              {back === "ok" && <p className="cs-sub" style={{ margin: "0 0 10px", fontSize: 13 }}>Pembayaran sedang dikonfirmasi. Muat ulang halaman ini sebentar lagi.</p>}
+              <p className="cs-sub" style={{ margin: "0 0 10px", fontSize: 13 }}>
+                {gateway === "xendit"
+                  ? "Bayar lewat Xendit: QRIS, virtual account, e-wallet atau kartu kredit. Kamu akan dibawa ke halaman pembayaran yang aman."
+                  : "Pembayaran saat ini masih simulasi: tidak ada uang yang ditarik."}
               </p>
               <button
                 type="button"
@@ -79,10 +91,16 @@ export function RegisterCompany({ email, name, prices, initial }: { email: strin
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);
-                  const res = await post(`/api/company/registrations/${r.id}/pay`, { method });
+                  const res = await post("/api/payments", { kind: "registration", id: r.id });
+                  if (!res.ok) return setBusy(false), setError(res.error);
+                  const p = res.data.payment;
+                  if (p?.status === "paid") {
+                    setBusy(false);
+                    return setList(list.map((x) => (x.id === r.id ? { ...x, status: "paid" } : x)));
+                  }
+                  if (p?.checkoutUrl) return void (window.location.href = p.checkoutUrl);
                   setBusy(false);
-                  if (!res.ok) return setError(res.error);
-                  setList(list.map((x) => (x.id === r.id ? { ...x, status: "paid" } : x)));
+                  setError("Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.");
                 }}
               >
                 {busy ? "Memproses…" : `Bayar ${rupiah(r.price)}`}

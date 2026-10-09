@@ -92,6 +92,13 @@
       "when": 1791580120005,
       "tag": "0012_early_access",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791586198788,
+      "tag": "0013_fair_payments",
+      "breakpoints": true
     }
   ]
 }

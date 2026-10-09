@@ -60,6 +60,7 @@ import { AccountGate } from "./AccountGate";
 import { type Account, checkSession, currentAccount, logout, resendVerification } from "./account";
 import { applyErrorText, myApplications, sendApplication as sendToServer } from "./server-fair";
 import { LIVE } from "./mode";
+import { claimPaidCoins, pay } from "./payments";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
@@ -1471,7 +1472,20 @@ export function JobFair() {
             stand={fair.fair.coinStand}
             atStand={reach?.kind === "coins"}
             canClaim={fair.canClaimDaily()}
-            onBuy={(id, method) => fair.buyCoins(id, method)}
+            live={LIVE}
+            onBuy={async (id, method) => {
+              if (!LIVE) {
+                const got = fair.buyCoins(id, method);
+                const pkg = fair.fair.coinStand.packages.find((p) => p.id === id);
+                return got ? { ok: true, text: `Pembayaran ${pkg?.price ?? ""} lewat ${method} berhasil. +${got} koin.` } : { ok: false, text: "Paket tidak ditemukan." };
+              }
+              const r = await pay({ kind: "coins", pack: id });
+              if (!r.ok) return { ok: false, text: r.error };
+              if ("redirect" in r) return "redirect";
+              // No gateway set up: the server settled it at once, so take the coins now.
+              await claimPaidCoins();
+              return { ok: true, text: "Pembayaran simulasi berhasil. Koin sudah masuk." };
+            }}
             onClaim={claimDaily}
             onGoToStand={() => {
               setWallet(false);

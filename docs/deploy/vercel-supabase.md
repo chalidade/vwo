@@ -35,6 +35,12 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      coming-soon page and `/play` only opens for organisers (`ADMIN_EMAILS`), accounts that run a
      booth, and companies whose registration an organiser verified (they sign in at
      `/masuk-panitia` or `/masuk-perusahaan`). Companies register at `/daftar-perusahaan`.
+   - `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN`: real payments through Xendit (coin packages,
+     booth registration, company bills). Secret key from Xendit → Settings → API Keys with
+     Money-in write access (`xnd_development_…` is test mode, `xnd_production_…` takes real money);
+     the token from Settings → Webhooks, where the "Invoices paid" URL is
+     `https://<domain>/api/payments/xendit/webhook`. While the key is unset every payment is a
+     simulation that charges nothing and is recorded as "Simulasi (tanpa uang)".
    - optional `PREVIEW_SECRET`: signs the pre-launch pass cookie (falls back to `DATABASE_URL`).
    - optional `PASSWORD_LOGIN=1`: brings back the email-and-password forms (local testing).
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
