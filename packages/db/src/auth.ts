@@ -77,6 +77,33 @@ export function newVerifyToken(db: Db, userId: string) {
   return issueEmailToken(db, userId, "verify");
 }
 
+/**
+ * Sign in with Google: find the account by Google id, else by email, else create one.
+ * Google has checked the address, so it counts as verified. An unverified password account with the
+ * same email may have been made by someone else, so its password and sessions are dropped on linking.
+ */
+export async function googleSignIn(db: Db, input: { sub: string; email: string; name: string }) {
+  return db.transaction(async (tx) => {
+    const [bySub] = await tx.select({ id: users.id }).from(users).where(eq(users.googleSub, input.sub));
+    if (bySub) return { userId: bySub.id, created: false };
+    const [byEmail] = await tx.select({ id: users.id, verified: users.emailVerifiedAt }).from(users).where(eq(users.email, input.email));
+    if (byEmail) {
+      await tx
+        .update(users)
+        .set({ googleSub: input.sub, emailVerifiedAt: sql`coalesce(${users.emailVerifiedAt}, now())`, ...(byEmail.verified ? {} : { passwordHash: null }) })
+        .where(eq(users.id, byEmail.id));
+      if (!byEmail.verified) await tx.delete(sessions).where(eq(sessions.userId, byEmail.id));
+      return { userId: byEmail.id, created: false };
+    }
+    const [user] = await tx
+      .insert(users)
+      .values({ email: input.email, displayName: input.name.slice(0, 40) || input.email.split("@")[0]!, googleSub: input.sub, emailVerifiedAt: new Date() })
+      .returning({ id: users.id });
+    await tx.insert(seekerProfiles).values({ userId: user!.id, termsAcceptedAt: new Date() });
+    return { userId: user!.id, created: true };
+  });
+}
+
 /** Check an email and password. Returns the user id or throws InvalidLoginError. */
 export async function checkLogin(db: Db, email: string, password: string) {
   const [user] = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.email, email));

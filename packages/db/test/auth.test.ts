@@ -11,6 +11,7 @@ import {
   createDb,
   createSession,
   endSession,
+  googleSignIn,
   hashPassword,
   register,
   requestPasswordReset,
@@ -85,5 +86,32 @@ describe("accounts", () => {
     expect(await sessionUser(db, session)).toBeNull();
     expect(await checkLogin(db, "sari@mail.example", "baru12345")).toBe(userId);
     await expect(resetPassword(db, reset, "lagi12345")).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+});
+
+describe("google sign-in", () => {
+  it("creates a verified account once, then finds it by Google id", async () => {
+    const first = await googleSignIn(db, { sub: "g-1", email: "rina@mail.example", name: "Rina" });
+    expect(first.created).toBe(true);
+    const again = await googleSignIn(db, { sub: "g-1", email: "rina@mail.example", name: "Rina" });
+    expect(again).toEqual({ userId: first.userId, created: false });
+    const s = await createSession(db, first.userId, null);
+    expect((await sessionUser(db, s.token))?.emailVerifiedAt).toBeInstanceOf(Date);
+  });
+
+  it("takes over an unverified password account with that email, dropping its password and sessions", async () => {
+    const { userId } = await register(db, { email: "budi@mail.example", password: "squatter-pass", name: "Budi" });
+    const squatter = await createSession(db, userId, null);
+    const g = await googleSignIn(db, { sub: "g-2", email: "budi@mail.example", name: "Budi" });
+    expect(g.userId).toBe(userId);
+    expect(await sessionUser(db, squatter.token)).toBeNull();
+    await expect(checkLogin(db, "budi@mail.example", "squatter-pass")).rejects.toBeInstanceOf(InvalidLoginError);
+  });
+
+  it("keeps the password of a verified account it links to", async () => {
+    const { userId, verifyToken } = await register(db, { email: "tia@mail.example", password: "tia-password", name: "Tia" });
+    await verifyEmail(db, verifyToken);
+    await googleSignIn(db, { sub: "g-3", email: "tia@mail.example", name: "Tia" });
+    expect(await checkLogin(db, "tia@mail.example", "tia-password")).toBe(userId);
   });
 });
