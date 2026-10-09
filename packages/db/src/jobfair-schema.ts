@@ -306,3 +306,14 @@ export const fairState = pgTable("fair_state", {
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** The live game's progress for one account (coins, missions, vouchers, psikotes, stamps, profile), so it follows them to any device. */
+export const fairPlayers = pgTable("fair_players", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  data: jsonb("data").notNull(),
+  /** Bumped on every save; a device saving on top of an older copy is refused and gets the newer one. */
+  rev: integer("rev").notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

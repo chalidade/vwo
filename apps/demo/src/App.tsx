@@ -6,6 +6,7 @@ import { CompanyPortal } from "./company/Portal";
 import { SpeakerStage } from "./organizer/Speaker";
 import { LIVE } from "./mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
+import { syncPlayer } from "./player-sync";
 import { startSharedSync } from "./shared-state";
 
 function useHash() {
@@ -18,7 +19,7 @@ function useHash() {
   return hash;
 }
 
-/** Live site: who is signed in, kept fresh, and the shared event setup synced for them. */
+/** Live site: who is signed in, kept fresh, with the shared event setup and their own progress synced. */
 function useLiveAccount() {
   const [account, setAccount] = useState(currentAccount);
   useEffect(() => {
@@ -27,9 +28,13 @@ function useLiveAccount() {
       const a = currentAccount();
       setAccount(a);
       startSharedSync(!!a?.fairAdmin);
+      syncPlayer(a);
     };
     window.addEventListener(ACCOUNT_EVENT, on);
-    void checkSession().then((a) => startSharedSync(!!a?.fairAdmin));
+    void checkSession().then((a) => {
+      startSharedSync(!!a?.fairAdmin);
+      syncPlayer(a);
+    });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);
   }, []);
   return account;

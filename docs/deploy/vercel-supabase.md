@@ -43,5 +43,7 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 - Security headers (HSTS, frame denial, nosniff, referrer and permissions policy) come from
   `next.config.ts`, so both hosts send them.
 - Never put a database URL in a `NEXT_PUBLIC_*` variable; those are shipped to browsers.
+- Each account's game progress (`fair_players`) is client-reported: coins are play money while
+  payments are a demo. Move the coin balance to server-side rules before coins buy anything real.
 - Realtime runs on Supabase broadcast channels (`apps/demo/src/live.ts`); on DigitalOcean the same
   `Transport` interface gets a Socket.IO implementation.

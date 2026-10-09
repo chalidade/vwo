@@ -13,10 +13,12 @@ import {
   createDb,
   grantCoins,
   myFairApplications,
+  readFairPlayer,
   setFairApplicationStatus,
   spendCoins,
   submitFairApplication,
   updateFairApplicationShared,
+  writeFairPlayer,
 } from "../src";
 import { applications, booths, companies, fairs, jobs, users } from "../src/schema";
 
@@ -143,5 +145,17 @@ describe("live game applications", () => {
     expect(shared.rating).toBe(4);
     // Someone else's account cannot write as this seeker.
     expect(await updateFairApplicationShared(db, { id, as: "seeker", userId: "00000000-0000-0000-0000-000000000000", incoming: {} })).toBe(false);
+  });
+});
+
+describe("live game progress", () => {
+  it("saves per account and refuses a save made on top of an older copy", async () => {
+    expect(await readFairPlayer(db, seeker)).toBeNull();
+    expect(await writeFairPlayer(db, { userId: seeker, rev: 0, data: { coins: 10 } })).toBe(1);
+    // A second device that also thought nothing was saved yet.
+    expect(await writeFairPlayer(db, { userId: seeker, rev: 0, data: { coins: 99 } })).toBeNull();
+    expect(await writeFairPlayer(db, { userId: seeker, rev: 1, data: { coins: 20 } })).toBe(2);
+    expect(await writeFairPlayer(db, { userId: seeker, rev: 1, data: { coins: 99 } })).toBeNull();
+    expect(await readFairPlayer(db, seeker)).toEqual({ data: { coins: 20 }, rev: 2 });
   });
 });
