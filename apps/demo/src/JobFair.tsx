@@ -12,6 +12,7 @@ import {
   type SponsorView,
   boothSpot,
   fairFloorId,
+  infoDeskOn,
   fairFloorIndex,
   LIFT_FRONT,
   findPath,
@@ -53,11 +54,11 @@ import {
   sponsorExtras,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
-import { CharacterCreator, type Character } from "./CharacterCreator";
+import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
 import { AccountGate } from "./AccountGate";
 import { type Account, currentAccount, logout } from "./account";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { type FloorPass, PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
 import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, VERIFY_COST, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
@@ -143,6 +144,9 @@ export function JobFair() {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [account, setAccount] = useState<Account | null>(currentAccount);
+  /** The saved character for this account: set once, then changed from the profile. */
+  const character = account ? loadCharacter() : null;
+  const [editLook, setEditLook] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState<string | null>(null);
   // The organiser's announcement stays on screen until the visitor closes it; a new one shows again.
@@ -211,6 +215,8 @@ export function JobFair() {
   const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === hall);
   const coinHere = !room && fair.fair.coinStand.floor === hall;
   const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks);
+  /** Every floor has an info desk; the first hall's is the one by the entrance. */
+  const desk = infoDeskOn(fair.fair, floor.id);
   /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
   const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
   const feed = useStageFeed(stageLive, liveHere && !seminar, session?.name ?? "Pengunjung");
@@ -303,8 +309,8 @@ export function JobFair() {
       if (seat && seat.d < 0.9) return { kind: "seat", seatId: seat.st.id };
     }
     for (const p of promotersHere) if (Math.hypot(self.x - p.x, self.y - (p.y + 1.1)) < 1.1) return { kind: "promoter", promoter: p };
-    const d = fair.fair.infoDesk;
-    if (firstHall && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
+    const d = desk;
+    if (self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
     const other = [...fair.visitors.values()]
       .filter((v) => v.memberId !== self.memberId && v.floorId === self.floorId)
       .map((v) => ({ v, d: Math.hypot(v.x - self.x, v.y - self.y) }))
@@ -494,9 +500,9 @@ export function JobFair() {
   function rideTo(floorId: string) {
     const s = savedSession;
     if (!s) return false;
-    const into = fair.roomOf(floorId);
+    const into = fair.passFor(floorId);
     if (into && !fair.hasTicket(into.id)) {
-      askTicket(into);
+      askTicket(into, () => pickFloor(floorId));
       return false;
     }
     fair.ride(s.visitorId, floorId);
@@ -510,7 +516,7 @@ export function JobFair() {
     setLift(false);
     const me = savedSession && fair.visitors.get(savedSession.visitorId);
     if (!me || floorId === me.floorId) return;
-    const into = fair.roomOf(floorId);
+    const into = fair.passFor(floorId);
     if (into && !fair.hasTicket(into.id)) {
       askTicket(into, () => pickFloor(floorId));
       return;
@@ -582,9 +588,9 @@ export function JobFair() {
     goTo(fairFloorId(fair.fair, c.floor), c.x + COIN_STAND_SPOTS.front.x, c.y + COIN_STAND_SPOTS.front.y, () => setWallet(true));
   };
 
+  /** Walk to the info desk on this floor. */
   const goToInfo = () => {
-    const d = fair.fair.infoDesk;
-    goTo(fairFloorId(fair.fair, 0), d.x + d.width / 2, d.y + d.height + 0.6, talkToInfo);
+    goTo(floor.id, desk.x + desk.width / 2, desk.y + desk.height + 0.6, talkToInfo);
   };
 
   const goToStall = (i: number) => {
@@ -649,11 +655,12 @@ export function JobFair() {
     else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Voucher aman, nanti makan di outletnya 😋" : "Lihat-lihat promo dulu ah", 2200);
   }
 
-  function askTicket(r: FairRoom, then: () => void = () => goToRoom(r)) {
+  /** A paid floor (a room, or a booth floor the organiser put a price on) asks for a ticket first. */
+  function askTicket(r: FloorPass, then: () => void) {
     const { price, voucher } = fair.roomPrice(r.id);
     const enough = me.coins >= price;
     setTalk({
-      speaker: `${r.staff.name} · ${r.name}`,
+      speaker: `${r.staff} · ${r.name}`,
       pages: [
         `${r.tagline}. Tiket masuk ${r.price} koin${voucher ? `, pakai voucher "${voucher.title}" jadi ${price} koin` : ""}. Saldo kamu ${me.coins} koin.`,
       ],
@@ -743,7 +750,7 @@ export function JobFair() {
   }
 
   function talkToInfo() {
-    const staff = fair.fair.infoDesk.staff;
+    const staff = desk.staff;
     const floorChoice = (i: number): Talk => ({
       speaker: `${staff} · Panitia`,
       pages: [`${fair.fair.floors[i]!.name} isinya ${fair.fair.floors[i]!.theme}. Mau ke stand mana?`],
@@ -766,7 +773,7 @@ export function JobFair() {
       pages: ["Ada yang bisa dibantu? Pilih lantainya: Aula, food court, seminar, psikotes, atau Stand Koin. Nanti aku antar."],
       choices: [
         ...fair.fair.floors.map((f, i) => ({
-          label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand)`,
+          label: `${f.name} · ${f.theme} (${fair.fair.booths.filter((b) => b.floor === i).length} stand${fair.floorPrice(fairFloorId(fair.fair, i)) ? ` · ${fair.floorPrice(fairFloorId(fair.fair, i))} koin` : ""})`,
           onPick: () => setTalk(floorChoice(i)),
         })),
         ...fair.fair.rooms.map((r) => ({
@@ -928,7 +935,7 @@ export function JobFair() {
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...(firstHall ? infoDeskExtras(fair.fair.infoDesk, session ? goToInfo : undefined) : []),
+    ...infoDeskExtras(desk, session ? goToInfo : undefined),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
     ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
     ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
@@ -1191,9 +1198,34 @@ export function JobFair() {
               setVerify(true);
             }}
             account={account?.email}
+            onEditCharacter={() => {
+              setPanel(null);
+              setEditLook(true);
+            }}
             onSignOut={signOut}
             onClose={() => setPanel(null)}
           />
+        )}
+
+        {session && editLook && (
+          <div className="mb-backdrop cc-modal" onPointerDown={(e) => e.stopPropagation()} onClick={() => setEditLook(false)}>
+            <div onClick={(e) => e.stopPropagation()}>
+              <CharacterCreator
+                defaultName={session.name}
+                withCompanions={false}
+                cta="Simpan karakter"
+                note=""
+                onCancel={() => setEditLook(false)}
+                onCheckIn={(c) => {
+                  const v = fair.visitors.get(session.visitorId);
+                  if (v) v.displayName = c.name;
+                  setSession({ ...session, name: c.name, look: c.look });
+                  setEditLook(false);
+                  setPanel("profile");
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {session && games && (
@@ -1335,7 +1367,10 @@ export function JobFair() {
             stops={fair.stops}
             here={floor.id}
             atLift={reach?.kind === "lift"}
-            ticket={(roomId) => (fair.hasTicket(roomId) ? null : fair.room(roomId)?.price ?? null)}
+            ticket={(floorId) => {
+              const pass = fair.passFor(floorId);
+              return pass && !fair.hasTicket(pass.id) ? pass.price : null;
+            }}
             onPick={pickFloor}
             onClose={() => setLift(false)}
           />
@@ -1497,7 +1532,11 @@ export function JobFair() {
                     Ganti akun
                   </button>
                 </div>
-                <CharacterCreator key={account.email} defaultName={account.name} onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Di acara sungguhan, pengunjung registrasi lewat scan QR di pintu masuk." />
+                {character ? (
+                  <ReturningCard character={character} onEnter={() => enter(character)} />
+                ) : (
+                  <CharacterCreator key={account.email} defaultName={account.name} onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Tampilan ini bisa diubah lagi nanti dari 🎒 Profil." />
+                )}
               </div>
             ) : (
               <AccountGate

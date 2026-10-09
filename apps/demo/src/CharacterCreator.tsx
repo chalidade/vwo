@@ -45,7 +45,7 @@ export function loadCharacter(): Character | null {
   }
 }
 
-function saveCharacter(c: Character) {
+export function saveCharacter(c: Character) {
   try {
     localStorage.setItem(storeKey(), JSON.stringify(c));
   } catch {
@@ -65,7 +65,10 @@ export function CharacterCreator({
   cta = "Check-in ▶",
   note = "Di cafe sungguhan, check-in lewat scan QR di pintu masuk.",
   defaultName = "",
+  onCancel,
 }: {
+  /** Shown when editing from the profile: closes without saving. */
+  onCancel?: () => void;
   /** Name to start with when there is no saved character yet, e.g. the account's name. */
   defaultName?: string;
   onCheckIn: (c: Character, companions: number) => void;
@@ -201,8 +204,34 @@ export function CharacterCreator({
         <button type="submit" className="cc-go">
           {cta}
         </button>
-        <p className="cc-note">{note}</p>
+        {onCancel && (
+          <button type="button" className="cc-cancel" onClick={onCancel}>
+            Batal
+          </button>
+        )}
+        {note && <p className="cc-note">{note}</p>}
       </div>
     </form>
+  );
+}
+
+/** The title screen once a character exists: who you are and one button in. Changing the look is in the profile. */
+export function ReturningCard({ character, onEnter }: { character: Character; onEnter: () => void }) {
+  return (
+    <div className="rpg-box cc-back">
+      <div className="cc-stage rpg-sprite-preview" data-dir="down">
+        <div className="pg-flip">
+          <Person look={character.look} size={2.4} />
+        </div>
+      </div>
+      <div className="cc-back-text">
+        <span className="cc-note">Selamat datang kembali</span>
+        <h2 className="cc-title">{character.name}</h2>
+        <button type="button" className="cc-go" onClick={onEnter} autoFocus>
+          Masuk job fair ▶
+        </button>
+        <span className="cc-note">Ubah tampilan karakter kapan saja dari 🎒 Profil.</span>
+      </div>
+    </div>
   );
 }

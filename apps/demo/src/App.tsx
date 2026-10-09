@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { JobFair } from "./JobFair";
-import { InstallButton } from "./install";
+import { Landing } from "./Landing";
 import { JobFairAdmin } from "./JobFairAdmin";
 import { CompanyPortal } from "./company/Portal";
 import { SpeakerStage } from "./organizer/Speaker";
@@ -20,9 +20,10 @@ export function App() {
   const route = hash.replace(/^#\/?/, "");
   // In a room the game takes the whole screen; the way back home is on the title screen.
   const game = route === "jobfair";
+  const home = !route.startsWith("jobfair");
   return (
-    <div className={game ? "app app-game" : "app"}>
-      {!game && (
+    <div className={game ? "app app-game" : home ? "app app-home" : "app"}>
+      {!game && !home && (
       <nav className="top">
         <a href="#/" className="brand">🌐 VWO</a>
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
@@ -44,37 +45,8 @@ export function App() {
       ) : route.startsWith("jobfair/company") ? (
         <CompanyPortal boothId={route.split("/")[2]} />
       ) : (
-        <Home />
+        <Landing />
       )}
     </div>
-  );
-}
-
-function Home() {
-  return (
-    <main className="home">
-      <div className="rpg-box home-card">
-        <h1>VWO - Virtual World Job</h1>
-        <InstallButton className="home-install" />
-        <p>Job fair virtual yang dijelajahi dengan karakter. Mulai di Aula, naik lift ke lantai booth, jalan dari stand ke stand, tanya recruiter, baca banner lowongan, lalu kirim lamaran. Ada juga seminar, psikotes, lounge konsultasi, dan food court.</p>
-        <div className="home-actions">
-          <a className="btn" href="#/jobfair">
-            ▶ Masuk Job Fair
-          </a>
-          <a className="btn ghost" href="#/jobfair/admin">
-            Dashboard panitia
-          </a>
-          <a className="btn ghost" href="#/jobfair/company">
-            Portal perusahaan
-          </a>
-          <a className="btn ghost" href="#/jobfair/speaker">
-            Halaman pembicara
-          </a>
-        </div>
-        <p className="muted small">
-          Demo statis: semua data hanya ada di browser kamu dan pelamar lain adalah bot. Kode: <a href="https://github.com/chalidade/vwo">github.com/chalidade/vwo</a>
-        </p>
-      </div>
-    </main>
   );
 }

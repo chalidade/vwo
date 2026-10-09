@@ -7,6 +7,7 @@ import {
   type JobPosting,
   type Facing,
   type FairRoom,
+  type FairFloorInfo,
   type FairStop,
   type FloorView,
   DEMO_JOB_FAIR,
@@ -32,6 +33,7 @@ import {
   type SponsorView,
   fairFloorId,
   hallLevel,
+  infoDeskOn,
   hallName,
   fairFloorIndex,
   LIFT_FRONT,
@@ -171,6 +173,12 @@ export interface OrgState {
   rundown?: AulaEvent[];
   /** Food court stalls per room, when the organiser added or removed any. */
   stalls?: Record<string, FoodStall[]>;
+  /** The booth floors, when the organiser added, removed or renamed any. */
+  halls?: FairFloorInfo[];
+  /** Room floors the organiser switched off (by room id). */
+  hiddenRooms?: string[];
+  /** Entry price in coins per floor id, when the organiser changed it. 0 is free. */
+  prices?: Record<string, number>;
   /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. 3 once
    *  promoters' levels follow the floor order with the Aula on Lantai 1. */
   layout?: number;
@@ -560,6 +568,21 @@ export const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
 const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
 
+/** A paid floor: a room or a booth floor the organiser put a price on. */
+export interface FloorPass {
+  /** What the ticket is stored under: the room id, or the booth floor's id. */
+  id: string;
+  name: string;
+  tagline: string;
+  price: number;
+  /** Who sells the ticket. */
+  staff: string;
+  room?: FairRoom;
+}
+
+/** The organiser behind a floor's info desk. */
+export const infoStaffId = (fair: JobFairView, floorId: string) => (floorId === fairFloorId(fair, 0) ? "fair-info" : `info:${floorId}`);
+
 export class DemoJobFair {
   readonly fair: JobFairView;
   /** One walkable floor per hall level, ground floor first, then one per room floor. */
@@ -580,6 +603,10 @@ export class DemoJobFair {
   private readonly originalSponsors: SponsorView[];
   /** Food court stalls as published, per room, before the organiser added or removed any. */
   private readonly originalStalls: Map<string, FoodStall[]>;
+  /** The building as published: booth floors, room floors and the level of the first booth floor. */
+  private readonly originalHalls: FairFloorInfo[];
+  private readonly originalRooms: FairRoom[];
+  private readonly originalHallBase: number;
   /** The organiser's changes. */
   org: OrgState = { removed: [], added: [] };
   /** Walking promoters: where they are heading and who they last talked to. */
@@ -611,8 +638,12 @@ export class DemoJobFair {
     this.originalPromoters = structuredClone(fair.promoters);
     this.originalSponsors = structuredClone(fair.sponsors);
     this.originalStalls = new Map(fair.rooms.map((r) => [r.id, structuredClone(r.stalls ?? [])]));
+    this.originalHalls = structuredClone(fair.floors);
+    this.originalRooms = structuredClone(fair.rooms);
+    this.originalHallBase = fair.hallBase ?? 0;
     this.fair = {
       ...fair,
+      floors: structuredClone(fair.floors),
       booths: fair.booths.map((b) => structuredClone(b)),
       promoters: structuredClone(fair.promoters),
       sponsors: structuredClone(fair.sponsors),
@@ -654,7 +685,11 @@ export class DemoJobFair {
     const promoFloor = (p: Promoter) => this.stops.find((st) => st.level === p.level)?.floorId ?? this.floors[0]!.id;
     const next: FairStaff[] = [
       ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
-      { id: "fair-info", name: fair.infoDesk.staff, boothId: null, floorId: fairFloorId(fair, 0), x: fair.infoDesk.x + fair.infoDesk.width / 2, y: fair.infoDesk.y - 0.45, facing: "front" },
+      // An info desk on every floor; the entrance one keeps its old id.
+      ...this.stops.map((st): FairStaff => {
+        const d = infoDeskOn(fair, st.floorId);
+        return { id: infoStaffId(fair, st.floorId), name: d.staff, boothId: null, floorId: st.floorId, x: d.x + d.width / 2, y: d.y - 0.45, facing: "front" };
+      }),
       {
         id: "coin-staff",
         name: fair.coinStand.staff,
@@ -695,6 +730,7 @@ export class DemoJobFair {
   /** Apply the organiser's changes: which booths stand where, the ads, the sponsors. */
   private loadOrg(org: OrgState | undefined) {
     this.org = org ? migrateOrg(structuredClone(org)) : { removed: [], added: [], layout: 3 };
+    this.applyBuilding();
     const before = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
     const base = [...[...this.original.values()].filter((b) => !this.org.removed.includes(b.id)), ...this.org.added];
     const byId = new Map(this.fair.booths.map((b) => [b.id, b]));
@@ -706,7 +742,16 @@ export class DemoJobFair {
       return Object.assign(mine, structuredClone(b));
     });
     this.fair.booths.splice(0, this.fair.booths.length, ...booths);
-    const active = structuredClone(this.org.promoters ?? this.originalPromoters).filter((p) => p.active !== false);
+    // Published promoters stand on the published levels: move them with their floor, drop them with it.
+    const published = () => {
+      const now = this.levelsByKey(), was = this.publishedLevels();
+      return structuredClone(this.originalPromoters).flatMap((p) => {
+        const key = [...was].find(([, l]) => l === p.level)?.[0];
+        const level = key ? now.get(key) : undefined;
+        return level === undefined ? [] : [{ ...p, level }];
+      });
+    };
+    const active = (this.org.promoters ? structuredClone(this.org.promoters) : published()).filter((p) => p.active !== false && this.stops.some((st) => st.level === p.level));
     // The organiser caps how many walkers are out; the first ones in the list go first.
     let walking = 0;
     const cap = this.org.walkers ?? Infinity;
@@ -737,6 +782,156 @@ export class DemoJobFair {
     this.loadCompany(Object.fromEntries(this.company));
     this.persist();
     this.emit();
+  }
+
+  // ---- Building: which floors there are, in what order, and what they cost ------------
+
+  /** Every floor by key ("hall:0", "room:aula") and its level, as published. */
+  private publishedLevels() {
+    const m = new Map<string, number>();
+    this.originalHalls.forEach((_, i) => m.set(`hall:${i}`, this.originalHallBase + i));
+    for (const r of this.originalRooms) m.set(`room:${r.id}`, r.level);
+    return m;
+  }
+
+  /** Every floor by key and its level now. */
+  private levelsByKey() {
+    const m = new Map<string, number>();
+    this.fair.floors.forEach((_, i) => m.set(`hall:${i}`, hallLevel(this.fair, i)));
+    for (const r of this.fair.rooms) m.set(`room:${r.id}`, r.level);
+    return m;
+  }
+
+  /** Lay the floors out from the organiser's choices: the published order, with the booth floors as
+   *  one block where the first one was, switched-off rooms left out, and no gaps between levels. */
+  private applyBuilding() {
+    const halls = this.org.halls?.length ? this.org.halls : this.originalHalls;
+    const hidden = new Set(this.org.hiddenRooms ?? []);
+    const order: string[] = [];
+    for (const [key] of [...this.publishedLevels()].sort((a, b) => a[1] - b[1])) {
+      if (key === "hall:0") halls.forEach((_, i) => order.push(`hall:${i}`));
+      else if (key.startsWith("room:") && !hidden.has(key.slice(5))) order.push(key);
+    }
+    const levelOf = (key: string) => order.indexOf(key);
+    const sig = () => [...this.levelsByKey()].map(([k, l]) => `${k}=${l}`).join() + this.fair.floors.map((f) => f.theme).join();
+    const before = sig();
+    this.fair.hallBase = levelOf("hall:0");
+    this.fair.floors.splice(0, this.fair.floors.length, ...halls.map((h, i) => ({ name: `Lantai ${this.fair.hallBase! + i + 1}`, theme: h.theme })));
+    const mine = new Map(this.fair.rooms.map((r) => [r.id, r]));
+    const rooms = this.originalRooms
+      .filter((r) => !hidden.has(r.id))
+      .map((r) => {
+        // Keep the same room objects, so open dialogs and stall lists keep pointing at them.
+        const room = mine.get(r.id) ?? structuredClone(r);
+        room.level = levelOf(`room:${r.id}`);
+        room.price = this.org.prices?.[fairRoomFloorId(this.fair, r.id)] ?? r.price;
+        return room;
+      });
+    this.fair.rooms.splice(0, this.fair.rooms.length, ...rooms);
+    if (before === sig() || !this.floors) return;
+    this.floors.splice(0, this.floors.length, ...buildJobFairFloors(this.fair));
+    this.stops.splice(0, this.stops.length, ...fairStops(this.fair));
+    this.floorSig = "";
+    // Whoever stood on a floor that is gone goes back to the entrance; the bots just leave.
+    const ids = new Set(this.floors.map((f) => f.id));
+    for (const v of [...this.visitors.values()]) {
+      if (v.isBot) this.leave(v.memberId);
+      else if (!ids.has(v.floorId)) Object.assign(v, { floorId: this.stops[0]!.floorId, x: this.fair.spawn.x, y: this.fair.spawn.y, seatId: null });
+    }
+  }
+
+  /** Change the building and move the organiser's promoters along with their floors. */
+  private rebuild(change: () => void) {
+    const was = this.levelsByKey();
+    change();
+    const promoters = this.org.promoters;
+    this.saveOrg();
+    if (!promoters) return;
+    const now = this.levelsByKey();
+    this.org.promoters = promoters.map((p) => {
+      const key = [...was].find(([, l]) => l === p.level)?.[0];
+      const level = key ? now.get(key) : undefined;
+      return level === undefined ? { ...p, active: false } : { ...p, level };
+    });
+    this.saveOrg();
+  }
+
+  /** Add an empty booth floor above the others. Companies can book its stands right away. */
+  addHall(theme: string) {
+    const halls = structuredClone(this.fair.floors);
+    if (halls.length >= 8) return false;
+    this.rebuild(() => (this.org.halls = [...halls, { name: "", theme: theme.trim().slice(0, 40) || "Lantai baru" }]));
+    return true;
+  }
+
+  /** Why the top booth floor cannot be taken out yet, or null when it can. */
+  removeHallBlocker(): string | null {
+    const i = this.fair.floors.length - 1;
+    if (i <= 0) return "Minimal harus ada satu lantai booth.";
+    const n = this.fair.booths.filter((b) => b.floor === i).length;
+    if (n) return `Masih ada ${n} stand di lantai ini. Pindahkan atau hapus dulu di tab Stand.`;
+    if (this.fair.sponsors.some((sp) => sp.floor === i)) return "Masih ada sponsor di lantai ini.";
+    if (this.fair.coinStand.floor === i) return "Stand koin ada di lantai ini.";
+    return null;
+  }
+
+  /** Take out the top booth floor, when it is empty. */
+  removeHall() {
+    if (this.removeHallBlocker()) return false;
+    const halls = structuredClone(this.fair.floors).slice(0, -1);
+    const prices = { ...this.org.prices };
+    delete prices[fairFloorId(this.fair, halls.length)];
+    this.rebuild(() => {
+      this.org.halls = halls;
+      this.org.prices = prices;
+    });
+    return true;
+  }
+
+  renameHall(i: number, theme: string) {
+    if (!this.fair.floors[i]) return;
+    this.org.halls = structuredClone(this.fair.floors).map((h, j) => (j === i ? { ...h, theme: theme.trim().slice(0, 40) || h.theme } : h));
+    this.saveOrg();
+  }
+
+  /** Switch a room floor (food court, seminar...) off or back on. */
+  setRoomHidden(roomId: string, hidden: boolean) {
+    const list = new Set(this.org.hiddenRooms ?? []);
+    if (hidden) list.add(roomId);
+    else list.delete(roomId);
+    // The floor everyone comes in on stays, so there is always somewhere to arrive.
+    if (hidden && this.stops.length <= 1) return;
+    this.rebuild(() => (this.org.hiddenRooms = [...list]));
+  }
+
+  /** Rooms the organiser switched off. */
+  hiddenRooms() {
+    return this.originalRooms.filter((r) => this.org.hiddenRooms?.includes(r.id));
+  }
+
+  /** Set what entering a floor costs, in coins. The floor everyone arrives on stays free. */
+  setFloorPrice(floorId: string, coins: number) {
+    if (floorId === this.stops[0]?.floorId) return;
+    this.org.prices = { ...this.org.prices, [floorId]: Math.max(0, Math.min(500, Math.round(coins) || 0)) };
+    this.saveOrg();
+  }
+
+  /** What entering a floor costs: rooms carry their price, booth floors are free unless the organiser set one. */
+  floorPrice(floorId: string) {
+    if (floorId === this.stops[0]?.floorId) return 0;
+    const room = this.roomOf(floorId);
+    return room ? room.price : (this.org.prices?.[floorId] ?? 0);
+  }
+
+  /** The ticket a floor asks for, or null when it is free. Rooms use their own id, booth floors their floor id. */
+  passFor(floorId: string): FloorPass | null {
+    if (!this.floorPrice(floorId)) return null;
+    const room = this.roomOf(floorId);
+    if (room) return { id: room.id, name: room.name, tagline: room.tagline, price: room.price, staff: room.staff.name, room };
+    const i = fairFloorIndex(floorId);
+    const hall = this.fair.floors[i];
+    if (!hall) return null;
+    return { id: floorId, name: `${hallName(this.fair, i)} · ${hall.theme}`, tagline: `Lantai khusus ${hall.theme}`, price: this.floorPrice(floorId), staff: infoDeskOn(this.fair, floorId).staff };
   }
 
   // ---- Organiser ----------------------------------------------------------------------
@@ -1511,13 +1706,21 @@ export class DemoJobFair {
     return new Date(this.now()).toISOString().slice(0, 10);
   }
 
-  hasTicket(roomId: string) {
-    return this.room(roomId)?.price === 0 || this.player.tickets.includes(roomId);
+  /** Whether the player may enter: a room id, or a booth floor's id. */
+  hasTicket(id: string) {
+    const room = this.room(id);
+    return (room ? room.price === 0 : this.floorPrice(id) === 0) || this.player.tickets.includes(id);
+  }
+
+  /** The pass for a room id or a booth floor id. */
+  private passById(id: string) {
+    const room = this.room(id);
+    return this.passFor(room ? fairRoomFloorId(this.fair, room.id) : id);
   }
 
   /** What entering a room costs right now, and which voucher would be used. */
   roomPrice(roomId: string) {
-    const room = this.room(roomId);
+    const room = this.passById(roomId);
     if (!room) return { price: 0, voucher: null as Voucher | null };
     const free = this.player.vouchers.find((v) => !v.used && v.kind === "room-free" && v.room === roomId);
     const half = this.player.vouchers.find((v) => !v.used && v.kind === "room-half" && v.room === roomId);
@@ -1528,8 +1731,8 @@ export class DemoJobFair {
 
   /** Buy a ticket for a premium room. False when there are not enough coins. */
   buyTicket(roomId: string) {
-    const room = this.room(roomId);
-    if (!room) return false;
+    const room = this.passById(roomId);
+    if (!room) return this.hasTicket(roomId);
     if (this.hasTicket(roomId)) return true;
     const { price, voucher } = this.roomPrice(roomId);
     if (price > 0 && !this.spend(price, `Tiket ${room.name}`)) return false;

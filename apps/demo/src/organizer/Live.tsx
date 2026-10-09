@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { fairFloorIndex } from "@vwo/shared";
-import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, lookFor, liftExtras, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import type { ApplicationStatus } from "../jobfair-engine";
-import { staffLook } from "../JobFair";
+import { FloorScene } from "../fair/FloorScene";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { fair } from "../useFair";
@@ -25,9 +23,6 @@ export function OrgLive() {
   const booths = fair.fair.booths;
   const [tab, setTab] = useState(0);
   const stop = fair.stops[tab] ?? fair.stops[0]!;
-  const floor = fair.floor(stop.floorId);
-  const level = fair.levelOf(floor.id);
-  const room = fair.roomOf(floor.id);
   const visitors = [...fair.visitors.values()];
   const decide = (id: string, status: ApplicationStatus) => fair.setStatus(id, status);
 
@@ -54,36 +49,7 @@ export function OrgLive() {
         ))}
       </div>
       <div className="layout2">
-        <CafeScene
-          className="admin-scene"
-          floor={floor}
-          floorName={(id) => fair.stopOf(id).name}
-          hallTitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).title}
-          hallSubtitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).subtitle}
-          hallBanner={!room}
-          occupiedSeatIds={fair.occupiedSeats()}
-          avatars={[...fair.visitors.values()]}
-          lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
-          npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || fair.fair.promoters.find((p) => s.id.endsWith(p.id))?.color || "#1e3a8a") }))}
-          bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-          extras={[
-            ...liftExtras(stop.name, fair.stops),
-            ...fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks).flatMap((p) => promoterExtras(p)),
-            ...(room
-              ? room.kind === "foodcourt"
-                ? foodStallExtras(room)
-                : room.kind === "psikotes"
-                  ? psikotesExtras(room)
-                  : seminarStageExtras(room, null)
-              : [
-                  ...booths.filter((b) => b.floor === fairFloorIndex(floor.id)).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
-                  ...(fairFloorIndex(floor.id) === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
-                  ...fair.fair.sponsors.filter((sp) => sp.floor === fairFloorIndex(floor.id)).map((sp) => sponsorExtras(sp)),
-                  ...(fair.fair.coinStand.floor === fairFloorIndex(floor.id) ? coinStandExtras(fair.fair.coinStand) : []),
-                ]),
-          ]}
-          hallSponsors={fair.fair.sponsors}
-        />
+        <FloorScene className="admin-scene" floorId={stop.floorId} />
         <div className="card org-log">
           <h2 className="cp-h2">Riwayat</h2>
           <div className="org-scroll">

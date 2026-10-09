@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · VWO: meja info di tiap lantai, karakter di profil, atur lantai, landing page baru
+
+**Konteks:** empat permintaan owner untuk job fair.
+
+**Yang berubah**
+- Setiap lantai sekarang punya meja informasi dengan petugasnya sendiri, termasuk lantai ruangan (Aula, seminar, psikotes, lounge, food court) dan lantai booth baru. Petugas mengantar ke stand atau lantai mana pun.
+- Pengaturan karakter hanya muncul sekali. Setelah itu layar masuk cukup menampilkan karakter dan satu tombol masuk, dan tampilan karakter diubah lewat tombol "Ubah karakter" di Profil.
+- Tab baru "Lantai" di dashboard panitia: tambah lantai booth (maksimal 8), hapus lantai booth teratas kalau sudah kosong, ganti nama tema, nonaktifkan atau aktifkan lagi ruangan, dan atur harga masuk tiap lantai (0 = gratis). Lantai pintu masuk selalu gratis. Lantai di atasnya otomatis naik atau turun, dan promotor ikut pindah bersama lantainya.
+- Lantai booth yang berbayar memakai tiket seperti ruangan premium: ditanya saat naik lift, dan harganya tampil di tombol lift.
+- Beranda diganti landing page baru: hero, preview live lantai job fair yang bergantian (pengunjung bot berjalan sungguhan), cara kerja, fitur, dan pintu untuk pencari kerja, perusahaan, dan panitia.
+- 2 tes baru: meja info di semua lantai bisa dijangkau dari lift, serta tambah/hapus lantai, nonaktifkan ruangan, dan harga lantai bertahan setelah reload.
+
+---
+
 ## 2026-10-09 · VWO: akun job fair di server (daftar, login, verifikasi, reset password)
 
 **Konteks:** langkah kedua checklist go-live. Owner menyetujui launch 18 Oktober dengan koin gratis.
