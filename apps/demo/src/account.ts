@@ -1,9 +1,14 @@
-// Job seeker accounts for the demo, before launch: kept in this browser's localStorage.
-// Passwords are never stored: only a salted PBKDF2 hash. The real launch moves accounts to the server.
+// Job seeker accounts. On the live site they live on the server (/api/auth, session cookie);
+// in the GitHub Pages demo they are kept in this browser's localStorage, where passwords are
+// never stored: only a salted PBKDF2 hash.
+import { LIVE } from "./mode";
 
 export interface Account {
   email: string;
   name: string;
+}
+
+interface StoredAccount extends Account {
   salt: string;
   hash: string;
   createdAt: number;
@@ -14,19 +19,19 @@ const CURRENT_KEY = "vwo:account";
 const ITERATIONS = 120_000;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const MIN_PASSWORD = 6;
+export const MIN_PASSWORD = LIVE ? 8 : 6;
 
-function readAll(): Record<string, Account> {
+function readAll(): Record<string, StoredAccount> {
   try {
     const raw = localStorage.getItem(ACCOUNTS_KEY);
-    const all = raw ? (JSON.parse(raw) as Record<string, Account>) : {};
+    const all = raw ? (JSON.parse(raw) as Record<string, StoredAccount>) : {};
     return all && typeof all === "object" ? all : {};
   } catch {
     return {};
   }
 }
 
-function writeAll(all: Record<string, Account>) {
+function writeAll(all: Record<string, StoredAccount>) {
   try {
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(all));
   } catch {
@@ -52,13 +57,85 @@ function sameHash(a: string, b: string) {
 
 export const normEmail = (email: string) => email.trim().toLowerCase();
 
-/** The signed-in account, if any. */
+const LIVE_ACCOUNT_KEY = "vwo:live-account";
+
+/** The signed-in account, if any. On the live site this is the last account the server confirmed;
+ *  `checkSession` asks the server whether the session cookie is still good. */
 export function currentAccount(): Account | null {
   try {
+    if (LIVE) {
+      const raw = localStorage.getItem(LIVE_ACCOUNT_KEY);
+      const a = raw ? (JSON.parse(raw) as Partial<Account>) : null;
+      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name } : null;
+    }
     const email = localStorage.getItem(CURRENT_KEY);
-    return email ? (readAll()[email] ?? null) : null;
+    const a = email ? readAll()[email] : undefined;
+    return a ? { email: a.email, name: a.name } : null;
   } catch {
     return null;
+  }
+}
+
+function rememberLive(a: Account | null) {
+  try {
+    if (a) {
+      localStorage.setItem(LIVE_ACCOUNT_KEY, JSON.stringify(a));
+      localStorage.setItem(CURRENT_KEY, a.email);
+    } else {
+      localStorage.removeItem(LIVE_ACCOUNT_KEY);
+      localStorage.removeItem(CURRENT_KEY);
+    }
+  } catch {
+    // Nothing to remember.
+  }
+}
+
+const SERVER_ERRORS: Record<string, string> = {
+  email_taken: "Email ini sudah terdaftar. Silakan masuk.",
+  wrong_email_or_password: "Email atau password salah.",
+  too_many_requests: "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.",
+  bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+};
+
+async function api(path: string, body?: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
+  const res = await fetch(`/api/auth/${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { status: res.status, data };
+}
+
+function serverError(data: Record<string, unknown>): string {
+  const code = typeof data.error === "string" ? data.error : "";
+  if (code === "invalid_input") {
+    const fields = (data.fields ?? {}) as Record<string, string[] | undefined>;
+    if (fields.email) return "Format email belum benar.";
+    if (fields.password) return `Password minimal ${MIN_PASSWORD} karakter.`;
+    if (fields.name) return "Nama minimal 2 huruf.";
+    if (fields.acceptTerms) return "Centang persetujuan syarat dan kebijakan privasi dulu.";
+  }
+  return SERVER_ERRORS[code] ?? "Server sedang bermasalah. Coba lagi sebentar lagi.";
+}
+
+/** Live site: the account behind the session cookie, or null when signed out or expired. */
+export async function checkSession(): Promise<Account | null> {
+  if (!LIVE) return currentAccount();
+  try {
+    const { status, data } = await api("me");
+    const user = data.user as { email?: string; name?: string } | null | undefined;
+    if (status === 200 && user?.email && user.name) {
+      const a = { email: user.email, name: user.name };
+      rememberLive(a);
+      return a;
+    }
+    if (status === 401) rememberLive(null);
+    // Any other answer (offline, server error) keeps the last known account.
+    return status === 401 ? null : currentAccount();
+  } catch {
+    return currentAccount();
   }
 }
 
@@ -83,7 +160,15 @@ export function accountKey(base: string) {
 
 export type AuthResult = { ok: true; account: Account } | { ok: false; error: string };
 
-export async function register(input: { name: string; email: string; password: string }): Promise<AuthResult> {
+export async function register(input: { name: string; email: string; password: string; acceptTerms?: boolean }): Promise<AuthResult> {
+  if (LIVE) {
+    const { status, data } = await api("register", { name: input.name.trim(), email: normEmail(input.email), password: input.password, acceptTerms: input.acceptTerms === true });
+    if (status !== 201) return { ok: false, error: serverError(data) };
+    const user = data.user as Account;
+    const account = { email: user.email, name: user.name };
+    rememberLive(account);
+    return { ok: true, account };
+  }
   const email = normEmail(input.email);
   const name = input.name.trim().slice(0, 40);
   if (!name) return { ok: false, error: "Isi nama kamu dulu." };
@@ -92,16 +177,22 @@ export async function register(input: { name: string; email: string; password: s
   const all = readAll();
   if (all[email]) return { ok: false, error: "Email ini sudah terdaftar. Silakan masuk." };
   const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
-  const account: Account = { email, name, salt, hash: await hashPassword(input.password, salt), createdAt: Date.now() };
-  all[email] = account;
+  const stored: StoredAccount = { email, name, salt, hash: await hashPassword(input.password, salt), createdAt: Date.now() };
+  all[email] = stored;
   writeAll(all);
   // The first account on this browser keeps the profile and character made before accounts existed.
   if (Object.keys(all).length === 1) adoptGuestData(email);
   setCurrent(email);
-  return { ok: true, account };
+  return { ok: true, account: { email, name } };
 }
 
 export async function login(emailIn: string, password: string): Promise<AuthResult> {
+  if (LIVE) {
+    const r = await api("login", { email: normEmail(emailIn), password });
+    if (r.status !== 200) return { ok: false, error: serverError(r.data) };
+    const account = await checkSession();
+    return account ? { ok: true, account } : { ok: false, error: "Server sedang bermasalah. Coba lagi sebentar lagi." };
+  }
   const email = normEmail(emailIn);
   const account = readAll()[email];
   // Same message for both cases, so the form doesn't reveal which emails exist.
@@ -109,10 +200,15 @@ export async function login(emailIn: string, password: string): Promise<AuthResu
   if (!account) return wrong;
   if (!sameHash(await hashPassword(password, account.salt), account.hash)) return wrong;
   setCurrent(email);
-  return { ok: true, account };
+  return { ok: true, account: { email: account.email, name: account.name } };
 }
 
 export function logout() {
+  if (LIVE) {
+    rememberLive(null);
+    void api("logout", {}).catch(() => {});
+    return;
+  }
   setCurrent(null);
 }
 

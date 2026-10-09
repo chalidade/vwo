@@ -56,7 +56,8 @@ import {
 import { InstallButton } from "./install";
 import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
 import { AccountGate } from "./AccountGate";
-import { type Account, currentAccount, logout } from "./account";
+import { type Account, checkSession, currentAccount, logout } from "./account";
+import { LIVE } from "./mode";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { type FloorPass, PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
@@ -144,6 +145,19 @@ export function JobFair() {
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
   const [account, setAccount] = useState<Account | null>(currentAccount);
+  // Live site: the session cookie may have expired or been signed out on another device.
+  useEffect(() => {
+    if (!LIVE) return;
+    let gone = false;
+    void checkSession().then((a) => {
+      if (!gone && (a?.email ?? null) !== (account?.email ?? null)) setAccount(a);
+    });
+    return () => {
+      gone = true;
+    };
+    // Checked once when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /** The saved character for this account: set once, then changed from the profile. */
   const character = account ? loadCharacter() : null;
   const [editLook, setEditLook] = useState(false);

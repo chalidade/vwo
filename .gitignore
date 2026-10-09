@@ -7,3 +7,5 @@ dist
 .turbo
 coverage
 *.tsbuildinfo
+# The game, built into the web app by `pnpm --filter @vwo/demo build:live`
+apps/web/public/play

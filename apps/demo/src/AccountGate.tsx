@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { type Account, MIN_PASSWORD, login, register } from "./account";
+import { LIVE } from "./mode";
 
-/** Sign in or sign up before entering the job fair. Accounts live in this browser until launch. */
+/** Sign in or sign up before entering the job fair. On the live site accounts are on the server. */
 export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
+  const [terms, setTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +17,7 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r = mode === "login" ? await login(email, password) : await register({ name, email, password });
+      const r = mode === "login" ? await login(email, password) : await register({ name, email, password, acceptTerms: terms });
       if (r.ok) onIn(r.account);
       else setError(r.error);
     } catch {
@@ -75,6 +77,12 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
           </button>
         </span>
       </label>
+      {mode === "register" && (
+        <label className="ag-terms">
+          <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} required />
+          Saya setuju dengan syarat penggunaan dan kebijakan privasi jobfair.
+        </label>
+      )}
       {error && (
         <p className="ag-error" role="alert">
           {error}
@@ -89,7 +97,7 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
           {mode === "login" ? "Daftar di sini" : "Masuk di sini"}
         </button>
       </p>
-      <p className="cc-note ag-demo">Versi demo: akun disimpan di browser ini saja. Saat launch, akun pindah ke server.</p>
+      {!LIVE && <p className="cc-note ag-demo">Versi demo: akun disimpan di browser ini saja. Saat launch, akun pindah ke server.</p>}
     </form>
   );
 }

@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair: game masuk ke aplikasi live, login pakai akun server
+
+**Konteks:** owner minta job fair dipindah ke aplikasi live (Vercel + Supabase) dan login game disambungkan ke akun di server.
+
+**Yang berubah**
+- Game dibangun ulang ke dalam aplikasi web di `/play/` (`pnpm --filter @vwo/demo build:live`), dan `/` diarahkan ke sana. Build Vercel menjalankan build game sebelum build web. Demo GitHub Pages tetap seperti dulu.
+- Di mode live, daftar, masuk, dan keluar memakai `/api/auth/*`: password minimal 8 karakter, wajib centang persetujuan syarat penggunaan, sesi disimpan di cookie HttpOnly. Saat dibuka ulang, game mengecek sesi ke server; kalau sesi sudah habis, layar login muncul lagi.
+- Pemain lain sekarang lewat lapisan transport: demo tetap memakai broker MQTT publik, mode live memakai Supabase Realtime (channel per ruangan), dan nanti Socket.IO di DigitalOcean tanpa mengubah game. Realtime aktif kalau `VITE_SUPABASE_URL` dan `VITE_SUPABASE_KEY` diisi di Vercel; tanpa itu game tetap jalan sendiri.
+- Service worker tidak lagi menyimpan jawaban `/api/*` di cache, supaya status login selalu baru.
+- Subjek email verifikasi dan reset password memakai nama jobfair.
+
+**Diuji:** di Postgres lokal dengan Chromium: daftar, buka ulang (tetap masuk), keluar dari server (kembali ke login), password salah ("Email atau password salah."), lalu masuk lagi. 37 tes demo lulus dan typecheck semua paket bersih.
+
+---
+
 ## 2026-10-09 · jobfair: cek kesehatan server `/api/health`
 
 **Konteks:** trial pertama di Vercel (vwo-xi.vercel.app) sudah online. Perlu cara mengecek dari luar bahwa database Supabase tersambung dan migrasi sudah jalan.
