@@ -286,7 +286,7 @@ export interface FairRoom {
   height: number;
   /** Who runs the room: the proctor, the speaker, the food court host. */
   staff: { name: string; role: string };
-  /** Food court stalls along the back wall. */
+  /** Food court stalls along the back wall and down both sides, one per slot (see STALL_SLOTS). */
   stalls?: FoodStall[];
   /** The consultation lounge's consultants, one per desk along the back wall. */
   consultants?: Consultant[];
@@ -316,6 +316,8 @@ export const LOUNGE_PLANS = [
 /** A food court stall: a real cafe or restaurant promoting its outlet and selling vouchers for it. */
 export interface FoodStall {
   id: string;
+  /** Which of the food court's STALL_SLOTS it stands in. Unset: its index in the list. */
+  slot?: number;
   name: string;
   emoji: string;
   color: string;
@@ -392,9 +394,22 @@ export function fairStops(fair: JobFairView): FairStop[] {
   ].sort((a, b) => a.level - b.level);
 }
 
-/** Stall geometry in the food court: four stalls spread along the back wall. */
-export function stallRect(i: number) {
-  return { x: 3 + i * 11, y: 0.3, width: 5.4, height: 2.4 };
+/** Where food court stalls can stand: eight along the back wall, four down the left wall and three
+ *  down the right one (the lift takes the bottom right). Every stall faces into the room. */
+export const STALL_W = 5;
+export const STALL_SLOTS: { x: number; y: number }[] = [
+  ...Array.from({ length: 8 }, (_, i) => ({ x: 0.9 + i * 5.6, y: 0.3 })),
+  ...[5, 9, 13, 17].map((y) => ({ x: 0.4, y })),
+  ...[5, 9, 13].map((y) => ({ x: 46 - 0.4 - STALL_W, y })),
+];
+
+/** The slot a stall stands in. */
+export const stallSlot = (st: { slot?: number }, i: number) => st.slot ?? i;
+
+/** Stall geometry in the food court, by slot. */
+export function stallRect(slot: number) {
+  const s = STALL_SLOTS[slot] ?? STALL_SLOTS[0]!;
+  return { x: s.x, y: s.y, width: STALL_W, height: 2.4 };
 }
 
 /** The Aula: a stage across the back wall, rows of chairs, a meeting point, and standing boards for the
@@ -461,8 +476,8 @@ export function aulaSpot(board: "rundown" | "info") {
   const b = AULA[board];
   return { x: b.x + b.width / 2, y: b.y + b.height + 0.7 };
 }
-export function stallSpot(i: number, spot: "vendor" | "order") {
-  const s = stallRect(i);
+export function stallSpot(slot: number, spot: "vendor" | "order") {
+  const s = stallRect(slot);
   return spot === "vendor" ? { x: s.x + s.width / 2, y: s.y + 0.95 } : { x: s.x + s.width / 2, y: s.y + s.height + 0.7 };
 }
 
@@ -512,13 +527,14 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
     // Coffee tables between each pair of sofas; the sofas themselves are added as decor below.
     for (const y of LOUNGE.rows) for (const cx of LOUNGE.groups) blocked.push({ x: cx - 0.9, y: y + 1.3, width: 1.8, height: 0.9 });
   } else {
-    (room.stalls ?? []).forEach((_, i) => {
-      const s = stallRect(i);
+    (room.stalls ?? []).forEach((st, i) => {
+      const s = stallRect(stallSlot(st, i));
       blocked.push({ x: s.x, y: s.y, width: s.width, height: 0.5 }, { x: s.x + 0.3, y: s.y + 1.45, width: s.width - 0.6, height: 0.7 });
     });
+    // Tables in the middle, between the stalls down both sides.
     for (let r = 0; r < 3; r++)
-      for (let c = 0; c < 6; c++) {
-        const t = table(`T${r * 6 + c + 1}`, "round", 3.2 + c * 6.8, 5.4 + r * 4.6, 1.8, 1.8);
+      for (let c = 0; c < 4; c++) {
+        const t = table(`T${r * 4 + c + 1}`, "round", 10.2 + c * 7.4, 6.4 + r * 4.6, 1.8, 1.8);
         seatPositionsAround(t, 4).forEach((p, i) => seat(t, i, p.x, p.y));
       }
   }
@@ -1065,6 +1081,174 @@ export const DEMO_JOB_FAIR: JobFairView = {
           deals: [
             { id: "martabak-30", title: "Diskon Rp30.000 martabak", worth: "Rp30.000", price: 12, terms: "Untuk martabak ukuran besar." },
             { id: "martabak-topping", title: "Gratis 2 topping", worth: "Rp16.000", price: 5, terms: "Berlaku tiap hari, 30 hari." },
+          ],
+        },
+        {
+          id: "sate",
+          name: "Sate Madura Cak Dul",
+          emoji: "🍢",
+          color: "#b45309",
+          vendor: "Cak Dul",
+          promo: "Sate ayam bumbu kacang, bakar dadakan",
+          about: "Sate ayam dan kambing khas Madura, dibakar arang di depan pembeli.",
+          address: "Jl. Mawar No. 21, dekat alun-alun",
+          hours: "16.00–23.00",
+          website: "https://satecakdul.example",
+          rating: 4.6,
+          menu: [
+            { id: "sate-ayam", name: "Sate ayam 10 tusuk", emoji: "🍢", price: "Rp25.000" },
+            { id: "sate-kambing", name: "Sate kambing", emoji: "🥩", price: "Rp40.000" },
+          ],
+          deals: [
+            { id: "sate-20", title: "Voucher makan Rp20.000", worth: "Rp20.000", price: 8, terms: "Minimal 2 porsi, 30 hari." },
+            { id: "sate-lontong", title: "Gratis lontong", worth: "Rp5.000", price: 2, terms: "Untuk setiap porsi sate." },
+          ],
+        },
+        {
+          id: "ayam",
+          name: "Ayam Geprek Pedas",
+          emoji: "🍗",
+          color: "#ef4444",
+          vendor: "Mbak Sri",
+          promo: "Geprek level 1–10, nasi bisa nambah",
+          about: "Ayam geprek sambal bawang dengan nasi gratis nambah. Favorit mahasiswa.",
+          address: "Jl. Cempaka No. 5, belakang kampus",
+          hours: "10.00–21.00",
+          website: "https://geprekpedas.example",
+          rating: 4.5,
+          menu: [
+            { id: "geprek", name: "Ayam geprek + nasi", emoji: "🍗", price: "Rp18.000" },
+            { id: "geprek-keju", name: "Geprek mozarella", emoji: "🧀", price: "Rp25.000" },
+          ],
+          deals: [
+            { id: "geprek-15", title: "Voucher makan Rp15.000", worth: "Rp15.000", price: 6, terms: "Berlaku 30 hari." },
+            { id: "geprek-es", title: "Gratis es teh jumbo", worth: "Rp6.000", price: 2, terms: "Dengan pembelian geprek apa saja." },
+          ],
+        },
+        {
+          id: "soto",
+          name: "Soto Lamongan Bu Tin",
+          emoji: "🥣",
+          color: "#eab308",
+          vendor: "Bu Tin",
+          promo: "Soto ayam koya, hangat untuk pagi interview",
+          about: "Soto ayam kuah kuning dengan koya gurih, resep keluarga dari Lamongan.",
+          address: "Jl. Anggrek No. 40",
+          hours: "06.00–14.00",
+          website: "https://sotobutin.example",
+          rating: 4.7,
+          menu: [
+            { id: "soto-ayam", name: "Soto ayam koya", emoji: "🥣", price: "Rp17.000" },
+            { id: "perkedel", name: "Perkedel kentang", emoji: "🥔", price: "Rp4.000" },
+          ],
+          deals: [
+            { id: "soto-15", title: "Voucher sarapan Rp15.000", worth: "Rp15.000", price: 6, terms: "Berlaku sebelum jam 10.00." },
+            { id: "soto-paket", title: "Paket soto + teh", worth: "Rp20.000", price: 7, terms: "Berlaku 30 hari." },
+          ],
+        },
+        {
+          id: "jus",
+          name: "Jus Segar Nusantara",
+          emoji: "🥤",
+          color: "#22c55e",
+          vendor: "Kak Nia",
+          promo: "Jus buah asli tanpa gula tambahan",
+          about: "Jus dan smoothie buah lokal, dibuat saat dipesan.",
+          address: "Jl. Dahlia No. 9",
+          hours: "08.00–20.00",
+          website: "https://jussegar.example",
+          rating: 4.6,
+          menu: [
+            { id: "jus-alpukat", name: "Jus alpukat", emoji: "🥑", price: "Rp15.000" },
+            { id: "smoothie", name: "Smoothie mangga", emoji: "🥭", price: "Rp18.000" },
+          ],
+          deals: [
+            { id: "jus-free", title: "Gratis 1 jus ukuran reguler", worth: "Rp15.000", price: 5, terms: "Berlaku 14 hari." },
+            { id: "jus-50", title: "Diskon 50% smoothie", worth: "Rp9.000", price: 3, terms: "Senin–Jumat." },
+          ],
+        },
+        {
+          id: "dimsum",
+          name: "Dimsum Mentai Yuk",
+          emoji: "🥟",
+          color: "#f97316",
+          vendor: "Koh Edo",
+          promo: "Dimsum mentai lumer, isi 6",
+          about: "Dimsum ayam udang dengan saus mentai yang dibakar.",
+          address: "Ruko Harmoni Blok A-3",
+          hours: "11.00–22.00",
+          website: "https://dimsummentai.example",
+          rating: 4.5,
+          menu: [
+            { id: "dimsum-mentai", name: "Dimsum mentai isi 6", emoji: "🥟", price: "Rp30.000" },
+            { id: "hakau", name: "Hakau udang", emoji: "🦐", price: "Rp25.000" },
+          ],
+          deals: [
+            { id: "dimsum-25", title: "Voucher Rp25.000", worth: "Rp25.000", price: 10, terms: "Berlaku 30 hari." },
+            { id: "dimsum-extra", title: "Gratis 2 dimsum tambahan", worth: "Rp10.000", price: 4, terms: "Untuk porsi isi 6." },
+          ],
+        },
+        {
+          id: "roti",
+          name: "Roti Bakar 24 Jam",
+          emoji: "🍞",
+          color: "#a16207",
+          vendor: "Bang Jali",
+          promo: "Roti bakar tebal, buka nonstop",
+          about: "Roti bakar dan pisang bakar dengan selai melimpah, buka 24 jam.",
+          address: "Jl. Veteran No. 24",
+          hours: "24 jam",
+          website: "https://rotibakar24.example",
+          rating: 4.4,
+          menu: [
+            { id: "roti-coklat", name: "Roti bakar cokelat keju", emoji: "🍞", price: "Rp20.000" },
+            { id: "pisang-bakar", name: "Pisang bakar", emoji: "🍌", price: "Rp15.000" },
+          ],
+          deals: [
+            { id: "roti-15", title: "Voucher Rp15.000", worth: "Rp15.000", price: 6, terms: "Berlaku 30 hari." },
+            { id: "roti-topping", title: "Gratis topping keju", worth: "Rp5.000", price: 2, terms: "Untuk roti bakar apa saja." },
+          ],
+        },
+        {
+          id: "mie",
+          name: "Mie Aceh Bang Rul",
+          emoji: "🍝",
+          color: "#9a3412",
+          vendor: "Bang Rul",
+          promo: "Mie Aceh tumis pedas, porsi besar",
+          about: "Mie Aceh goreng dan kuah dengan bumbu rempah khas.",
+          address: "Jl. Teuku Umar No. 7",
+          hours: "10.00–23.00",
+          website: "https://mieacehbangrul.example",
+          rating: 4.6,
+          menu: [
+            { id: "mie-aceh", name: "Mie Aceh goreng", emoji: "🍝", price: "Rp22.000" },
+            { id: "roti-cane", name: "Roti cane kari", emoji: "🫓", price: "Rp15.000" },
+          ],
+          deals: [
+            { id: "mie-20", title: "Voucher makan Rp20.000", worth: "Rp20.000", price: 8, terms: "Berlaku 30 hari." },
+            { id: "mie-teh", title: "Gratis teh tarik", worth: "Rp8.000", price: 3, terms: "Dengan pembelian mie." },
+          ],
+        },
+        {
+          id: "salad",
+          name: "Salad Bowl Sehat",
+          emoji: "🥗",
+          color: "#16a34a",
+          vendor: "Kak Lala",
+          promo: "Salad dan rice bowl rendah kalori",
+          about: "Bowl sehat dengan sayur segar, protein, dan saus pilihan.",
+          address: "Mal Kota Lt. 2",
+          hours: "10.00–21.00",
+          website: "https://saladbowl.example",
+          rating: 4.7,
+          menu: [
+            { id: "salad-chicken", name: "Chicken salad bowl", emoji: "🥗", price: "Rp35.000" },
+            { id: "rice-bowl", name: "Teriyaki rice bowl", emoji: "🍱", price: "Rp32.000" },
+          ],
+          deals: [
+            { id: "salad-30", title: "Voucher Rp30.000", worth: "Rp30.000", price: 12, terms: "Berlaku 30 hari." },
+            { id: "salad-drink", title: "Gratis infused water", worth: "Rp8.000", price: 3, terms: "Untuk bowl apa saja." },
           ],
         },
       ],

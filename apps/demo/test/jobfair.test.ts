@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { AULA, fairFloorId, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
+import { AULA, fairFloorId, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
 import { BOOTH_SLOTS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
@@ -676,6 +676,31 @@ describe("DemoJobFair", () => {
     // Level 3 was the Aula's old floor in the oldest saves, which became the food court, now on Lantai 8.
     expect(fair.fair.promoters[0]).toMatchObject({ level: 7, x: 38.5 });
     expect(fair.org.layout).toBe(3);
+  });
+
+  it("has 15 food court stands along three walls, which the organiser can empty and anyone can rent", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const room = fair.foodCourt()!;
+    expect(STALL_SLOTS).toHaveLength(15);
+    expect(room.stalls).toHaveLength(12);
+    expect(fair.freeStallSlots()).toEqual([12, 13, 14]);
+    // Fill every free slot, then check each stand's counter can be reached from the lift.
+    for (const slot of fair.freeStallSlots()) expect(fair.addStall(slot, { name: `Warung ${slot}`, deal: { title: "Voucher", worth: "Rp10.000", price: 5 } })).not.toBeNull();
+    expect(fair.freeStallSlots()).toEqual([]);
+    expect(fair.addStall(3, { name: "Tidak muat" })).toBeNull();
+    const f = fair.floor(fairRoomFloorId(fair.fair, room.id));
+    room.stalls!.forEach((st, i) => {
+      const at = stallSpot(stallSlot(st, i), "order");
+      expect(isBlocked(f, at.x, at.y), st.id).toBe(false);
+      expect(findPath(f, LIFT_FRONT, at), st.id).not.toBeNull();
+    });
+    // Taking one out leaves the others where they stand.
+    const second = room.stalls![1]!;
+    expect(fair.removeStall(room.stalls![0]!.id)).toBe(true);
+    expect(fair.freeStallSlots()).toEqual([0]);
+    expect(stallSlot(room.stalls!.find((x) => x.id === second.id)!, 0)).toBe(1);
+    fair.resetStalls();
+    expect(room.stalls).toHaveLength(12);
   });
 
   it("has a consultation lounge with big sofas and consultants, and charges for each call", () => {

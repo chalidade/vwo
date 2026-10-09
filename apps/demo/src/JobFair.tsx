@@ -17,6 +17,7 @@ import {
   findPath,
   openJobs,
   slide,
+  stallSlot,
   stallSpot,
   aulaSpot,
   LOUNGE,
@@ -37,6 +38,7 @@ import {
   emptyBoothExtras,
   coinStandExtras,
   foodStallExtras,
+  emptyStallExtras,
   infoDeskExtras,
   liftExtras,
   liftSignExtras,
@@ -77,6 +79,7 @@ import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
 import { WalletPanel } from "./fair/Wallet";
 import { BookStand } from "./fair/BookStand";
+import { RentStall } from "./fair/RentStall";
 import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
@@ -170,6 +173,7 @@ export function JobFair() {
   const [promo, setPromo] = useState<Promoter | null>(null);
   const [media, setMedia] = useState<{ boothId: string; acc: string } | null>(null);
   const [booking, setBooking] = useState<{ floor: number; x: number; y: number } | null>(null);
+  const [renting, setRenting] = useState<number | null>(null);
   const [games, setGames] = useState(false);
   const [missions, setMissions] = useState(false);
   const [ring, setRing] = useState<RingSignal | null>(null);
@@ -283,7 +287,7 @@ export function JobFair() {
     if (Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
     if (room?.stalls) {
       for (const [i, st] of room.stalls.entries()) {
-        const at = stallSpot(i, "order");
+        const at = stallSpot(stallSlot(st, i), "order");
         if (Math.abs(self.x - at.x) < 2.2 && Math.abs(self.y - at.y) < 0.9) return { kind: "stall", stallId: st.id, name: st.name };
       }
     }
@@ -582,7 +586,7 @@ export function JobFair() {
   const goToStall = (i: number) => {
     const st = room?.stalls?.[i];
     if (!st) return;
-    const at = stallSpot(i, "order");
+    const at = stallSpot(stallSlot(st, i), "order");
     goTo(floor.id, at.x, at.y, () => openStall(st.id));
   };
 
@@ -911,7 +915,10 @@ export function JobFair() {
     ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
     ...(room?.kind === "foodcourt"
-      ? foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined)
+      ? [
+          ...foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined),
+          ...emptyStallExtras(room, session ? setRenting : undefined),
+        ]
       : []),
     ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
     ...promotersHere.flatMap((p) => promoterExtras(p, session ? () => goToPromoter(p) : undefined)),
@@ -1285,6 +1292,7 @@ export function JobFair() {
         {sponsor && <SponsorCard sponsor={sponsor} onClose={() => setSponsor(null)} />}
 
         {booking && <BookStand slot={booking} onClose={() => setBooking(null)} />}
+        {renting !== null && <RentStall slot={renting} onClose={() => setRenting(null)} />}
 
         {session && wallet && (
           <WalletPanel

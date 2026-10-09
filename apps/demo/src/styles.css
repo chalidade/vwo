@@ -898,6 +898,7 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .bk-colors { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .bk-colors button { width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 2px solid #3b2a20; box-shadow: none; }
 .bk-colors button[data-active] { outline: 3px solid #f59e0b; outline-offset: 1px; }
+.bk-colors button.rs-emoji { width: 30px; height: 30px; background: #fff; font-size: 17px; line-height: 1; display: grid; place-items: center; }
 .bk-go { font-weight: 800; }
 .bk-err { margin: 0; color: #b91c1c; font-weight: 700; font-size: 13px; }
 .bk-ok { margin: 0; font-weight: 800; color: #15803d; }

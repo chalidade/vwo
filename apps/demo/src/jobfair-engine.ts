@@ -15,6 +15,10 @@ import {
   loungeBoardSpot,
   loungeSpot,
   safeImage,
+  safeUrl,
+  STALL_SLOTS,
+  buildFairRoom,
+  type FoodStall,
   type JobFairView,
   SPONSOR_H,
   SPONSOR_W,
@@ -34,6 +38,7 @@ import {
   fairRoomFloorId,
   fairStops,
   openJobs,
+  stallSlot,
   stallSpot,
   facingFor,
   findPath,
@@ -164,6 +169,8 @@ export interface OrgState {
   banner?: { title?: string; subtitles?: string[] };
   /** The Aula's rundown, when the organiser edited it. */
   rundown?: AulaEvent[];
+  /** Food court stalls per room, when the organiser added or removed any. */
+  stalls?: Record<string, FoodStall[]>;
   /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. 3 once
    *  promoters' levels follow the floor order with the Aula on Lantai 1. */
   layout?: number;
@@ -269,6 +276,9 @@ export interface StandBooking {
 }
 
 /** Stand prices for a booking, in rupiah. */
+/** What renting an empty food court stand costs a business, per event (demo payment). */
+export const STALL_PRICE = 750_000;
+
 export const STAND_PRICES = { regular: 7_500_000, premium: 15_000_000 } as const;
 
 /** The PIN a company uses to open its portal until the organiser sets another. */
@@ -528,6 +538,8 @@ export class DemoJobFair {
   private readonly original: Map<string, CompanyBooth>;
   private readonly originalPromoters: Promoter[];
   private readonly originalSponsors: SponsorView[];
+  /** Food court stalls as published, per room, before the organiser added or removed any. */
+  private readonly originalStalls: Map<string, FoodStall[]>;
   /** The organiser's changes. */
   org: OrgState = { removed: [], added: [] };
   /** Walking promoters: where they are heading and who they last talked to. */
@@ -558,7 +570,14 @@ export class DemoJobFair {
     this.original = new Map(fair.booths.map((b) => [b.id, structuredClone(b)]));
     this.originalPromoters = structuredClone(fair.promoters);
     this.originalSponsors = structuredClone(fair.sponsors);
-    this.fair = { ...fair, booths: fair.booths.map((b) => structuredClone(b)), promoters: structuredClone(fair.promoters), sponsors: structuredClone(fair.sponsors) };
+    this.originalStalls = new Map(fair.rooms.map((r) => [r.id, structuredClone(r.stalls ?? [])]));
+    this.fair = {
+      ...fair,
+      booths: fair.booths.map((b) => structuredClone(b)),
+      promoters: structuredClone(fair.promoters),
+      sponsors: structuredClone(fair.sponsors),
+      rooms: structuredClone(fair.rooms),
+    };
     this.floors = buildJobFairFloors(this.fair);
     this.stops = fairStops(this.fair);
     this.staff = [];
@@ -611,7 +630,7 @@ export class DemoJobFair {
         if (room.kind === "foodcourt")
           return [
             { ...host, x: 3, y: room.height - 2.4 },
-            ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(i, "vendor"), facing: "front" as Facing })),
+            ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(stallSlot(st, i), "vendor"), facing: "front" as Facing })),
           ];
         if (room.kind === "aula") return [{ ...host, x: room.width / 2 - 4, y: 2.3 }];
         if (room.kind === "konsultasi")
@@ -658,6 +677,18 @@ export class DemoJobFair {
       this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
       this.floorSig = "";
     }
+    // Food court stalls: the organiser's list replaces the published one; rebuild the floor when it changed.
+    for (const room of this.fair.rooms) {
+      if (!room.stalls) continue;
+      const next = structuredClone(this.org.stalls?.[room.id] ?? this.originalStalls.get(room.id) ?? []);
+      const sig = (l: FoodStall[]) => l.map((st, i) => `${st.id}@${stallSlot(st, i)}`).join();
+      const changed = sig(next) !== sig(room.stalls);
+      room.stalls.splice(0, room.stalls.length, ...next);
+      if (changed) {
+        const i = this.floors.findIndex((f) => f.id === fairRoomFloorId(this.fair, room.id));
+        if (i >= 0) this.floors[i] = buildFairRoom(this.fair, room);
+      }
+    }
     this.rebuildStaff();
   }
 
@@ -669,6 +700,71 @@ export class DemoJobFair {
   }
 
   // ---- Organiser ----------------------------------------------------------------------
+
+  /** The food court room (the first one, if there are several). */
+  foodCourt() {
+    return this.fair.rooms.find((r) => r.kind === "foodcourt" && r.stalls);
+  }
+
+  /** Free stall places in the food court, by slot number. */
+  freeStallSlots(roomId = this.foodCourt()?.id) {
+    const room = this.fair.rooms.find((r) => r.id === roomId);
+    if (!room?.stalls) return [];
+    const taken = new Set(room.stalls.map((st, i) => stallSlot(st, i)));
+    return STALL_SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
+  }
+
+  private setStalls(roomId: string, list: FoodStall[]) {
+    // Pin every stall to its slot, so taking one out leaves the others where they are.
+    this.org.stalls = { ...this.org.stalls, [roomId]: list.map((st, i) => ({ ...st, slot: stallSlot(st, i) })) };
+    this.saveOrg();
+  }
+
+  /** Put a business in a free food court slot (the organiser, or a business renting the stand). */
+  addStall(slot: number, input: { name: string; emoji?: string; color?: string; vendor?: string; promo?: string; about?: string; address?: string; hours?: string; website?: string; deal?: { title: string; worth: string; price: number } }, roomId = this.foodCourt()?.id) {
+    const room = this.fair.rooms.find((r) => r.id === roomId);
+    const name = input.name.trim().slice(0, 40);
+    if (!room?.stalls || !name || !this.freeStallSlots(room.id).includes(slot)) return null;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "stan";
+    let id = `stall-${slug}`;
+    for (let n = 2; room.stalls.some((st) => st.id === id); n++) id = `stall-${slug}-${n}`;
+    const deal = input.deal && input.deal.title.trim() && input.deal.price > 0 ? input.deal : null;
+    const stall: FoodStall = {
+      id,
+      slot,
+      name,
+      emoji: input.emoji?.trim() || "🍽️",
+      color: input.color || "#ea580c",
+      vendor: input.vendor?.trim().slice(0, 30) || "Penjaga stan",
+      promo: input.promo?.trim().slice(0, 80) || `Promo spesial dari ${name}`,
+      about: input.about?.trim().slice(0, 300) || "",
+      address: input.address?.trim().slice(0, 120) || "",
+      hours: input.hours?.trim().slice(0, 40) || "",
+      website: safeUrl(input.website ?? "") ?? "",
+      rating: 4.5,
+      menu: [],
+      deals: deal ? [{ id: `${id}-deal`, title: deal.title.trim().slice(0, 60), worth: deal.worth.trim().slice(0, 20) || "-", price: Math.min(200, Math.max(1, Math.round(deal.price))), terms: "Berlaku 30 hari." }] : [],
+    };
+    this.setStalls(room.id, [...room.stalls, stall]);
+    this.log({ type: "room", name: `Stan food court baru: ${name}` });
+    return stall;
+  }
+
+  /** Take a stall out of the food court; its slot becomes free to rent. */
+  removeStall(stallId: string) {
+    const room = this.fair.rooms.find((r) => r.stalls?.some((st) => st.id === stallId));
+    if (!room?.stalls) return false;
+    this.setStalls(room.id, room.stalls.filter((st) => st.id !== stallId));
+    return true;
+  }
+
+  /** Put the food court back as published. */
+  resetStalls(roomId = this.foodCourt()?.id) {
+    if (!roomId || !this.org.stalls?.[roomId]) return;
+    const { [roomId]: _, ...rest } = this.org.stalls;
+    this.org.stalls = rest;
+    this.saveOrg();
+  }
 
   /** Empty booth places on the hall floors. */
   freeSlots() {
