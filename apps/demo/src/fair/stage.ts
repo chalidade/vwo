@@ -1,8 +1,11 @@
 // The seminar stage: a speaker broadcasts their screen (or their slides) to everyone watching.
 // Like calls, the demo has no server: the stage reaches other tabs of this browser through a
-// BroadcastChannel, and the screen itself goes over WebRTC, one connection per viewer.
+// BroadcastChannel. The live site sends the same messages over a Supabase Realtime channel, so
+// viewers on any device see the talk. The screen itself goes over WebRTC, one connection per viewer.
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
-import { connectPeer } from "./call";
+import { hasRealtime, realtimeClient } from "../realtime";
+import { connectPeer, joinCall, leaveCall } from "./call";
 
 export interface StageChat {
   id: string;
@@ -42,17 +45,97 @@ export type StageMsg =
   | { type: "chat"; chat: StageChat }
   | { type: "react"; e: string };
 
-const channel: BroadcastChannel | null = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("vwo-seminar");
 const listeners = new Set<(m: StageMsg) => void>();
-channel?.addEventListener("message", (e: MessageEvent<StageMsg>) => {
-  for (const fn of listeners) fn(e.data);
-});
+const deliver = (m: StageMsg) => {
+  for (const fn of listeners) fn(m);
+};
+
+const ID = /^[\w-]{1,80}$/;
+const clean = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, n) : "");
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+function parseChat(x: unknown): StageChat | null {
+  const c = x as Partial<StageChat> | null;
+  if (!c || typeof c.id !== "string" || !ID.test(c.id) || typeof c.text !== "string" || !c.text.trim()) return null;
+  return { id: c.id, name: clean(c.name, 40) || "Tamu", text: clean(c.text, 280), at: num(c.at), q: c.q === true || undefined, host: c.host === true || undefined, done: c.done === true || undefined };
+}
+
+/** Anyone can send on a public channel: keep only well-formed stage messages, trimmed. */
+export function parseStage(x: unknown): StageMsg | null {
+  const m = x as Record<string, unknown> | null;
+  if (!m || typeof m.type !== "string") return null;
+  switch (m.type) {
+    case "off":
+    case "hello":
+    case "restart":
+      return { type: m.type };
+    case "on":
+      if (typeof m.sessionId !== "string" || !ID.test(m.sessionId)) return null;
+      return {
+        type: "on",
+        sessionId: m.sessionId,
+        title: clean(m.title, 160),
+        speaker: clean(m.speaker, 80),
+        role: clean(m.role, 120),
+        startedAt: num(m.startedAt),
+        screen: m.screen === true,
+        slide: Math.max(0, Math.min(500, Math.floor(num(m.slide)))),
+        viewers: Math.max(0, Math.min(100_000, Math.floor(num(m.viewers)))),
+        venue: m.venue === "aula" ? "aula" : "seminar",
+      };
+    case "join":
+    case "leave":
+      return typeof m.viewerId === "string" && ID.test(m.viewerId) ? { type: m.type, viewerId: m.viewerId, name: clean(m.name, 40) } : null;
+    case "history": {
+      if (typeof m.to !== "string" || !ID.test(m.to) || !Array.isArray(m.chat)) return null;
+      return { type: "history", to: m.to, chat: m.chat.slice(-50).map(parseChat).filter((c): c is StageChat => !!c) };
+    }
+    case "chat": {
+      const chat = parseChat(m.chat);
+      return chat ? { type: "chat", chat } : null;
+    }
+    case "react":
+      return typeof m.e === "string" && m.e.length <= 8 ? { type: "react", e: m.e } : null;
+    default:
+      return null;
+  }
+}
+
+// The demo: other tabs of this browser.
+const local: BroadcastChannel | null = !hasRealtime() && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("vwo-seminar") : null;
+local?.addEventListener("message", (e: MessageEvent<StageMsg>) => deliver(e.data));
+
+// The live site: every device, through one Realtime channel joined on first use.
+let remote: Promise<RealtimeChannel | null> | null = null;
+function stageChannel() {
+  remote ??= realtimeClient().then(
+    (sb) =>
+      new Promise<RealtimeChannel | null>((resolve) => {
+        if (!sb) return resolve(null);
+        const ch = sb.channel("jobfair:stage", { config: { broadcast: { self: false } } });
+        ch.on("broadcast", { event: "m" }, (e: { payload?: unknown }) => {
+          const m = parseStage(e.payload);
+          if (m) deliver(m);
+        });
+        ch.subscribe((status: string) => {
+          if (status === "SUBSCRIBED") resolve(ch);
+          else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            remote = null;
+            resolve(null);
+          }
+        });
+      }),
+  );
+  return remote;
+}
 
 export function sendStage(m: StageMsg) {
-  channel?.postMessage(m);
+  if (hasRealtime()) void stageChannel().then((ch) => ch?.send({ type: "broadcast", event: "m", payload: m }));
+  else local?.postMessage(m);
 }
 
 export function onStage(fn: (m: StageMsg) => void) {
+  if (hasRealtime()) void stageChannel();
   listeners.add(fn);
   return () => {
     listeners.delete(fn);
@@ -60,7 +143,18 @@ export function onStage(fn: (m: StageMsg) => void) {
 }
 
 /** The peer-connection id for one viewer, on the call channel. */
-export const stageCallId = (viewerId: string) => `stage:${viewerId}`;
+export const stageCallId = (viewerId: string) => `call-stage-${viewerId}`;
+
+/** A viewer asks for the screen once it can hear the speaker's offer. */
+export function joinStage(viewerId: string, name: string) {
+  void joinCall(stageCallId(viewerId)).then(() => sendStage({ type: "join", viewerId, name }));
+}
+
+/** A viewer leaves: tell the speaker and drop the signal channel. */
+export function leaveStage(viewerId: string, name: string) {
+  sendStage({ type: "leave", viewerId, name });
+  leaveCall(stageCallId(viewerId));
+}
 
 /** Whether a speaker is live in another tab right now, and what they show. */
 export function useStageLive() {
@@ -114,7 +208,7 @@ export function useStageFeed(live: StageLive | null, on: boolean, name: string) 
       peer?.close();
       setStream(null);
       peer = connectPeer({ callId: stageCallId(viewerId), caller: false, kind: "video", local: null, onRemote: (s) => setStream(new MediaStream(s.getTracks())) });
-      sendStage({ type: "join", viewerId, name });
+      joinStage(viewerId, name);
     };
     const off = onStage((m) => {
       if (m.type === "restart") join();
@@ -122,7 +216,7 @@ export function useStageFeed(live: StageLive | null, on: boolean, name: string) 
     join();
     return () => {
       off();
-      sendStage({ type: "leave", viewerId, name });
+      leaveStage(viewerId, name);
       peer?.close();
       setStream(null);
     };

@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: siaran pembicara ke semua perangkat
+
+**Konteks:** penutup permintaan owner agar semua fitur terhubung. Siaran pembicara (layar/slide, chat, Q&A, tepuk tangan) sebelumnya hanya sampai ke tab lain di browser yang sama.
+
+**Yang berubah**
+- Di versi live, pesan panggung lewat channel Supabase Realtime `jobfair:stage`, jadi penonton di perangkat mana pun melihat siaran yang sedang berjalan. Versi demo GitHub Pages tetap memakai BroadcastChannel.
+- Setiap pesan dari channel dicek dan dipotong panjangnya (`parseStage`), karena channel publik.
+- Layar dan suara tetap lewat WebRTC per penonton. ID panggilannya sekarang lolos validasi sinyal live (`call-stage-…`), dan penonton bergabung ke channel sinyal dulu sebelum minta siaran, jadi offer pembicara tidak hilang.
+- Setiap tab penonton punya ID sendiri (di live semua pemain bernama "player", jadi sebelumnya akan saling tabrakan).
+- Penonton bot di halaman pembicara mati di live, sesuai permintaan tanpa bot. Teks petunjuk demo diganti untuk live.
+
+**Dicek:** 3 tes baru untuk `parseStage` (43 tes demo lulus), build demo dan live sukses. Siaran antar perangkat belum bisa dites dari sini karena butuh Supabase; perlu dicoba owner di jobfair.co.id.
+
+---
+
 ## 2026-10-09 · jobfair live: progres pemain tersimpan per akun
 
 **Konteks:** lanjutan permintaan owner agar semua fitur terhubung. Koin, misi harian, voucher, tiket ruangan, hasil psikotes, stempel, notifikasi pelamar, profil, dan karakter sebelumnya hanya ada di browser. Ganti HP berarti mulai dari nol, dan akun lain yang login di browser yang sama ikut memakai koin akun sebelumnya.

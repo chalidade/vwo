@@ -87,7 +87,12 @@ function callChannel(callId: string) {
   return ch;
 }
 
-function leaveCall(callId: string) {
+/** Live site: be on a call's signal channel before the other side sends to it. Resolves at once in the demo. */
+export async function joinCall(callId: string) {
+  if (hasRealtime()) await callChannel(callId);
+}
+
+export function leaveCall(callId: string) {
   const ch = calls.get(callId);
   calls.delete(callId);
   void ch?.then((c) => c?.unsubscribe());
@@ -168,6 +173,7 @@ export function stopMedia(s: MediaStream | null) {
  */
 export function connectPeer(opts: { callId: string; caller: boolean; kind: CallKind; local: MediaStream | null; onRemote: (s: MediaStream) => void; onState?: (s: RTCPeerConnectionState) => void }) {
   const pc = new RTCPeerConnection({ iceServers: iceServers() });
+  void joinCall(opts.callId);
   const pending: RTCIceCandidateInit[] = [];
   let haveRemote = false;
   const remote = new MediaStream();

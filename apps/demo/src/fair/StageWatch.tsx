@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { StageSlide } from "../organizer/Speaker";
 import { connectPeer } from "./call";
 import type { SeminarSession } from "./content";
-import { type StageChat, type StageLive, onStage, sendStage, stageCallId } from "./stage";
+import { type StageChat, type StageLive, joinStage, leaveStage, onStage, sendStage, stageCallId } from "./stage";
 
 let chatN = 0;
 
@@ -27,7 +27,7 @@ function Sound({ stream }: { stream: MediaStream }) {
 export function StageWatch({
   live,
   session,
-  viewerId,
+  viewerId: who,
   name,
   onFinish,
   onRecorded,
@@ -43,6 +43,8 @@ export function StageWatch({
   onRecorded: () => void;
   onClose: () => void;
 }) {
+  // One id per tab: on the live site every visitor's player is called "player".
+  const [viewerId] = useState(() => `${who}-${Math.random().toString(36).slice(2, 10)}`);
   const [remote, setRemote] = useState<MediaStream | null>(null);
   const [chat, setChat] = useState<StageChat[]>([]);
   const [text, setText] = useState("");
@@ -57,7 +59,7 @@ export function StageWatch({
       peer.current?.close();
       setRemote(null);
       peer.current = connectPeer({ callId: stageCallId(viewerId), caller: false, kind: "video", local: null, onRemote: (s) => setRemote(new MediaStream(s.getTracks())) });
-      sendStage({ type: "join", viewerId, name });
+      joinStage(viewerId, name);
     };
     const off = onStage((m) => {
       if (m.type === "restart") join();
@@ -70,7 +72,7 @@ export function StageWatch({
     return () => {
       off();
       clearInterval(t);
-      sendStage({ type: "leave", viewerId, name });
+      leaveStage(viewerId, name);
       peer.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
