@@ -4,6 +4,12 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  attachCheckout,
+  claimPayment,
+  createPayment,
+  markPaid,
+  openPayment,
+  paidInvoicesOf,
   AlreadyAppliedError,
   JobClosedError,
   NotEnoughCoinsError,
@@ -234,5 +240,29 @@ describe("early access", () => {
     expect((await revokeEarlyAccess(db, "tester@example.com"))?.boothKey).toBe("gim-nusantara");
     expect(await boothsOf(db, u!.id)).toEqual([]);
     expect(await earlyAccessFor(db, "tester@example.com")).toBeNull();
+  });
+});
+
+describe("payments", () => {
+  it("is paid once, claimed once, reused while open, and found per booth", async () => {
+    const p = await createPayment(db, { userId: seeker, kind: "coins", ref: "koin-120", description: "120 koin", amount: 20_000, provider: "xendit" });
+    expect(p.status).toBe("pending");
+    await attachCheckout(db, p.id, "inv_123", "https://checkout.example/inv_123");
+    expect((await openPayment(db, seeker, "coins", "koin-120", 20_000))?.checkoutUrl).toBe("https://checkout.example/inv_123");
+    expect(await openPayment(db, seeker, "coins", "koin-120", 25_000)).toBeNull();
+    expect(await claimPayment(db, p.id, seeker)).toBeNull();
+    expect((await markPaid(db, p.id, "Xendit · QRIS"))?.status).toBe("paid");
+    expect(await markPaid(db, p.id, "Xendit · QRIS")).toBeNull();
+    expect(await openPayment(db, seeker, "coins", "koin-120", 20_000)).toBeNull();
+    expect(await claimPayment(db, p.id, "00000000-0000-0000-0000-000000000000")).toBeNull();
+    expect(await claimPayment(db, p.id, seeker)).not.toBeNull();
+    expect(await claimPayment(db, p.id, seeker)).toBeNull();
+    await expect(createPayment(db, { userId: seeker, kind: "coins", ref: "x", description: "x", amount: 0, provider: "demo" })).rejects.toThrow();
+
+    const inv = await createPayment(db, { userId: seeker, kind: "invoice", ref: "data_raya:inv-1", description: "Tagihan", amount: 2_500_000, meta: { items: [{ id: "vip", name: "VIP", price: 2_500_000 }] }, provider: "demo" });
+    await createPayment(db, { userId: seeker, kind: "invoice", ref: "dataXraya:inv-2", description: "Tagihan", amount: 1, provider: "demo" }).then((x) => markPaid(db, x.id, null));
+    expect(await paidInvoicesOf(db, "data_raya")).toEqual([]);
+    await markPaid(db, inv.id, null);
+    expect((await paidInvoicesOf(db, "data_raya")).map((x) => x.ref)).toEqual(["data_raya:inv-1"]);
   });
 });

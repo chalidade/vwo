@@ -1,20 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CoinStandView } from "@vwo/shared";
 import type { PlayerState } from "../jobfair-engine";
 import { price } from "@vwo/shared";
 import { streakBonus } from "./content";
 import { Modal } from "./Modal";
+import { type Gateway, paymentGateway } from "../payments";
 
 const METHODS = ["QRIS", "GoPay", "OVO", "Transfer bank"];
 const when = (at: number) => (at ? new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Awal");
 
-/** The coin wallet: balance, top-up packages (demo payment), vouchers, and history. */
+/** What a top-up did: done (with a message), failed, or the browser is going to the checkout page. */
+export type BuyResult = { ok: boolean; text: string } | "redirect";
+
+/** The coin wallet: balance, top-up packages (paid through the gateway on the live site), vouchers, and history. */
 export function WalletPanel({
   player,
   stand,
   atStand,
   canClaim,
   onBuy,
+  live,
   onClaim,
   onGoToStand,
   onClose,
@@ -24,7 +29,9 @@ export function WalletPanel({
   /** At the coin stand you can buy; elsewhere you are pointed to it. */
   atStand: boolean;
   canClaim: boolean;
-  onBuy: (packageId: string, method: string) => void;
+  onBuy: (packageId: string, method: string) => BuyResult | Promise<BuyResult>;
+  /** Live site: pay through the server's gateway instead of the offline demo. */
+  live?: boolean;
   onClaim: () => void;
   onGoToStand: () => void;
   onClose: () => void;
@@ -33,6 +40,13 @@ export function WalletPanel({
   const [pick, setPick] = useState<string | null>(null);
   const [method, setMethod] = useState(METHODS[0]!);
   const [paid, setPaid] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [gateway, setGateway] = useState<Gateway | "local">(live ? "xendit" : "local");
+  useEffect(() => {
+    if (live) void paymentGateway().then(setGateway);
+  }, [live]);
+  const viaXendit = gateway === "xendit";
   const pkg = stand.packages.find((p) => p.id === pick);
   const open = player.vouchers.filter((v) => !v.used);
 
@@ -94,26 +108,39 @@ export function WalletPanel({
               </div>
               {pkg && (
                 <div className="fx-pay">
-                  <span>Bayar pakai</span>
-                  <div className="fx-methods">
-                    {METHODS.map((m) => (
-                      <button key={m} type="button" data-active={method === m ? "" : undefined} onClick={() => setMethod(m)}>
-                        {m}
-                      </button>
-                    ))}
-                  </div>
+                  {viaXendit ? (
+                    <span>Bayar lewat Xendit: QRIS, e-wallet, virtual account atau kartu. Kamu akan dibawa ke halaman pembayaran yang aman.</span>
+                  ) : (
+                    <>
+                      <span>Bayar pakai</span>
+                      <div className="fx-methods">
+                        {METHODS.map((m) => (
+                          <button key={m} type="button" data-active={method === m ? "" : undefined} onClick={() => setMethod(m)}>
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
                     className="mb-order jb-apply"
-                    onClick={() => {
-                      onBuy(pkg.id, method);
-                      setPaid(`Pembayaran ${pkg.price} lewat ${method} berhasil. +${pkg.coins + pkg.bonus} koin.`);
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      setError("");
+                      const r = await onBuy(pkg.id, method);
+                      if (r === "redirect") return;
+                      setBusy(false);
+                      if (!r.ok) return setError(r.text);
+                      setPaid(r.text);
                       setPick(null);
                     }}
                   >
-                    Bayar {pkg.price}
+                    {busy ? "Memproses…" : `Bayar ${pkg.price}`}
                   </button>
-                  <span className="sp-muted">Demo: tidak ada uang sungguhan yang ditarik.</span>
+                  {error && <span className="fx-error">{error}</span>}
+                  {!viaXendit && <span className="sp-muted">Demo: tidak ada uang sungguhan yang ditarik.</span>}
                 </div>
               )}
             </>

@@ -391,3 +391,41 @@ export const earlyAccess = pgTable(
   },
   (t) => [check("early_access_role_ck", sql`${t.role} in ('seeker','company')`)],
 );
+
+/**
+ * Money paid through the payment gateway (Xendit), or recorded straight away when no gateway is
+ * set up (demo). What it buys is named by `kind` and `ref`; the amount is always worked out on the
+ * server from the price table, never taken from the browser.
+ */
+export const fairPayments = pgTable(
+  "fair_payments",
+  {
+    id: id(),
+    userId: userRef("user_id"),
+    /** coins (ref: coin package id) · registration (ref: registration id) · invoice (ref: "<booth>:<invoice id>") */
+    kind: text("kind").notNull(),
+    ref: text("ref").notNull(),
+    description: text("description").notNull(),
+    amount: integer("amount").notNull(),
+    /** What was bought, e.g. the products on a company invoice. */
+    meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
+    /** pending → paid, or expired / failed. */
+    status: text("status").notNull().default("pending"),
+    provider: text("provider").notNull(),
+    providerId: text("provider_id"),
+    checkoutUrl: text("checkout_url"),
+    method: text("method"),
+    paidAt: ts("paid_at"),
+    /** When the game took what was paid for (coins added, booth items switched on). */
+    claimedAt: ts("claimed_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("fair_payments_user_idx").on(t.userId),
+    index("fair_payments_ref_idx").on(t.kind, t.ref),
+    uniqueIndex("fair_payments_provider_uq").on(t.provider, t.providerId),
+    check("fair_payments_kind_ck", sql`${t.kind} in ('coins','registration','invoice')`),
+    check("fair_payments_status_ck", sql`${t.status} in ('pending','paid','expired','failed')`),
+    check("fair_payments_amount_ck", sql`${t.amount} > 0`),
+  ],
+);

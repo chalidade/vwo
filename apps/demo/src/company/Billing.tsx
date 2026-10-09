@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CompanyBooth } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
 import {
@@ -9,6 +9,9 @@ import {
   rupiah,
 } from "../fair/company";
 import { fair } from "../useFair";
+import { LIVE } from "../mode";
+import { claimPaidCoins, type Gateway, pay, paymentGateway } from "../payments";
+import { flushShared } from "../shared-state";
 
 const day = (at: number) =>
   new Date(at).toLocaleString("id-ID", {
@@ -19,7 +22,7 @@ const day = (at: number) =>
     minute: "2-digit",
   });
 
-/** Pay for the VIP booth and decorations. Demo payments only: nothing is charged. */
+/** Pay for the VIP booth and decorations: through Xendit on the live site, a demo payment offline. */
 export function Billing({ booth }: { booth: CompanyBooth }) {
   const [cart, setCart] = useState<Set<string>>(new Set());
   const [paying, setPaying] = useState<CompanyInvoice | null>(null);
@@ -238,6 +241,12 @@ function PayDialog({
 }) {
   const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [gateway, setGateway] = useState<Gateway | null>(null);
+  useEffect(() => {
+    if (LIVE) void paymentGateway().then(setGateway);
+  }, []);
   const va = `8808${(invoice.total % 1e8).toString().padStart(8, "0")}`;
   return (
     <div className="cp-modal" onClick={onClose}>
@@ -260,6 +269,43 @@ function PayDialog({
             <button type="button" onClick={onClose}>
               Selesai
             </button>
+          </>
+        ) : LIVE ? (
+          <>
+            <h2 className="cp-h2">Bayar {invoice.no}</h2>
+            <p className="muted small">
+              Ditagihkan ke {booth.company} · Total{" "}
+              <b>{rupiah(invoice.total)}</b>
+            </p>
+            <p>
+              {gateway === "demo"
+                ? "Pembayaran online belum diaktifkan panitia: tagihan ditandai lunas tanpa uang ditarik (simulasi)."
+                : "Bayar lewat Xendit: QRIS, virtual account, e-wallet atau kartu kredit. Kamu akan dibawa ke halaman pembayaran yang aman, lalu kembali ke portal ini."}
+            </p>
+            {error && <p className="cp-warn">{error}</p>}
+            <div className="row">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  // The bill must be on the server before it can be paid.
+                  await flushShared();
+                  const r = await pay({ kind: "invoice", booth: booth.id, invoice: invoice.id });
+                  if (r.ok && "redirect" in r) return;
+                  setBusy(false);
+                  if (!r.ok) return setError(r.error);
+                  await claimPaidCoins();
+                  setDone(true);
+                }}
+              >
+                {busy ? "Memproses…" : `Bayar ${rupiah(invoice.total)}`}
+              </button>
+              <button type="button" className="ghost" onClick={onClose}>
+                Nanti
+              </button>
+            </div>
           </>
         ) : (
           <>

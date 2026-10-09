@@ -12,3 +12,4 @@ export * from "./fair-booths";
 export * from "./fair-prices";
 export * from "./company-registrations";
 export * from "./early-access";
+export * from "./fair-payments";

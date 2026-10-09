@@ -1,5 +1,6 @@
 import { boothsOf, readFairState, writeFairState } from "@vwo/db";
 import { NextResponse } from "next/server";
+import { guardCompanyDoc } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth, isFairAdmin } from "@/lib/fair";
 import { fail, sameOrigin } from "@/lib/http";
@@ -61,8 +62,11 @@ export async function PUT(req: Request) {
     return fail(400, "invalid_input");
   }
   if (typeof body.key !== "string" || !KEY.test(body.key) || !body.data || typeof body.data !== "object" || Array.isArray(body.data)) return fail(400, "invalid_input");
-  const allowed = isFairAdmin(user) || (body.key.startsWith("company:") && (await canManageBooth(user, body.key.slice("company:".length))));
-  if (!allowed) return fail(403, "not_allowed");
-  await writeFairState(db, { key: body.key, data: body.data, userId: user.id });
+  const admin = isFairAdmin(user);
+  const booth = body.key.startsWith("company:") ? body.key.slice("company:".length) : null;
+  if (!admin && !(booth && (await canManageBooth(user, booth)))) return fail(403, "not_allowed");
+  // A company's own save can't mark bills paid or unlock products; only confirmed payments do.
+  const data = admin || !booth ? body.data : await guardCompanyDoc(booth, body.data as Parameters<typeof guardCompanyDoc>[1]);
+  await writeFairState(db, { key: body.key, data, userId: user.id });
   return NextResponse.json({ ok: true });
 }

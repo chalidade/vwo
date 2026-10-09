@@ -4,6 +4,30 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · pembayaran lewat Xendit
+
+**Konteks:** owner minta pembayaran disambungkan ke Xendit. Sebelumnya semua pembayaran hanya simulasi, dan status lunas tagihan perusahaan ditentukan oleh browser.
+
+**Yang berubah:**
+- Tabel baru `fair_payments` (migrasi 0013). Setiap pembayaran dicatat di server dengan harga yang dihitung server dari daftar harga panitia. Harga yang dikirim browser tidak pernah dipakai.
+- Isi koin, bayar pendaftaran stand, dan bayar tagihan VIP/aksesoris kini membuat invoice Xendit, lalu pembeli dibawa ke halaman bayar Xendit dan kembali ke situs.
+- Status lunas hanya diambil dari Xendit. Webhook dicek dengan `x-callback-token`, invoice diambil ulang dari Xendit memakai secret key, dan jumlahnya harus sama persis. Saat pembeli kembali ke situs, status juga dicek langsung tanpa menunggu webhook.
+- Koin diklaim satu kali per pembayaran.
+- Pendaftaran stand berubah menjadi "menunggu verifikasi" di server.
+- Tagihan perusahaan ditandai Lunas, produknya dimiliki, dan aksesorisnya dipasang di dokumen booth.
+- Penyimpanan booth oleh perusahaan kini dijaga. Browser tidak bisa lagi menandai tagihan lunas, menambah produk berbayar, menyalakan aksesoris yang belum dibeli, atau menaikkan tier sendiri.
+- Route bayar demo lama untuk pendaftaran (`/api/company/registrations/[id]/pay`) dihapus.
+- Tanpa `XENDIT_SECRET_KEY`, pembayaran tetap berupa simulasi dan tercatat sebagai "Simulasi (tanpa uang)".
+
+**Dicek:**
+- Tes database untuk `fair_payments`.
+- Uji lokal dengan server Xendit tiruan: pendaftaran lewat UI, koin lewat webhook, dan tagihan perusahaan lewat tombol Bayar di portal.
+- Jumlah bayar yang dimanipulasi tidak dianggap lunas, dan token webhook yang salah ditolak (401).
+- Penyimpanan booth palsu dikembalikan ke status belum dibayar.
+- Mode simulasi juga dicek.
+
+---
+
 ## 2026-10-09 · perbaikan crash "u is not a function" saat kirim pesan ke pelamar
 
 **Konteks:** dari screenshot layar error yang baru, owner mendapat pesan `TypeError: u is not a function` setiap kali mengirim pesan ke pelamar di portal perusahaan lewat Chrome di HP.

@@ -260,6 +260,7 @@ h1 { margin: 0; }
 .fx-package[data-active] { border-color: #ca8a04; background: #fefce8; }
 .fx-bonus { font-size: 11px; font-weight: 800; color: #16a34a; }
 .fx-pay { display: grid; gap: 8px; justify-items: start; }
+.fx-error { color: #dc2626; font-size: 13px; }
 .fx-methods { display: flex; flex-wrap: wrap; gap: 6px; }
 .fx-methods button, .fx-options button { background: #fff; color: var(--text); box-shadow: 0 2px 0 #3b2a20; font-size: 13px; }
 .fx-methods button[data-active], .fx-options button[data-active] { background: #23345c; color: #fff; }

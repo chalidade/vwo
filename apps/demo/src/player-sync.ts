@@ -18,6 +18,15 @@ const PULL_MS = 45_000;
 
 let stop: (() => void) | null = null;
 let syncedFor: string | null = null;
+/** The signed-in account's saved progress has been loaded (so coins added now are not overwritten). */
+let ready = false;
+const waiting: (() => void)[] = [];
+
+/** Run once this account's progress is loaded from the server. */
+export function whenPlayerReady(fn: () => void) {
+  if (ready) fn();
+  else waiting.push(fn);
+}
 
 function owner() {
   try {
@@ -50,6 +59,8 @@ export function syncPlayer(account: Account | null) {
   stop?.();
   stop = null;
   syncedFor = id;
+  ready = false;
+  waiting.length = 0;
   if (!id) return;
 
   let rev = -1;
@@ -71,6 +82,8 @@ export function syncPlayer(account: Account | null) {
         setOwner(id);
         rev = d.rev;
         sent = d.data ? JSON.stringify(snapshot()) : "";
+        ready = true;
+        waiting.splice(0).forEach((fn) => fn());
         return;
       }
       // Another device saved; take it unless this one has changes of its own waiting to go up.
