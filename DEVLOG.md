@@ -4,6 +4,14 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · kode error Xendit tampil saat bayar gagal
+
+**Konteks:** owner mencoba beli koin dan mendapat "Halaman pembayaran belum bisa dibuat". Tes webhook dari dashboard Xendit sudah berhasil (200, token cocok), jadi masalahnya ada saat membuat invoice.
+
+**Yang berubah:** kalau Xendit menolak, `error_code` dari Xendit (misalnya `INVALID_API_KEY` atau `REQUEST_FORBIDDEN_ERROR`) ikut tampil di pesan error, di dompet koin, di portal perusahaan, dan di halaman pendaftaran. Kode ini bukan rahasia. Key tetap tidak pernah dikirim ke browser.
+
+---
+
 ## 2026-10-09 · pembayaran lewat Xendit
 
 **Konteks:** owner minta pembayaran disambungkan ke Xendit. Sebelumnya semua pembayaran hanya simulasi, dan status lunas tagihan perusahaan ditentukan oleh browser.
