@@ -58,6 +58,29 @@ function cycle<T>(list: readonly T[], current: T, step: number): T {
   return list[(i + step + list.length) % list.length]!;
 }
 
+// Defined outside the creator so they keep their DOM between renders: the game re-renders many
+// times a second, and a remounted button loses a mouse click that spans two renders.
+const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="cc-row">
+    <span className="cc-label">{label}</span>
+    {children}
+  </div>
+);
+const Picker = ({ value, onPrev, onNext }: { value: string; onPrev: () => void; onNext: () => void }) => (
+  <span className="cc-picker">
+    <button type="button" onClick={onPrev} aria-label="Sebelumnya">◀</button>
+    <span>{value}</span>
+    <button type="button" onClick={onNext} aria-label="Berikutnya">▶</button>
+  </span>
+);
+const Swatches = ({ colors, value, onPick }: { colors: string[]; value: string; onPick: (c: string) => void }) => (
+  <span className="cc-swatches">
+    {colors.map((c) => (
+      <button key={c} type="button" aria-label={c} data-active={c === value ? "" : undefined} style={{ background: c }} onClick={() => onPick(c)} />
+    ))}
+  </span>
+);
+
 /** Pokémon-style "who are you?" screen: name, a few looks, and who came along. Then check in. */
 export function CharacterCreator({
   onCheckIn,
@@ -89,27 +112,6 @@ export function CharacterCreator({
     saveCharacter(c);
     onCheckIn(c, companions);
   };
-
-  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="cc-row">
-      <span className="cc-label">{label}</span>
-      {children}
-    </div>
-  );
-  const Picker = ({ value, onPrev, onNext }: { value: string; onPrev: () => void; onNext: () => void }) => (
-    <span className="cc-picker">
-      <button type="button" onClick={onPrev} aria-label="Sebelumnya">◀</button>
-      <span>{value}</span>
-      <button type="button" onClick={onNext} aria-label="Berikutnya">▶</button>
-    </span>
-  );
-  const Swatches = ({ colors, value, onPick }: { colors: string[]; value: string; onPick: (c: string) => void }) => (
-    <span className="cc-swatches">
-      {colors.map((c) => (
-        <button key={c} type="button" aria-label={c} data-active={c === value ? "" : undefined} style={{ background: c }} onClick={() => onPick(c)} />
-      ))}
-    </span>
-  );
 
   return (
     <form

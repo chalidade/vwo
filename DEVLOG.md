@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · early access untuk tester dan perbaikan klik warna karakter di laptop
+
+**Konteks:** owner ingin beberapa orang bisa mencoba jobfair sebelum rilis, sebagai pelamar atau sebagai perusahaan. Owner juga melaporkan bahwa di laptop warna dan gaya karakter tidak bisa diganti, padahal di HP bisa.
+
+**Yang berubah**
+- Tab baru Panitia → 🧪 Early access: masukkan email Google, pilih "Pelamar" atau "Perusahaan" (perusahaan memilih satu stand percobaan), tambahkan catatan, dan kirim email undangan bila perlu. Akses bisa dicabut kapan saja. Untuk tester perusahaan, akunnya juga dilepas dari stand percobaan.
+- Tester pelamar masuk lewat `/masuk`, tester perusahaan lewat `/masuk-perusahaan`, dan keduanya tanpa PIN. Stand percobaan diberikan otomatis saat tester login. Halaman coming soon punya tautan kecil "Early access".
+- Tabel baru `early_access` (migrasi 0012) dengan email sebagai kunci, dikunci RLS seperti tabel lain.
+- Penyebab bug warna: tombol-tombol pilihan di pembuat karakter dibuat sebagai komponen di dalam render, padahal game merender ulang berkali-kali per detik. Tombol diganti elemen baru di antara mouse-down dan mouse-up, jadi klik mouse di laptop hilang. Tap di HP cukup cepat sehingga tetap jalan. Komponennya sekarang dipindah ke luar render.
+
+**Dicek:** tes database dan engine lulus. Uji lokal di browser: panitia menambah tester pelamar dan perusahaan, tester perusahaan langsung mendapat stand dan perubahan warnanya tersimpan ke server, pencabutan melepas stand dan menutup akses /play, dan klik mouse dengan jeda 150 ms di pilihan warna karakter sekarang berhasil (sebelumnya gagal karena tombol terus terlepas dari DOM).
+
+---
+
 ## 2026-10-09 · halaman coming soon dan registrasi perusahaan dengan verifikasi
 
 **Konteks:** owner belum mau rilis dan khawatir aplikasi dicoba atau ditiru kompetitor, jadi jobfair.co.id harus menampilkan halaman coming soon dulu. Owner juga minta link registrasi khusus perusahaan: isi form, pilih paket, bayar, lalu panitia memverifikasi sebelum perusahaan mendapat PIN, supaya HRD yang masuk benar-benar nyata.
