@@ -85,6 +85,13 @@
       "when": 1791577708416,
       "tag": "0011_company_registrations",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791580120005,
+      "tag": "0012_early_access",
+      "breakpoints": true
     }
   ]
 }

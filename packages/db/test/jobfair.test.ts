@@ -8,6 +8,10 @@ import {
   JobClosedError,
   NotEnoughCoinsError,
   addBoothMember,
+  earlyAccessFor,
+  earlyAccessList,
+  grantEarlyAccess,
+  revokeEarlyAccess,
   createRegistration,
   hasVerifiedRegistration,
   myRegistrations,
@@ -211,5 +215,24 @@ describe("company registrations", () => {
     expect(await rejectRegistration(db, reg.id, seeker, "telat")).toBe(false);
     expect(await hasVerifiedRegistration(db, seeker)).toBe(true);
     expect((await myRegistrations(db, seeker))[0]).toMatchObject({ status: "verified", boothKey: "kopi-nusa", pin: "123456" });
+  });
+});
+
+describe("early access", () => {
+  it("is keyed by lowercased email, keeps a booth only for company testers, and can be revoked", async () => {
+    await grantEarlyAccess(db, { email: " Tester@Example.com ", role: "seeker", boothKey: "data-raya", addedBy: seeker });
+    expect(await earlyAccessFor(db, "tester@example.com")).toMatchObject({ role: "seeker", boothKey: null });
+    await grantEarlyAccess(db, { email: "tester@example.com", role: "company", boothKey: "data-raya", note: "HR teman", addedBy: seeker });
+    expect(await earlyAccessFor(db, "TESTER@example.com")).toMatchObject({ role: "company", boothKey: "data-raya", note: "HR teman" });
+    expect((await earlyAccessList(db)).length).toBe(1);
+    await expect(db.execute(sql`insert into early_access (email, role) values ('x@example.com', 'admin')`)).rejects.toThrow();
+    const [u] = await db.insert(users).values({ email: "Tester@example.com", displayName: "Tester" }).returning();
+    await addBoothMember(db, "data-raya", u!.id);
+    await grantEarlyAccess(db, { email: "tester@example.com", role: "company", boothKey: "gim-nusantara", addedBy: seeker });
+    expect(await boothsOf(db, u!.id)).toEqual([]);
+    await addBoothMember(db, "gim-nusantara", u!.id);
+    expect((await revokeEarlyAccess(db, "tester@example.com"))?.boothKey).toBe("gim-nusantara");
+    expect(await boothsOf(db, u!.id)).toEqual([]);
+    expect(await earlyAccessFor(db, "tester@example.com")).toBeNull();
   });
 });

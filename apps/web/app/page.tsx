@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 const NOTES: Record<string, string> = {
-  belum: "Akun ini belum punya akses sebelum rilis. Akses awal hanya untuk panitia dan perusahaan yang sudah diverifikasi.",
+  belum: "Akun ini belum punya akses sebelum rilis. Akses awal hanya untuk panitia, peserta early access, dan perusahaan yang sudah diverifikasi.",
   gagal: "Masuk dengan Google gagal. Coba lagi.",
 };
 
@@ -84,7 +84,7 @@ export default async function ComingSoon({ searchParams }: { searchParams: Promi
         <footer className="cs-foot">
           <span>© {new Date().getFullYear()} jobfair.co.id</span>
           <span>
-            <a href="/masuk-panitia">Masuk panitia</a>
+            <a href="/masuk">Early access</a> · <a href="/masuk-panitia">Masuk panitia</a>
           </span>
         </footer>
       </div>

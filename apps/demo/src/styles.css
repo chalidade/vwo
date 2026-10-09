@@ -1347,6 +1347,10 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 
 /* Organiser price list */
 .pr-group + .pr-group { margin-top: 14px; }
+.ea-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; margin: 12px 0; }
+.ea-form label { display: grid; gap: 4px; font-size: 13px; }
+.ea-form label.ea-check { display: flex; align-items: center; gap: 6px; }
+.ea-form input:not([type=checkbox]), .ea-form select { width: 100%; min-width: 0; }
 .pr-table td { vertical-align: middle; }
 .pr-table tr[data-changed] td { background: color-mix(in srgb, #facc15 14%, transparent); }
 .pr-input { width: 130px; max-width: 100%; }
