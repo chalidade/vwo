@@ -23,6 +23,9 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      check on sign-up. Off while unset; sign-up also has a hidden honeypot field.
    - optional `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`: a TURN relay for calls
      between networks where direct WebRTC fails (public STUN is used either way)
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: "Masuk dengan Google". Google Cloud Console →
+     OAuth client (Web application) with redirect URI `https://<domain>/api/auth/google/callback`
+     for every domain the site is served on; publish the consent screen.
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 

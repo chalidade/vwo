@@ -67,6 +67,8 @@ export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
+  /** Google's stable id for this person ("sub"), once they sign in with Google. */
+  googleSub: text("google_sub").unique(),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   displayName: text("display_name").notNull(),
   platformRole: platformRole("platform_role").notNull().default("user"),

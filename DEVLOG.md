@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: masuk dengan Google
+
+**Konteks:** owner bertanya cara memastikan email pendaftar benar-benar aktif, lalu memilih login dengan akun Google.
+
+**Yang berubah**
+- Tombol "Masuk dengan Google" di layar masuk, muncul setelah `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` diisi di Vercel. Daftar dengan email dan password tetap ada sebagai cadangan.
+- Alurnya OAuth dengan PKCE dan `state` di cookie HttpOnly, dibuat sendiri di server kita (tanpa Supabase Auth), jadi tetap jalan di DigitalOcean. Hanya email yang sudah diverifikasi Google yang diterima.
+- Akun Google langsung terhitung terverifikasi. Kalau email itu sudah terdaftar tapi belum diverifikasi, password dan sesi lamanya dihapus saat ditautkan, karena bisa saja akun itu dibuat orang lain memakai email tersebut. Akun yang sudah terverifikasi tetap bisa masuk dengan password juga.
+- Migrasi 0005 menambah kolom `google_sub` (unik) di `users`.
+
+**Diuji:** 3 tes database baru (akun dibuat sekali; akun email belum terverifikasi diambil alih dengan aman; password akun terverifikasi tetap berlaku). Di server lokal, `/api/auth/google/start` mengarah ke Google dengan PKCE S256, dan callback dengan `state` salah kembali ke layar masuk dengan pesan gagal. Login Google sungguhan perlu dicoba setelah key diisi.
+
+---
+
 ## 2026-10-09 · jobfair live: telepon dan lounge antar-device
 
 **Konteks:** owner mencoba menelepon dari device A ke device B di lounge dan tidak tersambung. Sinyal panggilan sebelumnya hanya lewat BroadcastChannel, jadi hanya antar-tab di browser yang sama.
