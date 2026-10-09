@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: progres pemain tersimpan per akun
+
+**Konteks:** lanjutan permintaan owner agar semua fitur terhubung. Koin, misi harian, voucher, tiket ruangan, hasil psikotes, stempel, notifikasi pelamar, profil, dan karakter sebelumnya hanya ada di browser. Ganti HP berarti mulai dari nol, dan akun lain yang login di browser yang sama ikut memakai koin akun sebelumnya.
+
+**Yang berubah**
+- Tabel baru `fair_players` (migrasi 0008, terkunci RLS) menyimpan satu dokumen progres per akun dengan nomor revisi.
+- Route `GET/PUT /api/jobfair/progress`: hanya untuk akun yang login, maksimal 400 KB, hanya bagian yang dikenal, dan rate limit. Simpanan di atas revisi lama ditolak 409 dan perangkat itu mengambil salinan terbaru.
+- `player-sync.ts`: saat login, progres dari server dipakai. Kalau akun belum punya, progres browser ini diunggah hanya jika memang milik akun itu, selain itu mulai baru. Perubahan dikirim tiap 4 detik, dan perangkat lain mengambilnya saat tab dibuka lagi atau tiap 45 detik.
+
+**Catatan:** saldo koin masih dihitung di perangkat (koin hanya mata uang permainan dan pembayaran masih demo). Kalau nanti koin bisa ditukar barang sungguhan, saldo perlu dihitung di server.
+
+**Dicek:** tes db baru untuk revisi (33 tes db, 40 tes demo lulus). Uji lokal: akun baru langsung tersimpan, perangkat lain yang menyimpan 777 koin muncul di device B setelah login dan di device A setelah tab dibuka lagi, simpanan basi ditolak 409, kunci asing ditolak 400, tanpa login 401, dan akun kedua di browser yang sama mulai dari 50 koin.
+
+---
+
 ## 2026-10-09 · jobfair live: chat, undangan interview, dan rating lintas perangkat
 
 **Konteks:** lanjutan permintaan owner agar panitia, perusahaan, dan pelamar saling terhubung. Chat HR, undangan interview, jawaban pelamar, rating, dan riwayat panggilan sebelumnya hanya tersimpan di browser masing-masing.

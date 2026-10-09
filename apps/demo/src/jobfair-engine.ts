@@ -485,6 +485,15 @@ export interface FairSaved {
   inbox?: FairNotif[];
 }
 
+/** The live site keeps this per account on the server. */
+export interface PlayerProgress {
+  player: PlayerState;
+  /** Booths stamped on the player's card. */
+  stamps: string[];
+  /** The player's own notifications. */
+  inbox: FairNotif[];
+}
+
 export interface FairStorage {
   load(): FairSaved | null;
   save(data: FairSaved): void;
@@ -1480,6 +1489,33 @@ export class DemoJobFair {
     for (const m of (after.messages ?? []).slice(seen)) if (m.from === "company") this.notices.push(`💬 ${after.company}: ${m.text.slice(0, 80)}`);
     if (after.interview && JSON.stringify(after.interview) !== JSON.stringify(before.interview) && !this.interviewAlerts.includes(after.id)) this.interviewAlerts.push(after.id);
     else if (after.status !== before.status && after.status !== "Dilihat") this.notices.push(`📋 ${after.company}: lamaran ${after.jobTitle} kamu sekarang "${after.status}"`);
+  }
+
+  /** Live: what belongs to the signed-in player, saved to their account so it follows them to any device. */
+  progress(): PlayerProgress {
+    return {
+      player: structuredClone(this.player),
+      stamps: [...(this.visitedBy.get(PLAYER_ID) ?? [])],
+      inbox: this.inbox.filter((n) => n.to === PLAYER_ID),
+    };
+  }
+
+  /** Live: take the account's saved progress (from another device), or start fresh with null. */
+  loadProgress(p: PlayerProgress | null) {
+    // Replace, not merge: nothing from the account that played here before may carry over.
+    for (const k of Object.keys(this.player)) delete (this.player as unknown as Record<string, unknown>)[k];
+    Object.assign(this.player, freshPlayer(), p?.player ?? {});
+    if (p?.stamps?.length) this.visitedBy.set(PLAYER_ID, new Set(p.stamps.filter((id) => typeof id === "string")));
+    else this.visitedBy.delete(PLAYER_ID);
+    const others = this.inbox.filter((n) => n.to !== PLAYER_ID);
+    const mine = (p?.inbox ?? []).filter((n) => n && n.to === PLAYER_ID && typeof n.text === "string");
+    this.inbox.splice(0, this.inbox.length, ...others, ...mine);
+    this.inbox.sort((x, y) => y.at - x.at);
+    trimInbox(this.inbox);
+    const me = this.visitors.get(PLAYER_ID);
+    if (me) me.verified = !!this.player.verified;
+    this.persist();
+    this.emit();
   }
 
   /** Live: the setup every visitor shares, the organiser's changes and each company's booth. */

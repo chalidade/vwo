@@ -57,6 +57,13 @@
       "when": 1791548939104,
       "tag": "0007_application_conversation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791549680123,
+      "tag": "0008_player_progress",
+      "breakpoints": true
     }
   ]
 }
