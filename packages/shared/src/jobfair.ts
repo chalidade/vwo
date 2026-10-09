@@ -677,7 +677,7 @@ function company(c: Omit<CompanyBooth, "website" | "email" | "socials" | "faq"> 
 /** The demo job fair: three floors of six fictional companies each, sponsors, lounges, and an info desk by the door. */
 export const DEMO_JOB_FAIR: JobFairView = {
   slug: "jobfair",
-  name: "Job Fair VWO 2026",
+  name: "jobfair 2026",
   width: 46,
   height: 22,
   floors: [
@@ -696,7 +696,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       logo: "TN",
       color: "#dc2626",
       tagline: "Internet cepat sampai pelosok",
-      about: "Penyedia internet dan seluler yang menghubungkan 80 juta pelanggan. Sponsor utama Job Fair VWO 2026.",
+      about: "Penyedia internet dan seluler yang menghubungkan 80 juta pelanggan. Sponsor utama jobfair 2026.",
       website: "https://telkonusa.example",
       promo: "Kuota 20 GB gratis untuk pengunjung: kode JOBFAIR26",
       floor: 0,

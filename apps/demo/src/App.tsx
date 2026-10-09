@@ -25,7 +25,7 @@ export function App() {
     <div className={game ? "app app-game" : home ? "app app-home" : "app"}>
       {!game && !home && (
       <nav className="top">
-        <a href="#/" className="brand">🌐 VWO</a>
+        <a href="#/" className="brand"><img src={`${import.meta.env.BASE_URL}brand/jobfair-logo.png`} alt="jobfair" className="brand-logo" /></a>
         <a href="#/jobfair" className={route === "jobfair" ? "active" : ""}>🎪 Job Fair</a>
         <a href="#/jobfair/admin" className={route.startsWith("jobfair/admin") && route !== "jobfair/admin/ads" ? "active" : ""}>Panitia job fair</a>
         <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>

@@ -36,7 +36,7 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
       <div className="ag-head">
         <span className="ag-logo">🌐</span>
         <div>
-          <h2 className="cc-title">{mode === "login" ? "Masuk ke VWO" : "Buat akun pelamar"}</h2>
+          <h2 className="cc-title">{mode === "login" ? "Masuk ke jobfair" : "Buat akun pelamar"}</h2>
           <p className="cc-note">Profil, CV, dan foto kamu tersimpan di akun ini.</p>
         </div>
       </div>
