@@ -29,25 +29,43 @@ export function watchErrors() {
   document.addEventListener("visibilitychange", () => (last = Date.now()));
 }
 
-export class CrashGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+/** Short enough to read off a phone screenshot: the message and the first frame of our own code. */
+const describe = (error: unknown) => {
+  const e = error instanceof Error ? error : new Error(String(error));
+  const frame = (e.stack ?? "").split("\n").find((l) => /\/assets\/|\.tsx?:/.test(l))?.trim() ?? "";
+  return `${e.name}: ${e.message}`.slice(0, 200) + (frame ? `\n${frame.slice(0, 160)}` : "");
+};
+
+/**
+ * Catches a crash in the part of the page it wraps. The whole app gets one at the top; a panel can
+ * have its own (`onClose`) so only that panel shows the error and the rest keeps working.
+ */
+export class CrashGuard extends Component<{ children: ReactNode; onClose?: () => void }, { error: string | null }> {
+  state = { error: null as string | null };
+  static getDerivedStateFromError(error: unknown) {
+    return { error: describe(error) };
   }
   componentDidCatch(error: unknown) {
     reportError("render", error);
   }
   render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <main className="cp">
-        <div className="card cp-server-note" role="alert">
-          <p style={{ marginTop: 0 }}>Maaf, halaman ini bermasalah. Laporannya sudah terkirim ke tim kami.</p>
-          <button type="button" onClick={() => location.reload()}>
+    if (this.state.error === null) return this.props.children;
+    const note = (
+      <div className="card cp-server-note" role="alert">
+        <p style={{ marginTop: 0 }}>Maaf, bagian ini bermasalah. Laporannya sudah terkirim ke tim kami.</p>
+        <pre className="crash-detail">{this.state.error}</pre>
+        <div className="row" style={{ gap: 8 }}>
+          {this.props.onClose && (
+            <button type="button" onClick={() => (this.setState({ error: null }), this.props.onClose!())}>
+              Tutup
+            </button>
+          )}
+          <button type="button" className={this.props.onClose ? "ghost" : undefined} onClick={() => location.reload()}>
             Muat ulang
           </button>
         </div>
-      </main>
+      </div>
     );
+    return this.props.onClose ? note : <main className="cp">{note}</main>;
   }
 }

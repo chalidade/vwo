@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · layar masuk tidak terpotong di HP, dan error kini terlihat di layar
+
+**Konteks:** owner mengirim rekaman layar: setelah mengirim pesan ke pelamar di portal perusahaan, muncul layar "Maaf, halaman ini bermasalah". Owner juga mengirim screenshot layar masuk job fair yang terpotong ke kanan di HP.
+
+**Yang berubah**
+- Layar masuk: baris akun (nama, email, "Ganti akun") dan kartu karakter tidak lagi mendorong layar melebar. Sebelumnya teks email yang panjang membuat kolom grid lebih lebar dari layar, terutama kalau ukuran teks HP diperbesar.
+- Layar error sekarang menampilkan pesan error singkat beserta lokasinya, jadi cukup dengan screenshot penyebabnya bisa dilacak.
+- Detail pelamar di portal perusahaan punya penahan error sendiri. Kalau bagian itu error, hanya panel tersebut yang menampilkan pesan dengan tombol "Tutup", dan portal lainnya tetap jalan.
+- Jadwal interview yang waktunya tidak terbaca tidak lagi membuat panel crash, dan undangan tanpa waktu yang valid ditolak.
+
+**Dicek:** tes engine lulus. Uji lokal: alur kirim pesan dan undang interview tetap jalan, termasuk dengan simulasi keyboard (IME) dan perubahan tinggi layar saat keyboard muncul. Error dari video belum bisa ditiru di lokal, jadi pesan error di layar yang akan menunjukkan penyebabnya. Layar masuk di lebar 300 px tidak lagi melebihi layar.
+
+---
+
 ## 2026-10-09 · early access untuk tester dan perbaikan klik warna karakter di laptop
 
 **Konteks:** owner ingin beberapa orang bisa mencoba jobfair sebelum rilis, sebagai pelamar atau sebagai perusahaan. Owner juga melaporkan bahwa di laptop warna dan gaya karakter tidak bisa diganti, padahal di HP bisa.
