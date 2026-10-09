@@ -16,6 +16,15 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 - Migrasi `0003_lock_public_api`: semua tabel memakai row level security dan peran API Supabase (`anon`, `authenticated`) dicabut aksesnya. Jadi API REST publik Supabase tidak membuka data apa pun, bahkan kalau anon key bocor. Tes baru gagal kalau ada tabel baru yang lupa dikunci.
 - Header keamanan di semua halaman: HSTS, larangan di-embed (anti clickjacking), nosniff, referrer policy, dan izin kamera/mikrofon hanya untuk situs sendiri.
 - Kode tetap sama untuk DigitalOcean: hanya Postgres biasa, tanpa Supabase Auth atau Storage. Pindah data cukup `pg_dump` lalu `pg_restore`.
+## 2026-10-09 · jobfair: skrip server DigitalOcean
+
+**Konteks:** owner memilih DigitalOcean dan ingin saya yang menyiapkan server lewat API DO.
+
+**Yang berubah**
+- `deploy/setup.sh` menyiapkan droplet Ubuntu 24.04 baru dalam satu kali jalan: swap 2 GB, PostgreSQL di localhost, Node 22, aplikasi web dan server realtime sebagai service systemd, Caddy dengan HTTPS otomatis, firewall (hanya SSH, 80, 443), dan backup database tiap malam yang disimpan 14 hari. Password database dibuat acak di server dan tidak pernah masuk repo.
+- `deploy/update.sh` (terpasang sebagai `jobfair-update`) menarik kode terbaru, menjalankan migrasi, build, lalu restart.
+- `deploy/do.sh` membuat droplet, melihat statusnya, dan mengubah ukurannya lewat API DO. Ukuran bisa dinaikkan sebelum event dan diturunkan lagi sesudahnya, karena disk tidak ikut diperbesar.
+- Diuji di sini: migrasi ke PostgreSQL 16 baru, build production, web dan realtime berjalan, dan daftar akun berhasil tersimpan. Membuat droplet sungguhan menunggu akses ke API DO.
 
 ---
 
