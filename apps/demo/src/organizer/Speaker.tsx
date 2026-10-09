@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { connectPeer, stopMedia } from "../fair/call";
+import { connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
 import { BOT_CHAT, BOT_NAMES, BOT_QUESTIONS, type StageChat, onStage, sendStage, stageCallId } from "../fair/stage";
+import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
 
 const canShare = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
@@ -63,7 +64,8 @@ export function SpeakerStage() {
   const [viewers, setViewers] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"chat" | "qa">("chat");
   const [text, setText] = useState("");
-  const [bots, setBots] = useState(true);
+  // The live site has only real visitors, so no demo audience there unless the speaker turns it on.
+  const [bots, setBots] = useState(!LIVE);
   const [seconds, setSeconds] = useState(0);
   const [claps, setClaps] = useState<{ id: number; x: number; e: string }[]>([]);
   const [warn, setWarn] = useState<string | null>(null);
@@ -116,6 +118,7 @@ export function SpeakerStage() {
         } else if (m.type === "leave") {
           peers.current.get(m.viewerId)?.close();
           peers.current.delete(m.viewerId);
+          leaveCall(stageCallId(m.viewerId));
           setViewers((v) => {
             const { [m.viewerId]: _, ...rest } = v;
             return rest;
@@ -320,16 +323,24 @@ export function SpeakerStage() {
             )}
           </div>
           {warn && <p className="cp-warn">{warn}</p>}
-          <p className="muted small st-note">
-            👥 {viewerCount} penonton dari tab lain{bots && live ? ` + ${botCrowd} penonton bot demo` : ""}. Demo ini tanpa server: siaran sampai ke tab lain di browser yang sama (buka{" "}
-            <a href="#/jobfair" target="_blank" rel="noreferrer">
-              job fair
-            </a>{" "}
-            di tab baru, naik lift ke Lantai 5 untuk seminar, atau tetap di Lantai 1 untuk Aula, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
-          </p>
-          <label className="st-bots small">
-            <input type="checkbox" checked={bots} onChange={(e) => setBots(e.target.checked)} /> Penonton bot (chat dan pertanyaan simulasi)
-          </label>
+          {LIVE ? (
+            <p className="muted small st-note">
+              👥 {viewerCount} penonton. Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
+            </p>
+          ) : (
+            <>
+              <p className="muted small st-note">
+                👥 {viewerCount} penonton dari tab lain{bots && live ? ` + ${botCrowd} penonton bot demo` : ""}. Demo ini tanpa server: siaran sampai ke tab lain di browser yang sama (buka{" "}
+                <a href="#/jobfair" target="_blank" rel="noreferrer">
+                  job fair
+                </a>{" "}
+                di tab baru, naik lift ke Lantai 5 untuk seminar, atau tetap di Lantai 1 untuk Aula, duduk). Untuk penonton di HP lain, versi asli memakai server siaran.
+              </p>
+              <label className="st-bots small">
+                <input type="checkbox" checked={bots} onChange={(e) => setBots(e.target.checked)} /> Penonton bot (chat dan pertanyaan simulasi)
+              </label>
+            </>
+          )}
         </section>
 
         <section className="card st-side">
