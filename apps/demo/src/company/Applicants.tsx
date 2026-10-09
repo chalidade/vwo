@@ -143,7 +143,11 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
   };
   const [iv, setIv] = useState({ at: local(a.interview ? new Date(a.interview.at) : tomorrow), mode: a.interview?.mode ?? "Video call", place: a.interview?.place ?? "", note: a.interview?.note ?? "" });
   const chatEnd = useRef<HTMLDivElement>(null);
-  useEffect(() => chatEnd.current?.scrollIntoView({ block: "nearest" }), [a.messages?.length]);
+  // Braces matter: newer Chrome returns a promise from scrollIntoView, and React would call it as
+  // the effect's cleanup on the next message ("u is not a function").
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ block: "nearest" });
+  }, [a.messages?.length]);
   useEffect(() => {
     if (a.status === "Terkirim") fair.setStatus(a.id, "Dilihat");
   }, [a.id, a.status]);
