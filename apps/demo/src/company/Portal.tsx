@@ -197,7 +197,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
           {server === "signin"
             ? "Masuk dengan akun jobfair di halaman Job Fair dulu untuk melihat pelamar dari server."
             : server === "denied"
-              ? "Selama trial, daftar pelamar dari server hanya bisa dilihat akun panitia. Minta panitia menambahkan email akunmu."
+              ? "Selama trial, daftar pelamar dan perubahan stand hanya tersimpan di server untuk akun panitia. Minta panitia menambahkan email akunmu."
               : "Tidak tersambung ke server. Daftar pelamar mungkin belum yang terbaru."}
         </p>
       )}

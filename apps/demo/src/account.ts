@@ -8,6 +8,8 @@ export interface Account {
   name: string;
   /** Live site: the server's id for this account, which calls are addressed to. */
   id?: string;
+  /** Live site: an event admin, who may change the setup and see applicants. */
+  fairAdmin?: boolean;
   /** Live site: email goes out and this address is not verified yet, so applying waits for it. */
   mustVerify?: boolean;
 }
@@ -62,6 +64,8 @@ function sameHash(a: string, b: string) {
 export const normEmail = (email: string) => email.trim().toLowerCase();
 
 const LIVE_ACCOUNT_KEY = "vwo:live-account";
+/** Fired on window when the live account changes (signed in, out, or refreshed from the server). */
+export const ACCOUNT_EVENT = "vwo:account";
 
 /** The signed-in account, if any. On the live site this is the last account the server confirmed;
  *  `checkSession` asks the server whether the session cookie is still good. */
@@ -70,7 +74,7 @@ export function currentAccount(): Account | null {
     if (LIVE) {
       const raw = localStorage.getItem(LIVE_ACCOUNT_KEY);
       const a = raw ? (JSON.parse(raw) as Partial<Account>) : null;
-      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name, id: typeof a.id === "string" ? a.id : undefined, mustVerify: a.mustVerify === true } : null;
+      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name, id: typeof a.id === "string" ? a.id : undefined, fairAdmin: a.fairAdmin === true, mustVerify: a.mustVerify === true } : null;
     }
     const email = localStorage.getItem(CURRENT_KEY);
     const a = email ? readAll()[email] : undefined;
@@ -81,6 +85,7 @@ export function currentAccount(): Account | null {
 }
 
 function rememberLive(a: Account | null) {
+  queueMicrotask(() => window.dispatchEvent(new Event(ACCOUNT_EVENT)));
   try {
     if (a) {
       localStorage.setItem(LIVE_ACCOUNT_KEY, JSON.stringify(a));
@@ -130,9 +135,9 @@ export async function checkSession(): Promise<Account | null> {
   if (!LIVE) return currentAccount();
   try {
     const { status, data } = await api("me");
-    const user = data.user as { id?: string; email?: string; name?: string; mustVerify?: boolean } | null | undefined;
+    const user = data.user as { id?: string; email?: string; name?: string; fairAdmin?: boolean; mustVerify?: boolean } | null | undefined;
     if (status === 200 && user?.email && user.name) {
-      const a = { email: user.email, name: user.name, id: user.id, mustVerify: user.mustVerify === true };
+      const a = { email: user.email, name: user.name, id: user.id, fairAdmin: user.fairAdmin === true, mustVerify: user.mustVerify === true };
       rememberLive(a);
       return a;
     }

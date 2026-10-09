@@ -43,6 +43,13 @@
       "when": 1791547801505,
       "tag": "0005_google_login",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791548290975,
+      "tag": "0006_fair_state",
+      "breakpoints": true
     }
   ]
 }

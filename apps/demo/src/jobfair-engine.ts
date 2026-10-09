@@ -1449,6 +1449,19 @@ export class DemoJobFair {
     else if (after.status !== before.status && after.status !== "Dilihat") this.notices.push(`📋 ${after.company}: lamaran ${after.jobTitle} kamu sekarang "${after.status}"`);
   }
 
+  /** Live: the setup every visitor shares, the organiser's changes and each company's booth. */
+  sharedState() {
+    return { org: this.org, companies: Object.fromEntries(this.company) as Record<string, CompanyState> };
+  }
+
+  /** Live: take the setup from the server. Missing parts keep what this browser has. */
+  applyShared(org: OrgState | null, companies: Record<string, CompanyState>) {
+    if (org) this.loadOrg(org);
+    this.loadCompany({ ...Object.fromEntries(this.company), ...companies });
+    this.persist();
+    this.emit();
+  }
+
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
     if (!saved) return;

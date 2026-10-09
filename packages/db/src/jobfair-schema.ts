@@ -295,3 +295,12 @@ export const fairApplications = pgTable(
   },
   (t) => [uniqueIndex("fair_applications_once_uq").on(t.userId, t.boothKey, t.jobKey), index("fair_applications_booth_idx").on(t.boothKey)],
 );
+
+/** The live game's shared event setup: the organiser's changes ("org") and each company's booth
+ *  ("company:<booth id>"), stored as the game saves them until fairs live in their own tables. */
+export const fairState = pgTable("fair_state", {
+  key: text("key").primaryKey(),
+  data: jsonb("data").notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
