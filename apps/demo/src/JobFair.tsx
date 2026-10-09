@@ -18,7 +18,7 @@ import {
   findPath,
   openJobs,
   slide,
-  LOUNGE_PLANS,
+  price,
   stallSlot,
   stallSpot,
   aulaSpot,
@@ -61,9 +61,9 @@ import { type Account, checkSession, currentAccount, logout, resendVerification 
 import { applyErrorText, myApplications, sendApplication as sendToServer } from "./server-fair";
 import { LIVE } from "./mode";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { type FloorPass, PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
-import { APPLY_COST, COMPANY_TITLES, SEEKER_TITLES, VERIFY_COST, levelOf, liveSeminar } from "./fair/content";
+import { COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, newCallId, onSignal, sendSignal } from "./fair/call";
@@ -888,7 +888,8 @@ export function JobFair() {
   /** Pay for a lounge call, then ring the consultant or the other job seeker. */
   function startLoungeCall(c: LoungeCallStart) {
     const who = c.consultant?.name ?? c.peer?.name ?? "";
-    const plan = LOUNGE_PLANS.find((p) => p.minutes === c.minutes) ?? LOUNGE_PLANS[0]!;
+    const plans = loungePlans();
+    const plan = plans.find((p) => p.minutes === c.minutes) ?? plans[0]!;
     setCoinAsk({ price: c.consultant ? plan.consultCoins : plan.coins, what: `${c.kind === "video" ? "video call" : "telepon"} ${c.minutes} menit dengan ${who}`, run: () => placeLoungeCall(c, who) });
   }
 
@@ -939,7 +940,7 @@ export function JobFair() {
     if (!session) return;
     if (!fair.canAffordApply()) {
       setApplying(null);
-      setToast(`Koin kurang: melamar butuh ${APPLY_COST} koin`);
+      setToast(`Koin kurang: melamar butuh ${price("coin.apply")} koin`);
       setWallet(true);
       return;
     }
@@ -948,7 +949,7 @@ export function JobFair() {
     if (free) return send();
     const b = fair.booth(boothId);
     const job = b?.jobs.find((j) => j.id === input.jobId);
-    setCoinAsk({ price: APPLY_COST, what: `melamar ${job?.title ?? "lowongan ini"}${b ? ` di ${b.company}` : ""}`, run: send });
+    setCoinAsk({ price: price("coin.apply"), what: `melamar ${job?.title ?? "lowongan ini"}${b ? ` di ${b.company}` : ""}`, run: send });
   };
 
   const sendApplication = async (boothId: string, input: ApplicationInput) => {
@@ -987,7 +988,7 @@ export function JobFair() {
     const a = fair.apply(session.visitorId, { id, boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
-    if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${APPLY_COST} 🪙)` : " (voucher)"}`);
+    if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${price("coin.apply")} 🪙)` : " (voucher)"}`);
   };
 
   /** Sign out: leave the fair and go back to the login screen. */
@@ -1414,7 +1415,7 @@ export function JobFair() {
             coins={me.coins}
             verified={!!me.verified}
             onBuy={() =>
-              setCoinAsk({ price: VERIFY_COST, what: "centang biru (akun terverifikasi)", run: () => fair.buyVerified() && setToast("✔ Akunmu sekarang terverifikasi") })
+              setCoinAsk({ price: price("coin.verify"), what: "centang biru (akun terverifikasi)", run: () => fair.buyVerified() && setToast("✔ Akunmu sekarang terverifikasi") })
             }
             onTopUp={() => {
               setVerify(false);
@@ -1633,7 +1634,7 @@ export function JobFair() {
             defaultName={session.name}
             defaults={profile}
             appliedJobIds={appliedIds}
-            cost={fair.freeApplies() ? "🎟️ voucher" : `${APPLY_COST} 🪙`}
+            cost={fair.freeApplies() ? "🎟️ voucher" : `${price("coin.apply")} 🪙`}
             note={LIVE ? "Lamaran disimpan di server jobfair dan dikirim ke perusahaan." : undefined}
             onClose={() => setApplying(null)}
             onSubmit={(input) => submit(applyBooth.id, input)}

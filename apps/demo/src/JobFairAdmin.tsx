@@ -5,6 +5,7 @@ import { OrgAula } from "./organizer/Aula";
 import { OrgBooths } from "./organizer/Booths";
 import { OrgFloors } from "./organizer/Floors";
 import { OrgLive } from "./organizer/Live";
+import { OrgPrices } from "./organizer/Prices";
 import { OrgPsych } from "./organizer/Psych";
 import { OrgSeminars } from "./organizer/Seminars";
 import { fair, useFair } from "./useFair";
@@ -14,6 +15,7 @@ const TABS = [
   ["floors", "🏢 Lantai"],
   ["booths", "🏬 Stand"],
   ["ads", "📣 Iklan"],
+  ["prices", "💰 Harga"],
   ["psych", "🧠 Psikotes"],
   ["seminar", "🎤 Seminar"],
   ["aula", "🏛️ Aula"],
@@ -86,6 +88,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
       {tab === "floors" && <OrgFloors onToast={setToast} />}
       {tab === "booths" && <OrgBooths onToast={setToast} />}
       {tab === "ads" && <OrgAds onToast={setToast} />}
+      {tab === "prices" && <OrgPrices onToast={setToast} />}
       {tab === "psych" && <OrgPsych onToast={setToast} />}
       {tab === "seminar" && <OrgSeminars onToast={setToast} />}
       {tab === "aula" && <OrgAula onToast={setToast} />}

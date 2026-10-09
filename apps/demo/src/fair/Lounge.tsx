@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { type Consultant, LOUNGE_PLANS } from "@vwo/shared";
+import type { Consultant } from "@vwo/shared";
+import { loungePlans } from "../jobfair-engine";
 import type { CallKind } from "./call";
 import { Modal } from "./Modal";
 
@@ -47,11 +48,11 @@ export function LoungeDesk({
   onTopUp: () => void;
   onClose: () => void;
 }) {
-  const [minutes, setMinutes] = useState<number>(LOUNGE_PLANS[0].minutes);
+  const [minutes, setMinutes] = useState<number>(loungePlans()[0]!.minutes);
   const [kind, setKind] = useState<CallKind>("voice");
   const [peerId, setPeerId] = useState(view.mode === "peer" ? (view.memberId ?? peers[0]?.memberId) : undefined);
   const consult = view.mode === "consult" ? consultants[view.index] : undefined;
-  const plan = LOUNGE_PLANS.find((p) => p.minutes === minutes) ?? LOUNGE_PLANS[0];
+  const plan = loungePlans().find((p) => p.minutes === minutes) ?? loungePlans()[0]!;
   const price = consult ? plan.consultCoins : plan.coins;
   const peer = peers.find((p) => p.memberId === peerId);
 
@@ -68,7 +69,7 @@ export function LoungeDesk({
             </tr>
           </thead>
           <tbody>
-            {LOUNGE_PLANS.map((p) => (
+            {loungePlans().map((p) => (
               <tr key={p.minutes}>
                 <td>{p.minutes} menit</td>
                 <td>{p.consultCoins} 🪙</td>
@@ -121,7 +122,7 @@ export function LoungeDesk({
 
       <div className="lg-label">Durasi</div>
       <div className="lg-options">
-        {LOUNGE_PLANS.map((p) => (
+        {loungePlans().map((p) => (
           <button key={p.minutes} type="button" className="lg-opt" data-active={minutes === p.minutes ? "" : undefined} onClick={() => setMinutes(p.minutes)}>
             <b>{p.minutes} menit</b>
             <span>{consult ? p.consultCoins : p.coins} 🪙</span>

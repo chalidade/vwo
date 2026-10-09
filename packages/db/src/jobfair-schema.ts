@@ -330,3 +330,16 @@ export const fairBoothMembers = pgTable(
   },
   (t) => [primaryKey({ columns: [t.boothKey, t.userId] }), index("fair_booth_members_user_idx").on(t.userId)],
 );
+
+/** The organiser's price list: one row per price they changed (keys from @vwo/shared PRICE_CATALOG).
+ *  Coins for job seekers, rupiah for companies. A key without a row costs its default. */
+export const fairPrices = pgTable(
+  "fair_prices",
+  {
+    key: text("key").primaryKey(),
+    amount: integer("amount").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [check("fair_prices_amount_ck", sql`${t.amount} >= 0`)],
+);

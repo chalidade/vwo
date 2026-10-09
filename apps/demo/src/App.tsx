@@ -7,6 +7,7 @@ import { SpeakerStage } from "./organizer/Speaker";
 import { LIVE } from "./mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
 import { syncPlayer } from "./player-sync";
+import { startPriceSync } from "./prices-sync";
 import { startSharedSync } from "./shared-state";
 
 function useHash() {
@@ -43,6 +44,7 @@ function useLiveAccount() {
 export function App() {
   const hash = useHash();
   const account = useLiveAccount();
+  useEffect(startPriceSync, []);
   // On the live site only event admins run the organiser pages; companies use their portal.
   const organizer = !LIVE || !!account?.fairAdmin;
   const route = hash.replace(/^#\/?/, "");

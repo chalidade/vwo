@@ -836,3 +836,28 @@ describe("DemoJobFair", () => {
     expect(again.room("psikotes")?.level).toBe(5);
   });
 });
+
+describe("organiser price list", () => {
+  it("prices calls, applications, coin packs and company products from the table", async () => {
+    const { setPriceTable, cleanPrices, price } = await import("@vwo/shared");
+    const { VIP_PRODUCT, ACCESSORY_PRODUCTS } = await import("../src/fair/company");
+    const { STAND_PRICES, loungePlans } = await import("../src/jobfair-engine");
+    expect(cleanPrices({ "coin.apply": 7.4, "nope": 3, "stand.regular": -5, "pack.koin-50": "x" })).toEqual({ "coin.apply": 7, "stand.regular": 0 });
+    const fair = new DemoJobFair(() => 0.5);
+    fair.applyPrices({ "coin.apply": 9, "call.10": 12, "pack.koin-50": 15_000, "product.vip": 3_000_000, "product.tv": 0, "stand.premium": 20_000_000 });
+    expect(price("coin.apply")).toBe(9);
+    expect(price("coin.verify")).toBe(60);
+    expect(loungePlans()[0]).toEqual({ minutes: 10, coins: 12, consultCoins: 20 });
+    expect(fair.fair.coinStand.packages[0]!.price).toBe("Rp15.000");
+    expect(VIP_PRODUCT.price).toBe(3_000_000);
+    expect(ACCESSORY_PRODUCTS.find((p) => p.id === "tv")!.price).toBe(0);
+    expect(STAND_PRICES.premium).toBe(20_000_000);
+    fair.join("Sari", false, PLAYER_ID);
+    const before = fair.player.coins;
+    const b = fair.fair.booths[0]!;
+    expect(fair.apply(PLAYER_ID, { boothId: b.id, jobId: b.jobs[0]!.id })).toBeTruthy();
+    expect(before - fair.player.coins).toBe(9);
+    setPriceTable({});
+    expect(price("coin.apply")).toBe(5);
+  });
+});

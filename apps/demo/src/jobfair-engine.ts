@@ -13,6 +13,11 @@ import {
   DEMO_JOB_FAIR,
   LOUNGE,
   LOUNGE_PLANS,
+  type Prices,
+  price,
+  priceTable,
+  rp,
+  setPriceTable,
   loungeBoardSpot,
   loungeSpot,
   safeImage,
@@ -48,16 +53,12 @@ import {
   type FairApplicationOut,
 } from "@vwo/shared";
 import {
-  APPLY_COST,
   CAREER_ARTICLES,
-  DAILY_COINS,
   FOOD_VOUCHERS,
   GAME_DAILY_CAP,
   MISSIONS_BONUS,
   type MissionKind,
   SEMINARS,
-  START_COINS,
-  VERIFY_COST,
   XP,
   type VoucherKind,
   levelOf,
@@ -294,8 +295,20 @@ export interface BookedBooth {
 /** Stand prices for a booking, in rupiah. */
 /** What renting an empty food court stand costs a business, per event (demo payment). */
 export const STALL_PRICE = 750_000;
+export const stallPrice = () => price("stall");
 
-export const STAND_PRICES = { regular: 7_500_000, premium: 15_000_000 } as const;
+/** Stand prices for a booking, from the organiser's price list. */
+export const STAND_PRICES = {
+  get regular() {
+    return price("stand.regular");
+  },
+  get premium() {
+    return price("stand.premium");
+  },
+};
+
+/** Paid calls in the lounge, priced from the organiser's price list. */
+export const loungePlans = () => LOUNGE_PLANS.map((p) => ({ minutes: p.minutes, coins: price(`call.${p.minutes}`), consultCoins: price(`consult.${p.minutes}`) }));
 
 /** The PIN a company uses to open its portal until the organiser sets another. */
 export function defaultPin(boothId: string) {
@@ -674,7 +687,9 @@ export class DemoJobFair {
       promoters: structuredClone(fair.promoters),
       sponsors: structuredClone(fair.sponsors),
       rooms: structuredClone(fair.rooms),
+      coinStand: structuredClone(fair.coinStand),
     };
+    this.applyPrices(priceTable(), false);
     this.floors = buildJobFairFloors(this.fair);
     this.stops = fairStops(this.fair);
     this.staff = [];
@@ -1539,6 +1554,16 @@ export class DemoJobFair {
     return { org: this.org, companies: Object.fromEntries(this.company) as Record<string, CompanyState> };
   }
 
+  /** The organiser's price list changed: coin stand boards show the new prices. */
+  applyPrices(table: Prices, notify = true) {
+    setPriceTable(table);
+    for (const p of this.fair.coinStand.packages) p.price = rp(price(`pack.${p.id}`));
+    if (notify) {
+      this.persist();
+      this.emit();
+    }
+  }
+
   /** Live: take the setup from the server. Missing parts keep what this browser has. */
   applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = []) {
     const base = org ?? (bookings.length ? this.org : null);
@@ -1771,9 +1796,9 @@ export class DemoJobFair {
     this.player.streak = this.player.dailyOn === yesterday ? (this.player.streak ?? 0) + 1 : 1;
     this.player.dailyOn = this.today();
     const bonus = streakBonus(this.player.streak);
-    this.earn(DAILY_COINS + bonus, bonus ? `Koin gratis harian + bonus ${this.player.streak} hari beruntun` : "Koin gratis harian");
+    this.earn(price("coin.daily") + bonus, bonus ? `Koin gratis harian + bonus ${this.player.streak} hari beruntun` : "Koin gratis harian");
     this.emit();
-    return DAILY_COINS + bonus;
+    return price("coin.daily") + bonus;
   }
 
   // --- Daily missions and sofa mini games.
@@ -1972,7 +1997,7 @@ export class DemoJobFair {
   /** Buy the blue verified check with coins. */
   buyVerified() {
     if (this.player.verified) return true;
-    if (!this.spend(VERIFY_COST, "Centang biru (verified)")) return false;
+    if (!this.spend(price("coin.verify"), "Centang biru (verified)")) return false;
     this.player.verified = true;
     const v = this.visitors.get(PLAYER_ID);
     if (v) v.verified = true;
@@ -1984,7 +2009,7 @@ export class DemoJobFair {
   /** Start a paid call in the consultation lounge: with a consultant, or with another job seeker.
    *  The price buys one call of up to `minutes`; the call screen hangs up when the time is over. */
   startLoungeCall(kind: "consult" | "peer", minutes: number, who: string) {
-    const plan = LOUNGE_PLANS.find((p) => p.minutes === minutes);
+    const plan = loungePlans().find((p) => p.minutes === minutes);
     if (!plan) return false;
     const cost = kind === "consult" ? plan.consultCoins : plan.coins;
     if (!this.spend(cost, `${kind === "consult" ? "Konsultasi" : "Telepon"} ${minutes} menit dengan ${who}`)) return false;
@@ -2000,7 +2025,7 @@ export class DemoJobFair {
   }
 
   canAffordApply() {
-    return this.freeApplies() > 0 || this.player.coins >= APPLY_COST;
+    return this.freeApplies() > 0 || this.player.coins >= price("coin.apply");
   }
 
   recordPsych(result: Omit<PsychResult, "at">) {
@@ -2207,7 +2232,7 @@ export class DemoJobFair {
       // Real seekers pay for each application: a free-apply voucher first, otherwise coins.
       const voucher = this.player.vouchers.find((x) => !x.used && x.kind === "free-apply");
       if (voucher) voucher.used = true;
-      else if (!this.spend(APPLY_COST, `Lamar ${job.title} di ${b.company}`)) return null;
+      else if (!this.spend(price("coin.apply"), `Lamar ${job.title} di ${b.company}`)) return null;
     }
     const a: FairApplication = {
       id: input.id ?? this.id("app"),
@@ -2921,7 +2946,7 @@ const FEEDBACK = [
 ];
 
 function freshPlayer(): PlayerState {
-  return { coins: START_COINS, txns: [{ at: 0, amount: START_COINS, reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false, streak: 0, daily: undefined, read: [], roadmap: {} };
+  return { coins: price("coin.start"), txns: [{ at: 0, amount: price("coin.start"), reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false, streak: 0, daily: undefined, read: [], roadmap: {} };
 }
 
 /** Reviews a company had before today, made up from its id so every visitor sees the same. */

@@ -8,6 +8,8 @@ import {
   JobClosedError,
   NotEnoughCoinsError,
   addBoothMember,
+  readPrices,
+  writePrices,
   boothMembers,
   boothsOf,
   isBoothMember,
@@ -177,5 +179,15 @@ describe("company accounts", () => {
     expect(await removeBoothMember(db, "nusantara-tech", seeker)).toBe(true);
     expect(await removeBoothMember(db, "nusantara-tech", seeker)).toBe(false);
     expect(await boothsOf(db, seeker)).toEqual([]);
+  });
+});
+
+describe("price list", () => {
+  it("keeps one row per price, overwriting on save, and refuses negative amounts", async () => {
+    expect(await readPrices(db)).toEqual({});
+    await writePrices(db, { "coin.apply": 7, "stand.regular": 5_000_000 }, seeker);
+    await writePrices(db, { "coin.apply": 8 }, seeker);
+    expect(await readPrices(db)).toEqual({ "coin.apply": 8, "stand.regular": 5_000_000 });
+    await expect(writePrices(db, { "coin.apply": -1 }, seeker)).rejects.toThrow();
   });
 });

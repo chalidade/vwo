@@ -71,6 +71,13 @@
       "when": 1791553457722,
       "tag": "0009_company_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791555060261,
+      "tag": "0010_price_table",
+      "breakpoints": true
     }
   ]
 }
