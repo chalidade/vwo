@@ -3,7 +3,20 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AlreadyAppliedError, JobClosedError, NotEnoughCoinsError, applyToJob, coinBalance, createDb, grantCoins, spendCoins } from "../src";
+import {
+  AlreadyAppliedError,
+  JobClosedError,
+  NotEnoughCoinsError,
+  applyToJob,
+  boothFairApplications,
+  coinBalance,
+  createDb,
+  grantCoins,
+  myFairApplications,
+  setFairApplicationStatus,
+  spendCoins,
+  submitFairApplication,
+} from "../src";
 import { applications, booths, companies, fairs, jobs, users } from "../src/schema";
 
 const url = process.env.TEST_DATABASE_URL ?? "postgres://vwo:vwo@localhost:5432/vwo_test";
@@ -77,5 +90,24 @@ describe("applications", () => {
     const [other] = await db.insert(users).values({ email: "budi@mail.example", displayName: "Budi" }).returning();
     await expect(applyToJob(db, { userId: other!.id, jobId, cost: 10, consent: true })).rejects.toBeInstanceOf(NotEnoughCoinsError);
     expect(await db.$count(applications)).toBe(1);
+  });
+});
+
+describe("live game applications", () => {
+  const data = { company: "TokoKita", jobTitle: "QA Engineer", name: "Sari", email: "sari@mail.example" };
+
+  it("keeps one application per seeker and job, visible to the seeker and the booth", async () => {
+    const row = await submitFairApplication(db, { userId: seeker, boothKey: "toko-kita", jobKey: "tk-qa", data });
+    await expect(submitFairApplication(db, { userId: seeker, boothKey: "toko-kita", jobKey: "tk-qa", data })).rejects.toBeInstanceOf(AlreadyAppliedError);
+    expect((await myFairApplications(db, seeker)).map((a) => a.id)).toEqual([row.id]);
+    expect((await boothFairApplications(db, "toko-kita")).map((a) => a.id)).toEqual([row.id]);
+    expect(await boothFairApplications(db, "other-booth")).toEqual([]);
+  });
+
+  it("lets only the booth that received an application change its status", async () => {
+    const [row] = await boothFairApplications(db, "toko-kita");
+    expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "other-booth", status: "Shortlist" })).toBe(false);
+    expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "toko-kita", status: "Shortlist" })).toBe(true);
+    expect((await myFairApplications(db, seeker))[0]!.status).toBe("Shortlist");
   });
 });

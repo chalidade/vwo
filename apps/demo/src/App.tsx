@@ -4,6 +4,7 @@ import { Landing } from "./Landing";
 import { JobFairAdmin } from "./JobFairAdmin";
 import { CompanyPortal } from "./company/Portal";
 import { SpeakerStage } from "./organizer/Speaker";
+import { LIVE } from "./mode";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -31,9 +32,15 @@ export function App() {
         <a href="#/jobfair/admin/ads" className={route === "jobfair/admin/ads" ? "active" : ""}>📣 Kelola iklan</a>
         <a href="#/jobfair/company" className={route.startsWith("jobfair/company") ? "active" : ""}>🏢 Portal perusahaan</a>
         <a href="#/jobfair/speaker" className={route === "jobfair/speaker" ? "active" : ""}>🎤 Pembicara</a>
-        <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelamar lain adalah bot. Versi lengkap butuh server.">
-          Demo · pengunjung lain bot
-        </span>
+        {LIVE ? (
+          <span className="demo-tag" title="Akun dan lamaran tersimpan di server. Fitur lain masih disambungkan bertahap.">
+            Trial
+          </span>
+        ) : (
+          <span className="demo-tag" title="Semua data hanya ada di browser kamu, dan pelamar lain adalah bot. Versi lengkap butuh server.">
+            Demo · pengunjung lain bot
+          </span>
+        )}
       </nav>
       )}
       {route === "jobfair" ? (

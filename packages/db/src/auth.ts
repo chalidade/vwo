@@ -72,6 +72,11 @@ export async function register(db: Db, input: { email: string; password: string;
   return { userId: user.id, verifyToken: await issueEmailToken(db, user.id, "verify") };
 }
 
+/** A fresh verification link for an account that lost or never got the first email. */
+export function newVerifyToken(db: Db, userId: string) {
+  return issueEmailToken(db, userId, "verify");
+}
+
 /** Check an email and password. Returns the user id or throws InvalidLoginError. */
 export async function checkLogin(db: Db, email: string, password: string) {
   const [user] = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.email, email));

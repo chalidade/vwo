@@ -45,6 +45,7 @@ import {
   facingFor,
   findPath,
   isBlocked,
+  type FairApplicationOut,
 } from "@vwo/shared";
 import {
   APPLY_COST,
@@ -620,6 +621,11 @@ export class DemoJobFair {
   readonly sponsorViews = new Map<string, number>();
   readonly bubbles = new Map<string, { text: string; until: number }>();
   private bots: Bot[] = [];
+  /** How many bot seekers walk the floors at once. None in the live app, where every visitor is real. */
+  maxBots = MAX_BOTS;
+  /** Bot guests fill the rooms and demo companies answer applications by themselves.
+   *  Off in the live app, where every applicant and every company is a real person. */
+  simulated = true;
   private seq = 0;
   private listeners = new Set<() => void>();
   private later: { at: number; fn: () => void }[] = [];
@@ -1384,6 +1390,56 @@ export class DemoJobFair {
   }
 
 
+  /** Called after a company changes an application's status here; the live app sends it to the server. */
+  onStatusChange: ((a: FairApplication) => void) | null = null;
+
+  /** Applications the server has: the player's own (from any device), or the ones a booth received. */
+  mergeServer(list: FairApplicationOut[], mine: boolean) {
+    let changed = false;
+    for (const s of list) {
+      const have = this.applications.find((x) => x.id === s.id);
+      if (have) {
+        if (s.updatedAt > (have.updatedAt ?? 0) && s.status !== have.status) {
+          const before = { ...have };
+          have.status = s.status;
+          have.updatedAt = s.updatedAt;
+          if (mine) this.tellPlayer(before, have);
+          changed = true;
+        }
+        continue;
+      }
+      this.applications.push({
+        id: s.id,
+        at: s.at,
+        visitorId: mine ? PLAYER_ID : `user-${s.id}`,
+        name: s.name,
+        boothId: s.boothId,
+        company: s.company,
+        jobId: s.jobId,
+        jobTitle: s.jobTitle,
+        email: s.email,
+        phone: s.phone ?? "",
+        cvUrl: s.cvUrl ?? "",
+        message: s.message ?? "",
+        status: s.status,
+        isBot: false,
+        psych: s.psych,
+        verified: s.verified,
+        headline: s.headline,
+        education: s.education,
+        skills: s.skills,
+        city: s.city,
+        photo: safeImage(s.photo),
+        updatedAt: s.updatedAt,
+      });
+      changed = true;
+    }
+    if (!changed) return;
+    this.applications.sort((x, y) => y.at - x.at);
+    this.persist();
+    this.emit();
+  }
+
   /** The company changed one of the player's applications in another tab (its portal): say what changed. */
   private tellPlayer(before: FairApplication, after: FairApplication) {
     const seen = before.messages?.length ?? 0;
@@ -2027,7 +2083,7 @@ export class DemoJobFair {
 
   apply(
     visitorId: string,
-    input: { boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string; photo?: string },
+    input: { id?: string; boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string; photo?: string },
   ) {
     const v = this.visitors.get(visitorId);
     const b = this.booth(input.boothId);
@@ -2041,7 +2097,7 @@ export class DemoJobFair {
       else if (!this.spend(APPLY_COST, `Lamar ${job.title} di ${b.company}`)) return null;
     }
     const a: FairApplication = {
-      id: this.id("app"),
+      id: input.id ?? this.id("app"),
       at: this.now(),
       visitorId,
       name: input.name?.trim() || v.displayName,
@@ -2071,6 +2127,13 @@ export class DemoJobFair {
     this.persist();
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
     if (!v.isBot) this.gainXp(XP.apply);
+    if (this.simulated) this.simulateRecruiter(a);
+    this.emit();
+    return a;
+  }
+
+  /** Demo companies read and rate an application by themselves a little later. */
+  private simulateRecruiter(a: FairApplication) {
     this.after(6000, () => {
       if (a.status === "Terkirim") {
         a.status = "Dilihat";
@@ -2094,8 +2157,6 @@ export class DemoJobFair {
       this.persist();
       this.emit();
     });
-    this.emit();
-    return a;
   }
 
   /** The recruiter's decision, from the admin view. */
@@ -2104,6 +2165,7 @@ export class DemoJobFair {
     if (!a || a.status === status) return;
     a.status = status;
     a.updatedAt = this.now();
+    this.onStatusChange?.(a);
     if (a.visitorId === PLAYER_ID && status !== "Dilihat" && !quiet) {
       this.notices.push(`📋 ${a.company}: lamaran ${a.jobTitle} kamu sekarang "${status}"`);
       this.notify(PLAYER_ID, "status", `${a.company}: lamaran ${a.jobTitle} sekarang "${status}"`, a.id);
@@ -2408,7 +2470,7 @@ export class DemoJobFair {
 
     if (now >= this.nextBotAt) {
       this.nextBotAt = now + 2500 + this.rand() * 4500;
-      if (this.bots.length < MAX_BOTS) {
+      if (this.bots.length < this.maxBots) {
         this.spawnBot();
         changed = true;
       }
@@ -2495,7 +2557,7 @@ export class DemoJobFair {
       const floor = this.floor(fairRoomFloorId(this.fair, room.id));
       const inRoom = [...this.visitors.values()].filter((v) => v.floorId === floor.id && v.isBot);
       const target = Math.round(floor.seats.length * (room.kind === "seminar" ? 0.5 : room.kind === "psikotes" ? 0.4 : 0.35));
-      if (inRoom.length < target && this.rand() < 0.7) {
+      if (this.simulated && inRoom.length < target && this.rand() < 0.7) {
         const free = floor.seats.filter((st) => !this.seatTaken(st.id));
         const seat = free.length ? this.pick(free) : null;
         if (seat) {
@@ -2590,10 +2652,11 @@ export class DemoJobFair {
       const job = open.length ? this.pick(open) : null;
       if (stop.spot === "talk" && job) {
         bot.phase = "talking";
-        const applies = this.rand() < 0.4;
+        // In the live app the bot only walks and chats: applications and reviews come from real people.
+        const applies = this.simulated && this.rand() < 0.4;
         bot.until = now + (applies ? 7600 : 4600) + this.rand() * 1500;
         const rid = recruiterId(booth.id);
-        if (this.rand() < 0.3) this.after(3000, () => this.visitors.has(v.memberId) && this.reviewCompany(v.memberId, booth.id, 3 + Math.round(this.rand() * 2)));
+        if (this.simulated && this.rand() < 0.3) this.after(3000, () => this.visitors.has(v.memberId) && this.reviewCompany(v.memberId, booth.id, 3 + Math.round(this.rand() * 2)));
         this.say(v.memberId, this.pick(QUESTIONS)(booth, job.title), 2200);
         this.after(1700, () => this.visitors.has(v.memberId) && this.say(rid, this.pick(ANSWERS)(booth, job.title), 2600));
         if (applies) {

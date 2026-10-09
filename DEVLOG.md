@@ -4,6 +4,24 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: lamaran ke database, tanpa bot, verifikasi email dan anti-bot
+
+**Konteks:** owner mencoba versi live di dua device. Lamaran dari device A tidak muncul di portal perusahaan di device B, bot masih berkeliaran, dialog koin berantakan, sambutan panjang muncul setiap kali masuk, dan perlu perlindungan dari pendaftaran bot.
+
+**Yang berubah**
+- Lamaran disimpan di tabel baru `fair_applications` (migrasi 0004, terkunci RLS seperti tabel lain). Koin baru dipotong setelah server menerima lamaran. Pelamar melihat lamarannya dan status dari perusahaan di semua device (diambil ulang tiap 30 detik).
+- Portal perusahaan mengambil pelamar dari server tiap 20 detik, dan perubahan status dikirim balik ke server. Selama trial, data pelamar (berisi kontak pribadi) hanya bisa dibuka akun panitia yang terdaftar di `ADMIN_EMAILS`, karena PIN perusahaan masih PIN demo. Akun lain mendapat pesan penjelasan.
+- Versi live tanpa bot: tidak ada pengunjung bot, tamu bot di ruangan, atau perusahaan bot yang membalas lamaran otomatis. Demo GitHub Pages tetap seperti dulu.
+- Dialog konfirmasi koin dirapikan: judul jelas, rincian saldo/dipakai/sisa, dua tombol sama lebar.
+- Tur sambutan panjang hanya muncul di kunjungan pertama per akun; berikutnya cukup sapaan singkat.
+- Anti-bot dan spam: kolom honeypot tersembunyi di form daftar, dukungan Cloudflare Turnstile (aktif setelah key diisi), dan setelah `RESEND_API_KEY` diisi, akun wajib verifikasi email sebelum melamar. Halaman `/verify` dan `/reset`, tombol kirim ulang verifikasi, dan "Lupa password?" sudah ada.
+- Cron harian Vercel memanggil `/api/health` agar database Supabase gratis tidak dijeda karena tidak aktif.
+- Label header di versi live jadi "Trial".
+
+**Diuji:** di Postgres lokal dengan dua browser: pelamar mengirim lamaran (201), kirim ulang ditolak (409), link CV `javascript:` ditolak (400), pelamar tidak bisa membuka daftar pelamar (403), honeypot menolak bot, panitia melihat pelamar di portal, status "Shortlist" dari panitia terlihat di sisi pelamar. 37 tes demo dan 28 tes database lulus.
+
+---
+
 ## 2026-10-09 · jobfair: game masuk ke aplikasi live, login pakai akun server
 
 **Konteks:** owner minta job fair dipindah ke aplikasi live (Vercel + Supabase) dan login game disambungkan ke akun di server.

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BoothLogo } from "@vwo/ui";
 import type { CompanyBooth } from "@vwo/shared";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { NotifList } from "../fair/Notifs";
+import { LIVE } from "../mode";
+import { boothApplications } from "../server-fair";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
@@ -132,6 +134,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
   const [bell, setBell] = useState(false);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
   const unread = fair.unreadFor(booth.id);
+  const server = useServerApplicants(booth.id);
 
   return (
     <main className="cp">
@@ -189,6 +192,15 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut: () => void }) {
           </button>
         ))}
       </nav>
+      {server && server !== "ok" && (
+        <p className="card cp-server-note" role="status">
+          {server === "signin"
+            ? "Masuk dengan akun jobfair di halaman Job Fair dulu untuk melihat pelamar dari server."
+            : server === "denied"
+              ? "Selama trial, daftar pelamar dari server hanya bisa dilihat akun panitia. Minta panitia menambahkan email akunmu."
+              : "Tidak tersambung ke server. Daftar pelamar mungkin belum yang terbaru."}
+        </p>
+      )}
       {tab === "overview" && <Overview booth={booth} onTab={setTab} />}
       {tab === "applicants" && <Applicants key={focus?.n} booth={booth} focusId={focus?.id} />}
       {tab === "jobs" && <JobsEditor booth={booth} />}
@@ -309,4 +321,26 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
       </div>
     </div>
   );
+}
+
+/** Live site: pull this booth's applications from the server while the portal is open. */
+function useServerApplicants(boothId: string) {
+  const [state, setState] = useState<"ok" | "signin" | "denied" | "offline" | null>(null);
+  useEffect(() => {
+    if (!LIVE) return;
+    let gone = false;
+    const pull = () =>
+      void boothApplications(boothId).then((r) => {
+        if (gone) return;
+        if (r.ok) fair.mergeServer(r.data.applications, false);
+        setState(r.ok ? "ok" : r.error === "not_signed_in" ? "signin" : r.error === "not_allowed" ? "denied" : "offline");
+      });
+    pull();
+    const timer = window.setInterval(pull, 20_000);
+    return () => {
+      gone = true;
+      window.clearInterval(timer);
+    };
+  }, [boothId]);
+  return state;
 }

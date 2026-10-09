@@ -5,3 +5,4 @@ export * from "./live";
 export * from "./jobfair";
 export * from "./auth";
 export * from "./ratelimit";
+export * from "./fair-applications";

@@ -22,3 +22,10 @@ export async function sendMail(to: string, subject: string, text: string) {
   });
   if (!res.ok) throw new Error(`mail failed: ${res.status}`);
 }
+
+/** Email goes out for real, so accounts can be asked to verify their address. */
+export const mailEnabled = () => !!process.env.RESEND_API_KEY;
+
+export function sendVerifyMail(email: string, name: string, token: string) {
+  return sendMail(email, "Verifikasi email jobfair", `Halo ${name},\n\nKlik link ini untuk memverifikasi email kamu (berlaku 48 jam):\n${appUrl()}/verify?token=${token}\n\nAbaikan email ini kalau kamu tidak mendaftar di jobfair.`);
+}

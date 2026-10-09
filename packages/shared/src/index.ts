@@ -6,3 +6,4 @@ export * from "./nav";
 export * from "./menu";
 export * from "./jobfair";
 export * from "./auth";
+export * from "./fair-api";

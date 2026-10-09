@@ -29,6 +29,13 @@
       "when": 1791539708881,
       "tag": "0003_lock_public_api",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791546030871,
+      "tag": "0004_fair_applications",
+      "breakpoints": true
     }
   ]
 }
