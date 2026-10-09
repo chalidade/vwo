@@ -18,6 +18,7 @@ import {
   findPath,
   openJobs,
   slide,
+  isBlocked,
   price,
   stallSlot,
   stallSpot,
@@ -91,6 +92,7 @@ import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
+import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
 import { fair, useFair } from "./useFair";
 
 interface Session {
@@ -222,6 +224,33 @@ export function JobFair() {
   const hud = useHud();
   const stageLive = useStageLive();
   savedSession = session;
+
+  // Remember where the player stands, so a reload or a trip to the payment page comes back here.
+  useEffect(() => {
+    if (!session) return;
+    const who = account?.email ?? "guest";
+    const save = () => {
+      const me = fair.visitors.get(session.visitorId);
+      if (me) saveSpot(who, me);
+    };
+    const timer = setInterval(save, 2_000);
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      save();
+      clearInterval(timer);
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", save);
+    };
+  }, [session, account?.email]);
+
+  // Left while inside the fair (closed the app, paid, reloaded): walk straight back in.
+  const autoEntered = useRef(false);
+  useEffect(() => {
+    if (session || autoEntered.current || !account || !character || !wasInside(account.email)) return;
+    autoEntered.current = true;
+    enter(character);
+  });
 
   const keys = useRef(new Set<string>());
   const route = useRef<{ x: number; y: number }[] | null>(null);
@@ -484,6 +513,11 @@ export function JobFair() {
 
   const enter = (c: Character) => {
     const v = fair.join(c.name, false, PLAYER_ID);
+    const who = account?.email ?? "guest";
+    // Back where they left off: same floor, same spot (if it is still free to stand on).
+    const spot = loadSpot(who);
+    if (spot && fair.floors.some((f) => f.id === spot.floorId) && !isBlocked(fair.floor(spot.floorId), spot.x, spot.y)) fair.placeAt(v.memberId, spot.floorId, spot.x, spot.y);
+    setInside(who, true);
     if (!profile.name || (!profile.email && account)) updateProfile({ ...profile, name: profile.name || account?.name || c.name, email: profile.email || account?.email || "" });
     counted.current.clear();
     setSession({ visitorId: v.memberId, name: c.name, look: c.look });
@@ -995,6 +1029,7 @@ export function JobFair() {
   /** Sign out: leave the fair and go back to the login screen. */
   const signOut = () => {
     if (session) fair.leave(session.visitorId);
+    setInside(account?.email ?? "guest", false);
     savedSession = null;
     setSession(null);
     setTalk(null);
@@ -1006,6 +1041,7 @@ export function JobFair() {
 
   const leave = () => {
     if (!session) return;
+    setInside(account?.email ?? "guest", false);
     fair.leave(session.visitorId);
     setSession(null);
     setTalk(null);

@@ -1696,6 +1696,14 @@ export class DemoJobFair {
     if (v) v.facing = "front";
   }
 
+  /** Put someone straight onto a spot (coming back to where they left off), without any greeting. */
+  placeAt(id: string, floorId: string, x: number, y: number) {
+    const v = this.visitors.get(id);
+    if (!v) return;
+    Object.assign(v, { floorId, x, y, seatId: null });
+    this.emit();
+  }
+
   /** Move someone to another floor. */
   changeFloor(id: string, floorId: string, x: number, y: number) {
     const v = this.visitors.get(id);
