@@ -9,3 +9,4 @@ export * from "./fair-applications";
 export * from "./fair-state";
 export * from "./fair-players";
 export * from "./fair-booths";
+export * from "./fair-prices";

@@ -1,6 +1,6 @@
 // The company portal's catalogue: what a company can buy for its booth, and how applicants are scored.
 import { BOOTH_ACCESSORIES } from "@vwo/ui";
-import type { CompanyBooth, JobPosting } from "@vwo/shared";
+import { type CompanyBooth, type JobPosting, price } from "@vwo/shared";
 
 /** One thing a company can pay for. Prices are demo prices in rupiah; nothing is charged. */
 export interface CompanyProduct {
@@ -15,7 +15,9 @@ export const VIP_PRODUCT: CompanyProduct = {
   id: "vip",
   name: "Upgrade stand VIP",
   emoji: "👑",
-  price: 2_500_000,
+  get price() {
+    return price("product.vip");
+  },
   about: "Stand lebih lebar dengan layar video, lounge dan gapura, 5 pilihan tampilan VIP (Emas, Platinum, Royal, Taman Hijau, Cyber Neon), tulisan backdrop sendiri, lampu sorot, LED berjalan, dan posisi teratas di daftar stand.",
 };
 
@@ -23,22 +25,10 @@ export const PROMOTER_PRODUCT: CompanyProduct = {
   id: "promoter",
   name: "NPC promotor keliling",
   emoji: "📣",
-  price: 1_000_000,
+  get price() {
+    return price("product.promoter");
+  },
   about: "Seorang promotor berbaju warna brand-mu berjalan di lantai stand, mendatangi pelamar, dan mengajak mereka melihat lowonganmu.",
-};
-
-const ACCESSORY_PRICES: Record<string, number> = {
-  plant: 0,
-  flag: 0,
-  standee: 200_000,
-  giveaway: 250_000,
-  coffee: 500_000,
-  beanbag: 250_000,
-  tv: 300_000,
-  photobooth: 750_000,
-  balloons: 150_000,
-  neon: 350_000,
-  gapura: 400_000,
 };
 
 export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_ACCESSORIES.map((a) => ({
@@ -46,7 +36,9 @@ export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_A
   name: a.name,
   emoji: a.emoji,
   slot: a.slot,
-  price: ACCESSORY_PRICES[a.id] ?? 0,
+  get price() {
+    return price(`product.${a.id}`);
+  },
   about:
     a.slot === "floor" ? "Diletakkan di depan stand (maks. 4 barang lantai)." : a.slot === "air" ? "Melayang di dua sudut atas stand." : a.slot === "wall" ? "Menyala di dinding stand." : a.slot === "gate" ? "Gerbang di pintu masuk stand; gaya dan tulisannya bisa diatur. Gratis untuk stand VIP." : "Di sudut belakang stand.",
 }));

@@ -1344,3 +1344,14 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
    flags, neon, breathing): dozens of SVG animations repainting every frame made scrolling stutter. */
 .lp-scene, .lp-scene * { animation: none !important; }
 .lp[data-scrolling] .lp-float, .lp[data-scrolling] .lp-glow { animation-play-state: paused; }
+
+/* Organiser price list */
+.pr-group + .pr-group { margin-top: 14px; }
+.pr-table td { vertical-align: middle; }
+.pr-table tr[data-changed] td { background: color-mix(in srgb, #facc15 14%, transparent); }
+.pr-input { width: 130px; max-width: 100%; }
+.pr-save { margin-top: 14px; gap: 8px; }
+.pr-table { table-layout: fixed; min-width: 560px; }
+.pr-table th:nth-child(2) { width: 70px; }
+.pr-table th:nth-child(3) { width: 130px; }
+.pr-table th:nth-child(4) { width: 210px; }

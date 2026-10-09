@@ -4,6 +4,22 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · tabel harga yang diatur panitia
+
+**Konteks:** owner ingin satu tabel keuangan untuk mengatur harga tiap fitur: harga koin, paket VIP, printilan booth, sewa stand, daftar booth, harga telepon, dan lainnya.
+
+**Yang berubah**
+- Tabel baru `fair_prices` di database (migrasi 0010): satu baris per harga yang diubah panitia, lengkap dengan siapa dan kapan mengubahnya. Harga yang belum diubah memakai harga bawaan.
+- Katalog harga di `packages/shared/src/pricing.ts`: koin pencari kerja (melamar, centang biru, koin sambutan, koin harian), paket koin dalam rupiah, telepon/video call dan konsultasi per durasi, sewa stand reguler/VIP, sewa stan food court, upgrade VIP, NPC promotor, dan tiap printilan booth.
+- Halaman Panitia → 💰 Harga: semua harga dalam satu tabel per kelompok, kolom harga bawaan, tombol kembali ke bawaan, perkiraan rupiah per koin untuk paket koin, dan tombol simpan sekaligus.
+- Endpoint `/api/jobfair/prices`: semua orang bisa membaca, hanya panitia yang bisa mengubah. Kunci yang tidak dikenal dan angka di luar batas dibuang.
+- Game, dompet koin, papan stand koin, lounge telepon, portal perusahaan (VIP, promotor, printilan), booking stand, dan sewa stan food court sekarang membaca harga dari tabel. Harga booking stand juga dihitung di server dari tabel.
+- Tiket lantai/ruangan tetap diatur di tab Lantai dan harga voucher makan di tab Food Court.
+
+**Dicek:** tes database dan engine lulus; uji lokal: panitia mengubah 3 harga lalu tersimpan di server, akun biasa ditolak (403), pengunjung lain menerima harga baru, dan booking stand memakai harga baru.
+
+---
+
 ## 2026-10-09 · akun perusahaan per stand, booking ke server, login hanya Google
 
 **Konteks:** owner meminta akun perusahaan dikerjakan (poin 1 dan 2 dari daftar fitur yang belum terintegrasi) dan form daftar/login email dihapus sehingga masuk hanya lewat Google.

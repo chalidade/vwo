@@ -1,5 +1,5 @@
-import { addBoothMember, readFairState, writeFairState } from "@vwo/db";
-import { type CompanyBooth, DEMO_JOB_FAIR } from "@vwo/shared";
+import { addBoothMember, readFairState, readPrices, writeFairState } from "@vwo/db";
+import { type CompanyBooth, DEMO_JOB_FAIR, priceFrom } from "@vwo/shared";
 import { randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -10,7 +10,6 @@ import { currentUser } from "@/lib/session";
 
 /** Where a stand can stand on a hall floor; the same slots the game offers. */
 const SLOTS = [3, 20, 37].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
-const PRICES = { regular: 7_500_000, premium: 15_000_000 } as const;
 
 const bookingSchema = z.object({
   company: z.string().trim().min(2).max(60),
@@ -74,7 +73,7 @@ export async function POST(req: Request) {
     jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],
   };
   const pin = String(randomInt(1000, 10000));
-  const booking = { id: `book-${Date.now().toString(36)}`, boothId: id, company: name, contact: input.contact, email: input.email, tier: input.tier, price: PRICES[input.tier], method: input.method, at: Date.now() };
+  const booking = { id: `book-${Date.now().toString(36)}`, boothId: id, company: name, contact: input.contact, email: input.email, tier: input.tier, price: priceFrom(await readPrices(db), `stand.${input.tier}`), method: input.method, at: Date.now() };
   await writeFairState(db, { key: `booking:${id}`, data: { booth, booking, pin }, userId: user.id });
   await addBoothMember(db, id, user.id);
   return NextResponse.json({ booth, pin }, { status: 201 });

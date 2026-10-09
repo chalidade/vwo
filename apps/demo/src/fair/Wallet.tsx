@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { CoinStandView } from "@vwo/shared";
 import type { PlayerState } from "../jobfair-engine";
-import { APPLY_COST, DAILY_COINS, streakBonus } from "./content";
+import { price } from "@vwo/shared";
+import { streakBonus } from "./content";
 import { Modal } from "./Modal";
 
 const METHODS = ["QRIS", "GoPay", "OVO", "Transfer bank"];
@@ -53,11 +54,11 @@ export function WalletPanel({
       {tab === "buy" && (
         <>
           <p className="sp-summary">
-            Koin dipakai untuk melamar ({APPLY_COST} koin per lamaran) dan masuk ruangan premium seperti Ruang Psikotes dan Ruang Seminar.
+            Koin dipakai untuk melamar ({price("coin.apply")} koin per lamaran) dan masuk ruangan premium seperti Ruang Psikotes dan Ruang Seminar.
           </p>
           <div className="fx-daily">
             <span>
-              🎁 Koin gratis harian +{DAILY_COINS + streakBonus((player.streak ?? 0) + 1)}
+              🎁 Koin gratis harian +{price("coin.daily") + streakBonus((player.streak ?? 0) + 1)}
               {player.streak ? <span className="sp-muted"> · 🔥 {player.streak} hari beruntun</span> : null}
             </span>
             <button type="button" className="mb-order" disabled={!canClaim} onClick={onClaim}>

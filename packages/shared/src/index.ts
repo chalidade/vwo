@@ -7,3 +7,4 @@ export * from "./menu";
 export * from "./jobfair";
 export * from "./auth";
 export * from "./fair-api";
+export * from "./pricing";

@@ -1,4 +1,4 @@
-import { VERIFY_COST } from "./content";
+import { price } from "@vwo/shared";
 import { Modal } from "./Modal";
 
 /** Buy the blue check with coins: it shows by your name for everyone, and on your applications. */
@@ -21,14 +21,14 @@ export function VerifyPanel({ name, coins, verified, onBuy, onTopUp, onClose }: 
         <button type="button" className="mb-order jb-apply" onClick={onClose}>
           Mantap 👍
         </button>
-      ) : coins >= VERIFY_COST ? (
+      ) : coins >= price("coin.verify") ? (
         <button type="button" className="mb-order jb-apply vf-buy" onClick={onBuy}>
-          Beli centang biru · {VERIFY_COST} 🪙
+          Beli centang biru · {price("coin.verify")} 🪙
         </button>
       ) : (
         <div className="fx-callout">
           <span>
-            Butuh <b>{VERIFY_COST} 🪙</b>, saldomu {coins} 🪙.
+            Butuh <b>{price("coin.verify")} 🪙</b>, saldomu {coins} 🪙.
           </span>
           <button type="button" className="mb-order" onClick={onTopUp}>
             Isi koin

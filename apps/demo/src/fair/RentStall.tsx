@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { STALL_PRICE } from "../jobfair-engine";
+import { stallPrice } from "../jobfair-engine";
 import { fair } from "../useFair";
 import { PAY_METHODS, rupiah } from "./company";
 import { Modal } from "./Modal";
@@ -33,7 +33,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
           }}
         >
           <p className="bk-place">
-            📍 Food Court, {side} · <b>tersedia</b> · {rupiah(STALL_PRICE)} per acara
+            📍 Food Court, {side} · <b>tersedia</b> · {rupiah(stallPrice())} per acara
           </p>
           <label>
             Nama usaha
@@ -78,7 +78,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
             </div>
           )}
           <button type="submit" className="bk-go">
-            Lanjut ke pembayaran · {rupiah(STALL_PRICE)}
+            Lanjut ke pembayaran · {rupiah(stallPrice())}
           </button>
         </form>
       )}
@@ -91,7 +91,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
                 <td>
                   Sewa stan food court · {emoji} {name}
                 </td>
-                <td>{rupiah(STALL_PRICE)}</td>
+                <td>{rupiah(stallPrice())}</td>
               </tr>
             </tbody>
           </table>
@@ -118,7 +118,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
                 setStep("done");
               }}
             >
-              Bayar {rupiah(STALL_PRICE)}
+              Bayar {rupiah(stallPrice())}
             </button>
           </div>
         </div>

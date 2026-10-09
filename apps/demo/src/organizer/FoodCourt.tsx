@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { STALL_SLOTS, stallSlot } from "@vwo/shared";
-import { STALL_PRICE } from "../jobfair-engine";
+import { stallPrice } from "../jobfair-engine";
 import { rupiah } from "../fair/company";
 import { fair } from "../useFair";
 
@@ -20,7 +20,7 @@ export function OrgFoodCourt({ onToast }: { onToast: (t: string) => void }) {
       <div className="card">
         <h2 className="cp-h2">🍜 Stan food court</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
-          {STALL_SLOTS.length} tempat stan: 8 di dinding belakang, 4 di sisi kiri, 3 di sisi kanan. {free} kosong. Stan kosong tampil di peta dengan tanda "Sewa stan" dan bisa disewa usaha sendiri seharga {rupiah(STALL_PRICE)}.
+          {STALL_SLOTS.length} tempat stan: 8 di dinding belakang, 4 di sisi kiri, 3 di sisi kanan. {free} kosong. Stan kosong tampil di peta dengan tanda "Sewa stan" dan bisa disewa usaha sendiri seharga {rupiah(stallPrice())}.
         </p>
         <div className="org-slots">
           {STALL_SLOTS.map((_, slot) => {
