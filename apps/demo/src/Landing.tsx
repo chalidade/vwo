@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { openJobs, type JobPosting } from "@vwo/shared";
 import { BoothLogo } from "@vwo/ui";
 import { FloorScene } from "./fair/FloorScene";
 import { InstallButton } from "./install";
-import { fair, useFair } from "./useFair";
+import { fair } from "./useFair";
 
 const LOGO = `${import.meta.env.BASE_URL}brand/jobfair-logo.png`;
 
@@ -56,6 +56,121 @@ const TYPES = ["Semua", "Full-time", "Magang", "Kontrak", "Part-time"] as const;
 /** Which floors the preview cycles through: the booth floors first, then the rooms. */
 function previewStops() {
   return [...fair.stops.filter((st) => !st.roomId), ...fair.stops.filter((st) => st.roomId && st.roomId !== "aula")];
+}
+
+// While the page is being scrolled the live preview holds still: its walking people are the most
+// expensive thing on the page to paint, and a frozen frame is not noticed mid-scroll.
+let scrolling = false;
+const scrollWaiters = new Set<() => void>();
+function useScrollPause(root: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const on = () => {
+      if (!scrolling) {
+        scrolling = true;
+        root.current?.setAttribute("data-scrolling", "");
+      }
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        scrolling = false;
+        root.current?.removeAttribute("data-scrolling");
+        scrollWaiters.forEach((fn) => fn());
+      }, 180);
+    };
+    window.addEventListener("scroll", on, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", on);
+      if (timer) clearTimeout(timer);
+      scrolling = false;
+    };
+  }, [root]);
+}
+
+/**
+ * Re-render with the job fair, but only while `ref` is on screen and the tab is visible, and at
+ * most a few times a second. The preview's people keep walking without the whole page redrawing
+ * every frame, which made scrolling the home page stutter on phones.
+ */
+function useFairWhileVisible(ref: RefObject<HTMLElement | null>, everyMs = 125) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    let off: (() => void) | null = null;
+    let last = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onChange = () => {
+      if (scrolling) return;
+      const wait = everyMs - (performance.now() - last);
+      if (wait <= 0) {
+        last = performance.now();
+        bump((n) => n + 1);
+      } else timer ??= setTimeout(() => {
+        timer = null;
+        last = performance.now();
+        bump((n) => n + 1);
+      }, wait);
+    };
+    let onScreen = true;
+    const sync = () => {
+      const want = onScreen && document.visibilityState === "visible";
+      if (want && !off) off = fair.subscribe(onChange);
+      else if (!want && off) {
+        off();
+        off = null;
+      }
+    };
+    const io =
+      el && typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(([e]) => {
+            onScreen = !!e?.isIntersecting;
+            sync();
+          })
+        : null;
+    if (el) io?.observe(el);
+    document.addEventListener("visibilitychange", sync);
+    scrollWaiters.add(onChange);
+    sync();
+    return () => {
+      scrollWaiters.delete(onChange);
+      io?.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      off?.();
+      if (timer) clearTimeout(timer);
+    };
+  }, [ref, everyMs]);
+}
+
+/** How many people are in the job fair, refreshed now and then. */
+function OnlineCount() {
+  const ref = useRef<HTMLSpanElement>(null);
+  useFairWhileVisible(ref, 2000);
+  const n = fair.visitors.size;
+  return <span ref={ref}>{n > 0 ? `${n} pencari kerja sedang online` : "Job fair sedang buka"}</span>;
+}
+
+/** The live look inside one floor, in the hero. */
+function LivePreview({ floorId, name, label }: { floorId: string; name: string; label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFairWhileVisible(ref);
+  const here = [...fair.visitors.values()].filter((v) => v.floorId === floorId).length + fair.staff.filter((x) => x.floorId === floorId).length;
+  return (
+    <div className="lp-frame" ref={ref}>
+      <div className="lp-frame-bar">
+        <span className="lp-dots" aria-hidden>
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="lp-frame-title">
+          <b className="lp-live">● LIVE</b> {name} · {label}
+        </span>
+        <span className="lp-frame-count">{here} orang</span>
+      </div>
+      <a className="lp-frame-body" href="#/jobfair" aria-label={`Masuk job fair, mulai dari ${label}`}>
+        <FloorScene floorId={floorId} className="lp-scene" />
+      </a>
+    </div>
+  );
 }
 
 /** Sections fade up the first time they scroll into view. */
@@ -119,8 +234,8 @@ function CountUp({ to }: { to: number }) {
 
 /** The home page for job seekers: what jobfair is, a live look inside, open jobs, and the way in. */
 export function Landing() {
-  useFair();
   const root = useReveal();
+  useScrollPause(root);
   const stops = previewStops();
   const [pick, setPick] = useState(0);
   const [auto, setAuto] = useState(true);
@@ -131,12 +246,10 @@ export function Landing() {
     return () => clearInterval(id);
   }, [auto]);
   const stop = stops[pick % Math.max(1, stops.length)] ?? fair.stops[0]!;
-  const here = [...fair.visitors.values()].filter((v) => v.floorId === stop.floorId).length + fair.staff.filter((x) => x.floorId === stop.floorId).length;
   const booths = fair.fair.booths;
   const allJobs = booths.flatMap((b) => openJobs(b).map((j) => ({ b, j })));
   const types = TYPES.filter((t) => t === "Semua" || allJobs.some(({ j }) => j.type === t));
   const shown = allJobs.filter(({ j }) => type === "Semua" || j.type === type).slice(0, 6);
-  const online = fair.visitors.size;
 
   return (
     <div className="lp" ref={root}>
@@ -165,7 +278,7 @@ export function Landing() {
           <div className="lp-hero-copy">
             <p className="lp-badge lp-in" style={{ ["--d" as string]: 0 }}>
               <span className="lp-pulse" aria-hidden />
-              {online} pencari kerja sedang online
+              <OnlineCount />
             </p>
             <h1 className="lp-in" style={{ ["--d" as string]: 1 }}>
               Langkah pertama ke <span className="lp-nw"><span className="lp-hl">karier impian</span>,</span> langsung dari HP.
@@ -191,22 +304,7 @@ export function Landing() {
           </div>
 
           <div className="lp-hero-visual lp-in" style={{ ["--d" as string]: 3 }}>
-            <div className="lp-frame">
-              <div className="lp-frame-bar">
-                <span className="lp-dots" aria-hidden>
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span className="lp-frame-title">
-                  <b className="lp-live">● LIVE</b> {stop.name} · {stop.label}
-                </span>
-                <span className="lp-frame-count">{here} orang</span>
-              </div>
-              <a className="lp-frame-body" href="#/jobfair" aria-label={`Masuk job fair, mulai dari ${stop.label}`}>
-                <FloorScene floorId={stop.floorId} className="lp-scene" />
-              </a>
-            </div>
+            <LivePreview floorId={stop.floorId} name={stop.name} label={stop.label} />
             <div className="lp-float lp-float-a" aria-hidden>
               <span className="lp-float-ic">
                 <Icon name="check" />
@@ -259,7 +357,7 @@ export function Landing() {
               [booths.length, "perusahaan"],
               [allJobs.length, "lowongan terbuka"],
               [fair.stops.length, "lantai"],
-              [online, "sedang online"],
+              [fair.visitors.size, "sedang online"],
             ] as const
           ).map(([n, label]) => (
             <div key={label}>

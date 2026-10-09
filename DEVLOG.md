@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · landing lebih lancar dan panduan install aplikasi
+
+**Konteks:** owner melaporkan landing terasa lag saat di-scroll ke bagian live, dan HP hanya menawarkan "add shortcut", bukan install aplikasi.
+
+**Yang berubah**
+- Seluruh landing sebelumnya digambar ulang setiap frame karena ikut berlangganan ke job fair. Sekarang hanya kotak preview live yang ikut bergerak, maksimal 8 kali per detik, dan hanya saat kotaknya terlihat di layar dan tab aktif. Saat sedang di-scroll, preview diam.
+- Animasi dekoratif di dalam preview (lampu, bendera, neon, napas karakter) dimatikan di landing. Ini sumber terbesar beban gambar.
+- CSS yang berat dikurangi: blur 90px pada cahaya latar, animasi grid, blur di kartu melayang, blur pada animasi muncul, dan blur nav di HP.
+- Badge "0 pencari kerja online" diganti "Job fair sedang buka" saat belum ada yang online.
+- Install: manifest diberi `id` dan `display_override`, cache service worker dinaikkan versinya. Panduan install sekarang menyesuaikan perangkat: browser di dalam WhatsApp/Instagram (harus dibuka di Chrome dulu), iPhone, Samsung Internet, dan Chrome (pilih Instal, bukan Buat pintasan; hapus pintasan lama dulu).
+
+**Dicek:** di emulasi Pixel 7 dengan CPU diperlambat 4x, scroll naik dari sekitar 9 fps menjadi 55 fps tanpa long task. Chrome melaporkan halaman memenuhi syarat install (tanpa installability error) dari /, /play, dan /play/.
+
+---
+
 ## 2026-10-09 · jobfair live: siaran pembicara ke semua perangkat
 
 **Konteks:** penutup permintaan owner agar semua fitur terhubung. Siaran pembicara (layar/slide, chat, Q&A, tepuk tangan) sebelumnya hanya sampai ke tab lain di browser yang sama.
