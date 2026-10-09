@@ -4,6 +4,18 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · VWO: cafe simulator dihapus dari demo
+
+**Konteks:** owner mengizinkan cafe simulator dihapus atau dipindah supaya fokus ke job fair.
+
+**Yang berubah**
+- Halaman cafe (`World.tsx`), live view admin cafe, mesin cafe, staf cafe, buku menu, dan tesnya dihapus dari demo. Beranda dan menu atas sekarang hanya berisi job fair.
+- Loop animasi yang dipakai job fair dipindah dari `useCafe.ts` ke `loop.ts`.
+- Versi terakhir dengan cafe disimpan di branch `cafe-final` (tag tidak bisa di-push dari lingkungan ini).
+- `apps/web`, `apps/realtime`, dan `packages/db` belum disentuh. Isinya masih backend cafe, dan akan dipakai ulang sebagai kerangka backend job fair sesuai rencana go-live.
+
+---
+
 ## 2026-10-09 · VWO: lantai baru, food court 15 stan, konfirmasi koin, obrolan pelamar, keramaian lebih ringan
 
 **Konteks:** owner meminta urutan lantai yang baru, food court yang lebih ramai dan bisa disewa, konfirmasi sebelum koin terpakai, suasana yang lebih hidup, perbaikan seminar yang kadang error, dan kesiapan untuk 3.000–10.000 pengguna.

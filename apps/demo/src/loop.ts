@@ -1,13 +1,7 @@
-import { useEffect, useReducer } from "react";
-import { DemoCafe } from "./engine";
-
-// One cafe per browser tab, shared by the customer world and the admin view.
-export const cafe = new DemoCafe();
-
 type FrameHook = (dtMs: number) => void;
 const hooks = new Set<FrameHook>();
 
-/** Run `fn` every animation frame, before the bots move. Returns an unsubscribe function. */
+/** Run `fn` every animation frame. Returns an unsubscribe function. */
 export function onFrame(fn: FrameHook) {
   hooks.add(fn);
   return () => {
@@ -23,7 +17,6 @@ const step = () => {
   const dt = Math.min(now - last, 250);
   last = now;
   hooks.forEach((fn) => fn(dt));
-  if (cafe.watched) cafe.tick(dt);
 };
 const frame = () => {
   step();
@@ -33,15 +26,3 @@ requestAnimationFrame(frame);
 setInterval(() => {
   if (document.hidden) step();
 }, 250);
-
-/** Re-render whenever the cafe changes. */
-export function useCafe() {
-  const [, bump] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    const unsubscribe = cafe.subscribe(bump);
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-  return cafe;
-}

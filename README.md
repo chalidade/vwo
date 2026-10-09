@@ -1,10 +1,10 @@
 # VWO - Virtual World Job
 
-Dunia virtual untuk mencari kerja: job fair dengan stand perusahaan, aula acara, seminar, dan psikotes, plus cafe virtual untuk nongkrong.
+Job fair virtual yang dijelajahi dengan karakter. Pelamar tiba di Aula (Lantai 1), naik lift ke booth perusahaan (Lantai 2–4), lalu ke seminar, psikotes, lounge konsultasi, dan food court. Ada dashboard panitia, portal perusahaan, dan halaman pembicara.
 
-Cermin virtual dari cafe sungguhan. Setiap cafe punya link sendiri (`/vwo/{slug}`), denah dengan meja dan kursi, daftar siapa yang sedang ada di dalam secara live, menu dan order yang tersambung ke kasir, serta karakter dan interaksi antar pelanggan.
+**Demo:** https://chalidade.github.io/vwo/ (versi statis yang jalan di browser, pelamar lain adalah bot).
 
-**Demo:** https://chalidade.github.io/vwo/ (versi statis yang jalan di browser, pelanggan lain adalah bot).
+Cafe simulator yang dulu ada di sini sudah dihapus dari demo. Versi terakhirnya disimpan di branch [`cafe-final`](https://github.com/chalidade/vwo/tree/cafe-final). `apps/web`, `apps/realtime`, dan `packages/db` masih berisi backend cafe dan akan dipakai ulang sebagai kerangka backend job fair.
 
 Desain lengkap ada di [`docs/design/`](docs/design/) (ERD, DFD, catatan keputusan). Progres dicatat di [`DEVLOG.md`](DEVLOG.md).
 
@@ -15,11 +15,11 @@ Desain lengkap ada di [`docs/design/`](docs/design/) (ERD, DFD, catatan keputusa
 | `apps/web` | Next.js: admin panel (`/admin`), live view per cafe (`/admin/{slug}`), dunia pelanggan (`/vwo/{slug}`), API |
 | `apps/realtime` | Server Socket.IO: posisi avatar, arah hadap, emote, duduk/berdiri, counter live |
 | `packages/db` | Skema Postgres (Drizzle) untuk 34 tabel, migrasi, seed, dan logika kunjungan/kursi |
-| `apps/demo` | Demo statis untuk GitHub Pages: mesin cafe di browser dengan bot, tanpa server |
-| `packages/shared` | Protokol realtime, validasi slug, helper posisi kursi, denah cafe contoh |
-| `packages/ui` | Komponen React bersama (denah lantai) |
+| `apps/demo` | Demo statis job fair untuk GitHub Pages: mesin acara di browser dengan bot, tanpa server |
+| `packages/shared` | Data dan geometri job fair, protokol realtime, helper denah dan kursi |
+| `packages/ui` | Komponen React bersama: scene RPG, karakter, stand, ruangan |
 
-## Menjalankan lokal
+## Menjalankan backend cafe lama secara lokal
 
 Butuh Node 22, pnpm 10, dan Docker (atau Postgres 16 lokal).
 
@@ -40,7 +40,7 @@ Lalu buka:
 
 ## Demo statis
 
-`apps/demo` di-deploy otomatis ke GitHub Pages setiap ada push ke `main` (workflow `pages.yml`). Untuk mencoba lokal: `pnpm --filter @vwo/demo dev`. Aturan kursi di demo sama dengan backend, tapi semua data hanya di memori browser.
+`apps/demo` di-deploy otomatis ke GitHub Pages setiap ada push ke `main` (workflow `pages.yml`). Untuk mencoba lokal: `pnpm --filter @vwo/demo dev`. Semua data hanya ada di browser.
 
 ## Tes
 
@@ -52,6 +52,6 @@ pnpm typecheck
 pnpm test
 ```
 
-## Belum ada di base ini
+## Menuju live
 
-Login dan hak akses staff, check-in QR dengan token berganti, editor denah drag-and-drop, pindah lantai lewat tangga di dunia virtual, menu dan order, pembayaran, chat, sprite karakter chibi, dan Redis adapter untuk realtime multi-instance. Urutannya dicatat di `DEVLOG.md`.
+Langkah go-live (backend job fair, pembayaran, skala 3.000–10.000 pengguna, hukum, dan load test) dicatat di `DEVLOG.md` dan di dokumen rencana go-live.

@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import { DEMO_JOB_FAIR } from "@vwo/shared";
 import { DemoJobFair, type FairSaved, type FairStorage } from "./jobfair-engine";
-import { onFrame } from "./useCafe";
+import { onFrame } from "./loop";
 
 const KEY = "vwo:jobfair";
 
