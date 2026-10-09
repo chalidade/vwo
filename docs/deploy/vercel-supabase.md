@@ -12,7 +12,17 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 3. Vercel env vars (Production):
    - `DATABASE_URL`: transaction pooler URL (the app turns prepared statements off for port 6543)
    - `MIGRATE_DATABASE_URL`: session pooler URL (migrations need a session)
-   - optional `RESEND_API_KEY`, `MAIL_FROM`; `APP_URL` defaults to the production `.vercel.app` URL
+   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (publishable key): players see each other through
+     Supabase Realtime. Read at build time, so redeploy after changing them.
+   - `ADMIN_EMAILS`: comma-separated accounts that may read and update applicants in the company
+     portal during the trial (until companies have their own accounts)
+   - `RESEND_API_KEY`, `MAIL_FROM`: verification and password reset emails. Once set, an account
+     must verify its email before applying.
+   - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
+   - `TURNSTILE_SECRET_KEY` and `VITE_TURNSTILE_SITE_KEY` (Cloudflare Turnstile, free): human
+     check on sign-up. Off while unset; sign-up also has a hidden honeypot field.
+4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
+   enough to be paused.
 
 ## What keeps the move to DigitalOcean free of rework
 - Only plain Postgres through Drizzle. No Supabase Auth, Storage or REST client in the app.
@@ -28,4 +38,5 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 - Security headers (HSTS, frame denial, nosniff, referrer and permissions policy) come from
   `next.config.ts`, so both hosts send them.
 - Never put a database URL in a `NEXT_PUBLIC_*` variable; those are shipped to browsers.
-- Realtime is not on Vercel yet; the job fair realtime layer comes with the job fair UI.
+- Realtime runs on Supabase broadcast channels (`apps/demo/src/live.ts`); on DigitalOcean the same
+  `Transport` interface gets a Socket.IO implementation.

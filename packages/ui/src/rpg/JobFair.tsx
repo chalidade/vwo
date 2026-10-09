@@ -1100,11 +1100,14 @@ export function ApplyForm({
   defaults = {},
   appliedJobIds = new Set(),
   cost,
+  note = "Ini demo: data lamaran hanya tersimpan di browser ini.",
   onSubmit,
   onClose,
 }: {
   booth: CompanyBooth;
   jobId?: string;
+  /** Where the application goes, under the buttons. */
+  note?: string;
   /** What sending costs, shown on the button, e.g. "5 🪙" or "voucher". */
   cost?: string;
   defaultName?: string;
@@ -1174,7 +1177,7 @@ export function ApplyForm({
             </button>
           )}
         </div>
-        <p className="mb-note">Ini demo: data lamaran hanya tersimpan di browser ini.</p>
+        <p className="mb-note">{note}</p>
       </form>
     </div>
   );

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { type Account, MIN_PASSWORD, login, register } from "./account";
+import { useEffect, useRef, useState } from "react";
+import { type Account, MIN_PASSWORD, forgotPassword, login, register } from "./account";
 import { LIVE } from "./mode";
 
 /** Sign in or sign up before entering the job fair. On the live site accounts are on the server. */
@@ -12,12 +12,20 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
   const [terms, setTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  // Bots fill every field, people never see this one.
+  const [website, setWebsite] = useState("");
+  const captcha = useTurnstile(LIVE && mode === "register");
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const r = mode === "login" ? await login(email, password) : await register({ name, email, password, acceptTerms: terms });
+      const r =
+        mode === "login"
+          ? await login(email, password)
+          : await register({ name, email, password, acceptTerms: terms, website, captcha: captcha.token ?? undefined });
+      if (!r.ok) captcha.reset();
       if (r.ok) onIn(r.account);
       else setError(r.error);
     } catch {
@@ -43,10 +51,10 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
         </div>
       </div>
       <div className="ag-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => (setMode("login"), setError(null))}>
+        <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => (setMode("login"), setError(null), setInfo(null))}>
           Masuk
         </button>
-        <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => (setMode("register"), setError(null))}>
+        <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => (setMode("register"), setError(null), setInfo(null))}>
           Daftar
         </button>
       </div>
@@ -77,6 +85,8 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
           </button>
         </span>
       </label>
+      <input className="ag-hp" name="website" tabIndex={-1} autoComplete="off" aria-hidden value={website} onChange={(e) => setWebsite(e.target.value)} />
+      {mode === "register" && captcha.enabled && <div className="ag-captcha" ref={captcha.ref} />}
       {mode === "register" && (
         <label className="ag-terms">
           <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} required />
@@ -88,9 +98,27 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
           {error}
         </p>
       )}
+      {info && (
+        <p className="ag-info" role="status">
+          {info}
+        </p>
+      )}
       <button type="submit" className="cc-go" disabled={busy}>
         {busy ? "Memproses..." : mode === "login" ? "Masuk ▶" : "Daftar & lanjut ▶"}
       </button>
+      {LIVE && mode === "login" && (
+        <button
+          type="button"
+          className="ag-link ag-forgot"
+          onClick={async () => {
+            setError(null);
+            if (!email.trim()) return setError("Isi email kamu dulu, lalu klik Lupa password.");
+            setInfo(await forgotPassword(email));
+          }}
+        >
+          Lupa password?
+        </button>
+      )}
       <p className="cc-note">
         {mode === "login" ? "Belum punya akun? " : "Sudah punya akun? "}
         <button type="button" className="ag-link" onClick={() => (setMode(mode === "login" ? "register" : "login"), setError(null))}>
@@ -100,4 +128,48 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
       {!LIVE && <p className="cc-note ag-demo">Versi demo: akun disimpan di browser ini saja. Saat launch, akun pindah ke server.</p>}
     </form>
   );
+}
+
+const TURNSTILE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+type Turnstile = { render(el: HTMLElement, opts: Record<string, unknown>): string; reset(id: string): void; remove(id: string): void };
+
+/** Cloudflare Turnstile on the sign-up form, when the site key is set. Usually passes without a puzzle. */
+function useTurnstile(on: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const widget = useRef<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const enabled = on && !!TURNSTILE_KEY;
+  useEffect(() => {
+    if (!enabled) return;
+    let gone = false;
+    const mount = () => {
+      const ts = (window as { turnstile?: Turnstile }).turnstile;
+      if (gone || !ts || !ref.current) return;
+      widget.current = ts.render(ref.current, { sitekey: TURNSTILE_KEY, language: "id", callback: setToken, "expired-callback": () => setToken(null) });
+    };
+    if ((window as { turnstile?: Turnstile }).turnstile) mount();
+    else {
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      s.async = true;
+      s.onload = mount;
+      document.head.appendChild(s);
+    }
+    return () => {
+      gone = true;
+      const ts = (window as { turnstile?: Turnstile }).turnstile;
+      if (ts && widget.current) ts.remove(widget.current);
+      widget.current = null;
+    };
+  }, [enabled]);
+  return {
+    enabled,
+    ref,
+    token,
+    reset() {
+      const ts = (window as { turnstile?: Turnstile }).turnstile;
+      if (ts && widget.current) ts.reset(widget.current);
+      setToken(null);
+    },
+  };
 }

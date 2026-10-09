@@ -6,6 +6,8 @@ import { LIVE } from "./mode";
 export interface Account {
   email: string;
   name: string;
+  /** Live site: email goes out and this address is not verified yet, so applying waits for it. */
+  mustVerify?: boolean;
 }
 
 interface StoredAccount extends Account {
@@ -66,7 +68,7 @@ export function currentAccount(): Account | null {
     if (LIVE) {
       const raw = localStorage.getItem(LIVE_ACCOUNT_KEY);
       const a = raw ? (JSON.parse(raw) as Partial<Account>) : null;
-      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name } : null;
+      return a && typeof a.email === "string" && typeof a.name === "string" ? { email: a.email, name: a.name, mustVerify: a.mustVerify === true } : null;
     }
     const email = localStorage.getItem(CURRENT_KEY);
     const a = email ? readAll()[email] : undefined;
@@ -95,6 +97,7 @@ const SERVER_ERRORS: Record<string, string> = {
   wrong_email_or_password: "Email atau password salah.",
   too_many_requests: "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.",
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+  not_human: "Pemeriksaan keamanan gagal. Muat ulang halaman lalu coba lagi.",
 };
 
 async function api(path: string, body?: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
@@ -125,9 +128,9 @@ export async function checkSession(): Promise<Account | null> {
   if (!LIVE) return currentAccount();
   try {
     const { status, data } = await api("me");
-    const user = data.user as { email?: string; name?: string } | null | undefined;
+    const user = data.user as { email?: string; name?: string; mustVerify?: boolean } | null | undefined;
     if (status === 200 && user?.email && user.name) {
-      const a = { email: user.email, name: user.name };
+      const a = { email: user.email, name: user.name, mustVerify: user.mustVerify === true };
       rememberLive(a);
       return a;
     }
@@ -160,12 +163,19 @@ export function accountKey(base: string) {
 
 export type AuthResult = { ok: true; account: Account } | { ok: false; error: string };
 
-export async function register(input: { name: string; email: string; password: string; acceptTerms?: boolean }): Promise<AuthResult> {
+export async function register(input: { name: string; email: string; password: string; acceptTerms?: boolean; website?: string; captcha?: string }): Promise<AuthResult> {
   if (LIVE) {
-    const { status, data } = await api("register", { name: input.name.trim(), email: normEmail(input.email), password: input.password, acceptTerms: input.acceptTerms === true });
+    const { status, data } = await api("register", {
+      name: input.name.trim(),
+      email: normEmail(input.email),
+      password: input.password,
+      acceptTerms: input.acceptTerms === true,
+      website: input.website || undefined,
+      captcha: input.captcha || undefined,
+    });
     if (status !== 201) return { ok: false, error: serverError(data) };
     const user = data.user as Account;
-    const account = { email: user.email, name: user.name };
+    const account = (await checkSession()) ?? { email: user.email, name: user.name };
     rememberLive(account);
     return { ok: true, account };
   }
@@ -201,6 +211,28 @@ export async function login(emailIn: string, password: string): Promise<AuthResu
   if (!sameHash(await hashPassword(password, account.salt), account.hash)) return wrong;
   setCurrent(email);
   return { ok: true, account: { email: account.email, name: account.name } };
+}
+
+/** Live site: email a password reset link. The answer is the same whether or not the account exists. */
+export async function forgotPassword(email: string): Promise<string> {
+  try {
+    const r = await api("forgot", { email: normEmail(email) });
+    if (r.status === 200) return "Kalau email itu terdaftar, link untuk membuat password baru sudah dikirim. Cek kotak masuk dan folder spam.";
+    return serverError(r.data);
+  } catch {
+    return "Tidak tersambung ke server. Coba lagi.";
+  }
+}
+
+/** Live site: send the verification email again. */
+export async function resendVerification(): Promise<string> {
+  try {
+    const r = await api("verify/resend", {});
+    if (r.status === 200) return r.data.alreadyVerified ? "Email kamu sudah terverifikasi." : "Email verifikasi dikirim ulang. Cek kotak masuk dan folder spam.";
+    return serverError(r.data);
+  } catch {
+    return "Tidak tersambung ke server. Coba lagi.";
+  }
 }
 
 export function logout() {

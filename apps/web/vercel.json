@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "regions": ["sin1"],
-  "buildCommand": "cd ../.. && if [ \"$VERCEL_ENV\" = production ]; then pnpm --filter @vwo/db migrate; fi && pnpm --filter @vwo/demo build:live && pnpm --filter @vwo/web build"
+  "buildCommand": "cd ../.. && if [ \"$VERCEL_ENV\" = production ]; then pnpm --filter @vwo/db migrate; fi && pnpm --filter @vwo/demo build:live && pnpm --filter @vwo/web build",
+  "crons": [{ "path": "/api/health", "schedule": "0 3 * * *" }]
 }

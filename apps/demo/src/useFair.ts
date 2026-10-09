@@ -2,6 +2,8 @@ import { useEffect, useReducer } from "react";
 import { DEMO_JOB_FAIR } from "@vwo/shared";
 import { DemoJobFair, type FairSaved, type FairStorage } from "./jobfair-engine";
 import { onFrame } from "./loop";
+import { LIVE } from "./mode";
+import { setApplicationStatus } from "./server-fair";
 
 const KEY = "vwo:jobfair";
 
@@ -33,6 +35,13 @@ const local: FairStorage = {
 
 // One job fair per browser tab, shared by the visitor page and the organiser view.
 export const fair = new DemoJobFair(Math.random, () => Date.now(), DEMO_JOB_FAIR, local);
+if (LIVE) {
+  fair.maxBots = 0;
+  fair.simulated = false;
+}
+// On the live site a company's decision goes to the server, so the seeker sees it on any device.
+const SERVER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (LIVE) fair.onStatusChange = (a) => void (SERVER_ID.test(a.id) && setApplicationStatus(a.boothId, a.id, a.status));
 onFrame((dt) => {
   if (fair.watched) fair.tick(dt);
 });

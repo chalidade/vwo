@@ -25,6 +25,7 @@ import {
   LOUNGE,
   loungeBoardSpot,
   loungeSpot,
+  safeImage,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -56,7 +57,8 @@ import {
 import { InstallButton } from "./install";
 import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
 import { AccountGate } from "./AccountGate";
-import { type Account, checkSession, currentAccount, logout } from "./account";
+import { type Account, checkSession, currentAccount, logout, resendVerification } from "./account";
+import { applyErrorText, myApplications, sendApplication as sendToServer } from "./server-fair";
 import { LIVE } from "./mode";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { type FloorPass, PLAYER_ID, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
@@ -150,7 +152,7 @@ export function JobFair() {
     if (!LIVE) return;
     let gone = false;
     void checkSession().then((a) => {
-      if (!gone && (a?.email ?? null) !== (account?.email ?? null)) setAccount(a);
+      if (!gone && ((a?.email ?? null) !== (account?.email ?? null) || a?.mustVerify !== account?.mustVerify)) setAccount(a);
     });
     return () => {
       gone = true;
@@ -158,6 +160,14 @@ export function JobFair() {
     // Checked once when the page opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Live site: the seeker's applications and the companies' answers come from the server, on every device.
+  useEffect(() => {
+    if (!LIVE || !account) return;
+    const pull = () => void myApplications().then((r) => r.ok && fair.mergeServer(r.data.applications, true));
+    pull();
+    const timer = window.setInterval(pull, 30_000);
+    return () => window.clearInterval(timer);
+  }, [account?.email]);
   /** The saved character for this account: set once, then changed from the profile. */
   const character = account ? loadCharacter() : null;
   const [editLook, setEditLook] = useState(false);
@@ -463,6 +473,19 @@ export function JobFair() {
     if (!profile.name || (!profile.email && account)) updateProfile({ ...profile, name: profile.name || account?.name || c.name, email: profile.email || account?.email || "" });
     counted.current.clear();
     setSession({ visitorId: v.memberId, name: c.name, look: c.look });
+    // The long tour is for the first visit; after that a short hello is enough.
+    const seenKey = `vwo:intro-seen:${account?.email ?? "guest"}`;
+    let seen = false;
+    try {
+      seen = localStorage.getItem(seenKey) === "1";
+      localStorage.setItem(seenKey, "1");
+    } catch {
+      // Blocked storage: show the tour every time.
+    }
+    if (seen) {
+      setToast(`Selamat datang kembali, ${c.name}! Tanya meja info kalau butuh arah.`);
+      return;
+    }
     setTalk({
       speaker: fair.fair.infoDesk.staff,
       pages: [
@@ -879,16 +902,47 @@ export function JobFair() {
       return;
     }
     const free = fair.player.vouchers.some((x) => !x.used && x.kind === "free-apply");
-    const send = () => sendApplication(boothId, input);
+    const send = () => void sendApplication(boothId, input);
     if (free) return send();
     const b = fair.booth(boothId);
     const job = b?.jobs.find((j) => j.id === input.jobId);
     setCoinAsk({ price: APPLY_COST, what: `melamar ${job?.title ?? "lowongan ini"}${b ? ` di ${b.company}` : ""}`, run: send });
   };
 
-  const sendApplication = (boothId: string, input: ApplicationInput) => {
+  const sendApplication = async (boothId: string, input: ApplicationInput) => {
     if (!session) return;
-    const a = fair.apply(session.visitorId, { boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
+    let id: string | undefined;
+    if (LIVE) {
+      // The server keeps the application, so the company sees it; coins are only spent once it is in.
+      const b = fair.booth(boothId);
+      const job = b?.jobs.find((j) => j.id === input.jobId);
+      if (!b || !job) return;
+      const photo = safeImage(profile.photo);
+      const res = await sendToServer({
+        boothId,
+        jobId: job.id,
+        company: b.company,
+        jobTitle: job.title,
+        name: input.name.trim() || session.name,
+        email: input.email.trim(),
+        phone: input.phone.trim() || undefined,
+        cvUrl: input.cvUrl.trim() || undefined,
+        message: input.message.trim() || undefined,
+        headline: profile.headline?.trim() || undefined,
+        education: profile.education?.trim() || undefined,
+        skills: profile.skills?.trim() || undefined,
+        city: profile.city?.trim() || undefined,
+        photo: photo && photo.length <= 100_000 ? photo : undefined,
+        psych: fair.bestPsych() ?? undefined,
+      });
+      if (!res.ok) {
+        setToast(applyErrorText(res.error));
+        if (res.error === "already_applied") setApplying(null);
+        return;
+      }
+      id = res.data.application.id;
+    }
+    const a = fair.apply(session.visitorId, { id, boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
     setApplying(null);
     if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${APPLY_COST} 🪙)` : " (voucher)"}`);
@@ -1535,6 +1589,7 @@ export function JobFair() {
             defaults={profile}
             appliedJobIds={appliedIds}
             cost={fair.freeApplies() ? "🎟️ voucher" : `${APPLY_COST} 🪙`}
+            note={LIVE ? "Lamaran disimpan di server jobfair dan dikirim ke perusahaan." : undefined}
             onClose={() => setApplying(null)}
             onSubmit={(input) => submit(applyBooth.id, input)}
           />
@@ -1552,6 +1607,14 @@ export function JobFair() {
                     Ganti akun
                   </button>
                 </div>
+                {account.mustVerify && (
+                  <div className="title-verify rpg-box" role="status">
+                    <span>📧 Cek email untuk verifikasi akun sebelum melamar.</span>
+                    <button type="button" onClick={async () => setToast(await resendVerification())}>
+                      Kirim ulang
+                    </button>
+                  </div>
+                )}
                 {character ? (
                   <ReturningCard character={character} onEnter={() => enter(character)} />
                 ) : (

@@ -11,6 +11,10 @@ export const registerSchema = z.object({
   name: displayNameSchema,
   /** The seeker accepted the terms and the privacy policy. */
   acceptTerms: z.literal(true),
+  /** Hidden from people; a bot that fills every field fills this one too. */
+  website: z.string().max(200).optional(),
+  /** Cloudflare Turnstile answer, when the site has it turned on. */
+  captcha: z.string().max(4000).optional(),
 });
 export const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(128) });
 export const forgotSchema = z.object({ email: emailSchema });

@@ -277,3 +277,21 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_log_target_idx").on(t.targetType, t.targetId)],
 );
+
+// ---------------------------------------------------------------- live trial applications
+/** An application from the live game. Booths and jobs still come from the game's own event data,
+ *  so they are referred to by the game's ids; `data` holds what the seeker filled in the form. */
+export const fairApplications = pgTable(
+  "fair_applications",
+  {
+    id: id(),
+    userId: userRef("user_id"),
+    boothKey: text("booth_key").notNull(),
+    jobKey: text("job_key").notNull(),
+    status: text("status").notNull().default("Terkirim"),
+    data: jsonb("data").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("fair_applications_once_uq").on(t.userId, t.boothKey, t.jobKey), index("fair_applications_booth_idx").on(t.boothKey)],
+);
