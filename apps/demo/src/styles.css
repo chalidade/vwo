@@ -150,11 +150,11 @@ h1 { margin: 0; }
 .ag-terms input { margin-top: 2px; flex: none; }
 .ag-link { padding: 0; border: 0; background: none; box-shadow: none; color: var(--accent); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
 .ag-demo { font-size: 11px; }
-.title-stack { display: grid; gap: 8px; justify-items: center; width: 100%; }
-.title-account { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; font-weight: 700; max-width: 100%; }
-.title-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; justify-items: center; width: 100%; max-width: 100%; }
+.title-account { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; font-weight: 700; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.title-account span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-account button { padding: 2px 10px; font-size: 12px; white-space: nowrap; flex: none; }
-.title-verify { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; font-weight: 700; background: #fef9c3; }
+.title-verify { min-width: 0; max-width: 100%; box-sizing: border-box; display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; font-weight: 700; background: #fef9c3; }
 .title-verify button { padding: 2px 10px; font-size: 12px; white-space: nowrap; flex: none; }
 
 @media (max-width: 640px) {
@@ -1359,3 +1359,5 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .pr-table th:nth-child(2) { width: 70px; }
 .pr-table th:nth-child(3) { width: 130px; }
 .pr-table th:nth-child(4) { width: 210px; }
+
+.crash-detail { white-space: pre-wrap; word-break: break-word; font-size: 11px; opacity: 0.75; margin: 0 0 10px; max-height: 8em; overflow: auto; }

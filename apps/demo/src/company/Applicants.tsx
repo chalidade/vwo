@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type CompanyBooth, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
+import { CrashGuard } from "../crash";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
 import { CallScreen, type CallResult } from "../fair/Call";
 import { type CallKind, type RingSignal, canCallOtherTabs, newCallId } from "../fair/call";
@@ -118,7 +119,11 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
           </ul>
         )}
       </div>
-      {open ? <Detail key={open.id} booth={booth} app={open} match={score(open)} onBack={() => setOpenId(null)} /> : <div className="card cp-empty muted">Pilih pelamar untuk melihat detail.</div>}
+      {open ? (
+        <CrashGuard key={open.id} onClose={() => setOpenId(null)}>
+          <Detail booth={booth} app={open} match={score(open)} onBack={() => setOpenId(null)} />
+        </CrashGuard>
+      ) : <div className="card cp-empty muted">Pilih pelamar untuk melihat detail.</div>}
     </div>
   );
 }
@@ -131,7 +136,11 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
   const [feedback, setFeedback] = useState(a.feedback ?? "");
   const tomorrow = new Date(Date.now() + 86400000);
   tomorrow.setHours(10, 0, 0, 0);
-  const local = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  // An interview time that came back unreadable falls back to tomorrow instead of throwing.
+  const local = (d: Date) => {
+    const t = Number.isFinite(d.getTime()) ? d : tomorrow;
+    return new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
   const [iv, setIv] = useState({ at: local(a.interview ? new Date(a.interview.at) : tomorrow), mode: a.interview?.mode ?? "Video call", place: a.interview?.place ?? "", note: a.interview?.note ?? "" });
   const chatEnd = useRef<HTMLDivElement>(null);
   useEffect(() => chatEnd.current?.scrollIntoView({ block: "nearest" }), [a.messages?.length]);
@@ -286,7 +295,9 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         className="cp-form cp-iv"
         onSubmit={(e) => {
           e.preventDefault();
-          fair.scheduleInterview(a.id, { at: new Date(iv.at).getTime(), mode: iv.mode, place: iv.place.trim() || undefined, note: iv.note.trim() || undefined });
+          const at = new Date(iv.at).getTime();
+          if (!Number.isFinite(at)) return flash("Isi waktu interview dulu");
+          fair.scheduleInterview(a.id, { at, mode: iv.mode, place: iv.place.trim() || undefined, note: iv.note.trim() || undefined });
           flash("Undangan interview terkirim ke pelamar");
         }}
       >
