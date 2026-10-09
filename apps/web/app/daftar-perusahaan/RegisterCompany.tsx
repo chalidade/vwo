@@ -31,8 +31,9 @@ const ERRORS: Record<string, string> = {
 async function post(path: string, body: unknown) {
   try {
     const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string }; payment?: { status: string; checkoutUrl: string | null } };
-    return r.ok ? { ok: true as const, data: d } : { ok: false as const, error: ERRORS[d.error ?? ""] ?? "Gagal. Coba lagi sebentar lagi." };
+    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string }; payment?: { status: string; checkoutUrl: string | null }; code?: string };
+    const msg = ERRORS[d.error ?? ""] ?? "Gagal. Coba lagi sebentar lagi.";
+    return r.ok ? { ok: true as const, data: d } : { ok: false as const, error: d.code ? `${msg} (kode: ${d.code})` : msg };
   } catch {
     return { ok: false as const, error: "Tidak tersambung ke server. Periksa internet lalu coba lagi." };
   }

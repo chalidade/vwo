@@ -8,6 +8,7 @@ import { canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { type Purchase, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
 import { allow } from "@/lib/ratelimit";
+import { XenditError } from "@/lib/xendit";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ payment: paymentOut(p), provider: p.provider }, { status: 201 });
   } catch (e) {
     console.error("payment start failed", e);
-    return fail(502, "gateway_error", { message: `Gagal membuat tagihan ${rupiah(purchase.amount)}. Coba lagi sebentar lagi.` });
+    const code = e instanceof XenditError ? e.code.replace(/[^A-Z0-9_]/gi, "").slice(0, 60) : "NETWORK";
+    return fail(502, "gateway_error", { code, message: `Gagal membuat tagihan ${rupiah(purchase.amount)}. Coba lagi sebentar lagi.` });
   }
 }

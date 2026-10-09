@@ -47,8 +47,9 @@ export async function paymentGateway(): Promise<Gateway> {
 export async function pay(body: { kind: "coins"; pack: string } | { kind: "invoice"; booth: string; invoice: string }): Promise<{ ok: true; redirect: true } | { ok: true; payment: PaymentView } | { ok: false; error: string }> {
   try {
     const r = await fetch("/api/payments", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = (await r.json().catch(() => ({}))) as { error?: string; payment?: PaymentView };
-    if (!r.ok || !d.payment) return { ok: false, error: ERRORS[d.error ?? ""] ?? "Pembayaran gagal dimulai. Coba lagi." };
+    const d = (await r.json().catch(() => ({}))) as { error?: string; code?: string; payment?: PaymentView };
+    const msg = ERRORS[d.error ?? ""] ?? "Pembayaran gagal dimulai. Coba lagi.";
+    if (!r.ok || !d.payment) return { ok: false, error: d.code ? `${msg} (kode: ${d.code})` : msg };
     if (d.payment.status === "pending" && d.payment.checkoutUrl) {
       window.location.href = d.payment.checkoutUrl;
       return { ok: true, redirect: true };

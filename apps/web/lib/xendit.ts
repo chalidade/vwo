@@ -22,6 +22,16 @@ export interface XenditInvoice {
   payment_channel?: string;
 }
 
+/** Xendit refused a request; `code` is its error_code (e.g. INVALID_API_KEY), safe to show. */
+export class XenditError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function call(path: string, init?: RequestInit): Promise<XenditInvoice> {
   const res = await fetch(`${base()}${path}`, {
     ...init,
@@ -29,7 +39,16 @@ async function call(path: string, init?: RequestInit): Promise<XenditInvoice> {
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error(`xendit ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let code = `HTTP_${res.status}`;
+    try {
+      code = String((JSON.parse(text) as { error_code?: string }).error_code ?? code);
+    } catch {
+      // Not JSON: keep the HTTP status.
+    }
+    throw new XenditError(code, `xendit ${res.status}: ${text.slice(0, 300)}`);
+  }
   return (await res.json()) as XenditInvoice;
 }
 
