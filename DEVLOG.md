@@ -4,6 +4,19 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · VWO: skema database job fair (langkah pertama go-live)
+
+**Konteks:** owner menargetkan job fair live di minggu ke-2 sampai ke-3 Oktober. Checklist go-live sekarang dilacak di Notion.
+
+**Yang berubah**
+- Migrasi `0001_jobfair` menambah tabel sesi login, token email, acara, staf acara, perusahaan dan anggotanya, stand, lowongan, stan food court, profil pelamar, lamaran beserta riwayatnya, buku besar koin, seminar dan kehadiran, hasil psikotes, panggilan, laporan, dan audit log.
+- Koin disimpan sebagai buku besar yang hanya bisa ditambah. Saldo adalah jumlah semua baris milik pengguna. Setiap pemberian dan pemakaian koin punya kunci idempoten, jadi permintaan yang terulang tidak terhitung dua kali.
+- `spendCoins` dan `applyToJob` mengunci per pengguna. Enam ketukan bersamaan dengan saldo 50 hanya berhasil tiga kali (15 koin per ketukan), dan saldo tidak pernah minus.
+- Lamaran menyimpan waktu persetujuan pelamar (UU PDP), hanya bisa sekali per lowongan, dan menolak lowongan yang sudah ditutup.
+- 5 tes integrasi baru jalan di Postgres sungguhan.
+
+---
+
 ## 2026-10-09 · VWO: cafe simulator dihapus dari demo
 
 **Konteks:** owner mengizinkan cafe simulator dihapus atau dipindah supaya fokus ke job fair.
