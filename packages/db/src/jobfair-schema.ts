@@ -343,3 +343,35 @@ export const fairPrices = pgTable(
   },
   (t) => [check("fair_prices_amount_ck", sql`${t.amount} >= 0`)],
 );
+
+/** A company asking for a booth: it fills in the form, pays (demo), and an organiser checks it is a
+ *  real company before the booth and its portal PIN are made. */
+export const companyRegistrations = pgTable(
+  "company_registrations",
+  {
+    id: id(),
+    userId: userRef("user_id"),
+    company: text("company").notNull(),
+    industry: text("industry").notNull(),
+    color: text("color").notNull(),
+    website: text("website"),
+    city: text("city").notNull(),
+    contactName: text("contact_name").notNull(),
+    contactRole: text("contact_role").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone").notNull(),
+    tier: text("tier").notNull(),
+    price: integer("price").notNull(),
+    method: text("method"),
+    /** unpaid → paid → verified, or rejected. */
+    status: text("status").notNull().default("unpaid"),
+    paidAt: ts("paid_at"),
+    verifiedAt: ts("verified_at"),
+    verifiedBy: uuid("verified_by").references(() => users.id, { onDelete: "set null" }),
+    boothKey: text("booth_key"),
+    pin: text("pin"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("company_registrations_user_idx").on(t.userId), index("company_registrations_status_idx").on(t.status), check("company_registrations_status_ck", sql`${t.status} in ('unpaid','paid','verified','rejected')`)],
+);

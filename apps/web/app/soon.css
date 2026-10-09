@@ -1,0 +1,121 @@
+/* Coming-soon page and the company registration form, outside the game. */
+.cs {
+  --cs-bg: #0b0b10;
+  --cs-ink: #f5f5f4;
+  --cs-mute: #a8a29e;
+  --cs-yellow: #fde047;
+  --cs-line: rgb(255 255 255 / 0.1);
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--cs-bg);
+  color: var(--cs-ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  isolation: isolate;
+}
+.cs a { color: inherit; }
+.cs-glow { position: absolute; border-radius: 50%; opacity: 0.55; z-index: -2; will-change: transform; }
+.cs-glow.a { width: 70vmax; height: 70vmax; left: -25vmax; top: -30vmax; background: radial-gradient(closest-side, rgb(250 204 21 / 0.35), transparent); animation: cs-drift 18s ease-in-out infinite alternate; }
+.cs-glow.b { width: 60vmax; height: 60vmax; right: -25vmax; bottom: -30vmax; background: radial-gradient(closest-side, rgb(249 115 22 / 0.28), transparent); animation: cs-drift 22s ease-in-out infinite alternate-reverse; }
+.cs-glow.c { width: 40vmax; height: 40vmax; left: 40%; top: 35%; background: radial-gradient(closest-side, rgb(56 189 248 / 0.16), transparent); animation: cs-drift 26s ease-in-out infinite alternate; }
+@keyframes cs-drift { to { transform: translate3d(8vmax, 6vmax, 0) scale(1.12); } }
+
+.cs-floor { position: absolute; inset: auto -20% -10% -20%; height: 55%; z-index: -1; perspective: 520px; pointer-events: none; mask-image: linear-gradient(to top, #000 10%, transparent 85%); -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 85%); }
+.cs-floor::before { content: ""; position: absolute; inset: 0; transform: rotateX(62deg); transform-origin: 50% 100%; background-image: linear-gradient(var(--cs-line) 1px, transparent 1px), linear-gradient(90deg, var(--cs-line) 1px, transparent 1px); background-size: 56px 56px; animation: cs-run 3.2s linear infinite; }
+@keyframes cs-run { to { background-position: 0 56px; } }
+
+.cs-wrap { position: relative; max-width: 1080px; margin: 0 auto; padding: 22px 16px 48px; min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; }
+.cs-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cs-logo { width: 74px; height: auto; display: block; }
+.cs-pill { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--cs-line); background: rgb(255 255 255 / 0.04); display: inline-flex; align-items: center; gap: 8px; }
+.cs-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgb(34 197 94 / 0.7); animation: cs-ping 1.8s ease-out infinite; }
+@keyframes cs-ping { to { box-shadow: 0 0 0 10px rgb(34 197 94 / 0); } }
+
+.cs-hero { align-self: center; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 40px 0; }
+.cs-kicker { color: var(--cs-yellow); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; font-size: 13px; margin: 0 0 14px; }
+.cs-h1 { font-size: clamp(38px, 6.4vw, 76px); line-height: 1.02; letter-spacing: -0.035em; margin: 0; font-weight: 900; }
+.cs-shine { background: linear-gradient(100deg, #fde047 10%, #fff7ae 30%, #f97316 55%, #fde047 80%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: cs-shine 6s linear infinite; }
+@keyframes cs-shine { to { background-position: -220% 0; } }
+.cs-sub { color: var(--cs-mute); font-size: clamp(16px, 2vw, 19px); line-height: 1.6; max-width: 34em; margin: 20px 0 28px; }
+.cs-cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.cs-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 20px; border-radius: 14px; font-weight: 800; text-decoration: none; transition: transform 0.15s ease, background 0.15s ease; }
+.cs-btn:hover { transform: translateY(-2px); }
+.cs-btn.primary { background: var(--cs-yellow); color: #111 !important; box-shadow: 0 10px 30px -10px rgb(250 204 21 / 0.6); }
+.cs-btn.ghost { border: 1px solid var(--cs-line); background: rgb(255 255 255 / 0.04); }
+
+.cs-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; padding: 0; list-style: none; }
+.cs-chips li { font-size: 13px; padding: 8px 12px; border-radius: 999px; background: rgb(255 255 255 / 0.05); border: 1px solid var(--cs-line); opacity: 0; transform: translateY(8px); animation: cs-in 0.6s ease forwards; }
+.cs-chips li:nth-child(1) { animation-delay: 0.3s; }
+.cs-chips li:nth-child(2) { animation-delay: 0.45s; }
+.cs-chips li:nth-child(3) { animation-delay: 0.6s; }
+.cs-chips li:nth-child(4) { animation-delay: 0.75s; }
+.cs-chips li:nth-child(5) { animation-delay: 0.9s; }
+@keyframes cs-in { to { opacity: 1; transform: none; } }
+.cs-rise { opacity: 0; transform: translateY(14px); animation: cs-in 0.8s cubic-bezier(.2,.7,.2,1) forwards; }
+.cs-rise.d1 { animation-delay: 0.1s; }
+.cs-rise.d2 { animation-delay: 0.2s; }
+.cs-rise.d3 { animation-delay: 0.3s; }
+
+/* The little hall on the right: booths float, visitors walk between them. */
+.cs-stage { position: relative; aspect-ratio: 1; max-width: 440px; width: 100%; justify-self: center; }
+.cs-ring { position: absolute; inset: 6%; border-radius: 50%; border: 1px dashed rgb(253 224 71 / 0.25); animation: cs-spin 40s linear infinite; }
+.cs-ring.two { inset: 20%; border-color: rgb(255 255 255 / 0.12); animation-duration: 28s; animation-direction: reverse; }
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+.cs-card { position: absolute; z-index: 2; width: 42%; padding: 12px; border-radius: 16px; background: rgb(24 24 32 / 0.9); border: 1px solid var(--cs-line); box-shadow: 0 20px 40px -20px rgb(0 0 0 / 0.8); animation: cs-float 6s ease-in-out infinite; }
+.cs-card b { display: block; font-size: 13px; }
+.cs-card span { display: block; font-size: 11px; color: var(--cs-mute); margin-top: 3px; }
+.cs-card i { display: block; height: 6px; border-radius: 4px; margin-top: 10px; background: var(--c); width: var(--w, 70%); }
+.cs-card.c1 { left: 2%; top: 10%; --c: #fde047; }
+.cs-card.c2 { right: -4%; top: 30%; --c: #38bdf8; animation-delay: -2s; }
+.cs-card.c3 { left: 10%; bottom: 8%; --c: #f97316; animation-delay: -4s; }
+@keyframes cs-float { 50% { transform: translateY(-12px); } }
+.cs-badge { position: absolute; z-index: 1; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 34%; aspect-ratio: 1; border-radius: 28px; background: #111; display: grid; place-items: center; border: 1px solid rgb(253 224 71 / 0.35); box-shadow: 0 0 0 10px rgb(253 224 71 / 0.05), 0 30px 60px -20px rgb(250 204 21 / 0.45); }
+.cs-badge img { width: 64%; height: auto; }
+.cs-walker { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--c); offset-path: path("M 60 220 C 120 60, 320 60, 380 220 S 120 380, 60 220"); animation: cs-walk 9s linear infinite; }
+.cs-walker:nth-of-type(2) { --c: #22c55e; animation-delay: -3s; }
+.cs-walker:nth-of-type(3) { --c: #f472b6; animation-delay: -6s; }
+@keyframes cs-walk { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+
+.cs-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; color: var(--cs-mute); font-size: 13px; border-top: 1px solid var(--cs-line); padding-top: 18px; }
+.cs-foot a { color: var(--cs-mute); }
+.cs-note { margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; background: rgb(250 204 21 / 0.1); border: 1px solid rgb(250 204 21 / 0.35); font-size: 14px; }
+
+@media (max-width: 820px) {
+  .cs-hero { grid-template-columns: 1fr; gap: 10px; padding: 24px 0; }
+  .cs-stage { max-width: 320px; order: -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs *, .cs *::before { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* Registration form */
+.rg { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
+.rg-card { background: rgb(24 24 32 / 0.92); border: 1px solid var(--cs-line); border-radius: 20px; padding: 22px; margin-top: 18px; }
+.rg-card h2 { margin: 0 0 6px; font-size: 20px; }
+.rg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rg-grid .full { grid-column: 1 / -1; }
+.rg label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: #e7e5e4; }
+.rg input, .rg select { width: 100%; padding: 12px 13px; border-radius: 12px; border: 1px solid rgb(255 255 255 / 0.16); background: #111118; color: var(--cs-ink); font: inherit; font-weight: 500; }
+.rg input:focus, .rg select:focus { outline: 2px solid var(--cs-yellow); outline-offset: 1px; }
+.rg-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rg-tier { text-align: left; padding: 16px; border-radius: 16px; border: 1px solid rgb(255 255 255 / 0.16); background: #111118; color: var(--cs-ink); cursor: pointer; font: inherit; }
+.rg-tier[data-on] { border-color: var(--cs-yellow); box-shadow: 0 0 0 2px rgb(253 224 71 / 0.35); }
+.rg-tier b { display: block; font-size: 16px; }
+.rg-tier strong { display: block; font-size: 20px; margin: 6px 0; color: var(--cs-yellow); }
+.rg-tier small { color: var(--cs-mute); }
+.rg-colors { display: flex; gap: 8px; flex-wrap: wrap; }
+.rg-colors button { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.rg-colors button[aria-checked="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--cs-yellow); }
+.rg-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.rg-err { color: #fca5a5; font-size: 14px; }
+.rg-ok { color: #86efac; }
+.rg-status { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: rgb(255 255 255 / 0.08); }
+.rg-status[data-s="paid"] { background: rgb(56 189 248 / 0.18); color: #7dd3fc; }
+.rg-status[data-s="verified"] { background: rgb(34 197 94 / 0.18); color: #86efac; }
+.rg-status[data-s="rejected"] { background: rgb(239 68 68 / 0.18); color: #fca5a5; }
+.rg-cred { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 12px 0; font-size: 15px; }
+.rg-cred dd { margin: 0; font-family: ui-monospace, monospace; font-weight: 800; color: var(--cs-yellow); }
+.rg-steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; padding: 0; list-style: none; color: var(--cs-mute); font-size: 13px; }
+.rg-steps li::before { content: counter(step) ". "; counter-increment: step; }
+.rg-steps { counter-reset: step; }
+@media (max-width: 640px) { .rg-grid, .rg-tiers { grid-template-columns: 1fr; } }

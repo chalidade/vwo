@@ -1,8 +1,10 @@
-import { createSession, googleSignIn } from "@vwo/db";
+import { createSession, googleSignIn, sessionUser } from "@vwo/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { GOOGLE_COOKIE, finishGoogle, googleEnabled } from "@/lib/google";
+import { launched } from "@/lib/preview";
+import { mayPreview, setPreview } from "@/lib/preview-grant";
 import { setSessionCookie } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -12,16 +14,21 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const saved = (await cookies()).get(GOOGLE_COOKIE)?.value ?? "";
   const [state, verifier, to] = saved.split(".");
-  const page = to === "company" ? "#/jobfair/company" : "#/jobfair";
-  const done = (ok: boolean) => NextResponse.redirect(new URL(ok ? `/play/${page}` : `/play/?login=google_failed${page}`, req.url));
+  const page = to === "company" ? "#/jobfair/company" : to === "admin" ? "#/jobfair/admin" : "#/jobfair";
+  // The company form lives outside the app; before launch, an account without a pass goes back home.
+  const target = (ok: boolean, pass: boolean) =>
+    to === "register" ? (ok ? "/daftar-perusahaan" : "/daftar-perusahaan?login=gagal") : !launched() && !pass ? (ok ? "/?akses=belum" : "/?login=gagal") : ok ? `/play/${page}` : `/play/?login=google_failed${page}`;
+  const done = (ok: boolean, pass = false) => NextResponse.redirect(new URL(target(ok, pass), req.url));
   const code = url.searchParams.get("code");
   if (!googleEnabled() || !code || !state || !verifier || url.searchParams.get("state") !== state) return clear(done(false));
   const person = await finishGoogle(req, code, verifier).catch(() => null);
   if (!person) return clear(done(false));
   const { userId } = await googleSignIn(db, person);
   const session = await createSession(db, userId, req.headers.get("user-agent"));
-  const res = done(true);
+  const user = await sessionUser(db, session.token);
+  const res = done(true, launched() || (await mayPreview(user)));
   setSessionCookie(res, session.token, session.expiresAt);
+  await setPreview(res, user);
   return clear(res);
 }
 

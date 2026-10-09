@@ -10,3 +10,4 @@ export * from "./fair-state";
 export * from "./fair-players";
 export * from "./fair-booths";
 export * from "./fair-prices";
+export * from "./company-registrations";

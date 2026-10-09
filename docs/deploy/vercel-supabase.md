@@ -31,6 +31,11 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      for every domain the site is served on; publish the consent screen. Google is the only way
      to sign up and sign in; an older email-and-password account signs in with Google on the
      same email and keeps its data.
+   - `SITE_LAUNCHED=1`: open the app to everyone. Until it is set, jobfair.co.id shows the
+     coming-soon page and `/play` only opens for organisers (`ADMIN_EMAILS`), accounts that run a
+     booth, and companies whose registration an organiser verified (they sign in at
+     `/masuk-panitia` or `/masuk-perusahaan`). Companies register at `/daftar-perusahaan`.
+   - optional `PREVIEW_SECRET`: signs the pre-launch pass cookie (falls back to `DATABASE_URL`).
    - optional `PASSWORD_LOGIN=1`: brings back the email-and-password forms (local testing).
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
