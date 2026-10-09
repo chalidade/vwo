@@ -4,6 +4,15 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair: cek kesehatan server `/api/health`
+
+**Konteks:** trial pertama di Vercel (vwo-xi.vercel.app) sudah online. Perlu cara mengecek dari luar bahwa database Supabase tersambung dan migrasi sudah jalan.
+
+**Yang berubah**
+- `GET /api/health` menjawab `{ ok, db, migrations }`: apakah database bisa dihubungi dan berapa migrasi yang sudah dijalankan. Tidak membuka data lain. Bisa juga dipakai untuk pemantauan uptime di Vercel maupun DigitalOcean.
+
+---
+
 ## 2026-10-09 · jobfair: siap trial di Vercel + Supabase, dengan pengamanan
 
 **Konteks:** owner memilih trial gratis (puluhan orang) di Vercel + Supabase, lalu pindah semua ke DigitalOcean saat event, tanpa kerja dua kali, dan minta keamanannya diperketat.
