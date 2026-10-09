@@ -165,8 +165,14 @@ export function JobFair() {
     if (!LIVE || !account) return;
     const pull = () => void myApplications().then((r) => r.ok && fair.mergeServer(r.data.applications, true));
     pull();
-    const timer = window.setInterval(pull, 30_000);
-    return () => window.clearInterval(timer);
+    // Often enough for a chat with HR to feel live; a returning tab catches up at once.
+    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 12_000);
+    const back = () => document.visibilityState === "visible" && pull();
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", back);
+    };
   }, [account?.email]);
   /** The saved character for this account: set once, then changed from the profile. */
   const character = account ? loadCharacter() : null;

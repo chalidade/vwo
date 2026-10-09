@@ -16,6 +16,7 @@ import {
   setFairApplicationStatus,
   spendCoins,
   submitFairApplication,
+  updateFairApplicationShared,
 } from "../src";
 import { applications, booths, companies, fairs, jobs, users } from "../src/schema";
 
@@ -109,5 +110,38 @@ describe("live game applications", () => {
     expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "other-booth", status: "Shortlist" })).toBe(false);
     expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "toko-kita", status: "Shortlist" })).toBe(true);
     expect((await myFairApplications(db, seeker))[0]!.status).toBe("Shortlist");
+  });
+
+  it("keeps both sides of the conversation, and each side only writes its own part", async () => {
+    const [row] = await myFairApplications(db, seeker);
+    const id = row!.id;
+    const invite = { at: 5, mode: "Video call", place: "meet.example/abc" };
+    expect(
+      await updateFairApplicationShared(db, {
+        id,
+        as: "company",
+        userId: "00000000-0000-0000-0000-000000000000",
+        incoming: { messages: [{ at: 1, from: "company", text: "Halo Sari" }], interview: invite, rating: 4, calls: [{ at: 3, kind: "voice", answered: true, seconds: 60 }] },
+      }),
+    ).toBe(true);
+    // The seeker's copy tries to rewrite the company's part; only the reply and its own message count.
+    expect(
+      await updateFairApplicationShared(db, {
+        id,
+        as: "seeker",
+        userId: seeker,
+        incoming: { messages: [{ at: 2, from: "seeker", text: "Siap" }, { at: 9, from: "company", text: "palsu" }], interview: { ...invite, place: "evil.example", reply: "hadir" }, rating: 5 },
+      }),
+    ).toBe(true);
+    const [after] = await myFairApplications(db, seeker);
+    const shared = after!.shared as Record<string, unknown>;
+    expect(shared.messages).toEqual([
+      { at: 1, from: "company", text: "Halo Sari" },
+      { at: 2, from: "seeker", text: "Siap" },
+    ]);
+    expect(shared.interview).toEqual({ ...invite, reply: "hadir" });
+    expect(shared.rating).toBe(4);
+    // Someone else's account cannot write as this seeker.
+    expect(await updateFairApplicationShared(db, { id, as: "seeker", userId: "00000000-0000-0000-0000-000000000000", incoming: {} })).toBe(false);
   });
 });

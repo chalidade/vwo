@@ -4,6 +4,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairApplications } from "./jobfair-schema";
 import { AlreadyAppliedError } from "./jobfair";
+import { type ApplicationShared, mergeShared } from "@vwo/shared";
 
 /** What a seeker can send. Each list stays short so one account cannot fill the table. */
 export const FAIR_APPLICATION_LIMIT = 100;
@@ -46,4 +47,21 @@ export async function setFairApplicationStatus(db: Db, input: { id: string; boot
     .where(and(eq(fairApplications.id, input.id), eq(fairApplications.boothKey, input.boothKey)))
     .returning({ id: fairApplications.id });
   return rows.length > 0;
+}
+
+/**
+ * Add one side's part of the conversation. The seeker may only write to their own application,
+ * the company only to one at its booth; returns false when the application is not theirs.
+ */
+export async function updateFairApplicationShared(
+  db: Db,
+  input: { id: string; as: "company" | "seeker"; userId: string; incoming: ApplicationShared },
+) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(fairApplications).where(eq(fairApplications.id, input.id)).for("update");
+    if (!row || (input.as === "seeker" && row.userId !== input.userId)) return false;
+    const shared = mergeShared(row.shared as ApplicationShared, input.incoming, input.as);
+    await tx.update(fairApplications).set({ shared, updatedAt: new Date() }).where(eq(fairApplications.id, input.id));
+    return true;
+  });
 }

@@ -290,6 +290,8 @@ export const fairApplications = pgTable(
     jobKey: text("job_key").notNull(),
     status: text("status").notNull().default("Terkirim"),
     data: jsonb("data").notNull(),
+    /** The conversation both sides add to: chat, interview invitation and answer, rating, calls. */
+    shared: jsonb("shared").notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
