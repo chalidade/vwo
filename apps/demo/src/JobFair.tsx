@@ -194,10 +194,14 @@ export function JobFair() {
   /** Set when the player is on a room floor (food court, seminar, psikotes) rather than a hall. */
   const room = fair.roomOf(floor.id);
   const level = fair.levelOf(floor.id);
+  /** Which hall this is (booths, sponsors and slots are stored per hall), or -1 in a room. */
+  const hall = room ? -1 : fairFloorIndex(floor.id);
+  /** The first hall has the entrance hall's info desk and its own lift signs. */
+  const firstHall = hall === 0;
   const stop = fair.stopOf(floor.id);
-  const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === level);
-  const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === level);
-  const coinHere = !room && fair.fair.coinStand.floor === level;
+  const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === hall);
+  const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === hall);
+  const coinHere = !room && fair.fair.coinStand.floor === hall;
   const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks);
   /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
   const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
@@ -292,7 +296,7 @@ export function JobFair() {
     }
     for (const p of promotersHere) if (Math.hypot(self.x - p.x, self.y - (p.y + 1.1)) < 1.1) return { kind: "promoter", promoter: p };
     const d = fair.fair.infoDesk;
-    if (!room && level === 0 && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
+    if (firstHall && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
     const other = [...fair.visitors.values()]
       .filter((v) => v.memberId !== self.memberId && v.floorId === self.floorId)
       .map((v) => ({ v, d: Math.hypot(v.x - self.x, v.y - self.y) }))
@@ -743,7 +747,7 @@ export function JobFair() {
             onPick: () => {
               setTalk(null);
               goToBooth(b);
-              setToast(i === level ? `Menuju stand ${b.company}` : `Menuju stand ${b.company} di ${fair.fair.floors[i]!.name}`);
+              setToast(i === hall ? `Menuju stand ${b.company}` : `Menuju stand ${b.company} di ${fair.fair.floors[i]!.name}`);
             },
           })),
         { label: "Kembali", onPick: () => setTalk(main) },
@@ -892,7 +896,7 @@ export function JobFair() {
 
   // --- Scene.
   const extras = [
-    ...(room ? [] : fair.freeSlots().filter((sl) => sl.floor === level)).flatMap((sl) => emptyBoothExtras(sl, () => setBooking(sl))),
+    ...(room ? [] : fair.freeSlots().filter((sl) => sl.floor === hall)).flatMap((sl) => emptyBoothExtras(sl, () => setBooking(sl))),
     ...booths.flatMap((b) =>
       boothExtras(b, {
         onBanner: () => setBoard({ boothId: b.id }),
@@ -901,10 +905,10 @@ export function JobFair() {
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...(!room && level === 0 ? infoDeskExtras(fair.fair.infoDesk, session ? goToInfo : undefined) : []),
+    ...(firstHall ? infoDeskExtras(fair.fair.infoDesk, session ? goToInfo : undefined) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
     ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
-    ...liftSignExtras(room ? ROOM_SIGNS : level === 0 ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
+    ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
     ...(room?.kind === "foodcourt"
       ? foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined)

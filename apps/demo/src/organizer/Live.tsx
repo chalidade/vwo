@@ -76,10 +76,10 @@ export function OrgLive() {
                   ? psikotesExtras(room)
                   : seminarStageExtras(room, null)
               : [
-                  ...booths.filter((b) => b.floor === level).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
-                  ...(level === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
-                  ...fair.fair.sponsors.filter((sp) => sp.floor === level).map((sp) => sponsorExtras(sp)),
-                  ...(fair.fair.coinStand.floor === level ? coinStandExtras(fair.fair.coinStand) : []),
+                  ...booths.filter((b) => b.floor === fairFloorIndex(floor.id)).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
+                  ...(fairFloorIndex(floor.id) === 0 ? infoDeskExtras(fair.fair.infoDesk) : []),
+                  ...fair.fair.sponsors.filter((sp) => sp.floor === fairFloorIndex(floor.id)).map((sp) => sponsorExtras(sp)),
+                  ...(fair.fair.coinStand.floor === fairFloorIndex(floor.id) ? coinStandExtras(fair.fair.coinStand) : []),
                 ]),
           ]}
           hallSponsors={fair.fair.sponsors}

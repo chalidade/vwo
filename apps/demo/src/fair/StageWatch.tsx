@@ -87,7 +87,7 @@ export function StageWatch({
 
   const react = (e: string) => {
     sendStage({ type: "react", e });
-    setClaps((l) => [...l.slice(-6), { id: Date.now(), x: 80, e }]);
+    setClaps((l) => [...l.slice(-6), { id: Date.now() + Math.random(), x: 80, e }]);
   };
   const send = () => {
     const t = text.trim();

@@ -221,7 +221,10 @@ export interface JobFairView {
   width: number;
   height: number;
   floors: FairFloorInfo[];
-  /** Where visitors come in, on the ground floor. */
+  /** The building level of the first hall: rooms can sit below the halls (the Aula on Lantai 1).
+   *  Hall i is on level hallBase + i. Unset: 0, the halls start at the ground floor. */
+  hallBase?: number;
+  /** Where visitors come in: on the lowest floor, a room or the first hall. */
   spawn: { x: number; y: number };
   /** The organisers' info desk near the entrance, on the ground floor. */
   infoDesk: { x: number; y: number; width: number; height: number; staff: string };
@@ -275,7 +278,7 @@ export interface FairRoom {
   tagline: string;
   emoji: string;
   color: string;
-  /** Building level, 0-based: level 3 is "Lantai 4". Halls take the levels below. */
+  /** Building level, 0-based: level 3 is "Lantai 4". Halls take the levels from hallBase up. */
   level: number;
   /** Entry price in coins; 0 is free. */
   price: number;
@@ -375,10 +378,16 @@ export interface FairStop {
   roomId?: string;
 }
 
+/** The building level hall `i` is on. */
+export const hallLevel = (fair: { hallBase?: number }, i: number) => (fair.hallBase ?? 0) + i;
+
+/** "Lantai 3" for hall `i`. */
+export const hallName = (fair: { hallBase?: number }, i: number) => `Lantai ${hallLevel(fair, i) + 1}`;
+
 /** Every floor the lift stops at, bottom first. */
 export function fairStops(fair: JobFairView): FairStop[] {
   return [
-    ...fair.floors.map((f, i) => ({ level: i, floorId: fairFloorId(fair, i), name: f.name, label: f.theme, emoji: "💼" })),
+    ...fair.floors.map((f, i) => ({ level: hallLevel(fair, i), floorId: fairFloorId(fair, i), name: `Lantai ${hallLevel(fair, i) + 1}`, label: f.theme, emoji: "💼" })),
     ...fair.rooms.map((r) => ({ level: r.level, floorId: fairRoomFloorId(fair, r.id), name: `Lantai ${r.level + 1}`, label: r.name, emoji: r.emoji, roomId: r.id })),
   ].sort((a, b) => a.level - b.level);
 }
@@ -593,7 +602,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
     add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
   }
   const info = fair.floors[floor];
-  return { id, name: info ? `${info.name} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats, objects, theme: "hall" };
+  return { id, name: info ? `${hallName(fair, floor)} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats, objects, theme: "hall" };
 }
 
 /** Every hall floor, then every room. */
@@ -632,10 +641,11 @@ export const DEMO_JOB_FAIR: JobFairView = {
   width: 46,
   height: 22,
   floors: [
-    { name: "Lantai 1", theme: "Teknologi & Keuangan" },
-    { name: "Lantai 2", theme: "Kreatif, Kuliner & Ritel" },
-    { name: "Lantai 3", theme: "Industri, Energi & Kesehatan" },
+    { name: "Lantai 2", theme: "Teknologi & Keuangan" },
+    { name: "Lantai 3", theme: "Kreatif, Kuliner & Ritel" },
+    { name: "Lantai 4", theme: "Industri, Energi & Kesehatan" },
   ],
+  hallBase: 1,
   spawn: { x: 23, y: 21.2 },
   infoDesk: { x: 20.6, y: 17.2, width: 4.8, height: 0.7, staff: "Dewi" },
   sponsors: [
@@ -742,7 +752,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Langkah Rapi",
       emoji: "👞",
       color: "#78350f",
-      level: 0,
+      level: 1,
       x: 28,
       y: 13,
       headline: "Sepatu kerja diskon 35%",
@@ -759,7 +769,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "CV Kilat",
       emoji: "📄",
       color: "#0284c7",
-      level: 0,
+      level: 1,
       x: 28,
       y: 13,
       headline: "Cek CV gratis oleh HR",
@@ -776,7 +786,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "SewaLaptop",
       emoji: "💻",
       color: "#475569",
-      level: 1,
+      level: 2,
       x: 28,
       y: 13,
       headline: "Sewa laptop mulai Rp99 ribu/minggu",
@@ -793,7 +803,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Rapi Salon",
       emoji: "💇",
       color: "#db2777",
-      level: 2,
+      level: 3,
       x: 28,
       y: 13,
       headline: "Potong rambut rapi Rp30 ribu",
@@ -810,7 +820,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Antar Makan",
       emoji: "🛵",
       color: "#ea580c",
-      level: 2,
+      level: 3,
       x: 28,
       y: 13,
       headline: "Gratis ongkir 5x makan siang",
@@ -827,7 +837,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Ojek Kita",
       emoji: "🛵",
       color: "#16a34a",
-      level: 0,
+      level: 1,
       x: 28,
       y: 13,
       headline: "Diskon 50% ojek ke lokasi interview",
@@ -844,7 +854,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Studio Pas Foto",
       emoji: "📷",
       color: "#7c3aed",
-      level: 1,
+      level: 2,
       x: 28,
       y: 13,
       headline: "Pas foto CV profesional Rp15 ribu",
@@ -861,7 +871,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Telko Nusa",
       emoji: "📶",
       color: "#e11d48",
-      level: 0,
+      level: 1,
       x: 12.5,
       y: 19.4,
       headline: "Kuota 30 GB cuma Rp25 ribu",
@@ -877,7 +887,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Kelas Koding Kita",
       emoji: "💻",
       color: "#2563eb",
-      level: 0,
+      level: 1,
       x: 14.5,
       y: 7.4,
       headline: "Bootcamp coding, bayar setelah kerja",
@@ -893,7 +903,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Tabungan Gajian",
       emoji: "🏦",
       color: "#0f766e",
-      level: 1,
+      level: 2,
       x: 31.5,
       y: 7.4,
       headline: "Buka rekening gaji online, gratis admin",
@@ -908,7 +918,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "KosDekat",
       emoji: "🏠",
       color: "#9333ea",
-      level: 2,
+      level: 3,
       x: 14.5,
       y: 7.4,
       headline: "Kos dekat kantor barumu",
@@ -924,7 +934,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       brand: "Segar Botol",
       emoji: "🥤",
       color: "#f59e0b",
-      level: 4,
+      level: 7,
       x: 43,
       y: 9,
       headline: "Sampling gratis minuman isotonik",
@@ -954,7 +964,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Panggung acara, jadwal hari ini, dan meeting point",
       emoji: "🏛️",
       color: "#9f1239",
-      level: 3,
+      level: 0,
       price: 0,
       width: 46,
       height: 22,
@@ -967,7 +977,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Promo cafe dan tempat makan, beli voucher pakai koin",
       emoji: "🍜",
       color: "#ea580c",
-      level: 4,
+      level: 7,
       price: 0,
       width: 46,
       height: 22,
@@ -1066,7 +1076,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Latihan psikotes, hasilnya dilihat recruiter",
       emoji: "🧠",
       color: "#7c3aed",
-      level: 6,
+      level: 5,
       price: 20,
       width: 46,
       height: 22,
@@ -1079,7 +1089,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Konsultasi dengan HR lewat telepon, atau ngobrol santai di sofa",
       emoji: "🛋️",
       color: "#0f766e",
-      level: 7,
+      level: 6,
       price: 0,
       width: 46,
       height: 22,
@@ -1098,7 +1108,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
             "Boleh ceritakan sedikit latar belakang dan posisi yang kamu incar?",
             "Untuk CV, taruh pencapaian dengan angka di bagian atas. Recruiter membaca sekilas saja.",
             "Soal gaji, riset dulu kisaran pasar, lalu sebutkan rentang, bukan satu angka.",
-            "Kalau sudah siap, lamar lewat stand kami di Lantai 1. Semoga sukses ya!",
+            "Kalau sudah siap, lamar lewat stand kami di Lantai 2. Semoga sukses ya!",
           ],
         },
         {
@@ -1156,7 +1166,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       tagline: "Seminar karier bersertifikat",
       emoji: "🎤",
       color: "#0e7490",
-      level: 5,
+      level: 4,
       price: 15,
       width: 46,
       height: 22,
@@ -1438,7 +1448,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
         job("pe-mobile", "Mobile Developer", "Full-time", "Remote", "12–18 jt", ["2+ tahun Flutter atau React Native", "Paham REST API", "Portofolio aplikasi"]),
       ],
     },
-    // Lantai 1 · Teknologi & Keuangan
+    // Lantai 2 · Teknologi & Keuangan
     company({
       id: "dompet-kita",
       company: "Dompet Kita",
@@ -1517,7 +1527,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
         job("tk-ads", "Digital Marketing", "Kontrak", "Semarang (Hybrid)", "7–10 jt", ["Pengalaman iklan Meta/Google", "Paham analitik", "Kreatif"]),
       ],
     }),
-    // Lantai 2 · Kreatif, Kuliner & Ritel
+    // Lantai 3 · Kreatif, Kuliner & Ritel
     company({
       id: "mode-lokal",
       company: "Mode Lokal",
@@ -1622,7 +1632,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
         job("gn-qa", "Game Tester", "Part-time", "Remote", "3–4 jt", ["Teliti", "Bisa menulis laporan bug", "Suka main gim mobile"]),
       ],
     }),
-    // Lantai 3 · Industri, Energi & Kesehatan
+    // Lantai 4 · Industri, Energi & Kesehatan
     company({
       id: "baja-prima",
       company: "Baja Prima",

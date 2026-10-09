@@ -21,7 +21,7 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card org-stagecard">
-        <h2 className="cp-h2">🏛️ Aula Utama · Lantai 4</h2>
+        <h2 className="cp-h2">🏛️ Aula Utama · Lantai 1</h2>
         <p className="muted small">
           Panggung untuk sambutan, talkshow, hiburan, dan door prize. Jadwal di bawah tampil di layar LED panggung, papan jadwal, dan papan info Aula. Meeting point ada di pojok kiri bawah.
         </p>

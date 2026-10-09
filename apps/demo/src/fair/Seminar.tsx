@@ -166,7 +166,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
   useEffect(() => {
     const id = setInterval(() => {
       const e = ["👏", "👍", "💡", "🔥", "❤️"][Math.floor(Math.random() * 5)]!;
-      setClaps((c) => [...c.slice(-5), { id: Date.now(), x: 10 + Math.random() * 70, e }]);
+      setClaps((c) => [...c.slice(-5), { id: Date.now() + Math.random(), x: 10 + Math.random() * 70, e }]);
     }, 2600);
     return () => clearInterval(id);
   }, []);
@@ -207,7 +207,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
         </div>
         <div className="sx-stage">
           <div className="sx-share">🖥️ {session.speaker} sedang berbagi layar</div>
-          <div className="sx-slide" key={line.slide}>
+          <div className="sx-slide" key={`slide-${line.slide}`}>
             <div className="sx-slide-n">
               {line.slide + 1}/{session.slides.length}
             </div>
@@ -219,7 +219,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
                 </li>
               ))}
             </ul>
-            <div className="sx-brand">Ruang Seminar · Lantai 6</div>
+            <div className="sx-brand">Ruang Seminar · Lantai 5</div>
           </div>
           <div className="sx-cam" data-talking={paused ? undefined : ""}>
             <div className="sx-cam-person">
@@ -235,7 +235,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
             ))}
           </div>
           {captions && (
-            <div className="sx-cc" key={k}>
+            <div className="sx-cc" key={`cc-${k}`}>
               <b>{session.speaker}:</b> {line.text}
             </div>
           )}
@@ -255,7 +255,7 @@ function LiveScreen({ session, look, audience, onPick, onEnd, onClose }: { sessi
           </button>
           <button
             type="button"
-            onClick={() => setClaps((c) => [...c.slice(-5), { id: Date.now(), x: 80, e: "👏" }])}
+            onClick={() => setClaps((c) => [...c.slice(-5), { id: Date.now() + Math.random(), x: 80, e: "👏" }])}
             title="Tepuk tangan"
           >
             👏
