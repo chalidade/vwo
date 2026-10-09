@@ -478,7 +478,8 @@ export function aulaSpot(board: "rundown" | "info") {
 }
 export function stallSpot(slot: number, spot: "vendor" | "order") {
   const s = stallRect(slot);
-  return spot === "vendor" ? { x: s.x + s.width / 2, y: s.y + 0.95 } : { x: s.x + s.width / 2, y: s.y + s.height + 0.7 };
+  // The vendor stands at the right end of the counter, so the sign and the voucher badge stay readable.
+  return spot === "vendor" ? { x: s.x + s.width - 0.9, y: s.y + 0.95 } : { x: s.x + s.width / 2, y: s.y + s.height + 0.7 };
 }
 
 /** Psikotes: rows of single desks facing the proctor. Seminar: rows of desks facing the stage. */
@@ -951,8 +952,8 @@ export const DEMO_JOB_FAIR: JobFairView = {
       emoji: "🥤",
       color: "#f59e0b",
       level: 7,
-      x: 43,
-      y: 9,
+      x: 26,
+      y: 19.8,
       headline: "Sampling gratis minuman isotonik",
       offer: "Coba rasa baru Segar Botol Lemon. Tunjukkan kode di minimarket mana pun untuk beli 2 gratis 1.",
       cta: "Lokasi minimarket",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
 import { AULA, fairFloorId, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
-import { BOOTH_SLOTS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
+import { BOOTH_SLOTS, CONVOS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
 function clock() {
@@ -701,6 +701,19 @@ describe("DemoJobFair", () => {
     expect(stallSlot(room.stalls!.find((x) => x.id === second.id)!, 0)).toBe(1);
     fair.resetStalls();
     expect(room.stalls).toHaveLength(12);
+  });
+
+  it("lets job seekers near each other talk, one line each in turn", () => {
+    const c = clock();
+    const fair = new DemoJobFair(Math.random, c.now);
+    const all = new Set(Object.values(CONVOS).flat(2));
+    const heard = new Set<string>();
+    for (let i = 0; i < 1200; i++) {
+      c.advance(100);
+      fair.tick(100);
+      for (const b of fair.bubbles.values()) if (all.has(b.text)) heard.add(b.text);
+    }
+    expect(heard.size).toBeGreaterThan(3);
   });
 
   it("has a consultation lounge with big sofas and consultants, and charges for each call", () => {

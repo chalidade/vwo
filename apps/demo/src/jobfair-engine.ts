@@ -518,7 +518,7 @@ const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
   konsultasi: ["Sofanya empuk 😌", "Nunggu giliran konsultasi", "📞 Halo?", "Tadi dapat tips CV bagus", "Ngobrol yuk!", "Pak Hendra baik banget"],
 };
 /** Short exchanges between two job seekers standing or sitting near each other, per kind of floor. */
-const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
+export const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
   hall: [
     ["Kamu udah lamar ke mana aja?", "Baru dua stand, kamu?", "Aku tiga, semoga ada yang nyangkut 🤞"],
     ["Stand yang VIP itu keren ya", "Iya, ada layar videonya!"],
