@@ -57,10 +57,6 @@ export const sendShared = (id: string, as: "company" | "seeker", shared: Applica
 /** A company account joins its booth with the code and PIN from the organiser. */
 export const claimBooth = (boothId: string, pin: string) => call<{ ok: true; boothId: string }>("company/claim", { method: "POST", body: { boothId, pin } });
 
-/** A company books an empty stand. The server builds the booth and the PIN for colleagues. */
-export const bookStandOnServer = (input: { company: string; industry: string; color: string; contact: string; email: string; tier: "premium" | "regular"; method: string; floor: number; x: number; y: number }) =>
-  call<{ booth: CompanyBooth; pin: string }>("bookings", { method: "POST", body: input });
-
 /** Event admins: the accounts that run a booth, and taking one out. */
 export const boothMembers = (boothId: string) => call<{ members: { id: string; email: string; name: string | null; since: number }[] }>(`booths/${encodeURIComponent(boothId)}/members`);
 export const removeBoothMember = (boothId: string, userId: string) =>

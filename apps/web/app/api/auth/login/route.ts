@@ -1,10 +1,11 @@
-import { InvalidLoginError, checkLogin, createSession } from "@vwo/db";
+import { InvalidLoginError, checkLogin, createSession, sessionUser } from "@vwo/db";
 import { loginSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
+import { setPreview } from "@/lib/preview-grant";
 import { setSessionCookie } from "@/lib/session";
 
 export async function POST(req: Request) {
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
     const session = await createSession(db, userId, req.headers.get("user-agent"));
     const res = NextResponse.json({ ok: true });
     setSessionCookie(res, session.token, session.expiresAt);
+    await setPreview(res, await sessionUser(db, session.token));
     return res;
   } catch (e) {
     if (e instanceof InvalidLoginError) return fail(401, "wrong_email_or_password");

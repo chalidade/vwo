@@ -8,6 +8,12 @@ import {
   JobClosedError,
   NotEnoughCoinsError,
   addBoothMember,
+  createRegistration,
+  hasVerifiedRegistration,
+  myRegistrations,
+  payRegistration,
+  rejectRegistration,
+  verifyRegistration,
   readPrices,
   writePrices,
   boothMembers,
@@ -189,5 +195,21 @@ describe("price list", () => {
     await writePrices(db, { "coin.apply": 8 }, seeker);
     expect(await readPrices(db)).toEqual({ "coin.apply": 8, "stand.regular": 5_000_000 });
     await expect(writePrices(db, { "coin.apply": -1 }, seeker)).rejects.toThrow();
+  });
+});
+
+describe("company registrations", () => {
+  it("goes unpaid → paid → verified only in that order, and only the registrant pays", async () => {
+    const reg = await createRegistration(db, { userId: seeker, company: "Kopi Nusa", industry: "F&B", color: "#16a34a", website: null, city: "Bandung", contactName: "Dewi", contactRole: "HR", email: "hr@kopinusa.example", phone: "0812", tier: "regular", price: 7_500_000 });
+    expect(reg.status).toBe("unpaid");
+    expect(await verifyRegistration(db, reg.id, seeker, "kopi-nusa", "123456")).toBe(false);
+    expect(await payRegistration(db, reg.id, "00000000-0000-0000-0000-000000000000", "QRIS")).toBe(false);
+    expect(await payRegistration(db, reg.id, seeker, "QRIS")).toBe(true);
+    expect(await payRegistration(db, reg.id, seeker, "QRIS")).toBe(false);
+    expect(await hasVerifiedRegistration(db, seeker)).toBe(false);
+    expect(await verifyRegistration(db, reg.id, seeker, "kopi-nusa", "123456")).toBe(true);
+    expect(await rejectRegistration(db, reg.id, seeker, "telat")).toBe(false);
+    expect(await hasVerifiedRegistration(db, seeker)).toBe(true);
+    expect((await myRegistrations(db, seeker))[0]).toMatchObject({ status: "verified", boothKey: "kopi-nusa", pin: "123456" });
   });
 });

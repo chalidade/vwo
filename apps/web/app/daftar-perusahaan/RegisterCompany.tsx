@@ -1,0 +1,201 @@
+"use client";
+
+import { useState } from "react";
+
+export interface RegistrationView {
+  id: string;
+  company: string;
+  tier: string;
+  price: number;
+  status: string;
+  boothKey: string | null;
+  pin: string | null;
+  note: string | null;
+  createdAt: number;
+}
+
+const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
+const METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mandiri", "Kartu kredit", "Transfer bank"];
+const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+const STATUS: Record<string, string> = { unpaid: "Menunggu pembayaran", paid: "Menunggu verifikasi panitia", verified: "Terverifikasi", rejected: "Ditolak" };
+
+const ERRORS: Record<string, string> = {
+  invalid_input: "Periksa lagi isian: website harus diawali https://, email dan nomor HP harus benar.",
+  too_many_open: "Masih ada pendaftaran yang belum selesai. Selesaikan atau tunggu verifikasi dulu.",
+  too_many_requests: "Terlalu banyak pendaftaran dari akun ini. Coba lagi besok.",
+  not_signed_in: "Sesi login habis. Muat ulang halaman lalu masuk lagi.",
+  bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+};
+
+async function post(path: string, body: unknown) {
+  try {
+    const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string } };
+    return r.ok ? { ok: true as const, data: d } : { ok: false as const, error: ERRORS[d.error ?? ""] ?? "Gagal. Coba lagi sebentar lagi." };
+  } catch {
+    return { ok: false as const, error: "Tidak tersambung ke server. Periksa internet lalu coba lagi." };
+  }
+}
+
+export function RegisterCompany({ email, name, prices, initial }: { email: string; name: string; prices: { regular: number; premium: number }; initial: RegistrationView[] }) {
+  const [list, setList] = useState(initial);
+  const open = list.find((r) => r.status === "unpaid" || r.status === "paid");
+  const [showForm, setShowForm] = useState(!list.length);
+  const [f, setF] = useState({ company: "", industry: "", website: "", city: "", contactName: name, contactRole: "HR", email, phone: "", website2: "" });
+  const [tier, setTier] = useState<"regular" | "premium">("regular");
+  const [color, setColor] = useState(COLORS[0]!);
+  const [method, setMethod] = useState(METHODS[0]!);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => (setF({ ...f, [k]: e.target.value }), setError(""));
+
+  return (
+    <>
+      {list.map((r) => (
+        <div key={r.id} className="rg-card">
+          <h2>
+            {r.company} <span className="rg-status" data-s={r.status}>{STATUS[r.status] ?? r.status}</span>
+          </h2>
+          <p className="cs-sub" style={{ margin: "4px 0 0", fontSize: 14 }}>
+            {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {rupiah(r.price)} · didaftarkan {new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          {r.status === "unpaid" && (
+            <div style={{ marginTop: 14 }}>
+              <label style={{ maxWidth: 320 }}>
+                Metode pembayaran
+                <select value={method} onChange={(e) => setMethod(e.target.value)}>
+                  {METHODS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="cs-sub" style={{ margin: "10px 0", fontSize: 13 }}>
+                Pembayaran saat ini masih simulasi: tidak ada uang yang ditarik.
+              </p>
+              <button
+                type="button"
+                className="cs-btn primary"
+                style={{ border: 0, cursor: "pointer" }}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  const res = await post(`/api/company/registrations/${r.id}/pay`, { method });
+                  setBusy(false);
+                  if (!res.ok) return setError(res.error);
+                  setList(list.map((x) => (x.id === r.id ? { ...x, status: "paid" } : x)));
+                }}
+              >
+                {busy ? "Memproses…" : `Bayar ${rupiah(r.price)}`}
+              </button>
+            </div>
+          )}
+          {r.status === "paid" && <p className="rg-ok">Pembayaran diterima. Panitia sedang memverifikasi perusahaanmu; kode dan PIN dikirim ke email setelah terverifikasi dan juga tampil di halaman ini.</p>}
+          {r.status === "verified" && r.boothKey && r.pin && (
+            <>
+              <dl className="rg-cred">
+                <dt>Kode perusahaan</dt>
+                <dd>{r.boothKey}</dd>
+                <dt>PIN</dt>
+                <dd>{r.pin}</dd>
+              </dl>
+              <a className="cs-btn primary" href="/masuk-perusahaan">
+                Masuk portal perusahaan →
+              </a>
+            </>
+          )}
+          {r.status === "rejected" && <p className="rg-err">Alasan: {r.note}</p>}
+        </div>
+      ))}
+      {error && !showForm && <p className="rg-err">{error}</p>}
+
+      {!open && !showForm && (
+        <p style={{ marginTop: 18 }}>
+          <button type="button" className="cs-btn ghost" style={{ cursor: "pointer", color: "inherit" }} onClick={() => setShowForm(true)}>
+            + Daftarkan perusahaan lain
+          </button>
+        </p>
+      )}
+
+      {!open && showForm && (
+        <form
+          className="rg-card"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            const res = await post("/api/company/registrations", { ...f, tier, color });
+            setBusy(false);
+            if (!res.ok) return setError(res.error);
+            const r = res.data.registration!;
+            setList([{ ...r, createdAt: new Date(r.createdAt).getTime() }, ...list]);
+            setShowForm(false);
+          }}
+        >
+          <h2>Pilih paket</h2>
+          <div className="rg-tiers" style={{ margin: "12px 0 20px" }}>
+            {(["regular", "premium"] as const).map((t) => (
+              <button key={t} type="button" className="rg-tier" data-on={tier === t ? "" : undefined} onClick={() => setTier(t)}>
+                <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
+                <strong>{rupiah(prices[t])}</strong>
+                <small>{t === "premium" ? "Stand lebih lebar, layar video, lampu sorot, LED berjalan, posisi teratas" : "Panel, meja recruiter, roll-up banner, lowongan tanpa batas"}</small>
+              </button>
+            ))}
+          </div>
+          <h2>Data perusahaan</h2>
+          <div className="rg-grid" style={{ marginTop: 12 }}>
+            <label className="full">
+              Nama perusahaan
+              <input required maxLength={60} value={f.company} onChange={set("company")} placeholder="PT Contoh Maju" />
+            </label>
+            <label>
+              Bidang usaha
+              <input required maxLength={60} value={f.industry} onChange={set("industry")} placeholder="Teknologi, Retail, …" />
+            </label>
+            <label>
+              Kota kantor
+              <input required maxLength={60} value={f.city} onChange={set("city")} placeholder="Jakarta" />
+            </label>
+            <label className="full">
+              Website perusahaan
+              <input type="url" maxLength={120} value={f.website} onChange={set("website")} placeholder="https://perusahaan.example" />
+            </label>
+            <label>
+              Nama PIC / HR
+              <input required maxLength={60} value={f.contactName} onChange={set("contactName")} />
+            </label>
+            <label>
+              Jabatan
+              <input required maxLength={60} value={f.contactRole} onChange={set("contactRole")} placeholder="HR Manager" />
+            </label>
+            <label>
+              Email kantor
+              <input required type="email" maxLength={120} value={f.email} onChange={set("email")} />
+            </label>
+            <label>
+              No. HP / WhatsApp
+              <input required inputMode="tel" maxLength={20} value={f.phone} onChange={set("phone")} placeholder="0812 3456 7890" />
+            </label>
+            <div className="full">
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Warna brand</span>
+              <div className="rg-colors" role="radiogroup" aria-label="Warna brand" style={{ marginTop: 6 }}>
+                {COLORS.map((c) => (
+                  <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={c} style={{ background: c }} onClick={() => setColor(c)} />
+                ))}
+              </div>
+            </div>
+            <label className="rg-hp" aria-hidden>
+              Website kedua
+              <input tabIndex={-1} autoComplete="off" value={f.website2} onChange={set("website2")} />
+            </label>
+          </div>
+          <p className="cs-sub" style={{ fontSize: 13, margin: "16px 0" }}>
+            Panitia akan mengecek data ini (website, email kantor, nomor HP) sebelum booth dibuka. Pakai data asli perusahaan.
+          </p>
+          {error && <p className="rg-err">{error}</p>}
+          <button type="submit" className="cs-btn primary" style={{ border: 0, cursor: "pointer" }} disabled={busy}>
+            {busy ? "Mengirim…" : `Lanjut ke pembayaran · ${rupiah(prices[tier])}`}
+          </button>
+        </form>
+      )}
+    </>
+  );
+}

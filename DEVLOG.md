@@ -4,6 +4,22 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · halaman coming soon dan registrasi perusahaan dengan verifikasi
+
+**Konteks:** owner belum mau rilis dan khawatir aplikasi dicoba atau ditiru kompetitor, jadi jobfair.co.id harus menampilkan halaman coming soon dulu. Owner juga minta link registrasi khusus perusahaan: isi form, pilih paket, bayar, lalu panitia memverifikasi sebelum perusahaan mendapat PIN, supaya HRD yang masuk benar-benar nyata.
+
+**Yang berubah**
+- jobfair.co.id sekarang menampilkan halaman coming soon (animasi latar, kartu melayang, teks berkilau; animasi mati otomatis untuk pengguna yang memilih reduced motion). Aplikasi di /play hanya terbuka untuk panitia, akun pengelola booth, dan perusahaan yang sudah diverifikasi. Yang lain diarahkan kembali ke halaman coming soon. Manifest dan ikon tetap terbuka supaya instalasi aplikasi tetap jalan.
+- Izin akses sebelum rilis disimpan di cookie bertanda tangan (berlaku 7 hari, diperbarui otomatis), jadi middleware tidak perlu membuka database. Setelah rilis, cukup set `SITE_LAUNCHED=1` di Vercel: jobfair.co.id langsung mengarah ke landing page seperti dulu.
+- Link masuk: `/masuk-panitia` dan `/masuk-perusahaan` (login Google lalu langsung ke halaman panitia atau portal perusahaan).
+- Registrasi perusahaan di `/daftar-perusahaan`: login Google, isi data perusahaan (nama, bidang, kota, website, PIC, jabatan, email kantor, HP, warna brand), pilih paket stand reguler atau VIP (harga dari tabel harga), lalu bayar (masih simulasi). Ada field jebakan untuk bot dan batas 5 pendaftaran per akun per hari.
+- Tab baru Panitia → 📝 Pendaftaran: daftar pendaftar per status, detail untuk dicek, pilih tempat stand kosong, lalu Verifikasi (booth langsung berdiri dengan PIN 6 angka) atau Tolak dengan alasan. Kode dan PIN dikirim lewat email (kalau email aktif) dan tampil di halaman pendaftaran perusahaan.
+- Booking stand langsung dari peta di versi live diganti tombol ke formulir registrasi, supaya semua booth lewat verifikasi panitia.
+
+**Dicek:** tes database dan engine lulus; uji lokal: pengunjung tanpa izin diarahkan dari /play ke halaman coming soon, panitia bisa masuk, perusahaan mendaftar lalu membayar lalu diverifikasi panitia, setelah itu bisa membuka /play dan masuk portal dengan kode dan PIN, dan pencari kerja tetap tertahan di halaman coming soon.
+
+---
+
 ## 2026-10-09 · ikon aplikasi, menu atas dihapus, laporan error otomatis
 
 **Konteks:** owner melaporkan ikon aplikasi terpasang dengan logo Chrome kecil di pojok dan logo jobfair terlalu besar, meminta menu atas di halaman perusahaan dan panitia dihapus, dan kadang aplikasi hang di halaman pelamar.

@@ -133,7 +133,7 @@ function ClaimBooth({ code: start, mine, admin }: { code: string; mine: string[]
           </>
         )}
         <p className="muted small" style={{ marginTop: 0 }}>
-          Masukkan kode perusahaan dan PIN dari panitia sekali saja. Setelah itu akun ini langsung membuka portal stand tersebut.
+          Masukkan kode perusahaan dan PIN dari panitia sekali saja. Setelah itu akun ini langsung membuka portal stand tersebut. Belum punya booth? <a href="/daftar-perusahaan">Daftarkan perusahaan</a>.
         </p>
         <label>
           Kode perusahaan

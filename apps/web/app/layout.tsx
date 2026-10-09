@@ -2,7 +2,7 @@ import "@vwo/ui/src/rpg/rpg.css";
 import "./globals.css";
 import type { ReactNode } from "react";
 
-export const metadata = { title: "VWO - Virtual World Job" };
+export const metadata = { title: "jobfair.co.id" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

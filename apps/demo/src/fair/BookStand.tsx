@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { STAND_PRICES } from "../jobfair-engine";
-import { checkSession } from "../account";
 import { sessionLogin } from "../company/login";
 import { LIVE } from "../mode";
-import { bookStandOnServer } from "../server-fair";
 import { fair } from "../useFair";
 import { PAY_METHODS, rupiah } from "./company";
 import { Modal } from "./Modal";
@@ -22,8 +20,26 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
   const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [done, setDone] = useState<{ id: string; company: string; pin: string } | null>(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const floorName = fair.fair.floors[slot.floor]?.name ?? "Aula";
+  if (LIVE)
+    return (
+      <Modal title="🏬 Booking stand" onClose={onClose} className="bk">
+        <div className="bk-form">
+          <p className="bk-place">📍 Stand ini masih kosong.</p>
+          <p className="small">
+            Untuk membuka booth, perusahaan mendaftar lewat formulir perusahaan: isi data perusahaan, pilih paket, dan bayar. Panitia memverifikasi bahwa perusahaannya nyata, lalu mengirim kode dan PIN untuk masuk ke portal perusahaan.
+          </p>
+          <div className="row">
+            <a className="small-btn cp-link" href="/daftar-perusahaan">
+              Daftarkan perusahaan →
+            </a>
+            <button type="button" className="ghost" onClick={onClose}>
+              Kembali
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
   const place = `${floorName}, ${slot.y < 5 ? "baris belakang" : "baris depan"} ${slot.x < 10 ? "kiri" : slot.x < 25 ? "tengah" : "kanan"}`;
 
   return (
@@ -109,26 +125,14 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             <button
               type="button"
               className="bk-go"
-              disabled={busy}
-              onClick={async () => {
-                if (LIVE) {
-                  setBusy(true);
-                  const r = await bookStandOnServer({ company: company.trim(), industry: industry.trim(), color, contact: contact.trim(), email: email.trim(), tier, method, ...slot });
-                  setBusy(false);
-                  if (!r.ok) return setError(bookErrorText(r.error));
-                  // The booth stands for everyone on the next pull; show it here straight away.
-                  fair.applyShared(null, {}, [{ booth: r.data.booth }]);
-                  void checkSession();
-                  setDone({ id: r.data.booth.id, company: r.data.booth.company, pin: r.data.pin });
-                  return setStep("done");
-                }
+              onClick={() => {
                 const r = fair.bookStand({ company, industry, color, contact, email, tier, method, ...slot });
                 if (!r) return setError("Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.");
                 setDone({ id: r.booth.id, company: r.booth.company, pin: r.pin });
                 setStep("done");
               }}
             >
-              {busy ? "Memproses…" : `Bayar ${rupiah(STAND_PRICES[tier])}`}
+              Bayar {rupiah(STAND_PRICES[tier])}
             </button>
           </div>
         </div>
@@ -162,19 +166,3 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
   );
 }
 
-function bookErrorText(error: string) {
-  switch (error) {
-    case "slot_taken":
-      return "Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.";
-    case "not_signed_in":
-      return "Masuk dulu dengan akun Google di halaman Job Fair, lalu booking lagi.";
-    case "too_many_requests":
-      return "Terlalu banyak booking dari akun ini. Coba lagi nanti.";
-    case "invalid_input":
-      return "Periksa lagi data perusahaan dan email PIC.";
-    case "offline":
-      return "Tidak tersambung ke server. Periksa internet lalu coba lagi.";
-    default:
-      return "Booking gagal. Coba lagi sebentar lagi.";
-  }
-}
