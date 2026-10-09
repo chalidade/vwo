@@ -1,7 +1,8 @@
 import "server-only";
 
 /** Where links in emails point, for example https://vwo.example. */
-export const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+export const appUrl = () =>
+  (process.env.APP_URL ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")).replace(/\/$/, "");
 
 /**
  * Send a transactional email through Resend when RESEND_API_KEY is set. Without it (local

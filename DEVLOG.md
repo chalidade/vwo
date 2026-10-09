@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair: siap trial di Vercel + Supabase, dengan pengamanan
+
+**Konteks:** owner memilih trial gratis (puluhan orang) di Vercel + Supabase, lalu pindah semua ke DigitalOcean saat event, tanpa kerja dua kali, dan minta keamanannya diperketat.
+
+**Yang berubah**
+- Koneksi database otomatis menyesuaikan Supabase: pooler transaksi (port 6543) tanpa prepared statement, dan satu koneksi per fungsi di Vercel. Migrasi memakai `MIGRATE_DATABASE_URL` (session pooler).
+- `apps/web/vercel.json`: region Singapura, dan migrasi hanya jalan saat deploy production.
+- Pembatas percobaan login, daftar, verifikasi, lupa password, dan reset sekarang dihitung di Postgres (tabel `rate_limits`), bukan di memori. Sebelumnya tidak berguna di Vercel karena tiap fungsi punya memorinya sendiri. Sudah diuji dengan 12 permintaan serentak: tepat 5 yang lolos dari batas 5.
+- IP pengunjung diambil dari entri yang ditambahkan proxy kita sendiri, jadi penyerang tidak bisa mengakali batas login dengan memalsukan header `X-Forwarded-For`.
+- Migrasi `0003_lock_public_api`: semua tabel memakai row level security dan peran API Supabase (`anon`, `authenticated`) dicabut aksesnya. Jadi API REST publik Supabase tidak membuka data apa pun, bahkan kalau anon key bocor. Tes baru gagal kalau ada tabel baru yang lupa dikunci.
+- Header keamanan di semua halaman: HSTS, larangan di-embed (anti clickjacking), nosniff, referrer policy, dan izin kamera/mikrofon hanya untuk situs sendiri.
+- Kode tetap sama untuk DigitalOcean: hanya Postgres biasa, tanpa Supabase Auth atau Storage. Pindah data cukup `pg_dump` lalu `pg_restore`.
+
+---
+
 ## 2026-10-09 · jobfair: nama dan logo baru, dialog lebih rapi, landing page profesional
 
 **Konteks:** owner memberi logo dan nama aplikasi "jobfair", meminta pilihan di semua dialog dirapikan, dan landing page yang lebih profesional untuk pencari kerja dengan warna logo.

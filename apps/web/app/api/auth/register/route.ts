@@ -9,7 +9,7 @@ import { setSessionCookie } from "@/lib/session";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
-  if (!allow(`register:${clientIp(req)}`, 10, 3600_000)) return fail(429, "too_many_requests");
+  if (!(await allow(`register:${clientIp(req)}`, 10, 3600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, registerSchema);
   if ("error" in body) return body.error;
   const { email, password, name } = body.data;
