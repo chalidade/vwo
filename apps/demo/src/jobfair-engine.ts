@@ -370,6 +370,8 @@ export interface FairApplication {
   calls?: CallLog[];
   /** Last change, so two open tabs keep the newest copy. */
   updatedAt?: number;
+  /** Live: the server's last change we took, on the server's clock, so a fast device clock can't hide newer answers. */
+  serverAt?: number;
 }
 
 /** A job seeker's review of a company. */
@@ -1392,6 +1394,8 @@ export class DemoJobFair {
 
   /** Called after a company changes an application's status here; the live app sends it to the server. */
   onStatusChange: ((a: FairApplication) => void) | null = null;
+  /** Called after either side adds to an application's conversation (chat, interview, rating, calls). */
+  onShared: ((a: FairApplication) => void) | null = null;
 
   /** Applications the server has: the player's own (from any device), or the ones a booth received. */
   mergeServer(list: FairApplicationOut[], mine: boolean) {
@@ -1400,11 +1404,14 @@ export class DemoJobFair {
       const have = this.applications.find((x) => x.id === s.id);
       if (have) {
         if (!mine) have.visitorId = `user:${s.seeker}`;
-        if (s.updatedAt > (have.updatedAt ?? 0) && s.status !== have.status) {
-          const before = { ...have };
+        if (s.updatedAt > (have.serverAt ?? 0)) {
+          const before = structuredClone(have);
           have.status = s.status;
-          have.updatedAt = s.updatedAt;
+          have.updatedAt = Math.max(have.updatedAt ?? 0, s.updatedAt);
+          have.serverAt = s.updatedAt;
+          this.takeShared(have, s);
           if (mine) this.tellPlayer(before, have);
+          else this.tellCompany(before, have);
           changed = true;
         }
         continue;
@@ -1432,13 +1439,39 @@ export class DemoJobFair {
         city: s.city,
         photo: safeImage(s.photo),
         updatedAt: s.updatedAt,
+        serverAt: s.updatedAt,
+        messages: s.messages,
+        interview: s.interview,
+        rating: s.rating,
+        feedback: s.feedback,
+        calls: s.calls,
       });
+      if (!mine) this.notify(s.boothId, "apply", `${s.name} melamar ${s.jobTitle}`, s.id);
       changed = true;
     }
     if (!changed) return;
     this.applications.sort((x, y) => y.at - x.at);
     this.persist();
     this.emit();
+  }
+
+  /** The server's copy of the conversation: messages from both sides are kept, the rest is the server's. */
+  private takeShared(a: FairApplication, s: FairApplicationOut) {
+    const key = (m: AppMessage) => `${m.at}|${m.from}|${m.text}`;
+    const seen = new Set((s.messages ?? []).map(key));
+    a.messages = [...(s.messages ?? []), ...(a.messages ?? []).filter((m) => !seen.has(key(m)))].sort((x, y) => x.at - y.at);
+    if (s.interview) a.interview = s.interview;
+    if (s.rating !== undefined) a.rating = s.rating;
+    if (s.feedback !== undefined) a.feedback = s.feedback;
+    if (s.calls) a.calls = s.calls;
+  }
+
+  /** The applicant answered on another device: tell the company in its portal. */
+  private tellCompany(before: FairApplication, after: FairApplication) {
+    const seen = before.messages?.length ?? 0;
+    for (const m of (after.messages ?? []).slice(seen)) if (m.from === "seeker") this.notify(after.boothId, "chat", `${after.name}: ${m.text.slice(0, 120)}`, after.id);
+    if (after.interview?.reply && after.interview.reply !== before.interview?.reply)
+      this.notify(after.boothId, "confirm", after.interview.reply === "hadir" ? `${after.name} konfirmasi hadir interview ${after.jobTitle}` : `${after.name} minta jadwal ulang interview ${after.jobTitle}`, after.id);
   }
 
   /** The company changed one of the player's applications in another tab (its portal): say what changed. */
@@ -1972,6 +2005,7 @@ export class DemoJobFair {
     if (feedback) a.feedback = feedback;
     this.log({ type: "rate", name: a.name, company: a.company, jobTitle: "★".repeat(a.rating) });
     if (a.visitorId === PLAYER_ID && a.rating > before) this.gainXp((a.rating - before) * XP.ratedPerStar);
+    this.onShared?.(a);
     this.persist();
     this.emit();
   }
@@ -2320,6 +2354,7 @@ export class DemoJobFair {
 
   private touch(a: FairApplication) {
     a.updatedAt = this.now();
+    this.onShared?.(a);
     this.persist();
     this.emit();
   }

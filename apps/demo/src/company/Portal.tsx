@@ -336,10 +336,13 @@ function useServerApplicants(boothId: string) {
         setState(r.ok ? "ok" : r.error === "not_signed_in" ? "signin" : r.error === "not_allowed" ? "denied" : "offline");
       });
     pull();
-    const timer = window.setInterval(pull, 20_000);
+    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 8_000);
+    const back = () => document.visibilityState === "visible" && pull();
+    document.addEventListener("visibilitychange", back);
     return () => {
       gone = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", back);
     };
   }, [boothId]);
   return state;

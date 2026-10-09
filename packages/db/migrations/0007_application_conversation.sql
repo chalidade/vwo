@@ -1,0 +1,1 @@
+ALTER TABLE "fair_applications" ADD COLUMN "shared" jsonb DEFAULT '{}'::jsonb NOT NULL;

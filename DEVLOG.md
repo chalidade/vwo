@@ -4,6 +4,20 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · jobfair live: chat, undangan interview, dan rating lintas perangkat
+
+**Konteks:** lanjutan permintaan owner agar panitia, perusahaan, dan pelamar saling terhubung. Chat HR, undangan interview, jawaban pelamar, rating, dan riwayat panggilan sebelumnya hanya tersimpan di browser masing-masing.
+
+**Yang berubah**
+- Kolom baru `shared` di `fair_applications` (migrasi 0007) menyimpan percakapan satu lamaran.
+- Route `PUT /api/jobfair/applications/<id>/shared`: perusahaan (akun admin) menulis pesan, undangan interview, rating, feedback, dan log panggilan; pelamar hanya bisa menulis pesannya sendiri dan jawaban undangan (hadir / jadwal ulang) di lamarannya sendiri. Digabung di server (`mergeShared`) dalam transaksi, jadi pesan dari dua perangkat tidak saling menimpa.
+- Game mengirim perubahan 0,4 detik setelah aksi terakhir. Portal perusahaan menarik data tiap 8 detik dan pelamar tiap 12 detik selama tab terlihat, plus langsung saat tab dibuka lagi.
+- Waktu server dicatat terpisah (`serverAt`), jadi jam perangkat yang kecepetan tidak menyembunyikan balasan baru.
+
+**Dicek:** tes db baru (pelamar tidak bisa memalsukan pesan perusahaan atau mengubah rating; akun lain ditolak), 32 tes db dan 40 tes demo lulus. Uji dua browser lokal: HR kirim pesan, undangan, dan rating di portal, pelamar melihatnya setelah buka game, pelamar membalas dan konfirmasi hadir, portal menampilkan "Pelamar konfirmasi hadir" dan balasannya. Pelamar yang mencoba menulis sebagai perusahaan ditolak 403.
+
+---
+
 ## 2026-10-09 · jobfair live: pengaturan panitia dan stand perusahaan di server
 
 **Konteks:** owner minta semua fitur saling terhubung antara panitia, perusahaan, dan pelamar. Sebelumnya pengaturan panitia (lantai, stand, iklan, pengumuman, jadwal Aula, psikotes) dan editan stand perusahaan hanya tersimpan di browser yang mengubahnya.

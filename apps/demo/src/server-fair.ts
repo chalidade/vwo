@@ -1,6 +1,6 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
-import type { FairApplicationInput, FairApplicationOut } from "@vwo/shared";
+import type { ApplicationShared, FairApplicationInput, FairApplicationOut } from "@vwo/shared";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -49,3 +49,7 @@ export function applyErrorText(error: string) {
       return "Lamaran gagal terkirim. Coba lagi sebentar lagi.";
   }
 }
+
+/** One side's part of an application's conversation: chat, interview, rating and call log. */
+export const sendShared = (id: string, as: "company" | "seeker", shared: ApplicationShared) =>
+  call<{ ok: true }>(`applications/${encodeURIComponent(id)}/shared`, { method: "PUT", body: { as, shared } });

@@ -36,17 +36,74 @@ export const fairApplicationSchema = z.object({
 });
 export type FairApplicationInput = z.infer<typeof fairApplicationSchema>;
 
+/** Filled in below; declared here so the response type can carry the conversation. */
+interface ApplicationSharedFields {
+  messages?: { at: number; from: "company" | "seeker"; text: string }[];
+  interview?: { at: number; mode: string; place?: string; note?: string; reply?: "hadir" | "jadwal-ulang" };
+  rating?: number;
+  feedback?: string;
+  calls?: { at: number; kind: "video" | "voice"; answered: boolean; seconds: number }[];
+}
+
 export const fairApplicationStatusSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(FAIR_APPLICATION_STATUSES),
 });
 
 /** An application as the server sends it back to the game. */
-export interface FairApplicationOut extends FairApplicationInput {
+export interface FairApplicationOut extends FairApplicationInput, ApplicationSharedFields {
   id: string;
   /** The applicant's account id, so the company can call them. */
   seeker: string;
   status: (typeof FAIR_APPLICATION_STATUSES)[number];
   at: number;
   updatedAt: number;
+}
+
+// --- The conversation on one application, which the company and the applicant both add to.
+const message = z.object({ at: z.number().int().nonnegative(), from: z.enum(["company", "seeker"]), text: z.string().trim().min(1).max(600) });
+const interview = z.object({
+  at: z.number().int().nonnegative(),
+  mode: z.string().trim().max(60),
+  place: z.string().trim().max(300).optional(),
+  note: z.string().trim().max(600).optional(),
+  reply: z.enum(["hadir", "jadwal-ulang"]).optional(),
+});
+const callLog = z.object({ at: z.number().int().nonnegative(), kind: z.enum(["video", "voice"]), answered: z.boolean(), seconds: z.number().int().min(0).max(86_400) });
+
+export const applicationSharedSchema = z.object({
+  messages: z.array(message).max(300).optional(),
+  interview: interview.optional(),
+  rating: z.number().int().min(1).max(5).optional(),
+  feedback: z.string().trim().max(300).optional(),
+  calls: z.array(callLog).max(100).optional(),
+});
+export type ApplicationShared = z.infer<typeof applicationSharedSchema>;
+
+export const applicationSharedPutSchema = z.object({ as: z.enum(["company", "seeker"]), shared: applicationSharedSchema });
+
+const msgKey = (m: { at: number; from: string; text: string }) => `${m.at}|${m.from}|${m.text}`;
+
+/**
+ * Fold one side's copy into the stored conversation. Each side only adds its own part: the company
+ * its messages, the interview, the rating and call log; the applicant its messages and the answer to
+ * the invitation. Messages are never removed, so two devices writing at once both keep theirs.
+ */
+export function mergeShared(stored: ApplicationShared, incoming: ApplicationShared, as: "company" | "seeker"): ApplicationShared {
+  const out: ApplicationShared = { ...stored };
+  const seen = new Set((stored.messages ?? []).map(msgKey));
+  const added = (incoming.messages ?? []).filter((m) => m.from === as && !seen.has(msgKey(m)));
+  if (added.length) out.messages = [...(stored.messages ?? []), ...added].sort((a, b) => a.at - b.at).slice(-300);
+  if (as === "company") {
+    if (incoming.interview) out.interview = { ...incoming.interview, reply: stored.interview && stored.interview.at === incoming.interview.at ? stored.interview.reply : undefined };
+    if (incoming.rating !== undefined) out.rating = incoming.rating;
+    if (incoming.feedback !== undefined) out.feedback = incoming.feedback;
+    if (incoming.calls) {
+      const have = new Set((stored.calls ?? []).map((c) => c.at));
+      out.calls = [...(stored.calls ?? []), ...incoming.calls.filter((c) => !have.has(c.at))].sort((a, b) => b.at - a.at).slice(0, 100);
+    }
+  } else if (stored.interview && incoming.interview?.reply && incoming.interview.at === stored.interview.at) {
+    out.interview = { ...stored.interview, reply: incoming.interview.reply };
+  }
+  return out;
 }
