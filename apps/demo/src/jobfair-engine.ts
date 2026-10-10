@@ -1859,10 +1859,14 @@ export class DemoJobFair {
     return true;
   }
 
+  /** Get up from a chair. A seat walled in by furniture (a VIP lounge armchair) lets the visitor out
+   *  onto the nearest free spot, in front of the seat first, so they can walk or tap away from it. */
   stand(id: string) {
     const v = this.visitors.get(id);
     if (!v?.seatId) return;
     v.seatId = null;
+    const floor = this.floor(v.floorId);
+    if (isBlocked(floor, v.x, v.y)) Object.assign(v, freeSpotNear(floor, v.x, v.y));
     this.emit();
   }
 
@@ -3384,3 +3388,14 @@ export function seededReviews(boothId: string) {
   return { count, sum: Math.round(count * average) };
 }
 
+
+/** The nearest walkable spot to (x, y): straight in front (below) first, then rings around it. */
+export function freeSpotNear(floor: FloorView, x: number, y: number) {
+  for (let d = 0.25; d <= 3; d += 0.25) {
+    for (const [dx, dy] of [[0, 1], [-0.7, 0.7], [0.7, 0.7], [-1, 0], [1, 0], [0, -1], [-0.7, -0.7], [0.7, -0.7]] as const) {
+      const p = { x: x + dx * d, y: y + dy * d };
+      if (!isBlocked(floor, p.x, p.y)) return p;
+    }
+  }
+  return { x, y };
+}
