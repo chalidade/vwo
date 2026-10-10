@@ -106,17 +106,17 @@ export function DashShell<T extends string>({
 
       <nav className="dash-tabbar" aria-label="Menu utama">
         {tabs.map((i) => (
-          <button key={i.id} type="button" aria-current={active === i.id ? "page" : undefined} data-active={active === i.id ? "" : undefined} onClick={() => pick(i.id)}>
+          <button key={i.id} type="button" aria-label={i.label} title={i.label} aria-current={active === i.id ? "page" : undefined} data-active={active === i.id ? "" : undefined} onClick={() => pick(i.id)}>
             <span className="dash-tab-ic">
-              <Icon i={i.icon} size={22} />
+              <Icon i={i.icon} size={24} />
               {!!i.count && <span className="dash-dot">{i.count > 9 ? "9+" : i.count}</span>}
             </span>
             <span>{i.label.split(" ")[0]}</span>
           </button>
         ))}
-        <button type="button" data-active={inMenu || sheet ? "" : undefined} aria-expanded={sheet} onClick={() => setSheet(!sheet)}>
+        <button type="button" aria-label="Semua menu" title="Semua menu" data-active={inMenu || sheet ? "" : undefined} aria-expanded={sheet} onClick={() => setSheet(!sheet)}>
           <span className="dash-tab-ic">
-            <Icon i={sheet ? X : Menu} size={22} />
+            <Icon i={sheet ? X : Menu} size={24} />
           </span>
           <span>{inMenu && current ? current.label.split(" ")[0] : "Menu"}</span>
         </button>
