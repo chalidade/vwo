@@ -120,6 +120,13 @@
       "when": 1791593798240,
       "tag": "0016_company_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791594150979,
+      "tag": "0017_booth_reviews",
+      "breakpoints": true
     }
   ]
 }
