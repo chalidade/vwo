@@ -106,6 +106,13 @@
       "when": 1791591392879,
       "tag": "0014_early_access_organizer",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791592446384,
+      "tag": "0015_stall_payments",
+      "breakpoints": true
     }
   ]
 }

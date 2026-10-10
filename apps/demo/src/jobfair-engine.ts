@@ -22,7 +22,9 @@ import {
   loungeSpot,
   safeImage,
   safeUrl,
-  STALL_SLOTS,
+  makeStall,
+  freeStallSlotsOf,
+  type StallInput,
   buildFairRoom,
   type FoodStall,
   type JobFairView,
@@ -175,6 +177,8 @@ export interface OrgState {
   rundown?: AulaEvent[];
   /** Food court stalls per room, when the organiser added or removed any. */
   stalls?: Record<string, FoodStall[]>;
+  /** Paid food court rentals the organiser took out again; the server keeps them, they stay hidden. */
+  removedStalls?: string[];
   /** The booth floors, when the organiser added, removed or renamed any. */
   halls?: FairFloorInfo[];
   /** Room floors the organiser switched off (by room id). */
@@ -290,6 +294,15 @@ export interface BookedBooth {
   booth: CompanyBooth;
   booking?: StandBooking;
   pin?: string;
+}
+
+/** Live: a food court stand a business rented and paid for through the server. */
+export interface RentedStall {
+  roomId: string;
+  stall: FoodStall;
+  /** Organiser only: who paid, and the payment. */
+  by?: string;
+  paymentId?: string;
 }
 
 /** Stand prices for a booking, in rupiah. */
@@ -654,6 +667,8 @@ export class DemoJobFair {
   org: OrgState = { removed: [], added: [] };
   /** Live: booths that came from a server booking. */
   private booked = new Set<string>();
+  /** Live: food court stalls that came from a paid rental. */
+  private rentedStalls = new Set<string>();
   /** Walking promoters: where they are heading and who they last talked to. */
   private walkers = new Map<string, { path: Point[] | null; target: Goal | null; until: number; met: Map<string, number>; pitching: string | null }>();
   readonly events: FairEvent[] = [];
@@ -996,9 +1011,7 @@ export class DemoJobFair {
   /** Free stall places in the food court, by slot number. */
   freeStallSlots(roomId = this.foodCourt()?.id) {
     const room = this.fair.rooms.find((r) => r.id === roomId);
-    if (!room?.stalls) return [];
-    const taken = new Set(room.stalls.map((st, i) => stallSlot(st, i)));
-    return STALL_SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
+    return room?.stalls ? freeStallSlotsOf(room.stalls) : [];
   }
 
   private setStalls(roomId: string, list: FoodStall[]) {
@@ -1008,30 +1021,15 @@ export class DemoJobFair {
   }
 
   /** Put a business in a free food court slot (the organiser, or a business renting the stand). */
-  addStall(slot: number, input: { name: string; emoji?: string; color?: string; vendor?: string; promo?: string; about?: string; address?: string; hours?: string; website?: string; deal?: { title: string; worth: string; price: number } }, roomId = this.foodCourt()?.id) {
+  addStall(slot: number, input: StallInput & { website?: string }, roomId = this.foodCourt()?.id) {
     const room = this.fair.rooms.find((r) => r.id === roomId);
     const name = input.name.trim().slice(0, 40);
     if (!room?.stalls || !name || !this.freeStallSlots(room.id).includes(slot)) return null;
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "stan";
     let id = `stall-${slug}`;
     for (let n = 2; room.stalls.some((st) => st.id === id); n++) id = `stall-${slug}-${n}`;
-    const deal = input.deal && input.deal.title.trim() && input.deal.price > 0 ? input.deal : null;
-    const stall: FoodStall = {
-      id,
-      slot,
-      name,
-      emoji: input.emoji?.trim() || "🍽️",
-      color: input.color || "#ea580c",
-      vendor: input.vendor?.trim().slice(0, 30) || "Penjaga stan",
-      promo: input.promo?.trim().slice(0, 80) || `Promo spesial dari ${name}`,
-      about: input.about?.trim().slice(0, 300) || "",
-      address: input.address?.trim().slice(0, 120) || "",
-      hours: input.hours?.trim().slice(0, 40) || "",
-      website: safeUrl(input.website ?? "") ?? "",
-      rating: 4.5,
-      menu: [],
-      deals: deal ? [{ id: `${id}-deal`, title: deal.title.trim().slice(0, 60), worth: deal.worth.trim().slice(0, 20) || "-", price: Math.min(200, Math.max(1, Math.round(deal.price))), terms: "Berlaku 30 hari." }] : [],
-    };
+    const stall = makeStall(id, slot, input)!;
+    stall.website = safeUrl(input.website ?? "") ?? "";
     this.setStalls(room.id, [...room.stalls, stall]);
     this.log({ type: "room", name: `Stan food court baru: ${name}` });
     return stall;
@@ -1041,6 +1039,7 @@ export class DemoJobFair {
   removeStall(stallId: string) {
     const room = this.fair.rooms.find((r) => r.stalls?.some((st) => st.id === stallId));
     if (!room?.stalls) return false;
+    if (this.rentedStalls.has(stallId) && !this.org.removedStalls?.includes(stallId)) this.org.removedStalls = [...(this.org.removedStalls ?? []), stallId];
     this.setStalls(room.id, room.stalls.filter((st) => st.id !== stallId));
     return true;
   }
@@ -1577,8 +1576,8 @@ export class DemoJobFair {
   }
 
   /** Live: take the setup from the server. Missing parts keep what this browser has. */
-  applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = []) {
-    const base = org ?? (bookings.length ? this.org : null);
+  applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = [], stalls: RentedStall[] = []) {
+    const base = org ?? (bookings.length || stalls.length ? this.org : null);
     if (base) {
       const next = structuredClone(base);
       next.added ??= [];
@@ -1589,6 +1588,14 @@ export class DemoJobFair {
         if (!next.added.some((x) => x.id === b.booth.id)) next.added.push(b.booth);
         if (b.pin && !next.pins?.[b.booth.id]) next.pins = { ...next.pins, [b.booth.id]: b.pin };
         if (b.booking && !next.bookings?.some((x) => x.id === b.booking!.id)) next.bookings = [b.booking, ...(next.bookings ?? [])];
+      }
+      // Food court stands businesses paid for: in their slot, unless the organiser took one out.
+      for (const r of stalls) {
+        this.rentedStalls.add(r.stall.id);
+        if (next.removedStalls?.includes(r.stall.id)) continue;
+        const list = next.stalls?.[r.roomId] ?? this.originalStalls.get(r.roomId);
+        if (!list || list.some((st) => st.id === r.stall.id) || !freeStallSlotsOf(list).includes(r.stall.slot ?? -1)) continue;
+        next.stalls = { ...next.stalls, [r.roomId]: [...list.map((st, i) => ({ ...st, slot: stallSlot(st, i) })), r.stall] };
       }
       this.loadOrg(next);
     }
@@ -1818,6 +1825,12 @@ export class DemoJobFair {
   readonly levelUps: number[] = [];
 
   /** Top up coins at the coin stand (a demo payment). */
+  /** Live: a food court stand this account rented is paid and open (the server opened it). */
+  stallRentPaid(name: string) {
+    this.notices.push(`🍜 Pembayaran sewa stan diterima. ${name.slice(0, 40)} sudah buka di Food Court.`);
+    this.emit();
+  }
+
   buyCoins(packageId: string, method: string) {
     const pkg = this.fair.coinStand.packages.find((p) => p.id === packageId);
     if (!pkg) return null;

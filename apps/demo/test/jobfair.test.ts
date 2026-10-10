@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
-import { AULA, fairFloorId, infoDeskOn, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
+import { AULA, makeStall, fairFloorId, infoDeskOn, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
 import { BOOTH_SLOTS, CONVOS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
 
@@ -700,6 +700,22 @@ describe("DemoJobFair", () => {
     // Level 3 was the Aula's old floor in the oldest saves, which became the food court, now on Lantai 8.
     expect(fair.fair.promoters[0]).toMatchObject({ level: 7, x: 38.5 });
     expect(fair.org.layout).toBe(3);
+  });
+
+  it("live: shows food court stands rented through the server, and the organiser can take one out", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const stall = makeStall("rent-abc", 13, { name: "Kopi Sewa", deal: { title: "Voucher kopi", worth: "Rp15.000", price: 6 } })!;
+    fair.applyShared(null, {}, [], [{ roomId: "foodcourt", stall }]);
+    expect(fair.foodCourt()!.stalls!.map((st) => st.id)).toContain("rent-abc");
+    expect(fair.freeStallSlots()).toEqual([12, 14]);
+    // A second rental claiming a taken slot is not drawn on top of it.
+    fair.applyShared(null, {}, [], [{ roomId: "foodcourt", stall }, { roomId: "foodcourt", stall: { ...stall, id: "rent-def" } }]);
+    expect(fair.foodCourt()!.stalls!.filter((st) => st.slot === 13)).toHaveLength(1);
+    // Taken out by the organiser: it stays out when the server sends it again.
+    expect(fair.removeStall("rent-abc")).toBe(true);
+    expect(fair.org.removedStalls).toEqual(["rent-abc"]);
+    fair.applyShared(fair.org, {}, [], [{ roomId: "foodcourt", stall }]);
+    expect(fair.foodCourt()!.stalls!.some((st) => st.id === "rent-abc")).toBe(false);
   });
 
   it("has 15 food court stands along three walls, which the organiser can empty and anyone can rent", () => {

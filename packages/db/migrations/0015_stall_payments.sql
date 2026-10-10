@@ -1,0 +1,2 @@
+ALTER TABLE "fair_payments" DROP CONSTRAINT "fair_payments_kind_ck";--> statement-breakpoint
+ALTER TABLE "fair_payments" ADD CONSTRAINT "fair_payments_kind_ck" CHECK ("fair_payments"."kind" in ('coins','registration','invoice','stall'));

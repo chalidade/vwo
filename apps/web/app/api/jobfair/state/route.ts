@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canManageBooth, isFairAdmin } from "@/lib/fair";
 import { fail, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
+import { rentedOut } from "@/lib/stalls";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET() {
   let org: Doc | null = null;
   const companies: Record<string, Doc> = {};
   const bookings: Doc[] = [];
+  const stalls: unknown[] = [];
   let version = 0;
   for (const r of rows) {
     version = Math.max(version, r.updatedAt.getTime());
@@ -38,13 +40,16 @@ export async function GET() {
     } else if (r.key.startsWith("booking:")) {
       // A stand a company booked itself: everyone sees the booth, admins also the booking and PIN.
       bookings.push(admin ? { booth: data.booth, booking: data.booking, pin: data.pin } : { booth: data.booth });
+    } else if (r.key.startsWith("stall:")) {
+      // A food court stand a business paid for: everyone sees it, admins also who paid.
+      stalls.push(rentedOut(data, admin));
     } else if (r.key.startsWith("company:")) {
       const id = r.key.slice("company:".length);
       const { invoices, ...rest } = data;
       companies[id] = admin || mine.has(id) ? data : { ...rest, invoices: [] };
     }
   }
-  return NextResponse.json({ org, companies, bookings, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ org, companies, bookings, stalls, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** Save the organiser's setup (event admins) or one company's booth (its accounts, or admins). */

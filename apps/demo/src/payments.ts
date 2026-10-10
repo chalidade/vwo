@@ -8,8 +8,9 @@ export type Gateway = "xendit" | "demo";
 
 export interface PaymentView {
   id: string;
-  kind: "coins" | "registration" | "invoice";
+  kind: "coins" | "registration" | "invoice" | "stall";
   ref: string;
+  description: string;
   amount: number;
   status: "pending" | "paid" | "expired" | "failed";
   provider: Gateway;
@@ -22,6 +23,8 @@ const ERRORS: Record<string, string> = {
   not_signed_in: "Sesi login habis. Muat ulang halaman lalu masuk lagi.",
   not_allowed: "Akun ini tidak bisa membayar tagihan stand ini.",
   not_payable: "Tagihan ini sudah dibayar atau tidak bisa dibayar lagi.",
+  slot_taken: "Maaf, stan ini baru saja disewa usaha lain. Pilih stan kosong lain.",
+  invalid_input: "Data belum lengkap atau terlalu panjang. Periksa lagi isiannya.",
   too_many_requests: "Terlalu banyak percobaan bayar. Coba lagi nanti.",
   gateway_error: "Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.",
 };
@@ -40,11 +43,16 @@ export async function paymentGateway(): Promise<Gateway> {
   return gateway ?? "xendit";
 }
 
+export type PayFor =
+  | { kind: "coins"; pack: string }
+  | { kind: "invoice"; booth: string; invoice: string }
+  | { kind: "stall"; slot: number; stall: { name: string; vendor?: string; promo?: string; emoji?: string; color?: string; deal?: { title: string; worth: string; price: number } | null } };
+
 /**
- * Pay for coins or a company bill. Returns "redirect" when the browser is on its way to the
+ * Pay for coins, a company bill or a food court stand. Returns "redirect" when the browser is on its way to the
  * checkout page, the paid payment when it was settled at once (demo), or an error to show.
  */
-export async function pay(body: { kind: "coins"; pack: string } | { kind: "invoice"; booth: string; invoice: string }): Promise<{ ok: true; redirect: true } | { ok: true; payment: PaymentView } | { ok: false; error: string }> {
+export async function pay(body: PayFor): Promise<{ ok: true; redirect: true } | { ok: true; payment: PaymentView } | { ok: false; error: string }> {
   try {
     const r = await fetch("/api/payments", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = (await r.json().catch(() => ({}))) as { error?: string; code?: string; payment?: PaymentView };
@@ -66,7 +74,7 @@ export async function pay(body: { kind: "coins"; pack: string } | { kind: "invoi
  */
 export async function claimPaidCoins() {
   try {
-    const r = await fetch("/api/payments?kind=coins,invoice", { credentials: "same-origin" });
+    const r = await fetch("/api/payments?kind=coins,invoice,stall", { credentials: "same-origin" });
     if (!r.ok) return { pending: false };
     const { payments } = (await r.json()) as { payments: PaymentView[] };
     let bills = false;
@@ -75,6 +83,11 @@ export async function claimPaidCoins() {
       const c = await fetch(`/api/payments/${p.id}/claim`, { method: "POST", credentials: "same-origin" });
       if (!c.ok) continue;
       if (p.kind === "coins") fair.buyCoins(p.ref, p.method ?? "Xendit");
+      // A rented stand is opened by the server; the next pull shows it.
+      else if (p.kind === "stall") {
+        fair.stallRentPaid(p.description.replace(/^.*· /, ""));
+        bills = true;
+      }
       else {
         const at = p.ref.indexOf(":");
         fair.payInvoice(p.ref.slice(0, at), p.ref.slice(at + 1), p.method ?? "Xendit");

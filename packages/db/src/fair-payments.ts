@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairPayments } from "./jobfair-schema";
 
-export type PaymentKind = "coins" | "registration" | "invoice";
+export type PaymentKind = "coins" | "registration" | "invoice" | "stall";
 export type Payment = typeof fairPayments.$inferSelect;
 
 export async function createPayment(
