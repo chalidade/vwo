@@ -1,0 +1,1 @@
+ALTER TABLE "fair_applications" ADD COLUMN "company_notes" text DEFAULT '' NOT NULL;

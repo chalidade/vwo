@@ -32,6 +32,8 @@ export async function GET() {
   const stalls: unknown[] = [];
   let version = 0;
   for (const r of rows) {
+    // A booth's inbox read marks are that company's alone (see booths/[booth]/inbox).
+    if (r.key.startsWith("inbox:")) continue;
     version = Math.max(version, r.updatedAt.getTime());
     const data = r.data as Doc;
     if (r.key === "org") {

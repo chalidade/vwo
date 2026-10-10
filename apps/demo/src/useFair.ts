@@ -3,7 +3,7 @@ import { DEMO_JOB_FAIR } from "@vwo/shared";
 import { DemoJobFair, PLAYER_ID, type FairApplication, type FairSaved, type FairStorage } from "./jobfair-engine";
 import { onFrame } from "./loop";
 import { LIVE } from "./mode";
-import { sendShared, setApplicationStatus } from "./server-fair";
+import { markBoothInboxRead, saveNotes, sendShared, setApplicationStatus } from "./server-fair";
 
 const KEY = "vwo:jobfair";
 
@@ -66,7 +66,12 @@ function pushShared(a: FairApplication) {
     }, 400),
   );
 }
-if (LIVE) fair.onShared = pushShared;
+if (LIVE) {
+  fair.onShared = pushShared;
+  fair.serverInbox = true;
+  fair.onNote = (a) => saveNotes(a.boothId, a.id, a.notes ?? "").then((r) => r.ok);
+  fair.onBoothRead = (boothId, read) => void markBoothInboxRead(boothId, read).then((r) => r.ok && fair.setBoothRead(boothId, r.data.read));
+}
 onFrame((dt) => {
   if (fair.watched) fair.tick(dt);
 });

@@ -39,7 +39,7 @@ export type FairApplicationInput = z.infer<typeof fairApplicationSchema>;
 /** Filled in below; declared here so the response type can carry the conversation. */
 interface ApplicationSharedFields {
   messages?: { at: number; from: "company" | "seeker"; text: string }[];
-  interview?: { at: number; mode: string; place?: string; note?: string; reply?: "hadir" | "jadwal-ulang" };
+  interview?: { at: number; mode: string; place?: string; note?: string; reply?: "hadir" | "jadwal-ulang"; repliedAt?: number };
   rating?: number;
   feedback?: string;
   calls?: { at: number; kind: "video" | "voice"; answered: boolean; seconds: number }[];
@@ -58,6 +58,8 @@ export interface FairApplicationOut extends FairApplicationInput, ApplicationSha
   status: (typeof FAIR_APPLICATION_STATUSES)[number];
   at: number;
   updatedAt: number;
+  /** The company's private notes; only in the booth's own list. */
+  notes?: string;
 }
 
 // --- The conversation on one application, which the company and the applicant both add to.
@@ -68,6 +70,8 @@ const interview = z.object({
   place: z.string().trim().max(300).optional(),
   note: z.string().trim().max(600).optional(),
   reply: z.enum(["hadir", "jadwal-ulang"]).optional(),
+  /** When the applicant answered; set by the server. */
+  repliedAt: z.number().int().nonnegative().optional(),
 });
 const callLog = z.object({ at: z.number().int().nonnegative(), kind: z.enum(["video", "voice"]), answered: z.boolean(), seconds: z.number().int().min(0).max(86_400) });
 
@@ -89,13 +93,16 @@ const msgKey = (m: { at: number; from: string; text: string }) => `${m.at}|${m.f
  * its messages, the interview, the rating and call log; the applicant its messages and the answer to
  * the invitation. Messages are never removed, so two devices writing at once both keep theirs.
  */
-export function mergeShared(stored: ApplicationShared, incoming: ApplicationShared, as: "company" | "seeker"): ApplicationShared {
+export function mergeShared(stored: ApplicationShared, incoming: ApplicationShared, as: "company" | "seeker", now = Date.now()): ApplicationShared {
   const out: ApplicationShared = { ...stored };
   const seen = new Set((stored.messages ?? []).map(msgKey));
   const added = (incoming.messages ?? []).filter((m) => m.from === as && !seen.has(msgKey(m)));
   if (added.length) out.messages = [...(stored.messages ?? []), ...added].sort((a, b) => a.at - b.at).slice(-300);
   if (as === "company") {
-    if (incoming.interview) out.interview = { ...incoming.interview, reply: stored.interview && stored.interview.at === incoming.interview.at ? stored.interview.reply : undefined };
+    if (incoming.interview) {
+      const same = stored.interview && stored.interview.at === incoming.interview.at;
+      out.interview = { ...incoming.interview, reply: same ? stored.interview!.reply : undefined, repliedAt: same ? stored.interview!.repliedAt : undefined };
+    }
     if (incoming.rating !== undefined) out.rating = incoming.rating;
     if (incoming.feedback !== undefined) out.feedback = incoming.feedback;
     if (incoming.calls) {
@@ -103,7 +110,8 @@ export function mergeShared(stored: ApplicationShared, incoming: ApplicationShar
       out.calls = [...(stored.calls ?? []), ...incoming.calls.filter((c) => !have.has(c.at))].sort((a, b) => b.at - a.at).slice(0, 100);
     }
   } else if (stored.interview && incoming.interview?.reply && incoming.interview.at === stored.interview.at) {
-    out.interview = { ...stored.interview, reply: incoming.interview.reply };
+    const changed = stored.interview.reply !== incoming.interview.reply;
+    out.interview = { ...stored.interview, reply: incoming.interview.reply, repliedAt: changed ? now : stored.interview.repliedAt };
   }
   return out;
 }

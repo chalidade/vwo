@@ -45,3 +45,64 @@ describe("live channel", () => {
     expect(fair.visitors.has(remoteId("abc123"))).toBe(false);
   });
 });
+
+describe("live company inbox and notes", () => {
+  const booth = DEMO_JOB_FAIR.booths[0]!;
+  const job = booth.jobs[0]!;
+  const app = (extra: object = {}) => ({
+    id: "11111111-1111-1111-1111-111111111111",
+    seeker: "u1",
+    status: "Terkirim" as const,
+    at: 1000,
+    updatedAt: 1000,
+    boothId: booth.id,
+    company: booth.company,
+    jobId: job.id,
+    jobTitle: job.title,
+    name: "Sari",
+    email: "sari@example.com",
+    ...extra,
+  });
+
+  it("works the booth's notifications out from its applications, with read marks that only grow", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    fair.serverInbox = true;
+    const marks: unknown[] = [];
+    fair.onBoothRead = (_b, read) => marks.push(read);
+    fair.mergeServer([app()], false);
+    // A second device merging the same application makes no second notification.
+    fair.mergeServer([app()], false);
+    expect(fair.notifsFor(booth.id).map((n) => n.id)).toEqual(["apply:11111111-1111-1111-1111-111111111111"]);
+    fair.mergeServer(
+      [app({ updatedAt: 3000, messages: [{ at: 2000, from: "seeker", text: "Halo" }], interview: { at: 9000, mode: "Online", reply: "hadir", repliedAt: 2500 }, calls: [{ at: 2200, kind: "video", answered: false, seconds: 0 }] })],
+      false,
+    );
+    expect(fair.notifsFor(booth.id).map((n) => n.kind)).toEqual(["confirm", "call", "chat", "apply"]);
+    expect(fair.unreadFor(booth.id)).toBe(4);
+    fair.markRead(booth.id, "chat:11111111-1111-1111-1111-111111111111:2000");
+    expect(fair.unreadFor(booth.id)).toBe(3);
+    fair.markRead(booth.id);
+    expect(fair.unreadFor(booth.id)).toBe(0);
+    expect(marks.at(-1)).toEqual({ all: 2500, ids: [] });
+    // Another device's older marks don't make anything unread again.
+    fair.setBoothRead(booth.id, { all: 1000, ids: [] });
+    expect(fair.unreadFor(booth.id)).toBe(0);
+  });
+
+  it("keeps the company's notes from the server, but not over a note still being saved", async () => {
+    const fair = new DemoJobFair(() => 0.5);
+    fair.mergeServer([app({ notes: "Kandidat kuat" })], false);
+    const a = fair.applications.find((x) => x.boothId === booth.id && x.name === "Sari")!;
+    expect(a.notes).toBe("Kandidat kuat");
+    let done!: (ok: boolean) => void;
+    fair.onNote = () => new Promise((r) => (done = r));
+    fair.noteApplicant(a.id, "Panggil interview");
+    fair.mergeServer([app({ notes: "Kandidat kuat" })], false);
+    expect(a.notes).toBe("Panggil interview");
+    done(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    fair.mergeServer([app({ notes: "Panggil interview" })], false);
+    expect(a.notes).toBe("Panggil interview");
+  });
+});

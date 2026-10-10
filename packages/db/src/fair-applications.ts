@@ -65,3 +65,13 @@ export async function updateFairApplicationShared(
     return true;
   });
 }
+
+/** The company's private notes on one applicant at its booth. Leaves updated_at alone: the applicant sees nothing change. */
+export async function setFairApplicationNotes(db: Db, input: { id: string; boothKey: string; notes: string }) {
+  const rows = await db
+    .update(fairApplications)
+    .set({ companyNotes: input.notes })
+    .where(and(eq(fairApplications.id, input.id), eq(fairApplications.boothKey, input.boothKey)))
+    .returning({ id: fairApplications.id });
+  return rows.length > 0;
+}

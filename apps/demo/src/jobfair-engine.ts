@@ -121,10 +121,18 @@ export interface Interview {
   note?: string;
   /** The applicant's answer to the invitation. */
   reply?: "hadir" | "jadwal-ulang";
+  /** Live: when the applicant answered, as the server recorded it. */
+  repliedAt?: number;
 }
 
 /** A notification between an applicant and a company's HR, kept with the saved state so the
  *  portal and the job fair see each other's in any open tab. */
+/** Live: which of a booth's notifications its team read: everything up to `all`, and `ids` after it. */
+export interface BoothRead {
+  all: number;
+  ids: string[];
+}
+
 export interface FairNotif {
   id: string;
   at: number;
@@ -1446,6 +1454,16 @@ export class DemoJobFair {
   onStatusChange: ((a: FairApplication) => void) | null = null;
   /** Called after either side adds to an application's conversation (chat, interview, rating, calls). */
   onShared: ((a: FairApplication) => void) | null = null;
+  /** Live: saves the company's private note on an applicant; resolves false when it did not save. */
+  onNote: ((a: FairApplication) => Promise<boolean>) | null = null;
+  /** Live: the company read notifications; the app stores the marks for the booth on the server. */
+  onBoothRead: ((boothId: string, read: BoothRead) => void) | null = null;
+  /** Live: a booth's notifications are worked out from its applications, the same on every device. */
+  serverInbox = false;
+  /** Live: which booth notifications the company has read, per booth. */
+  private boothRead = new Map<string, BoothRead>();
+  /** Notes being saved: the server's older copy must not overwrite them meanwhile. */
+  private notesSaving = new Set<string>();
 
   /** Applications the server has: the player's own (from any device), or the ones a booth received. */
   mergeServer(list: FairApplicationOut[], mine: boolean) {
@@ -1454,6 +1472,10 @@ export class DemoJobFair {
       const have = this.applications.find((x) => x.id === s.id);
       if (have) {
         if (!mine) have.visitorId = `user:${s.seeker}`;
+        if (!mine && s.notes !== undefined && s.notes !== (have.notes ?? "") && !this.notesSaving.has(s.id)) {
+          have.notes = s.notes;
+          changed = true;
+        }
         if (s.updatedAt > (have.serverAt ?? 0)) {
           const before = structuredClone(have);
           have.status = s.status;
@@ -1495,6 +1517,7 @@ export class DemoJobFair {
         rating: s.rating,
         feedback: s.feedback,
         calls: s.calls,
+        notes: s.notes,
       });
       if (!mine) this.notify(s.boothId, "apply", `${s.name} melamar ${s.jobTitle}`, s.id);
       changed = true;
@@ -2510,6 +2533,13 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
     a.notes = notes.slice(0, 1000);
+    if (this.onNote) {
+      this.notesSaving.add(a.id);
+      void this.onNote(a).finally(() => this.notesSaving.delete(a.id));
+      this.persist();
+      this.emit();
+      return;
+    }
     this.touch(a);
   }
 
@@ -2585,6 +2615,7 @@ export class DemoJobFair {
   readonly inbox: FairNotif[] = [];
 
   private notify(to: string, kind: FairNotif["kind"], text: string, appId?: string) {
+    if (this.serverInbox && to !== PLAYER_ID) return;
     // Another tab numbers its notifications too: add the time and a random tail so ids never clash.
     const id = `ntf-${this.now().toString(36)}-${++this.seq}-${Math.random().toString(36).slice(2, 6)}`;
     this.inbox.unshift({ id, at: this.now(), to, kind, text, appId });
@@ -2593,15 +2624,65 @@ export class DemoJobFair {
   }
 
   notifsFor(to: string) {
+    if (this.serverInbox && to !== PLAYER_ID) return this.boothNotifs(to);
     return this.inbox.filter((n) => n.to === to);
   }
 
   unreadFor(to: string) {
-    return this.inbox.reduce((k, n) => k + (n.to === to && !n.read ? 1 : 0), 0);
+    return this.notifsFor(to).reduce((k, n) => k + (n.read ? 0 : 1), 0);
+  }
+
+  /**
+   * Live: a booth's notifications, worked out from the applications it received: each application,
+   * each message from the applicant, each answer to an interview, each call they missed. Ids come
+   * from the data, so the read marks on the server mean the same on every device.
+   */
+  private boothNotifs(boothId: string): FairNotif[] {
+    const read = this.boothRead.get(boothId) ?? { all: 0, ids: [] };
+    const ids = new Set(read.ids);
+    const out: FairNotif[] = [];
+    const add = (n: Omit<FairNotif, "to" | "read">) => out.push({ ...n, to: boothId, read: n.at <= read.all || ids.has(n.id) });
+    for (const a of this.applications) {
+      if (a.boothId !== boothId || a.isBot) continue;
+      add({ id: `apply:${a.id}`, at: a.at, kind: "apply", text: `${a.name} melamar ${a.jobTitle}`, appId: a.id });
+      for (const m of a.messages ?? []) if (m.from === "seeker") add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.name}: ${m.text.slice(0, 120)}`, appId: a.id });
+      const iv = a.interview;
+      if (iv?.reply)
+        add({
+          id: `confirm:${a.id}:${iv.at}:${iv.reply}`,
+          at: iv.repliedAt ?? a.serverAt ?? a.at,
+          kind: "confirm",
+          text: iv.reply === "hadir" ? `${a.name} konfirmasi hadir interview ${a.jobTitle}` : `${a.name} minta jadwal ulang interview ${a.jobTitle}`,
+          appId: a.id,
+        });
+      for (const c of a.calls ?? []) if (!c.answered) add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `${a.name} tidak mengangkat panggilan ${c.kind === "video" ? "video" : "telepon"}`, appId: a.id });
+    }
+    return out.sort((x, y) => y.at - x.at).slice(0, 200);
+  }
+
+  /** Live: the read marks the server has for a booth; marks only grow. */
+  setBoothRead(boothId: string, read: BoothRead) {
+    const have = this.boothRead.get(boothId) ?? { all: 0, ids: [] };
+    const next = { all: Math.max(have.all, read.all), ids: [...new Set([...have.ids, ...read.ids])] };
+    if (next.all === have.all && next.ids.length === have.ids.length) return;
+    this.boothRead.set(boothId, next);
+    this.emit();
   }
 
   /** Mark one notification, or all of them for someone, as read. */
   markRead(to: string, id?: string) {
+    if (this.serverInbox && to !== PLAYER_ID) {
+      const have = this.boothRead.get(to) ?? { all: 0, ids: [] };
+      const list = this.boothNotifs(to);
+      const next = id ? { all: have.all, ids: [...new Set([...have.ids, id])] } : { all: Math.max(have.all, ...list.map((n) => n.at)), ids: [] as string[] };
+      // Only marks after `all` still matter.
+      const at = new Map(list.map((n) => [n.id, n.at]));
+      next.ids = next.ids.filter((x) => (at.get(x) ?? Infinity) > next.all).slice(-300);
+      this.boothRead.set(to, next);
+      this.onBoothRead?.(to, next);
+      this.emit();
+      return;
+    }
     let changed = false;
     for (const n of this.inbox)
       if (n.to === to && !n.read && (!id || n.id === id)) {

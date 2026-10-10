@@ -7,6 +7,11 @@ export function readFairState(db: Db) {
   return db.select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt }).from(fairState);
 }
 
+export async function readFairStateKey(db: Db, key: string) {
+  const [row] = await db.select({ data: fairState.data, updatedAt: fairState.updatedAt }).from(fairState).where(eq(fairState.key, key));
+  return row ?? null;
+}
+
 export async function writeFairState(db: Db, input: { key: string; data: unknown; userId: string }) {
   await db
     .insert(fairState)
