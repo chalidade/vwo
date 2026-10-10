@@ -56,8 +56,8 @@ export const saveNotes = (boothId: string, id: string, notes: string) =>
 
 /** Which of the booth's notifications its team read. */
 export const boothInboxRead = (boothId: string) => call<{ read: { all: number; ids: string[] } }>(`booths/${encodeURIComponent(boothId)}/inbox`);
-export const markBoothInboxRead = (boothId: string, read: { all: number; ids: string[] }) =>
-  call<{ read: { all: number; ids: string[] } }>(`booths/${encodeURIComponent(boothId)}/inbox`, { method: "PUT", body: read });
+export const markBoothInboxRead = (boothId: string, read: { all: number; ids: string[]; cleared?: number; hidden?: string[] }) =>
+  call<{ read: { all: number; ids: string[]; cleared?: number; hidden?: string[] } }>(`booths/${encodeURIComponent(boothId)}/inbox`, { method: "PUT", body: read });
 
 /** One side's part of an application's conversation: chat, interview, rating and call log. */
 export const sendShared = (id: string, as: "company" | "seeker", shared: ApplicationShared) =>

@@ -169,11 +169,17 @@ export interface ServerReviews {
   mine: Record<string, number>;
 }
 
-/** Live: which of a booth's notifications its team read: everything up to `all`, and `ids` after it. */
+/** Live: which of a booth's notifications its team read: everything up to `all`, and `ids` after it.
+ *  Deleted ones the same way: everything up to `cleared`, and `hidden` after it. */
 export interface BoothRead {
   all: number;
   ids: string[];
+  cleared?: number;
+  hidden?: string[];
 }
+
+/** Notifications older than this drop off the list by themselves, so nothing piles up. */
+export const NOTIF_TTL = 7 * 86_400_000;
 
 export interface FairNotif {
   id: string;
@@ -260,9 +266,11 @@ export interface AulaEvent {
 const INBOX_PER = 40;
 
 /** Keep the newest notifications of everyone, so busy companies don't push out the seeker's. */
-function trimInbox(list: FairNotif[]) {
+function trimInbox(list: FairNotif[], now: number) {
   const seen = new Map<string, number>();
+  const since = now - NOTIF_TTL;
   const keep = list.filter((n) => {
+    if (n.at < since) return false;
     const k = (seen.get(n.to) ?? 0) + 1;
     seen.set(n.to, k);
     return k <= INBOX_PER;
@@ -1660,7 +1668,7 @@ export class DemoJobFair {
     const mine = (p?.inbox ?? []).filter((n) => n && n.to === PLAYER_ID && typeof n.text === "string");
     this.inbox.splice(0, this.inbox.length, ...others, ...mine);
     this.inbox.sort((x, y) => y.at - x.at);
-    trimInbox(this.inbox);
+    trimInbox(this.inbox, this.now());
     const me = this.visitors.get(PLAYER_ID);
     if (me) me.verified = !!this.player.verified;
     this.persist();
@@ -1734,7 +1742,7 @@ export class DemoJobFair {
       else this.inbox.push(n);
     }
     this.inbox.sort((x, y) => y.at - x.at);
-    trimInbox(this.inbox);
+    trimInbox(this.inbox, this.now());
     this.emit();
   }
 
@@ -2802,13 +2810,55 @@ export class DemoJobFair {
     // Another tab numbers its notifications too: add the time and a random tail so ids never clash.
     const id = `ntf-${this.now().toString(36)}-${++this.seq}-${Math.random().toString(36).slice(2, 6)}`;
     this.inbox.unshift({ id, at: this.now(), to, kind, text, appId });
-    trimInbox(this.inbox);
+    trimInbox(this.inbox, this.now());
     this.persist();
   }
 
-  notifsFor(to: string) {
+  /** Everything someone was notified of, deleted or not. */
+  private allNotifs(to: string) {
     if (this.serverInbox) return to === PLAYER_ID ? this.playerNotifs() : this.boothNotifs(to);
     return this.inbox.filter((n) => n.to === to);
+  }
+
+  private marksOf(to: string): BoothRead {
+    return (to === PLAYER_ID ? this.player.notifRead : this.boothRead.get(to)) ?? { all: 0, ids: [] };
+  }
+
+  /** Someone's notifications from the last week that they haven't deleted, newest first. */
+  notifsFor(to: string) {
+    const m = this.marksOf(to);
+    const since = Math.max(this.now() - NOTIF_TTL, m.cleared ?? 0);
+    const hidden = new Set(m.hidden ?? []);
+    return this.allNotifs(to).filter((n) => n.at > since && !hidden.has(n.id));
+  }
+
+  /** Delete one notification, or all of them for someone. Saved like the read marks, so other devices drop them too. */
+  deleteNotif(to: string, id?: string) {
+    const have = this.marksOf(to);
+    const window = this.allNotifs(to).filter((n) => n.at > this.now() - NOTIF_TTL);
+    const next: BoothRead = { ...have };
+    if (id) next.hidden = [...new Set([...(have.hidden ?? []), id])];
+    else {
+      next.cleared = Math.max(have.cleared ?? 0, ...window.map((n) => n.at));
+      next.hidden = [];
+    }
+    // Only marks for notifications still on the list matter; older ones are gone by themselves.
+    const at = new Map(window.map((n) => [n.id, n.at]));
+    next.hidden = (next.hidden ?? []).filter((x) => (at.get(x) ?? 0) > (next.cleared ?? 0)).slice(-300);
+    next.ids = next.ids.filter((x) => at.has(x));
+    if (!this.serverInbox) {
+      const keep = this.inbox.filter((n) => n.to !== to || (id ? n.id !== id : n.at > next.cleared!));
+      this.inbox.splice(0, this.inbox.length, ...keep);
+    }
+    if (to === PLAYER_ID) {
+      this.player.notifRead = next;
+      this.persist();
+    } else {
+      this.boothRead.set(to, next);
+      if (this.serverInbox) this.onBoothRead?.(to, next);
+      else this.persist();
+    }
+    this.emit();
   }
 
   unreadFor(to: string) {
@@ -2882,8 +2932,13 @@ export class DemoJobFair {
   /** Live: the read marks the server has for a booth; marks only grow. */
   setBoothRead(boothId: string, read: BoothRead) {
     const have = this.boothRead.get(boothId) ?? { all: 0, ids: [] };
-    const next = { all: Math.max(have.all, read.all), ids: [...new Set([...have.ids, ...read.ids])] };
-    if (next.all === have.all && next.ids.length === have.ids.length) return;
+    const next: BoothRead = {
+      all: Math.max(have.all, read.all),
+      ids: [...new Set([...have.ids, ...read.ids])],
+      cleared: Math.max(have.cleared ?? 0, read.cleared ?? 0),
+      hidden: [...new Set([...(have.hidden ?? []), ...(read.hidden ?? [])])].slice(-300),
+    };
+    if (next.all === have.all && next.ids.length === have.ids.length && next.cleared === (have.cleared ?? 0) && next.hidden!.length === (have.hidden ?? []).length) return;
     this.boothRead.set(boothId, next);
     this.emit();
   }
@@ -2894,7 +2949,7 @@ export class DemoJobFair {
       const mine = to === PLAYER_ID;
       const have = (mine ? this.player.notifRead : this.boothRead.get(to)) ?? { all: 0, ids: [] };
       const list = mine ? this.playerNotifs() : this.boothNotifs(to);
-      const next = id ? { all: have.all, ids: [...new Set([...have.ids, id])] } : { all: Math.max(have.all, ...list.map((n) => n.at)), ids: [] as string[] };
+      const next: BoothRead = id ? { ...have, ids: [...new Set([...have.ids, id])] } : { ...have, all: Math.max(have.all, ...list.map((n) => n.at)), ids: [] as string[] };
       // Only marks after `all` still matter.
       const at = new Map(list.map((n) => [n.id, n.at]));
       next.ids = next.ids.filter((x) => (at.get(x) ?? Infinity) > next.all).slice(-300);

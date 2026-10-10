@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { isFairAdmin } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
+import { maybeCleanup } from "@/lib/cleanup";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
+  maybeCleanup();
   if (!(await allow(`stats:${user.id}`, 120, 600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, schema);
   if ("error" in body) return body.error;

@@ -65,7 +65,7 @@ describe("live company inbox and notes", () => {
   });
 
   it("works the booth's notifications out from its applications, with read marks that only grow", () => {
-    const fair = new DemoJobFair(() => 0.5);
+    const fair = new DemoJobFair(() => 0.5, () => 10_000);
     fair.serverInbox = true;
     const marks: unknown[] = [];
     fair.onBoothRead = (_b, read) => marks.push(read);
@@ -90,7 +90,7 @@ describe("live company inbox and notes", () => {
   });
 
   it("works the job seeker's notifications from HR out from their applications, read marks saved with the account", () => {
-    const fair = new DemoJobFair(() => 0.5);
+    const fair = new DemoJobFair(() => 0.5, () => 100_000);
     fair.serverInbox = true;
     fair.mergeServer([app()], true);
     expect(fair.notifsFor(PLAYER_ID)).toEqual([]);
@@ -126,6 +126,30 @@ describe("live company inbox and notes", () => {
     // Accepted later: a new notification, unread.
     fair.mergeServer([app({ status: "Diterima", updatedAt: 8000, statusAt: 8000 })], true);
     expect(fair.notifsFor(PLAYER_ID)[0]).toMatchObject({ kind: "status", read: false });
+  });
+
+  it("lets people delete notifications, and drops the ones older than a week by themselves", () => {
+    let t = 100_000;
+    const fair = new DemoJobFair(() => 0.5, () => t);
+    fair.serverInbox = true;
+    const marks: unknown[] = [];
+    fair.onBoothRead = (_b, read) => marks.push(read);
+    const msgs = [
+      { at: 2000, from: "seeker", text: "Halo" },
+      { at: 3000, from: "seeker", text: "Masih buka?" },
+    ];
+    fair.mergeServer([app({ updatedAt: 3000, messages: msgs })], false);
+    expect(fair.notifsFor(booth.id).map((n) => n.kind)).toEqual(["chat", "chat", "apply"]);
+    fair.deleteNotif(booth.id, "chat:11111111-1111-1111-1111-111111111111:2000");
+    expect(fair.notifsFor(booth.id).map((n) => n.id)).toEqual(["chat:11111111-1111-1111-1111-111111111111:3000", "apply:11111111-1111-1111-1111-111111111111"]);
+    fair.deleteNotif(booth.id);
+    expect(fair.notifsFor(booth.id)).toEqual([]);
+    expect(marks.at(-1)).toMatchObject({ cleared: 3000, hidden: [] });
+    // A new message after clearing shows up; a week later it is gone by itself.
+    fair.mergeServer([app({ updatedAt: 5000, messages: [...msgs, { at: 5000, from: "seeker", text: "Halo lagi" }] })], false);
+    expect(fair.notifsFor(booth.id).map((n) => n.at)).toEqual([5000]);
+    t = 5000 + 8 * 86_400_000;
+    expect(fair.notifsFor(booth.id)).toEqual([]);
   });
 
   it("keeps the company's notes from the server, but not over a note still being saved", async () => {

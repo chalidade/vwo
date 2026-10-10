@@ -262,9 +262,15 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
                       Tandai semua dibaca
                     </button>
                   )}
+                  {fair.notifsFor(booth.id).length > 0 && (
+                    <button type="button" className="small-btn ghost" onClick={() => fair.deleteNotif(booth.id)}>
+                      🗑️ Hapus semua
+                    </button>
+                  )}
                 </div>
                 <NotifList
                   items={fair.notifsFor(booth.id)}
+                  onDelete={(n) => fair.deleteNotif(booth.id, n.id)}
                   empty="Belum ada notifikasi. Lamaran baru, balasan chat, dan konfirmasi interview dari pelamar muncul di sini."
                   onPick={(n) => {
                     fair.markRead(booth.id, n.id);
