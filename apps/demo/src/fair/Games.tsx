@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CAREER_ARTICLES, CAREER_QUIZ, type CareerArticle, GAME_DAILY_CAP, stepKey } from "./content";
 import { Modal } from "./Modal";
-import { type Board, type Dir, canMove, coinsFor, newBoard, slide, spawn } from "./g2048";
+import { type Dir, type Tile, boardOf, canMove, coinsFor, newBoard, slideTiles, spawnTile, tilesFrom } from "./g2048";
 import { type Board as RankBoard, SCORE_GAMES, type ScoreGame, loadBoard, submitScore } from "./scores";
 
 type GameId = "quiz" | "catch" | "memory" | "2048";
@@ -543,21 +543,32 @@ function Article({
 
 const KEY_DIR: Record<string, Dir> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down" };
 
-/** 2048: swipe or use the arrow keys; stop any time to take the coins for the biggest tile. */
+/** 2048: swipe or use the arrow keys; stop any time to take the coins for the biggest tile. Tiles
+ *  slide to their new cell, merges pop and new tiles grow in. */
 function Game2048({ onDone }: { onDone: (best: number, score: number) => void }) {
-  const [board, setBoard] = useState<Board>(() => newBoard());
+  const [tiles, setTiles] = useState<Tile[]>(() => tilesFrom(newBoard()));
   const [score, setScore] = useState(0);
+  const now = useRef(tiles);
+  now.current = tiles;
   const start = useRef<{ x: number; y: number } | null>(null);
+  const sweep = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const board = boardOf(tiles);
   const best = Math.max(...board);
   const over = !canMove(board);
   const move = (dir: Dir) => {
-    setBoard((b) => {
-      const r = slide(b, dir);
-      if (!r.moved) return b;
-      setScore((s) => s + r.gained);
-      return spawn(r.board);
-    });
+    const r = slideTiles(now.current, dir);
+    if (!r.moved) return;
+    const next = spawnTile(r.tiles);
+    now.current = next;
+    setTiles(next);
+    setScore((s) => s + r.gained);
+    // The tiles that slid into a merge are only there for the animation.
+    if (sweep.current) clearTimeout(sweep.current);
+    sweep.current = setTimeout(() => setTiles((ts) => ts.filter((t) => t.state !== "gone")), 160);
   };
+  useEffect(() => () => {
+    if (sweep.current) clearTimeout(sweep.current);
+  }, []);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const d = KEY_DIR[e.code];
@@ -578,23 +589,33 @@ function Game2048({ onDone }: { onDone: (best: number, score: number) => void })
         className="g48-board"
         onPointerDown={(e) => {
           start.current = { x: e.clientX, y: e.clientY };
-          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
         }}
-        onPointerUp={(e) => {
+        // The move happens as soon as the finger has travelled far enough, not when it lifts.
+        onPointerMove={(e) => {
           const s0 = start.current;
-          start.current = null;
           if (!s0) return;
           const dx = e.clientX - s0.x;
           const dy = e.clientY - s0.y;
-          if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+          start.current = null;
           move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up");
         }}
+        onPointerUp={() => (start.current = null)}
+        onPointerCancel={() => (start.current = null)}
       >
-        {board.map((v, i) => (
-          <div key={i} className="g48-cell" data-v={v || undefined}>
-            {v || ""}
-          </div>
+        {board.map((_, i) => (
+          <div key={i} className="g48-slot" />
         ))}
+        <div className="g48-tiles">
+          {tiles.map((t) => (
+            <div key={t.id} className="g48-tile" data-state={t.state} style={{ ["--x" as string]: t.cell % 4, ["--y" as string]: Math.floor(t.cell / 4) }}>
+              <div className="g48-cell" data-v={t.v}>
+                {t.v}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       {over && <p className="sp-muted">Tidak ada langkah lagi.</p>}
       <div className="g48-pad">

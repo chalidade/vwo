@@ -59,3 +59,59 @@ export function coinsFor(best: number) {
   if (best < 128) return 0;
   return Math.min(10, 2 * (Math.log2(best) - 6));
 }
+
+/** A numbered tile that keeps its id while it slides, so the screen can animate it. "gone" tiles
+ *  slid into a merge and are drawn underneath the new one for a moment. */
+export interface Tile {
+  id: number;
+  v: number;
+  cell: number;
+  state?: "new" | "merged" | "gone";
+}
+
+let tileId = 0;
+const tile = (v: number, cell: number, state?: Tile["state"]): Tile => ({ id: ++tileId, v, cell, ...(state ? { state } : {}) });
+
+export const tilesFrom = (board: Board): Tile[] => board.flatMap((v, cell) => (v ? [tile(v, cell)] : []));
+
+export function boardOf(tiles: Tile[]): Board {
+  const b: Board = Array(SIZE * SIZE).fill(0);
+  for (const t of tiles) if (t.state !== "gone") b[t.cell] = t.v;
+  return b;
+}
+
+/** The same move as slide(), but on tiles: each keeps its id and gets its new cell. */
+export function slideTiles(tiles: Tile[], dir: Dir): { tiles: Tile[]; gained: number; moved: boolean } {
+  const at = new Map<number, Tile>();
+  for (const t of tiles) if (t.state !== "gone") at.set(t.cell, { ...t, state: undefined });
+  const out: Tile[] = [];
+  let gained = 0;
+  let moved = false;
+  for (const line of lines(dir)) {
+    const row = line.map((c) => at.get(c)).filter((t): t is Tile => !!t);
+    let k = 0;
+    for (let n = 0; n < row.length; n++) {
+      const a = row[n]!;
+      const b = row[n + 1];
+      const to = line[k++]!;
+      if (b && b.v === a.v) {
+        out.push({ ...a, cell: to, state: "gone" }, { ...b, cell: to, state: "gone" }, tile(a.v * 2, to, "merged"));
+        gained += a.v * 2;
+        moved = true;
+        n++;
+      } else {
+        if (a.cell !== to) moved = true;
+        out.push({ ...a, cell: to });
+      }
+    }
+  }
+  return { tiles: out, gained, moved };
+}
+
+/** A new 2 (or 4) in a random empty cell, marked so it can pop in. */
+export function spawnTile(tiles: Tile[], rand = Math.random): Tile[] {
+  const board = boardOf(tiles);
+  const empty = board.flatMap((v, i) => (v ? [] : [i]));
+  if (!empty.length) return tiles;
+  return [...tiles, tile(rand() < 0.9 ? 2 : 4, empty[Math.floor(rand() * empty.length)]!, "new")];
+}
