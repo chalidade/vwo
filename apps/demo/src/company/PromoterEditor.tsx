@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CompanyBooth } from "@vwo/shared";
-import { PROMOTER_PRODUCT, rupiah } from "../fair/company";
+import { PROMOTER_PRODUCT, coinText } from "../fair/company";
 import { fair } from "../useFair";
 import type { PortalTab } from "./Portal";
 
@@ -25,7 +25,7 @@ export function PromoterEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (
           {PROMOTER_PRODUCT.about}
         </p>
         <button type="button" onClick={() => onTab("billing")}>
-          🛒 Beli promotor · {rupiah(PROMOTER_PRODUCT.price)}
+          🛒 Beli promotor · {coinText(PROMOTER_PRODUCT.price)}
         </button>
       </div>
     );

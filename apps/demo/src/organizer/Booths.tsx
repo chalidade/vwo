@@ -3,7 +3,7 @@ import { type BoothTheme, type CompanyBooth, type GateStyle } from "@vwo/shared"
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
-import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
+import { ACCESSORY_PRODUCTS, coinText, rupiah } from "../fair/company";
 import { LIVE } from "../mode";
 import { boothMembers, removeBoothMember } from "../server-fair";
 import { fair } from "../useFair";
@@ -115,7 +115,7 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                     {bk.company} {bk.tier === "premium" && "👑"}
                   </b>
                   <span className="muted small">
-                    {bk.contact} · {bk.email} · {rupiah(bk.price)} lunas via {bk.method} · {new Date(bk.at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {bk.contact} · {bk.email} · {coinText(bk.price)} lunas via {bk.method} · {new Date(bk.at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </span>
               </li>
@@ -311,7 +311,7 @@ function ConfigureBooth({ booth, onClose, onDone }: { booth: CompanyBooth; onClo
               return (
                 <label key={p.id} className="cp-check">
                   <input type="checkbox" checked={included || addons.has(p.id)} disabled={included} onChange={() => toggle(p.id, p.slot)} />
-                  {p.emoji} {p.name} <span className="muted small">{included ? "termasuk VIP" : p.price ? rupiah(p.price) : "gratis"}</span>
+                  {p.emoji} {p.name} <span className="muted small">{included ? "termasuk VIP" : p.price ? coinText(p.price) : "gratis"}</span>
                 </label>
               );
             })}

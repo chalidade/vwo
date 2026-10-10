@@ -20,7 +20,7 @@ const RUPIAH = 1_000_000_000;
 const koin = (group: string, key: string, label: string, value: number, note?: string): PriceItem => ({ key, group, label, unit: "koin", default: value, max: KOIN, ...(note ? { note } : {}) });
 const rupiah = (group: string, key: string, label: string, value: number, note?: string): PriceItem => ({ key, group, label, unit: "rupiah", default: value, max: RUPIAH, ...(note ? { note } : {}) });
 
-export const PRICE_GROUPS = ["Koin pencari kerja", "Paket koin", "Telepon & video call", "Sewa stand", "Upgrade & paket VIP", "Printilan booth"] as const;
+export const PRICE_GROUPS = ["Koin pencari kerja", "Paket koin", "Paket koin perusahaan", "Telepon & video call", "Sewa stand", "Upgrade & paket VIP", "Printilan booth"] as const;
 
 /** Coin packages sold at the coin stand: how many coins (and bonus) each gives is fixed, the price is set here. */
 export const COIN_PACKAGES = [
@@ -28,6 +28,20 @@ export const COIN_PACKAGES = [
   { id: "koin-120", coins: 100, bonus: 20 },
   { id: "koin-300", coins: 250, bonus: 50 },
 ] as const;
+
+/**
+ * Bigger coin packages for companies and food court businesses: everything they buy (a booth, a
+ * food court stand, VIP, decorations) is paid in coins, topped up here through the payment gateway.
+ */
+export const BUSINESS_PACKAGES = [
+  { id: "bisnis-5rb", coins: 5_000, bonus: 0 },
+  { id: "bisnis-20rb", coins: 20_000, bonus: 1_000 },
+  { id: "bisnis-40rb", coins: 40_000, bonus: 2_500 },
+  { id: "bisnis-80rb", coins: 80_000, bonus: 6_000 },
+] as const;
+
+/** Every package the gateway sells, seekers' and companies'. */
+export const ALL_COIN_PACKAGES = [...COIN_PACKAGES, ...BUSINESS_PACKAGES];
 
 /** Booth extras a company can buy, by the accessory id the booth renders. */
 export const ACCESSORY_DEFAULTS: { id: string; name: string; price: number }[] = [
@@ -52,6 +66,11 @@ export const PRICE_CATALOG: PriceItem[] = [
   rupiah("Paket koin", "pack.koin-50", "50 koin", 10_000),
   rupiah("Paket koin", "pack.koin-120", "100 koin + 20 bonus", 20_000),
   rupiah("Paket koin", "pack.koin-300", "250 koin + 50 bonus", 45_000),
+  rupiah("Paket koin perusahaan", "coin.rupiah", "Nilai 1 koin untuk harga perusahaan", 200, "Harga perusahaan dibayar dengan koin senilai ini"),
+  rupiah("Paket koin perusahaan", "pack.bisnis-5rb", "5.000 koin", 1_000_000),
+  rupiah("Paket koin perusahaan", "pack.bisnis-20rb", "20.000 koin + 1.000 bonus", 4_000_000),
+  rupiah("Paket koin perusahaan", "pack.bisnis-40rb", "40.000 koin + 2.500 bonus", 8_000_000),
+  rupiah("Paket koin perusahaan", "pack.bisnis-80rb", "80.000 koin + 6.000 bonus", 16_000_000),
   koin("Telepon & video call", "call.2", "Telepon/video call 2 menit antar pencari kerja", 3),
   koin("Telepon & video call", "call.5", "Telepon/video call 5 menit antar pencari kerja", 6),
   koin("Telepon & video call", "call.10", "Telepon/video call 10 menit antar pencari kerja", 10),
@@ -101,6 +120,21 @@ export function priceTable(): Prices {
 }
 
 export const price = (key: string) => priceFrom(current, key);
+
+/**
+ * What a company price costs in coins. Companies and food court businesses pay everything in coins;
+ * the organiser keeps their prices in rupiah and sets how much one coin is worth.
+ */
+export function coinsFor(table: Prices | null | undefined, rupiahPrice: number) {
+  if (!(rupiahPrice > 0)) return 0;
+  return Math.ceil(rupiahPrice / Math.max(1, priceFrom(table, "coin.rupiah")));
+}
+
+/** A company price in coins, from this browser's price table. */
+export const coinPrice = (rupiahPrice: number) => coinsFor(current, rupiahPrice);
+
+/** Coins as people write them: 1.250 koin. */
+export const koinText = (n: number) => (n === 0 ? "Gratis" : `${n.toLocaleString("id-ID")} koin`);
 
 /** Rupiah as people write it: Rp20.000. */
 export const rp = (n: number) => `Rp${n.toLocaleString("id-ID")}`;

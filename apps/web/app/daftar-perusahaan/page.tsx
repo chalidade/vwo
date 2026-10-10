@@ -1,5 +1,6 @@
 import { myPayments, myRegistrations, readPrices } from "@vwo/db";
-import { priceFrom } from "@vwo/shared";
+import { BUSINESS_PACKAGES, coinsFor, priceFrom } from "@vwo/shared";
+import { liveCoins } from "@/lib/coins";
 import { db } from "@/lib/db";
 import { googleEnabled } from "@/lib/google";
 import { provider, refresh } from "@/lib/payments";
@@ -19,15 +20,18 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const premium = priceFrom(prices, "stand.premium");
   // Back from the checkout page: ask Xendit straight away instead of waiting for its webhook.
   if (user && q.bayar) {
-    const open = (await myPayments(db, user.id, ["registration"])).filter((p) => p.status === "pending");
+    const open = (await myPayments(db, user.id, ["coins", "registration"])).filter((p) => p.status === "pending");
     await Promise.all(open.map((p) => refresh(p).catch(() => p)));
   }
+  const balance = user ? (await liveCoins(user.id)).balance : 0;
+  const packs = BUSINESS_PACKAGES.map((p) => ({ id: p.id, coins: p.coins + p.bonus, bonus: p.bonus, price: priceFrom(prices, `pack.${p.id}`) }));
   const mine: RegistrationView[] = user
     ? (await myRegistrations(db, user.id)).map((r) => ({
         id: r.id,
         company: r.company,
         tier: r.tier,
         price: r.price,
+        coins: coinsFor(prices, r.price),
         status: r.status,
         boothKey: r.status === "verified" ? r.boothKey : null,
         pin: r.status === "verified" ? r.pin : null,
@@ -50,17 +54,27 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           Buka booth di <span className="cs-shine">jobfair</span>
         </h1>
         <p className="cs-sub" style={{ margin: "12px 0 0" }}>
-          Isi data perusahaan dan pilih paket stand. Setelah pembayaran, panitia memverifikasi bahwa perusahaanmu nyata. Kode perusahaan dan PIN untuk masuk ke portal dikirim setelah terverifikasi.
+          Isi data perusahaan dan pilih paket stand, lalu bayar dengan koin (isi koin lewat QRIS, virtual account, e-wallet atau kartu). Setelah pembayaran, panitia memverifikasi bahwa perusahaanmu nyata. Kode perusahaan dan PIN untuk masuk ke portal dikirim setelah terverifikasi.
         </p>
         <ol className="rg-steps">
           <li>Masuk dengan Google</li>
           <li>Isi data & pilih paket</li>
-          <li>Bayar</li>
+          <li>Bayar dengan koin</li>
           <li>Verifikasi panitia</li>
           <li>Terima kode & PIN</li>
         </ol>
         {user ? (
-          <RegisterCompany email={user.email} name={user.name} prices={{ regular, premium }} initial={mine} gateway={provider()} back={q.bayar ?? null} />
+          <RegisterCompany
+            email={user.email}
+            name={user.name}
+            prices={{ regular, premium }}
+            coins={{ regular: coinsFor(prices, regular), premium: coinsFor(prices, premium) }}
+            balance={balance}
+            packs={packs}
+            initial={mine}
+            gateway={provider()}
+            back={q.bayar ?? null}
+          />
         ) : (
           <div className="rg-card">
             <h2>Masuk dulu</h2>
