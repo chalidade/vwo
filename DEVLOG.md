@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · lounge 2/5/10 menit, koin di meja info, kunjungan kantor, notifikasi pelamar, dan panduan ruangan
+
+**Konteks:** enam permintaan dari owner setelah mencoba job fair.
+
+**Yang berubah:**
+- Telepon di lounge kini 2, 5, atau 10 menit. Tarif default sesama pencari kerja 3/6/10 koin, konsultan 5/10/20 koin; panitia bisa mengubahnya di daftar harga (#60).
+- Meja informasi di tiap lantai menjual koin, jadi tidak perlu ke Stand Koin (#60).
+- Notifikasi pelamar dari HR kini dihitung dari lamaran di server: status, chat, undangan, rating, dan panggilan tak terjawab muncul di lonceng di perangkat mana pun. Tanda sudah dibaca ikut tersimpan di akun (#61).
+- HR punya tahap baru setelah interview: "Lolos interview" dan "Kunjungan kantor". Untuk kunjungan kantor, HR mengisi jadwal dan alamat kantor. Pelamar mendapat kartu undangan dengan peta, file kalender, dan tombol konfirmasi hadir atau minta jadwal ulang (#61).
+- Saat pertama kali masuk tiap ruangan (lantai stand, Aula, Seminar, Psikotes, Food Court, Lounge), muncul kartu penjelasan ruangan (#62).
+- Tombol ❓ Panduan menjelaskan ruangan saat ini dan semua fitur, termasuk sofa yang bisa diduduki (#62).
+- Saat berdiri dekat sesuatu, muncul tombol petunjuk di bawah layar, misalnya "🛋️ Duduk di sini", yang langsung menjalankan aksinya (#62).
+
+---
+
 ## 2026-10-10 · API tidak lagi menggantung saat koneksi database putus
 
 **Konteks:** login panitia dan form early access sempat loading terus. Semua endpoint API, termasuk `/api/health`, gagal selama beberapa menit, lalu pulih sendiri. Supabase tetap sehat dengan trafik kecil.
