@@ -1740,3 +1740,131 @@ body:has(.app-dash) { background: #f4f5f7; }
 .app-dash .tu-pack { border-color: var(--line); }
 .app-dash .cp-colors button, .app-dash .bk-colors button { border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
 .app-dash .cp-colors button[data-active], .app-dash .cp-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--text); }
+
+/* ======================================================================
+   Dashboard theme 2026: warm canvas, big titles, gradient tiles, pill
+   controls, a floating light sidebar on desktop and an icon tab bar with a
+   pill on phones. Overrides the first dashboard theme above.
+   ====================================================================== */
+.app-dash {
+  --page: #f6f3ee;
+  --surface: #ffffff;
+  --text: #1c1917;
+  --muted: #78716c;
+  --line: #ece7e0;
+  --ink: #1c1917;
+  --soft: #f1ede7;
+  --ring: 0 0 0 3px rgb(28 25 23 / 0.12);
+  --shadow: 0 1px 2px rgb(28 25 23 / 0.04), 0 8px 28px rgb(28 25 23 / 0.05);
+  font-family: "Inter", "SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.005em;
+}
+body:has(.app-dash) { background: #f6f3ee; }
+
+/* Surfaces */
+.app-dash .card { border: 0; border-radius: 22px; padding: 20px 22px; box-shadow: var(--shadow); }
+.app-dash .card h2, .app-dash .cp-h2 { font-size: 17px; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 12px; }
+.app-dash .cp-h3 { font-size: 12px; font-weight: 650; letter-spacing: 0.02em; text-transform: none; color: var(--muted); }
+
+/* Controls: dark pill buttons, filled inputs */
+:where(.app-dash) button { background: var(--ink); color: #fff; border-radius: 999px; padding: 9px 16px; font-weight: 650; }
+:where(.app-dash) button:where(:hover:not(:disabled)) { background: #44403c; }
+:where(.app-dash) button.ghost, .app-dash .small-btn.ghost, .app-dash a.cp-link.ghost { background: var(--soft); color: var(--text); border-color: transparent; }
+:where(.app-dash) button.ghost:hover:not(:disabled), .app-dash .small-btn.ghost:hover:not(:disabled), .app-dash a.cp-link.ghost:hover { background: #e7e1d8; }
+.app-dash button { border-color: transparent; }
+.app-dash .small-btn { border-radius: 999px; padding: 6px 12px; }
+.app-dash a.cp-link { border-radius: 999px; background: var(--ink); color: #fff; padding: 8px 14px; }
+.app-dash a.cp-link:hover { background: #44403c; }
+:where(.app-dash) input, :where(.app-dash) select, :where(.app-dash) textarea { background: var(--soft); border: 1px solid transparent; border-radius: 14px; padding: 10px 12px; }
+:where(.app-dash) input:focus, :where(.app-dash) select:focus, :where(.app-dash) textarea:focus { background: #fff; border-color: #d6d3d1; box-shadow: var(--ring); }
+:where(.app-dash) input[type="checkbox"], :where(.app-dash) input[type="radio"] { accent-color: var(--ink); }
+.app-dash .cp-linkbtn { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #d6d3d1; }
+
+/* Lists and tables: no grid lines, rows breathe */
+.app-dash table.list th { background: transparent; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 12px; }
+.app-dash table.list td { border-bottom: 1px solid #f4f1ec; padding: 12px; }
+.app-dash table.list tbody tr:hover td { background: #faf8f5; }
+.app-dash .floor-tabs button, .app-dash .cp-tabs button { border: 0; border-radius: 999px; background: var(--soft); color: var(--text); }
+.app-dash .floor-tabs button[data-active], .app-dash .cp-tabs button[data-active] { background: var(--ink); color: #fff; }
+
+/* KPI tiles: bold gradient cards like a music app's library shelves */
+.app-dash .cp-kpis { gap: 14px; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); }
+.app-dash .cp-kpi { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; min-height: 120px; padding: 18px 20px; border-radius: 24px; color: #fff; box-shadow: none; isolation: isolate;
+  background: radial-gradient(circle at 18% 22%, #22c55e 0, transparent 55%), radial-gradient(circle at 85% 80%, #2563eb 0, transparent 60%), #1d4ed8; }
+.app-dash .cp-kpi:nth-child(7n + 2) { background: radial-gradient(circle at 80% 25%, #ec4899 0, transparent 55%), radial-gradient(circle at 15% 85%, #7c3aed 0, transparent 60%), #9333ea; }
+.app-dash .cp-kpi:nth-child(7n + 3) { background: radial-gradient(circle at 20% 20%, #facc15 0, transparent 55%), radial-gradient(circle at 85% 85%, #f97316 0, transparent 60%), #ea580c; }
+.app-dash .cp-kpi:nth-child(7n + 4) { background: radial-gradient(circle at 75% 20%, #2dd4bf 0, transparent 55%), radial-gradient(circle at 20% 85%, #0e7490 0, transparent 60%), #0f766e; }
+.app-dash .cp-kpi:nth-child(7n + 5) { background: radial-gradient(circle at 20% 25%, #fb7185 0, transparent 55%), radial-gradient(circle at 85% 80%, #e11d48 0, transparent 60%), #be123c; }
+.app-dash .cp-kpi:nth-child(7n + 6) { background: radial-gradient(circle at 80% 20%, #a5b4fc 0, transparent 55%), radial-gradient(circle at 15% 85%, #4338ca 0, transparent 60%), #3730a3; }
+.app-dash .cp-kpi:nth-child(7n + 7) { background: radial-gradient(circle at 20% 20%, #bef264 0, transparent 55%), radial-gradient(circle at 85% 85%, #16a34a 0, transparent 60%), #15803d; }
+.app-dash .cp-kpi .muted { color: rgb(255 255 255 / 0.88); font-size: 13px; font-weight: 650; }
+.app-dash .cp-kpi .stat { order: 2; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / 0.12); }
+
+/* Shell */
+.dash { background: var(--page); }
+.dash-top { background: transparent; border: 0; padding: 28px 36px 8px; align-items: flex-end; }
+.dash-crumb { font-size: 13px; font-weight: 600; color: var(--muted); }
+.dash-crumb-group { color: #a8a29e; }
+.dash-title { font-size: 34px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; }
+.dash-sub { font-size: 14px; }
+.dash-body { padding: 20px 36px 48px; gap: 18px; }
+.app-dash .dash-coins { background: #fef3c7; color: #92400e; border: 0; border-radius: 999px; }
+.app-dash .dash-coins:hover:not(:disabled) { background: #fde68a; }
+.app-dash .dash-quick .nt-bell { width: 40px; height: 40px; border-radius: 999px; background: #fff; color: var(--text); box-shadow: var(--shadow); }
+
+@media (min-width: 901px) {
+  .dash { grid-template-columns: 268px minmax(0, 1fr); }
+  .dash-side { top: 12px; height: calc(100vh - 24px); margin: 12px 0 12px 12px; border-radius: 26px; background: #fff; color: var(--text); box-shadow: var(--shadow); padding: 18px 14px; gap: 22px; }
+  .dash-brand { border-bottom: 0; padding: 6px 8px 4px; }
+  .dash-brand .cp-logo { background: var(--soft); }
+  .dash-brand-text b { color: var(--text); font-size: 15px; font-weight: 750; }
+  .dash-brand-text span { color: var(--muted); }
+  .dash-group-label { color: #a8a29e; font-weight: 650; letter-spacing: 0.04em; font-size: 11px; }
+  .app-dash .dash-nav button { color: #57534e; padding: 10px 12px; border-radius: 14px; font-weight: 550; }
+  .app-dash .dash-nav button:hover { background: var(--soft); color: var(--text); }
+  .app-dash .dash-nav button[data-active] { background: var(--ink); color: #fff; font-weight: 650; }
+  .app-dash .dash-nav button[data-active]::before { display: none; }
+  .dash-ic { color: #a8a29e; }
+  .app-dash .dash-nav button:hover .dash-ic { color: var(--text); }
+  .app-dash .dash-nav button[data-active] .dash-ic { color: var(--c, #fff); }
+}
+
+/* Phones: big title like an app screen, tiles that scroll sideways, icon tab bar with a pill */
+@media (max-width: 900px) {
+  .dash-top { position: static; box-shadow: none; padding: calc(18px + env(safe-area-inset-top)) 18px 6px; align-items: center; flex-wrap: wrap; row-gap: 10px; }
+  .dash-mbrand { order: 3; }
+  .dash-top-text { order: 1; flex: 1 1 0; }
+  .dash-quick { order: 2; }
+  .dash-crumb { font-size: 12px; }
+  .dash-title { font-size: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-dash .dash-mbrand .cp-logo { width: 42px; height: 42px; box-shadow: var(--shadow); background: #fff; }
+  .dash-body { padding: 12px 16px calc(104px + env(safe-area-inset-bottom)); gap: 16px; }
+  .app-dash .card { padding: 18px 18px; border-radius: 22px; }
+
+  .app-dash .cp-kpis { display: grid; grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 64%; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+  .app-dash .cp-kpis::-webkit-scrollbar { display: none; }
+  .app-dash .cp-kpi { scroll-snap-align: start; min-height: 150px; border-radius: 26px; padding: 18px 20px; }
+  .app-dash .cp-kpi .stat { font-size: 40px; }
+  .app-dash .cp-kpi .muted { font-size: 15px; }
+
+  .dash-tabbar { left: 0; right: 0; bottom: 0; padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); background: rgb(246 243 238 / 0.92); backdrop-filter: blur(16px); border-top: 0; box-shadow: 0 -1px 0 rgb(28 25 23 / 0.05); }
+  .app-dash .dash-tabbar button > span:last-child { display: none; }
+  .app-dash .dash-tabbar button { color: #a8a29e; }
+  .dash-tab-ic { width: 64px; height: 44px; }
+  .app-dash .dash-tabbar button[data-active] { color: var(--text); }
+  .app-dash .dash-tabbar button[data-active] .dash-tab-ic { background: #d6d1ca; }
+
+  .dash-sheet { border-radius: 28px 28px 0 0; background: var(--page); padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .app-dash .dash-sheet-grid button { background: #fff; border: 0; border-radius: 20px; box-shadow: var(--shadow); min-height: 92px; }
+  .app-dash .dash-sheet-grid button[data-active] { background: var(--ink); color: #fff; }
+  .dash-sheet-ic { background: var(--soft); box-shadow: none; border-radius: 14px; }
+  .app-dash .dash-sheet-grid button[data-active] .dash-sheet-ic { background: rgb(255 255 255 / 0.14); }
+  .dash-sheet-actions { border-top: 0; }
+  .pr-save { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+.pr-list { border: 0; border-radius: 18px; background: #fff; }
+.pr-row + .pr-row { border-top: 1px solid #f4f1ec; }
+.pr-field { border: 0; background: var(--soft, #f1ede7); border-radius: 14px; }
+.pr-unit { background: transparent; border-right: 0; }
+.app-dash .pr-field input { background: transparent; }
+.pr-save { border: 0; border-radius: 999px; box-shadow: 0 10px 30px rgb(28 25 23 / 0.12); padding: 8px 8px 8px 18px; }
