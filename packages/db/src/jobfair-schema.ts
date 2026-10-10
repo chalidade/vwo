@@ -376,8 +376,8 @@ export const companyRegistrations = pgTable(
   (t) => [index("company_registrations_user_idx").on(t.userId), index("company_registrations_status_idx").on(t.status), check("company_registrations_status_ck", sql`${t.status} in ('unpaid','paid','verified','rejected')`)],
 );
 
-/** People the organiser lets into the app before launch to try it: as a job seeker, or as a
- *  company running one booth. Keyed by email, so they can be added before they have an account. */
+/** People the organiser lets into the app before launch to try it: as a job seeker, as a
+ *  company running one booth, or as an organiser (panitia). Keyed by email, so they can be added before they have an account. */
 export const earlyAccess = pgTable(
   "early_access",
   {
@@ -389,7 +389,7 @@ export const earlyAccess = pgTable(
     addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (t) => [check("early_access_role_ck", sql`${t.role} in ('seeker','company')`)],
+  (t) => [check("early_access_role_ck", sql`${t.role} in ('seeker','company','organizer')`)],
 );
 
 /**

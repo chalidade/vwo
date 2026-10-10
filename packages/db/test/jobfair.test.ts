@@ -240,6 +240,8 @@ describe("early access", () => {
     expect((await revokeEarlyAccess(db, "tester@example.com"))?.boothKey).toBe("gim-nusantara");
     expect(await boothsOf(db, u!.id)).toEqual([]);
     expect(await earlyAccessFor(db, "tester@example.com")).toBeNull();
+    await grantEarlyAccess(db, { email: "Panitia2@example.com", role: "organizer", boothKey: "data-raya", addedBy: seeker });
+    expect(await earlyAccessFor(db, "panitia2@example.com")).toMatchObject({ role: "organizer", boothKey: null });
   });
 });
 

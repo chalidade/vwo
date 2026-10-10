@@ -4,7 +4,14 @@ import { db } from "./db";
 import type { FairApplicationOut } from "@vwo/shared";
 
 /** Accounts that run the event: they see and change everything. */
-export function isFairAdmin(user: { email: string; role: string } | null) {
+export function isFairAdmin(user: { email: string; role: string; earlyOrganizer?: boolean } | null) {
+  if (!user) return false;
+  if (user.earlyOrganizer) return true;
+  return isOwnerAdmin(user);
+}
+
+/** The event's own admins (ADMIN_EMAILS, super admins), not early-access panitia testers. */
+export function isOwnerAdmin(user: { email: string; role: string } | null) {
   if (!user) return false;
   if (user.role === "super_admin") return true;
   const list = (process.env.ADMIN_EMAILS ?? "")

@@ -4,7 +4,7 @@ import { fair, useFair } from "../useFair";
 
 interface Tester {
   email: string;
-  role: "seeker" | "company";
+  role: "seeker" | "company" | "organizer";
   boothKey: string | null;
   note: string | null;
   since: number;
@@ -20,9 +20,9 @@ async function call<T>(path: string, init?: { method: string; body?: unknown }):
   }
 }
 
-const ROLE = { seeker: "🎒 Pelamar", company: "🏢 Perusahaan" } as const;
+const ROLE = { seeker: "🎒 Pelamar", company: "🏢 Perusahaan", organizer: "🛠️ Panitia" } as const;
 
-/** People who may try the app before launch: as a job seeker, or as a company running a trial booth. */
+/** People who may try the app before launch: as a job seeker, a company running a trial booth, or panitia. */
 export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
   useFair();
   const [list, setList] = useState<Tester[] | null>(null);
@@ -52,8 +52,8 @@ export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
     setBusy(true);
     const r = await call("/api/jobfair/early-access", { method: "POST", body: { email: email.trim(), role, boothKey, note: note.trim() || null, invite } });
     setBusy(false);
-    if (!r.ok) return setError(r.error === "invalid_input" ? "Cek lagi alamat emailnya." : "Gagal menyimpan. Coba lagi.");
-    onToast(`${email.trim()} bisa masuk sebagai ${role === "company" ? `perusahaan (${boothName(boothKey ?? null)})` : "pelamar"}${invite ? " · undangan terkirim" : ""}`);
+    if (!r.ok) return setError(r.error === "invalid_input" ? "Cek lagi alamat emailnya." : r.error === "not_allowed" ? "Hanya admin utama acara yang bisa menambah atau mengubah panitia." : "Gagal menyimpan. Coba lagi.");
+    onToast(`${email.trim()} bisa masuk sebagai ${role === "company" ? `perusahaan (${boothName(boothKey ?? null)})` : role === "organizer" ? "panitia" : "pelamar"}${invite ? " · undangan terkirim" : ""}`);
     setEmail("");
     setNote("");
     load();
@@ -61,7 +61,7 @@ export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
   const remove = async (t: Tester) => {
     if (!confirm(`Cabut early access ${t.email}?${t.role === "company" ? " Akunnya juga dilepas dari stand percobaan." : ""}`)) return;
     const r = await call(`/api/jobfair/early-access?email=${encodeURIComponent(t.email)}`, { method: "DELETE" });
-    if (!r.ok) return setError("Gagal mencabut. Coba lagi.");
+    if (!r.ok) return setError(r.error === "not_allowed" ? "Hanya admin utama acara yang bisa mencabut panitia." : "Gagal mencabut. Coba lagi.");
     onToast(`Early access ${t.email} dicabut`);
     load();
   };
@@ -83,6 +83,7 @@ export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
             <select id="ea-role" value={role} onChange={(e) => setRole(e.target.value as Tester["role"])}>
               <option value="seeker">Pelamar</option>
               <option value="company">Perusahaan</option>
+              <option value="organizer">Panitia</option>
             </select>
           </label>
           {role === "company" && (
@@ -108,6 +109,7 @@ export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
             + Beri akses
           </button>
         </form>
+        {role === "organizer" && <p className="muted small">Panitia bisa mengatur semua hal di acara seperti admin: stand, harga, verifikasi perusahaan, dan pengumuman. Hanya admin utama yang bisa menambah atau mencabut panitia.</p>}
         {role === "company" && <p className="muted small">Perubahan tester di stand percobaan langsung terlihat oleh semua yang punya akses. Pakai stand contoh, bukan stand perusahaan asli.</p>}
         {error && <p className="bk-err">{error}</p>}
         {!list && !error && <p className="muted small">Memuat…</p>}
