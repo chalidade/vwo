@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CAREER_ARTICLES, CAREER_QUIZ, type CareerArticle, GAME_DAILY_CAP, stepKey } from "./content";
 import { Modal } from "./Modal";
+import { type Board, type Dir, canMove, coinsFor, newBoard, slide, spawn } from "./g2048";
 
-type GameId = "quiz" | "catch" | "memory";
+type GameId = "quiz" | "catch" | "memory" | "2048";
 
 const GAMES: { id: GameId; emoji: string; name: string; desc: string; max: number }[] = [
   { id: "quiz", emoji: "🧩", name: "Kuis Karier", desc: "5 soal seputar melamar kerja. 2 koin tiap jawaban benar.", max: 10 },
   { id: "catch", emoji: "🪙", name: "Tangkap Koin", desc: "20 detik, tap koin yang jatuh, hindari bom.", max: 10 },
   { id: "memory", emoji: "🃏", name: "Cocokkan Logo", desc: "Temukan 6 pasang logo perusahaan secepatnya.", max: 6 },
+  { id: "2048", emoji: "🔢", name: "2048", desc: "Geser angka, gabungkan yang sama. Ubin 128 ke atas dapat koin.", max: 10 },
 ];
 
 export interface RelatedJob {
@@ -129,6 +131,8 @@ export function SofaGames({
         <Quiz onDone={(right, total) => finish("quiz", `${right}/${total} benar`, right * 2)} />
       ) : game === "catch" ? (
         <CatchCoins onDone={(score) => finish("catch", `${score} poin`, Math.min(10, Math.floor(score / 2)))} />
+      ) : game === "2048" ? (
+        <Game2048 onDone={(best, score) => finish("2048", `ubin ${best} · skor ${score}`, coinsFor(best))} />
       ) : game === "memory" ? (
         <Memory logos={logos} onDone={(moves) => finish("memory", `selesai dalam ${moves} langkah`, moves <= 10 ? 6 : moves <= 14 ? 4 : 2)} />
       ) : (
@@ -448,5 +452,75 @@ function Article({
         <p className="fd-bonus">{finished ? "📚 +8 XP. Wawasanmu bertambah!" : done ? "Sudah pernah dibaca, tetap dihitung untuk misi hari ini." : "Tercatat untuk misi hari ini."}</p>
       )}
     </article>
+  );
+}
+
+const KEY_DIR: Record<string, Dir> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down" };
+
+/** 2048: swipe or use the arrow keys; stop any time to take the coins for the biggest tile. */
+function Game2048({ onDone }: { onDone: (best: number, score: number) => void }) {
+  const [board, setBoard] = useState<Board>(() => newBoard());
+  const [score, setScore] = useState(0);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const best = Math.max(...board);
+  const over = !canMove(board);
+  const move = (dir: Dir) => {
+    setBoard((b) => {
+      const r = slide(b, dir);
+      if (!r.moved) return b;
+      setScore((s) => s + r.gained);
+      return spawn(r.board);
+    });
+  };
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const d = KEY_DIR[e.code];
+      if (!d) return;
+      e.preventDefault();
+      e.stopPropagation();
+      move(d);
+    };
+    window.addEventListener("keydown", down, true);
+    return () => window.removeEventListener("keydown", down, true);
+  }, []);
+  return (
+    <div className="g48">
+      <div className="gm-progress">
+        Skor {score} · ubin terbesar {best} · {coinsFor(best) ? `${coinsFor(best)} 🪙` : "128 = 2 🪙"}
+      </div>
+      <div
+        className="g48-board"
+        onPointerDown={(e) => {
+          start.current = { x: e.clientX, y: e.clientY };
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        }}
+        onPointerUp={(e) => {
+          const s0 = start.current;
+          start.current = null;
+          if (!s0) return;
+          const dx = e.clientX - s0.x;
+          const dy = e.clientY - s0.y;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+          move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up");
+        }}
+      >
+        {board.map((v, i) => (
+          <div key={i} className="g48-cell" data-v={v || undefined}>
+            {v || ""}
+          </div>
+        ))}
+      </div>
+      {over && <p className="sp-muted">Tidak ada langkah lagi.</p>}
+      <div className="g48-pad">
+        {(["up", "left", "down", "right"] as Dir[]).map((d) => (
+          <button key={d} type="button" onClick={() => move(d)} aria-label={d} data-dir={d}>
+            {{ up: "▲", left: "◀", down: "▼", right: "▶" }[d]}
+          </button>
+        ))}
+      </div>
+      <button type="button" className="mb-order jb-apply" onClick={() => onDone(best, score)}>
+        {over ? "Selesai" : "Berhenti & ambil koin"}
+      </button>
+    </div>
   );
 }

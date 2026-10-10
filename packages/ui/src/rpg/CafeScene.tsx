@@ -83,6 +83,8 @@ export interface NpcView {
   look: Look;
   /** Carrying a tray with an order. */
   carrying?: boolean;
+  /** Sitting (drawn like a seated visitor). */
+  seated?: boolean;
 }
 
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
@@ -454,22 +456,23 @@ export function CafeScene({
     people.add(n.id);
     ents.push({
       key: n.id,
-      z: py(n.y),
+      z: py(n.y) + (n.seated ? 1 : 0),
       x: px(n.x) - 22,
-      y: py(n.y) - 58,
+      y: py(n.y) - (n.seated ? 50 : 58),
       title: n.name,
       onClick: onNpcClick ? () => onNpcClick(n.id) : undefined,
       node: (
         <div
           className="rpg-sprite"
           data-dir={DIR[n.facing]}
-          data-walking={walking.has(n.id) ? "" : undefined}
+          data-walking={walking.has(n.id) && !n.seated ? "" : undefined}
+          data-seated={n.seated ? "" : undefined}
           data-clickable={onNpcClick ? "" : undefined}
           style={breath(n.id)}
         >
-          <div className="rpg-shadow" />
+          {!n.seated && <div className="rpg-shadow" />}
           <div className="pg-flip" style={{ transform: `scaleX(${n.facing === "left" ? -1 : 1})` }}>
-            <Figure look={n.look} dir={DIR[n.facing]} flat />
+            <Figure look={n.look} dir={DIR[n.facing]} seated={!!n.seated} flat />
           </div>
           {n.carrying && n.facing !== "back" && <div className="rpg-tray" />}
           <div className="rpg-name" data-staff="">

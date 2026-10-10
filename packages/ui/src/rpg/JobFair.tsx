@@ -742,7 +742,7 @@ export function boothExtras(live: CompanyBooth, opts: { onBanner?: () => void; o
           { key: `${booth.id}-videowall`, x: f.x + 9 / T, y: y - 1.7 - 18 / T, z: y + 0.55, node: <VideoWall booth={booth} />, onClick: onTv, title: onTv ? `Tonton video ${booth.company}` : undefined },
           // A red carpet from the gate to the recruiter's desk.
           { key: `${booth.id}-runner`, x: x + 1.85, y: y + 2.7, z: 0.8, ground: true, node: <div className="jb-runner" style={{ width: 1.7 * T, height: (BOOTH_H - 2.7 + 0.35) * T, ["--trim" as string]: vipLook(booth).trim, ["--runner" as string]: vipLook(booth).runner }} /> },
-          { key: `${booth.id}-lounge`, x: vipLounge(booth).x - 0.1, y: y - 0.2, z: vipLounge(booth).y + vipLounge(booth).height, node: <VipLounge booth={booth} /> },
+          { key: `${booth.id}-lounge`, x: vipLounge(booth).x - 0.1, y: y - 0.2, z: vipLounge(booth).y + 0.3, node: <VipLounge booth={booth} /> },
           ...([
             [f.x + 0.5, x - 0.2],
             [x + BOOTH_W + 0.2, f.x + f.width - 0.5],

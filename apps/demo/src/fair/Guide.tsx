@@ -22,6 +22,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Berdiri di depan meja stand lalu tekan E (atau ketuk meja) untuk ngobrol dengan recruiter.",
       "Dekati banner di samping meja untuk melihat daftar lowongan dan melamar.",
       "Duduk di sofa untuk main mini game berhadiah koin dan membaca artikel karier.",
+      "Di stand VIP, duduk di kursi lounge: SPG datang menemani dan bisa ditanya soal lowongan.",
       "Meja informasi ada di tiap lantai: tanya arah, minta diantar, atau beli koin di sana.",
       "Naik turun lantai lewat lift 🛗 di pojok kanan bawah.",
     ],
@@ -63,7 +64,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
     steps: [
       "Berdiri di depan stan lalu ketuk atau tekan E untuk melihat menu dan voucher.",
       "Beli voucher dengan koin; ada cashback koin untuk beberapa pembelian.",
-      "Duduk di meja makan untuk beristirahat dan ngobrol dengan pengunjung lain.",
+      "Duduk di meja makan untuk beristirahat sambil main mini game (2048, kuis, tangkap koin).",
       "Punya usaha kuliner? Stan kosong bisa disewa langsung dari sini.",
     ],
   },

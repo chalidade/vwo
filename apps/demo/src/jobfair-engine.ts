@@ -53,6 +53,9 @@ import {
   findPath,
   isBlocked,
   type FairApplicationOut,
+  BOOTH_H,
+  boothFrame,
+  vipSeats,
 } from "@vwo/shared";
 import {
   CAREER_ARTICLES,
@@ -108,6 +111,8 @@ export interface FairStaff {
   x: number;
   y: number;
   facing: Facing;
+  /** Sitting down (a VIP booth's SPG keeping a visitor company in the lounge). */
+  seated?: boolean;
 }
 
 export type ApplicationStatus = "Terkirim" | "Dilihat" | "Shortlist" | "Diundang interview" | "Lolos interview" | "Kunjungan kantor" | "Diterima" | "Belum cocok";
@@ -832,6 +837,16 @@ export class DemoJobFair {
           ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
+      // VIP booths have an SPG who greets at the gate and sits with whoever takes the lounge.
+      ...fair.booths
+        .filter((b) => b.tier === "premium")
+        .map((b): FairStaff => {
+          const id = spgId(b.id);
+          const was = old.get(id);
+          const floorId = fairFloorId(fair, b.floor);
+          if (was && was.floorId === floorId) return { ...was, name: spgName(b.id), boothId: b.id };
+          return { id, name: spgName(b.id), boothId: b.id, floorId, ...spgHome(b), facing: "front" };
+        }),
       ...fair.promoters.map((p) => {
         const id = promoterId(p.id);
         const was = old.get(id);
@@ -2992,7 +3007,63 @@ export class DemoJobFair {
     const step = (WALK_SPEED * Math.min(dtMs, 250)) / 1000;
     for (const bot of [...this.bots]) if (this.tickBot(bot, now, step)) changed = true;
     if (this.tickWalkers(now, step * 0.85)) changed = true;
+    if (this.tickSpg(step * 0.9)) changed = true;
     if (changed) this.emit();
+  }
+
+  /** Where each VIP booth's SPG should be: in the free lounge chair next to a lone sitter, else at the gate. */
+  spgPlace(boothId: string): { x: number; y: number; seated: boolean } | null {
+    const b = this.booth(boothId);
+    if (!b || b.tier !== "premium") return null;
+    const seats = vipSeats(b);
+    const taken = seats.map((st) => [...this.visitors.values()].some((v) => v.seatId === st.id));
+    const free = taken[0] !== taken[1] ? seats[taken[0] ? 1 : 0]! : null;
+    return free ? { x: free.x, y: free.y, seated: true } : { ...spgHome(b), seated: false };
+  }
+
+  /** Each SPG's route: where it is headed and the steps left, walked around the booth's furniture. */
+  private spgRoutes = new Map<string, { key: string; path: { x: number; y: number }[] }>();
+
+  private tickSpg(step: number) {
+    let moved = false;
+    for (const s of this.staff) {
+      if (!s.id.startsWith("spg:") || !s.boothId) continue;
+      const to = this.spgPlace(s.boothId);
+      if (!to) continue;
+      const key = `${to.x.toFixed(2)},${to.y.toFixed(2)}`;
+      let r = this.spgRoutes.get(s.id);
+      if (!r || r.key !== key) {
+        // The chairs sit inside the lounge's solid block: walk to just in front, then step in.
+        const floor = this.floor(s.floorId);
+        const front = to.seated ? { x: to.x, y: to.y + 0.75 } : to;
+        const path = findPath(floor, s, front) ?? [front];
+        r = { key, path: to.seated ? [...path, { x: to.x, y: to.y }] : path };
+        this.spgRoutes.set(s.id, r);
+      }
+      let next = r.path[0];
+      while (next && Math.hypot(next.x - s.x, next.y - s.y) < 0.03) {
+        r.path.shift();
+        next = r.path[0];
+      }
+      if (!next) {
+        if (s.seated !== to.seated || s.facing !== "front") {
+          s.seated = to.seated;
+          s.facing = "front";
+          moved = true;
+        }
+        continue;
+      }
+      const dx = next.x - s.x;
+      const dy = next.y - s.y;
+      const d = Math.hypot(dx, dy);
+      s.seated = false;
+      const k = Math.min(1, step / d);
+      s.x += dx * k;
+      s.y += dy * k;
+      s.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "front" : "back";
+      moved = true;
+    }
+    return moved;
   }
 
   private nextRoomAt = 0;
@@ -3279,6 +3350,18 @@ export const roomStaffId = (roomId: string) => `room-${roomId}`;
 export const stallStaffId = (stallId: string) => `stall-${stallId}`;
 export const consultantId = (id: string) => `consult-${id}`;
 export const promoterId = (id: string) => `npc-${id}`;
+export const spgId = (boothId: string) => `spg:${boothId}`;
+const SPG_NAMES = ["Nadia", "Sinta", "Ayu", "Rina", "Mega", "Tasya", "Laras", "Vina"];
+/** The SPG's name, the same for a booth on every device. */
+export function spgName(boothId: string) {
+  let h = 7;
+  for (const ch of boothId) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  return SPG_NAMES[h % SPG_NAMES.length]!;
+}
+/** Where a VIP booth's SPG waits: just outside the rope of the left wing, by the gate. */
+export function spgHome(b: { x: number; y: number; tier?: "premium" | "regular" }) {
+  return { x: boothFrame(b).x + 1.2, y: b.y + BOOTH_H + 0.35 };
+}
 
 const FEEDBACK = [
   "Belum sesuai kebutuhan kami saat ini.",
