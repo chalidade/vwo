@@ -45,6 +45,7 @@ import {
   spendCoins,
   submitFairApplication,
   updateFairApplicationShared,
+  setFairApplicationNotes,
   writeFairPlayer,
 } from "../src";
 import { applications, booths, companies, fairs, jobs, users } from "../src/schema";
@@ -168,10 +169,19 @@ describe("live game applications", () => {
       { at: 1, from: "company", text: "Halo Sari" },
       { at: 2, from: "seeker", text: "Siap" },
     ]);
-    expect(shared.interview).toEqual({ ...invite, reply: "hadir" });
+    expect(shared.interview).toEqual({ ...invite, reply: "hadir", repliedAt: expect.any(Number) });
     expect(shared.rating).toBe(4);
     // Someone else's account cannot write as this seeker.
     expect(await updateFairApplicationShared(db, { id, as: "seeker", userId: "00000000-0000-0000-0000-000000000000", incoming: {} })).toBe(false);
+  });
+
+  it("keeps the company's notes private to the booth, without touching the applicant's copy", async () => {
+    const [row] = await boothFairApplications(db, "toko-kita");
+    expect(await setFairApplicationNotes(db, { id: row!.id, boothKey: "other-booth", notes: "x" })).toBe(false);
+    expect(await setFairApplicationNotes(db, { id: row!.id, boothKey: "toko-kita", notes: "Kandidat kuat" })).toBe(true);
+    const [after] = await boothFairApplications(db, "toko-kita");
+    expect(after!.companyNotes).toBe("Kandidat kuat");
+    expect(after!.updatedAt.getTime()).toBe(row!.updatedAt.getTime());
   });
 });
 

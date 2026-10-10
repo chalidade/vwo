@@ -7,7 +7,7 @@ import { NotifList } from "../fair/Notifs";
 import { LIVE } from "../mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "../account";
 import { AccountGate } from "../AccountGate";
-import { boothApplications, claimBooth, claimErrorText } from "../server-fair";
+import { boothApplications, boothInboxRead, claimBooth, claimErrorText } from "../server-fair";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
@@ -435,6 +435,7 @@ function useServerApplicants(boothId: string) {
       void boothApplications(boothId).then((r) => {
         if (gone) return;
         if (r.ok) fair.mergeServer(r.data.applications, false);
+        if (r.ok) void boothInboxRead(boothId).then((x) => !gone && x.ok && fair.setBoothRead(boothId, x.data.read));
         setState(r.ok ? "ok" : r.error === "not_signed_in" ? "signin" : r.error === "not_allowed" ? "denied" : "offline");
       });
     pull();

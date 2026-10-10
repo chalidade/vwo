@@ -50,6 +50,15 @@ export function applyErrorText(error: string) {
   }
 }
 
+/** The company's private notes on one applicant. */
+export const saveNotes = (boothId: string, id: string, notes: string) =>
+  call<{ ok: true }>(`booths/${encodeURIComponent(boothId)}/applications`, { method: "PATCH", body: { id, notes: notes.slice(0, 1000) } });
+
+/** Which of the booth's notifications its team read. */
+export const boothInboxRead = (boothId: string) => call<{ read: { all: number; ids: string[] } }>(`booths/${encodeURIComponent(boothId)}/inbox`);
+export const markBoothInboxRead = (boothId: string, read: { all: number; ids: string[] }) =>
+  call<{ read: { all: number; ids: string[] } }>(`booths/${encodeURIComponent(boothId)}/inbox`, { method: "PUT", body: read });
+
 /** One side's part of an application's conversation: chat, interview, rating and call log. */
 export const sendShared = (id: string, as: "company" | "seeker", shared: ApplicationShared) =>
   call<{ ok: true }>(`applications/${encodeURIComponent(id)}/shared`, { method: "PUT", body: { as, shared } });

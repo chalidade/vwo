@@ -292,6 +292,8 @@ export const fairApplications = pgTable(
     data: jsonb("data").notNull(),
     /** The conversation both sides add to: chat, interview invitation and answer, rating, calls. */
     shared: jsonb("shared").notNull().default(sql`'{}'::jsonb`),
+    /** The company's private notes on the applicant; never sent to the applicant. */
+    companyNotes: text("company_notes").notNull().default(""),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

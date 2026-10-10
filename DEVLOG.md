@@ -4,6 +4,27 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · catatan dan notifikasi perusahaan di server
+
+**Konteks:** catatan pribadi perusahaan tentang pelamar dan lonceng notifikasi di portal perusahaan hanya tersimpan di browser. Akibatnya, di HP lain catatan hilang, dan semua lamaran muncul lagi sebagai notifikasi baru yang belum dibaca.
+
+**Yang berubah:**
+- Catatan disimpan di kolom baru `company_notes` di `fair_applications` (migrasi `0016`).
+  - Hanya akun stand itu dan panitia yang bisa membaca dan mengubahnya.
+  - Pelamar tidak pernah menerima catatan ini.
+  - Menyimpan catatan tidak membuat lamaran terlihat "diperbarui" di sisi pelamar.
+- Notifikasi perusahaan kini dihitung dari data lamaran di server: lamaran baru, chat dari pelamar, jawaban undangan interview, dan panggilan tak terjawab. Daftarnya sama di semua perangkat.
+- Tanda "sudah dibaca" disimpan per stand lewat `/api/jobfair/booths/<stand>/inbox`. Tanda ini hanya bisa bertambah, jadi membaca di laptop juga menghapus angka di HP.
+- Server kini mencatat waktu pelamar menjawab undangan interview (`repliedAt`) supaya urutan notifikasi benar.
+
+**Dites:** unit test engine dan database; uji end-to-end dengan dua perangkat panitia:
+- angka 2 belum dibaca muncul di kedua perangkat;
+- setelah "tandai semua dibaca" di perangkat 1, angka di perangkat 2 ikut hilang;
+- catatan muncul di perangkat 2;
+- pelamar tidak bisa membaca atau mengubah catatan (403).
+
+---
+
 ## 2026-10-10 · sewa stan food court lewat Xendit
 
 **Konteks:** menyewa stan kosong di Food Court masih pembayaran simulasi, dan stan baru hanya muncul di browser penyewa. Pengunjung lain tidak melihatnya.
