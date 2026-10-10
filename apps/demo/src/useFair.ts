@@ -69,6 +69,7 @@ function pushShared(a: FairApplication) {
 if (LIVE) {
   fair.onShared = pushShared;
   fair.serverInbox = true;
+  fair.setReviews({ totals: {}, mine: {} });
   fair.onNote = (a) => saveNotes(a.boothId, a.id, a.notes ?? "").then((r) => r.ok);
   fair.onBoothRead = (boothId, read) => void markBoothInboxRead(boothId, read).then((r) => r.ok && fair.setBoothRead(boothId, r.data.read));
 }

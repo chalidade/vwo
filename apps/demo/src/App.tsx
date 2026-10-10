@@ -10,6 +10,7 @@ import { startCoinSync } from "./coin-sync";
 import { startPaymentSync } from "./payments";
 import { syncPlayer } from "./player-sync";
 import { startPriceSync } from "./prices-sync";
+import { startReviewSync } from "./review-sync";
 import { startSharedSync } from "./shared-state";
 
 function useHash() {
@@ -34,6 +35,7 @@ function useLiveAccount() {
       if (a) startCoinSync();
       syncPlayer(a);
       if (a) startPaymentSync();
+      startReviewSync();
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
@@ -41,6 +43,7 @@ function useLiveAccount() {
       if (a) startCoinSync();
       syncPlayer(a);
       if (a) startPaymentSync();
+      startReviewSync();
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);
   }, []);

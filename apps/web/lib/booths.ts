@@ -65,3 +65,12 @@ export async function placeBooth(input: NewBooth, userId: string): Promise<{ boo
   await writeFairState(db, { key: `booking:${id}`, data: { booth, booking, pin }, userId });
   return { booth, pin };
 }
+
+/** Whether a booth stands in the event now: published and not removed, added by the organiser, or booked. */
+export async function boothStands(boothId: string) {
+  const rows = await readFairState(db);
+  const org = (rows.find((r) => r.key === "org")?.data ?? {}) as Org;
+  if (org.removed?.includes(boothId)) return false;
+  if (DEMO_JOB_FAIR.booths.some((b) => b.id === boothId) || org.added?.some((b) => b.id === boothId)) return true;
+  return rows.some((r) => r.key.startsWith("booking:") && (r.data as { booth?: CompanyBooth }).booth?.id === boothId);
+}

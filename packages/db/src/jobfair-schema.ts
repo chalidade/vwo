@@ -333,6 +333,19 @@ export const fairBoothMembers = pgTable(
   (t) => [primaryKey({ columns: [t.boothKey, t.userId] }), index("fair_booth_members_user_idx").on(t.userId)],
 );
 
+/** Job seekers' star reviews of a company's booth in the live game: one per account and booth. */
+export const fairReviews = pgTable(
+  "fair_reviews",
+  {
+    userId: userRef("user_id"),
+    boothKey: text("booth_key").notNull(),
+    stars: integer("stars").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.boothKey] }), index("fair_reviews_booth_idx").on(t.boothKey), check("fair_reviews_stars_ck", sql`${t.stars} between 1 and 5`)],
+);
+
 /** The organiser's price list: one row per price they changed (keys from @vwo/shared PRICE_CATALOG).
  *  Coins for job seekers, rupiah for companies. A key without a row costs its default. */
 export const fairPrices = pgTable(

@@ -4,6 +4,29 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · ulasan stand di server
+
+**Konteks:** bintang yang diberikan pencari kerja ke stand hanya tersimpan di browser masing-masing. Rating yang terlihat di situs live pun bercampur dengan ulasan karangan dari demo.
+
+**Yang berubah:**
+- Tabel baru `fair_reviews` (migrasi `0017`, RLS aktif) menyimpan satu ulasan per akun per stand. Ulasan baru menggantikan ulasan lama.
+- `/api/jobfair/reviews`:
+  - GET memberi jumlah ulasan dan total bintang per stand, tanpa nama penulis, plus bintang dari akun sendiri.
+  - POST mewajibkan login, stand harus ada, dan bintang 1–5.
+  - Tim perusahaan tidak bisa menilai standnya sendiri.
+- Di situs live, rating stand hanya dihitung dari ulasan sungguhan. Ulasan karangan tetap ada di demo GitHub Pages.
+- Game langsung menampilkan ulasan baru, lalu menyamakannya dengan server setiap menit.
+
+**Dites:** unit test engine dan database; uji end-to-end:
+- tanpa login 401;
+- mengubah ulasan tidak menambah jumlah;
+- bintang 6 ditolak 400;
+- stand tak dikenal 404;
+- tim stand sendiri 403;
+- data publik hanya berisi jumlah dan total.
+
+---
+
 ## 2026-10-10 · catatan dan notifikasi perusahaan di server
 
 **Konteks:** catatan pribadi perusahaan tentang pelamar dan lonceng notifikasi di portal perusahaan hanya tersimpan di browser. Akibatnya, di HP lain catatan hilang, dan semua lamaran muncul lagi sebagai notifikasi baru yang belum dibaca.

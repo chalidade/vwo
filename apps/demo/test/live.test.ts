@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_JOB_FAIR, fairFloorId } from "@vwo/shared";
-import { DemoJobFair, remoteId } from "../src/jobfair-engine";
+import { DemoJobFair, PLAYER_ID, remoteId } from "../src/jobfair-engine";
 import { parseWire } from "../src/live";
 
 const floor = fairFloorId(DEMO_JOB_FAIR, 0);
@@ -104,5 +104,28 @@ describe("live company inbox and notes", () => {
     await Promise.resolve();
     fair.mergeServer([app({ notes: "Panggil interview" })], false);
     expect(a.notes).toBe("Panggil interview");
+  });
+});
+
+describe("live booth reviews", () => {
+  it("rates booths from real reviews only, and a changed review replaces the old one", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const booth = DEMO_JOB_FAIR.booths[0]!.id;
+    expect(fair.companyRating(booth).count).toBeGreaterThan(0); // the offline demo's made-up history
+    const sent: [string, number][] = [];
+    fair.onReview = (b, s) => sent.push([b, s]);
+    fair.setReviews({ totals: { [booth]: { count: 2, sum: 9 } }, mine: {} });
+    expect(fair.companyRating(booth)).toEqual({ count: 2, average: 4.5 });
+    fair.join("Sari", false, PLAYER_ID);
+    fair.reviewCompany(PLAYER_ID, booth, 3);
+    expect(fair.companyRating(booth)).toEqual({ count: 3, average: 4 });
+    fair.reviewCompany(PLAYER_ID, booth, 5);
+    expect(fair.companyRating(booth)).toEqual({ count: 3, average: 14 / 3 });
+    expect(fair.myReview(PLAYER_ID, booth)?.stars).toBe(5);
+    expect(sent).toEqual([
+      [booth, 3],
+      [booth, 5],
+    ]);
+    expect(fair.companyRating(DEMO_JOB_FAIR.booths[1]!.id)).toEqual({ count: 0, average: 0 });
   });
 });

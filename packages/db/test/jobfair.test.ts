@@ -46,6 +46,9 @@ import {
   submitFairApplication,
   updateFairApplicationShared,
   setFairApplicationNotes,
+  reviewBooth,
+  reviewTotals,
+  myReviews,
   writeFairPlayer,
 } from "../src";
 import { applications, booths, companies, fairs, jobs, users } from "../src/schema";
@@ -182,6 +185,16 @@ describe("live game applications", () => {
     const [after] = await boothFairApplications(db, "toko-kita");
     expect(after!.companyNotes).toBe("Kandidat kuat");
     expect(after!.updatedAt.getTime()).toBe(row!.updatedAt.getTime());
+  });
+});
+
+describe("live booth reviews", () => {
+  it("keeps one review per account and booth, and counts stars per booth", async () => {
+    expect(await reviewBooth(db, { userId: seeker, boothKey: "toko-kita", stars: 3 })).toBe(true);
+    expect(await reviewBooth(db, { userId: seeker, boothKey: "toko-kita", stars: 5 })).toBe(false);
+    expect(await reviewTotals(db)).toEqual({ "toko-kita": { count: 1, sum: 5 } });
+    expect(await myReviews(db, seeker)).toEqual({ "toko-kita": 5 });
+    await expect(reviewBooth(db, { userId: seeker, boothKey: "toko-kita", stars: 9 })).rejects.toThrow();
   });
 });
 

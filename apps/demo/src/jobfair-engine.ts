@@ -127,6 +127,12 @@ export interface Interview {
 
 /** A notification between an applicant and a company's HR, kept with the saved state so the
  *  portal and the job fair see each other's in any open tab. */
+/** Live: review counts and star totals per booth, and the signed-in player's own stars. */
+export interface ServerReviews {
+  totals: Record<string, { count: number; sum: number }>;
+  mine: Record<string, number>;
+}
+
 /** Live: which of a booth's notifications its team read: everything up to `all`, and `ids` after it. */
 export interface BoothRead {
   all: number;
@@ -1458,6 +1464,10 @@ export class DemoJobFair {
   onNote: ((a: FairApplication) => Promise<boolean>) | null = null;
   /** Live: the company read notifications; the app stores the marks for the booth on the server. */
   onBoothRead: ((boothId: string, read: BoothRead) => void) | null = null;
+  /** Live: sends the player's review of a booth to the server. */
+  onReview: ((boothId: string, stars: number) => void) | null = null;
+  /** Live: every booth's rating from real reviews, and the player's own stars, from the server. */
+  private serverReviews: ServerReviews | null = null;
   /** Live: a booth's notifications are worked out from its applications, the same on every device. */
   serverInbox = false;
   /** Live: which booth notifications the company has read, per booth. */
@@ -2135,9 +2145,20 @@ export class DemoJobFair {
     const v = this.visitors.get(visitorId);
     const b = this.booth(boothId);
     if (!v || !b) return;
+    stars = Math.max(1, Math.min(5, Math.round(stars)));
     const list = (this.reviews.get(boothId) ?? []).filter((r) => r.by !== visitorId);
-    const first = list.length === (this.reviews.get(boothId) ?? []).length;
-    list.unshift({ at: this.now(), by: visitorId, stars: Math.max(1, Math.min(5, Math.round(stars))), tag });
+    let first = list.length === (this.reviews.get(boothId) ?? []).length;
+    const sr = this.serverReviews;
+    if (sr && visitorId === PLAYER_ID) {
+      // Show it at once; the server's count comes with the next pull.
+      const before = sr.mine[boothId];
+      const t = sr.totals[boothId] ?? { count: 0, sum: 0 };
+      sr.totals[boothId] = before ? { count: t.count, sum: t.sum - before + stars } : { count: t.count + 1, sum: t.sum + stars };
+      sr.mine[boothId] = stars;
+      first = !before;
+      this.onReview?.(boothId, stars);
+    }
+    list.unshift({ at: this.now(), by: visitorId, stars, tag });
     this.reviews.set(boothId, list.slice(0, 40));
     this.log({ type: "review", name: v.displayName, company: b.company, jobTitle: "★".repeat(stars) });
     if (!v.isBot && first) this.gainXp(XP.review);
@@ -2145,12 +2166,25 @@ export class DemoJobFair {
     this.emit();
   }
 
+  /** Live: the server's ratings. */
+  setReviews(r: ServerReviews) {
+    this.serverReviews = { totals: { ...r.totals }, mine: { ...r.mine } };
+    this.emit();
+  }
+
   myReview(visitorId: string, boothId: string) {
+    const stars = visitorId === PLAYER_ID ? this.serverReviews?.mine[boothId] : undefined;
+    if (stars) return { at: 0, by: visitorId, stars };
     return this.reviews.get(boothId)?.find((r) => r.by === visitorId) ?? null;
   }
 
   /** A company's star rating: earlier reviews (seeded per booth) plus the ones written today. */
   companyRating(boothId: string) {
+    // Live: only real reviews count.
+    if (this.serverReviews) {
+      const t = this.serverReviews.totals[boothId] ?? { count: 0, sum: 0 };
+      return { count: t.count, average: t.count ? t.sum / t.count : 0 };
+    }
     const base = seededReviews(boothId);
     const list = this.reviews.get(boothId) ?? [];
     const count = base.count + list.length;
