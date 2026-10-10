@@ -4,6 +4,7 @@
 // Realtime to other devices: a ring goes to the callee's inbox channel, everything after it to a
 // channel named after the call's random id. The audio and video go straight between the two devices.
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { LIVE } from "../mode";
 import { hasRealtime, realtimeClient } from "../realtime";
 
 export type CallKind = "video" | "voice";
@@ -140,12 +141,32 @@ export function onSignal(fn: (s: CallSignal) => void) {
 
 export const canCallOtherTabs = () => (channel !== null || hasRealtime()) && typeof RTCPeerConnection !== "undefined";
 
-/** Public STUN finds each device's address; a TURN relay (when configured) carries calls between strict networks. */
+/** Public STUN finds each device's address; a TURN relay carries calls between strict networks. */
 function iceServers(): RTCIceServer[] {
   const list: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }];
   const turn = import.meta.env.VITE_TURN_URL as string | undefined;
   if (turn) list.push({ urls: turn.split(","), username: import.meta.env.VITE_TURN_USERNAME as string | undefined, credential: import.meta.env.VITE_TURN_CREDENTIAL as string | undefined });
-  return list;
+  return [...list, ...(relay?.servers ?? [])];
+}
+
+/** Live site: short-lived relay credentials from the server, so phones on different networks still hear each other. */
+let relay: { servers: RTCIceServer[]; until: number } | null = null;
+let relayLoading: Promise<void> | null = null;
+
+/** Fetch (or refresh) the relay servers; resolves quickly either way, a call never waits long on it. */
+export function loadRelay(): Promise<void> {
+  if (!LIVE) return Promise.resolve();
+  if (relay && relay.until > Date.now()) return Promise.resolve();
+  relayLoading ??= fetch("/api/turn", { credentials: "same-origin" })
+    .then((r) => (r.ok ? (r.json() as Promise<{ iceServers?: RTCIceServer[]; ttl?: number }>) : null))
+    .then((d) => {
+      if (d?.iceServers?.length) relay = { servers: d.iceServers, until: Date.now() + Math.max(60, (d.ttl ?? 3600) - 600) * 1000 };
+    })
+    .catch(() => {})
+    .finally(() => {
+      relayLoading = null;
+    });
+  return Promise.race([relayLoading, new Promise<void>((r) => setTimeout(r, 4000))]);
 }
 
 /** The camera and microphone, or null when the browser has none or the user says no. */
@@ -173,6 +194,14 @@ export function stopMedia(s: MediaStream | null) {
  */
 export function connectPeer(opts: { callId: string; caller: boolean; kind: CallKind; local: MediaStream | null; onRemote: (s: MediaStream) => void; onState?: (s: RTCPeerConnectionState) => void }) {
   const pc = new RTCPeerConnection({ iceServers: iceServers() });
+  // Relay credentials may still be on their way: take them before gathering any candidates.
+  const ready = loadRelay().then(() => {
+    try {
+      if (pc.signalingState !== "closed") pc.setConfiguration({ ...pc.getConfiguration(), iceServers: iceServers() });
+    } catch {
+      // Keep the servers it started with.
+    }
+  });
   void joinCall(opts.callId);
   const pending: RTCIceCandidateInit[] = [];
   let haveRemote = false;
@@ -197,6 +226,7 @@ export function connectPeer(opts: { callId: string; caller: boolean; kind: CallK
   const off = onSignal(async (s) => {
     if (s.callId !== opts.callId) return;
     if (s.type === "offer" && !opts.caller) {
+      await ready;
       await pc.setRemoteDescription(s.sdp);
       await flush();
       const answer = await pc.createAnswer();
@@ -212,6 +242,7 @@ export function connectPeer(opts: { callId: string; caller: boolean; kind: CallK
   });
   if (opts.caller)
     void (async () => {
+      await ready;
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       sendSignal({ type: "offer", callId: opts.callId, sdp: pc.localDescription!.toJSON() });
