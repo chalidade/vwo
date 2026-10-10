@@ -137,6 +137,9 @@ importers:
       '@types/web-push':
         specifier: 3.6.4
         version: 3.6.4
+      '@vwo/demo':
+        specifier: workspace:*
+        version: link:../demo
       typescript:
         specifier: ^5.6.0
         version: 5.9.3

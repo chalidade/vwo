@@ -23,6 +23,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@vwo/demo": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
