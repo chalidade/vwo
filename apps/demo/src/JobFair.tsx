@@ -64,7 +64,10 @@ import { LIVE } from "./mode";
 import { claimPaidCoins, pay } from "./payments";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
-import { LiveChannel, type LiveStatus } from "./live";
+import { LiveChannel, type LiveStatus, pickTransport } from "./live";
+import { PING_REPLIES, PING_STARTERS, PING_TEXT, type Ping, PingLimiter, parsePing } from "./fair/social";
+import { FollowBar, type PingCardView, PingCards } from "./fair/Pings";
+import { playPing } from "./fair/ringtone";
 import { COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
@@ -140,6 +143,8 @@ const HALL_SIGNS = [{ x: 6, y: 15.2 }, { x: 23, y: 6.7 }, { x: 33.5, y: 14.8 }];
 const ROOM_SIGNS = [{ x: 11, y: 19.6 }, { x: 25, y: 19.6 }];
 
 let savedSession: Session | null = null; // survives switching to the organiser view and back
+
+let pingSeq = 0;
 
 export function JobFair() {
   useFair();
@@ -226,6 +231,17 @@ export function JobFair() {
   const [live, setLive] = useState<{ status: LiveStatus; peers: number }>({ status: "connecting", peers: 0 });
   /** How players on other devices look, by their visitor id here. */
   const remoteLooks = useRef(new Map<string, Look>());
+  const liveChannel = useRef<LiveChannel | null>(null);
+  /** Quick messages from other job seekers, newest last. */
+  const [pings, setPings] = useState<PingCardView[]>([]);
+  /** The job seeker this player is walking after. */
+  const [follow, setFollow] = useState<{ memberId: string; name: string } | null>(null);
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  /** People pointed out on the floor (who pinged us, who we follow), until a time. */
+  const marks = useRef(new Map<string, number>());
+  const muted = useRef(new Set<string>());
+  const pingLimit = useRef(new PingLimiter());
   const hud = useHud();
   const stageLive = useStageLive();
   savedSession = session;
@@ -311,6 +327,38 @@ export function JobFair() {
     const id = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Following someone: keep walking to just behind them, onto other floors too.
+  useEffect(() => {
+    if (!follow || !session) return;
+    const step = () => {
+      const t = fair.visitors.get(follow.memberId);
+      const me = fair.visitors.get(session.visitorId);
+      if (!me) return;
+      if (!t) {
+        setFollow(null);
+        setToast(`${follow.name} sudah keluar dari job fair`);
+        return;
+      }
+      if (busy.current) return;
+      mark(follow.memberId, 1_500);
+      if (t.floorId !== me.floorId) {
+        const into = fair.passFor(t.floorId);
+        if (into && !fair.hasTicket(into.id)) {
+          setFollow(null);
+          askTicket(into, () => startFollow(follow.memberId, false));
+          return;
+        }
+        if (goal.current?.floorId !== t.floorId) goTo(t.floorId, t.x, t.y + 0.9);
+        return;
+      }
+      if (Math.hypot(t.x - me.x, t.y - me.y) > 1.6 && (!goal.current || Math.hypot(goal.current.x - t.x, goal.current.y - t.y) > 0.8)) goTo(t.floorId, t.x, t.y + 0.9);
+    };
+    step();
+    const timer = window.setInterval(step, 600);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follow, session]);
 
   // A company scheduled an interview: show the invitation once, over everything but a call.
   // An office visit invitation is queued as "visit:<application id>".
@@ -434,6 +482,7 @@ export function JobFair() {
       if (ix || iy) {
         route.current = null;
         goal.current = null;
+        if (followRef.current) setFollow(null);
         if (me.seatId) fair.stand(me.memberId);
       }
       else if (route.current) {
@@ -495,7 +544,10 @@ export function JobFair() {
       },
       (id) => fair.floors.some((f) => f.id === id),
       (status, peers) => setLive({ status, peers }),
+      pickTransport,
+      (from, data) => receivePing(remoteId(from), data),
     );
+    liveChannel.current = channel;
     channel.start();
     const off = onFrame(() => channel.publish());
     // Other job seekers ring this player from the lounge.
@@ -504,6 +556,7 @@ export function JobFair() {
       off();
       stopCalls();
       channel.stop();
+      liveChannel.current = null;
     };
   }, [session]);
 
@@ -637,6 +690,7 @@ export function JobFair() {
   const walkTo = (x: number, y: number) => {
     const me = session && fair.visitors.get(session.visitorId);
     if (!me || busy.current) return;
+    if (followRef.current) setFollow(null);
     const taken = fair.occupiedSeats();
     const seat = fair
       .floor(me.floorId)
@@ -904,32 +958,171 @@ export function JobFair() {
     setTalk(main);
   }
 
+  /** Who is pointed out on the floor right now. */
+  function markedNow() {
+    const now = Date.now();
+    for (const [id, until] of marks.current) if (until < now) marks.current.delete(id);
+    return new Set(marks.current.keys());
+  }
+
+  /** "Lantai 2 · Seminar": a floor's name for quick messages. */
+  function floorLabel(floorId: string) {
+    const st = fair.stopOf(floorId);
+    return `${st.name} · ${st.label}`;
+  }
+
+  const plainName = (v: { displayName: string }) => v.displayName.replace(/^🌐 /, "");
+
+  /** Point someone out on the floor for a while. */
+  function mark(memberId: string, ms = 20_000) {
+    marks.current.set(memberId, Date.now() + ms);
+  }
+
+  /** Send a quick message to one job seeker. People on other devices get it on their screen; the
+   *  fair's own visitors answer after a moment, so the feature can be tried alone. */
+  function sendPing(memberId: string, ping: Ping) {
+    const v = fair.visitors.get(memberId);
+    if (!v || !session) return;
+    const text = PING_TEXT[ping.key](ping.floorId ? floorLabel(ping.floorId) : "");
+    if (v.remote) {
+      if (!liveChannel.current?.sendTo(memberId.slice(4), ping)) {
+        setToast(`${plainName(v)} sedang tidak terhubung`);
+        return;
+      }
+    } else if (v.isBot) {
+      const answer: Ping = { key: ping.key === "hi" || ping.key === "team" ? "hiback" : ping.key === "floor" || ping.key === "here" ? "coming" : "ok" };
+      window.setTimeout(() => {
+        if (!fair.visitors.has(memberId)) return;
+        fair.say(memberId, PING_TEXT[answer.key](""), 2600);
+        showPing(memberId, answer);
+      }, 1400);
+    }
+    // Everyone nearby sees who it was for, as a bubble over the player.
+    fair.say(session.visitorId, `${text.split(" ")[0]} @${plainName(v)}`, 2600);
+    fair.track("greet");
+    mark(memberId, 8_000);
+    setToast(`Terkirim ke ${plainName(v)}`);
+  }
+
+  /** A quick message arrived over the live channel. */
+  function receivePing(memberId: string, data: unknown) {
+    const ping = parsePing(data);
+    if (!ping || muted.current.has(memberId) || !fair.visitors.has(memberId)) return;
+    if (ping.floorId && !fair.floors.some((f) => f.id === ping.floorId)) return;
+    if (!pingLimit.current.allow(memberId)) return;
+    showPing(memberId, ping);
+  }
+
+  function showPing(memberId: string, ping: Ping) {
+    const v = fair.visitors.get(memberId);
+    if (!v) return;
+    const name = plainName(v);
+    const id = ++pingSeq;
+    const close = () => setPings((list) => list.filter((p) => p.id !== id));
+    const answer = (key: Ping["key"]) => () => {
+      close();
+      sendPing(memberId, { key });
+    };
+    const later = { label: "🙏 Nanti", onPick: answer("later") };
+    const actions =
+      ping.key === "follow"
+        ? [{ label: "👣 Ikuti", primary: true, onPick: () => (close(), startFollow(memberId, true)) }, later]
+        : ping.key === "floor" && ping.floorId
+          ? [{ label: `🛗 Ke ${fair.stopOf(ping.floorId).name}`, primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), pickFloor(ping.floorId!)) }, later]
+          : ping.key === "here" || ping.key === "where" || ping.key === "wait"
+            ? [
+                ...(ping.key === "where" ? [{ label: "📍 Kirim lokasiku", primary: true, onPick: () => (close(), sendHere(memberId)) }] : []),
+                ...(ping.key !== "where" ? [{ label: "🏃 Datangi", primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), walkToPerson(memberId)) }] : []),
+                later,
+              ]
+            : ["ok", "later", "following", "coming", "thanks", "hiback"].includes(ping.key)
+              ? [{ label: "📍 Lihat", onPick: () => (close(), mark(memberId)) }]
+              : PING_REPLIES.map((k) => ({ label: PING_TEXT[k](""), primary: k === "ok", onPick: answer(k) }));
+    actions.push({ label: "🔕", onPick: () => (close(), muted.current.add(memberId), setToast(`${name} dibisukan sampai kamu keluar`)) });
+    setPings((list) => [...list.slice(-2), { id, name, look: lookOfMember(memberId), text: PING_TEXT[ping.key](ping.floorId ? floorLabel(ping.floorId) : ""), where: floorLabel(v.floorId), actions }]);
+    window.setTimeout(close, 30_000);
+    mark(memberId);
+    playPing();
+  }
+
+  function lookOfMember(memberId: string) {
+    const v = fair.visitors.get(memberId);
+    return remoteLooks.current.get(memberId) ?? (v ? lookFor(`${v.displayName}:${v.memberId}`) : undefined);
+  }
+
+  function sendHere(memberId: string) {
+    const me = session && fair.visitors.get(session.visitorId);
+    if (me) sendPing(memberId, { key: "here", floorId: me.floorId });
+  }
+
+  /** Walk up to someone, on whatever floor they are. */
+  function walkToPerson(memberId: string) {
+    const t = fair.visitors.get(memberId);
+    if (!t) return;
+    const into = fair.passFor(t.floorId);
+    const me = session && fair.visitors.get(session.visitorId);
+    if (into && me?.floorId !== t.floorId && !fair.hasTicket(into.id)) {
+      askTicket(into, () => walkToPerson(memberId));
+      return;
+    }
+    goTo(t.floorId, t.x, t.y + 0.9);
+    mark(memberId, 15_000);
+  }
+
+  /** Walk after someone until they leave or the player moves on their own. */
+  function startFollow(memberId: string, tell: boolean) {
+    const v = fair.visitors.get(memberId);
+    if (!v) return;
+    setFollow({ memberId, name: plainName(v) });
+    if (tell) sendPing(memberId, { key: "following" });
+    else setToast(`👣 Mengikuti ${plainName(v)}`);
+  }
+
   function talkToVisitor(memberId: string) {
     const v = fair.visitors.get(memberId);
     if (!v || !session) return;
     const sent = fair.applications.filter((a) => a.visitorId === memberId);
+    const name = plainName(v);
+    const close = () => setTalk(null);
+    const ping = (p: Ping) => () => (close(), sendPing(memberId, p));
+    const floors = () =>
+      setTalk({
+        speaker: v.displayName,
+        pages: [`Ajak ${name} ke lantai mana?`],
+        choices: [
+          ...fair.stops.map((st) => ({ label: `🛗 ${st.name}`, hint: st.label, onPick: ping({ key: "floor", floorId: st.floorId }) })),
+          { label: "Kembali", onPick: () => talkToVisitor(memberId) },
+        ],
+      });
+    const following = follow?.memberId === memberId;
     setTalk({
       speaker: v.displayName,
       pages: [
         v.remote
-          ? `${v.displayName.replace("🌐 ", "")} sedang online dari device lain. Kirim sapaan, nanti muncul di layarnya.`
+          ? `${name} sedang online dari device lain. Pesan cepatmu muncul di layarnya, lengkap dengan wajahmu.`
           : sent.length
-          ? `Hai! Aku barusan melamar ${sent[0]!.jobTitle} di ${sent[0]!.company}. Semoga lolos!`
-          : `Hai! Aku ${v.displayName}, lagi keliling cari lowongan yang cocok.`,
+            ? `Hai! Aku barusan melamar ${sent[0]!.jobTitle} di ${sent[0]!.company}. Semoga lolos!`
+            : `Hai! Aku ${name}, lagi keliling cari lowongan yang cocok.`,
       ],
       choices: [
-        ...EMOTES.slice(0, 2).map((e) => ({
-          label: `${EMOTE_ICON[e]} ${e === "wave" ? "Lambai" : "Semangat"}`,
+        ...PING_STARTERS.filter((k) => k !== "here").map((k) => ({ label: PING_TEXT[k](""), onPick: ping({ key: k }) })),
+        { label: "📍 Kirim lokasiku", hint: floorLabel(fair.visitors.get(session.visitorId)?.floorId ?? v.floorId), onPick: () => (close(), sendHere(memberId)) },
+        { label: "🛗 Ajak ke lantai…", onPick: floors },
+        following
+          ? { label: "✋ Berhenti mengikuti", onPick: () => (close(), setFollow(null)) }
+          : { label: `👣 Ikuti ${name}`, onPick: () => (close(), startFollow(memberId, !!v.remote)) },
+        ...EMOTES.slice(1, 2).map((e) => ({
+          label: `${EMOTE_ICON[e]} Semangat`,
           onPick: () => {
-            fair.say(session.visitorId, e === "wave" ? "👋 Hai!" : "Semangat ya! 💪", 1800);
+            fair.say(session.visitorId, "Semangat ya! 💪", 1800);
             fair.track("greet");
-            setTalk(null);
+            close();
           },
         })),
         ...(fair.roomOf(v.floorId)?.kind === "konsultasi" && !v.remote
-          ? [{ label: "📞 Telepon", onPick: () => (setTalk(null), setLounge({ mode: "peer", memberId: v.memberId })) }]
+          ? [{ label: "📞 Telepon", onPick: () => (close(), setLounge({ mode: "peer", memberId: v.memberId })) }]
           : []),
-        { label: "Tutup", onPick: () => setTalk(null) },
+        { label: "Tutup", onPick: close },
       ],
     });
   }
@@ -1194,6 +1387,7 @@ export function JobFair() {
         hallSponsors={fair.fair.sponsors}
         follow={self ? { x: self.x, y: self.y } : null}
         onTileClick={session ? walkTo : undefined}
+        markedMemberIds={markedNow()}
         onAvatarClick={session ? (id) => (id === session.visitorId ? seatedAction() : talkToVisitor(id)) : undefined}
         onNpcClick={
           session
@@ -1311,6 +1505,10 @@ export function JobFair() {
         </div>
 
         {toast && <div className="toast rpg-box">{toast}</div>}
+        <PingCards items={pings} onClose={(id) => setPings((list) => list.filter((p) => p.id !== id))} />
+        {follow && !pings.length && (
+          <FollowBar name={follow.name} where={fair.visitors.get(follow.memberId) && floorLabel(fair.visitors.get(follow.memberId)!.floorId)} onStop={() => setFollow(null)} />
+        )}
 
         {session && announcement && announcement.at !== annSeen && (
           <div className="fair-ann rpg-box" role="status" onPointerDown={(e) => e.stopPropagation()}>

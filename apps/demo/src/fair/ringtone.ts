@@ -63,3 +63,14 @@ export function playTone(tone: Tone): () => void {
     if (tone === "incoming") document.title = title;
   };
 }
+
+/** A short two-note chime and a buzz, for a quick message from another job seeker. */
+export function playPing() {
+  const a = audio();
+  if (a) {
+    const t = a.currentTime + 0.03;
+    beep(a, t, [988], 0.12, 0.16);
+    beep(a, t + 0.13, [1319], 0.2, 0.16);
+  }
+  navigator.vibrate?.([120, 80, 120]);
+}

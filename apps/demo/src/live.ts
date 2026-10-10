@@ -73,6 +73,15 @@ export function parseWire(raw: string, knownFloor: (id: string) => boolean): (Re
   };
 }
 
+function readDirect(text: string): { from: string; t: string } | null {
+  try {
+    const m = JSON.parse(text) as { from?: unknown; t?: unknown };
+    return typeof m.from === "string" && typeof m.t === "string" && m.t.length < 400 ? { from: m.from, t: m.t } : null;
+  } catch {
+    return null;
+  }
+}
+
 function peerId() {
   try {
     const saved = sessionStorage.getItem("vwo:peer");
@@ -85,10 +94,19 @@ function peerId() {
   }
 }
 
+interface TransportEvents {
+  message: (id: string, text: string) => void;
+  status: (s: LiveStatus) => void;
+  /** A message meant for this peer only (a quick message from another job seeker). */
+  direct?: (from: string, text: string) => void;
+}
+
 /** Carries one peer's latest state (a JSON string, or "" when leaving) to everyone in the room. */
 export interface Transport {
-  connect(on: { message: (id: string, text: string) => void; status: (s: LiveStatus) => void }): Promise<void>;
+  connect(on: TransportEvents): Promise<void>;
   send(id: string, text: string): void;
+  /** Send `text` from peer `from` to peer `to` only. */
+  direct?(from: string, to: string, text: string): void;
   readonly connected: boolean;
   close(id: string): void;
 }
@@ -122,7 +140,7 @@ class MqttTransport implements Transport {
     return !!this.client?.connected;
   }
 
-  async connect(on: { message: (id: string, text: string) => void; status: (s: LiveStatus) => void }) {
+  async connect(on: TransportEvents) {
     // Loaded on demand: the MQTT client is as big as the rest of the demo.
     const { default: mqtt } = await import("mqtt");
     if (this.stopped) return;
@@ -139,9 +157,16 @@ class MqttTransport implements Transport {
     this.client = client;
     client.on("connect", () => {
       client.subscribe(`${TOPIC}/${this.room}/p/+`, { qos: 0 });
+      client.subscribe(`${TOPIC}/${this.room}/d/${this.selfId}`, { qos: 0 });
       on.status("online");
     });
-    client.on("message", (topic, payload) => on.message(topic.slice(topic.lastIndexOf("/") + 1), new TextDecoder().decode(payload)));
+    client.on("message", (topic, payload) => {
+      const text = new TextDecoder().decode(payload);
+      if (topic.startsWith(`${TOPIC}/${this.room}/d/`)) {
+        const m = readDirect(text);
+        if (m) on.direct?.(m.from, m.t);
+      } else on.message(topic.slice(topic.lastIndexOf("/") + 1), text);
+    });
     client.on("offline", () => on.status("offline"));
     client.on("error", () => {
       // Try the next public broker if this one refuses us.
@@ -155,6 +180,10 @@ class MqttTransport implements Transport {
 
   send(id: string, text: string) {
     this.client?.publish(this.topic(id), text, { qos: 0 });
+  }
+
+  direct(from: string, to: string, text: string) {
+    this.client?.publish(`${TOPIC}/${this.room}/d/${to}`, JSON.stringify({ from, t: text }), { qos: 0 });
   }
 
   close(id: string) {
@@ -171,19 +200,27 @@ class SupabaseTransport implements Transport {
   private channel: RealtimeChannel | null = null;
   private ready = false;
   private stopped = false;
-  constructor(private readonly room: string) {}
+  constructor(
+    private readonly room: string,
+    private readonly selfId: string,
+  ) {}
 
   get connected() {
     return this.ready;
   }
 
-  async connect(on: { message: (id: string, text: string) => void; status: (s: LiveStatus) => void }) {
+  async connect(on: TransportEvents) {
     const sb = await realtimeClient();
     if (this.stopped || !sb) return;
     const ch = sb.channel(`jobfair:${this.room}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "p" }, (m: { payload?: { id?: unknown; t?: unknown } }) => {
       const { id, t } = m.payload ?? {};
       if (typeof id === "string" && typeof t === "string" && t.length < 4000) on.message(id, t);
+    });
+    // Everyone in the room gets every direct message; each keeps only those addressed to it.
+    ch.on("broadcast", { event: "d" }, (m: { payload?: { to?: unknown; from?: unknown; t?: unknown } }) => {
+      const { to, from, t } = m.payload ?? {};
+      if (to === this.selfId && typeof from === "string" && typeof t === "string" && t.length < 400) on.direct?.(from, t);
     });
     ch.subscribe((status: string) => {
       this.ready = status === "SUBSCRIBED";
@@ -194,6 +231,10 @@ class SupabaseTransport implements Transport {
 
   send(id: string, text: string) {
     if (this.ready) void this.channel?.send({ type: "broadcast", event: "p", payload: { id, t: text } });
+  }
+
+  direct(from: string, to: string, text: string) {
+    if (this.ready) void this.channel?.send({ type: "broadcast", event: "d", payload: { from, to, t: text } });
   }
 
   close(id: string) {
@@ -208,7 +249,7 @@ class SupabaseTransport implements Transport {
 /** Picks the transport for this build: Supabase on the live trial, the public broker in the demo. */
 export function pickTransport(room: string, selfId: string): Transport | null {
   if (!LIVE) return new MqttTransport(room, selfId);
-  return hasRealtime() ? new SupabaseTransport(room) : null;
+  return hasRealtime() ? new SupabaseTransport(room, selfId) : null;
 }
 
 export class LiveChannel {
@@ -228,6 +269,8 @@ export class LiveChannel {
     private readonly knownFloor: (id: string) => boolean,
     private readonly onStatus: (s: LiveStatus, peers: number) => void,
     private readonly makeTransport: (room: string, selfId: string) => Transport | null = pickTransport,
+    /** A direct message from a peer we can see (anything from strangers is dropped). */
+    private readonly onDirect?: (from: string, data: unknown) => void,
   ) {}
 
   start() {
@@ -246,6 +289,14 @@ export class LiveChannel {
         this.setStatus(s);
       },
       message: (id, text) => this.receive(id, text),
+      direct: (from, text) => {
+        if (from === this.id || !SAFE.test(from) || !this.seen.has(from)) return;
+        try {
+          this.onDirect?.(from, JSON.parse(text));
+        } catch {
+          // Not JSON: ignore.
+        }
+      },
     });
     this.timer = setInterval(() => this.tick(), 1000);
   }
@@ -295,6 +346,14 @@ export class LiveChannel {
     this.last = text;
     this.lastAt = now;
     t.send(this.id, text);
+  }
+
+  /** Send a small JSON message to one peer. False when we are not connected or they are gone. */
+  sendTo(peer: string, data: unknown) {
+    const t = this.transport;
+    if (!t?.connected || !t.direct || !this.seen.has(peer)) return false;
+    t.direct(this.id, peer, JSON.stringify(data));
+    return true;
   }
 
   stop() {
