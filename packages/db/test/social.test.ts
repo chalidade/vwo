@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addFriend, createDb, friendsOf, leaderboard, register, removeFriend, sessionUser, createSession, submitScore } from "../src";
+import { addFriend, cleanupJunk, createDb, friendsOf, leaderboard, register, removeFriend, sessionUser, createSession, submitScore } from "../src";
 
 const url = process.env.TEST_DATABASE_URL ?? "postgres://vwo:vwo@localhost:5432/vwo_test";
 const { db, close } = createDb(url);
@@ -64,5 +64,20 @@ describe("friends", () => {
     expect(await addFriend(db, ani, "000000000000")).toBe("not_found");
     expect(await removeFriend(db, budi, ta)).toBe(true);
     expect(await friendsOf(db, ani)).toEqual([]);
+  });
+});
+
+describe("cleanup", () => {
+  it("deletes expired sessions, old feed events and stale friend requests, and keeps the rest", async () => {
+    await createSession(db, citra, "t");
+    await db.execute(sql`insert into sessions (token_hash, user_id, expires_at) values ('old-session', ${citra}, now() - interval '1 day')`);
+    await db.execute(sql`insert into fair_events (user_id, type, name, created_at) values (${citra}, 'visit', 'Citra', now() - interval '40 days'), (${citra}, 'visit', 'Citra', now())`);
+    await db.execute(sql`insert into friendships (requester_user_id, addressee_user_id, created_at) values (${citra}, ${ani}, now() - interval '45 days')`);
+    await db.execute(sql`insert into fair_scores (user_id, week, game, best, updated_at) values (${citra}, '2026-W20', 'catch', 10, now() - interval '90 days')`);
+    const gone = await cleanupJunk(db);
+    expect(gone).toMatchObject({ sessions: 1, events: 1, friendRequests: 1, scores: 1 });
+    const left = await db.execute<{ n: number }>(sql`select count(*)::int as n from fair_events`);
+    expect(left[0]!.n).toBe(1);
+    expect((await db.execute<{ n: number }>(sql`select count(*)::int as n from sessions where user_id = ${citra}`))[0]!.n).toBe(1);
   });
 });

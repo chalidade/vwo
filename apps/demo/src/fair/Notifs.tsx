@@ -8,13 +8,14 @@ const ago = (t: number) => {
   return new Date(t).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 };
 
-/** A list of notifications, newest first; unread ones are marked. */
-export function NotifList({ items, onPick, empty }: { items: FairNotif[]; onPick: (n: FairNotif) => void; empty: string }) {
+/** A list of notifications, newest first; unread ones are marked, and each can be deleted.
+ *  Notifications older than a week drop off by themselves. */
+export function NotifList({ items, onPick, onDelete, empty }: { items: FairNotif[]; onPick: (n: FairNotif) => void; onDelete?: (n: FairNotif) => void; empty: string }) {
   if (!items.length) return <p className="nt-empty">{empty}</p>;
   return (
     <ul className="nt-list">
       {items.map((n) => (
-        <li key={n.id}>
+        <li key={n.id} className="nt-row">
           <button type="button" className="nt-item" data-unread={n.read ? undefined : ""} onClick={() => onPick(n)}>
             <span className="nt-ico" data-kind={n.kind}>
               {NOTIF_ICON[n.kind]}
@@ -24,6 +25,11 @@ export function NotifList({ items, onPick, empty }: { items: FairNotif[]; onPick
               <span className="nt-time">{ago(n.at)}</span>
             </span>
           </button>
+          {onDelete && (
+            <button type="button" className="nt-del" onClick={() => onDelete(n)} aria-label="Hapus notifikasi" title="Hapus">
+              ✕
+            </button>
+          )}
         </li>
       ))}
     </ul>

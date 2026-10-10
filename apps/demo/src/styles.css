@@ -1457,3 +1457,9 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .sx-link[data-state="failed"], .sx-link[data-state="disconnected"] { background: #dc2626cc; }
 .sf-link { font-size: 11px; opacity: 0.8; }
 .st-links { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; max-height: 140px; overflow: auto; }
+.nt-row { position: relative; }
+.nt-row .nt-item { padding-right: 34px; }
+.nt-del { box-shadow: none !important; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 0; background: transparent; color: #a8a29e; font-size: 13px; cursor: pointer; }
+.nt-del:hover { background: #f5f5f4; color: #57534e; }
+.nt-foot { display: flex; gap: 8px; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; }
+.nt-foot small { color: #78716c; }

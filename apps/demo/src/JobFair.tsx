@@ -1956,15 +1956,26 @@ export function JobFair() {
             className="nt-modal"
             onClose={() => setNotifs(false)}
             foot={
-              fair.unreadFor(PLAYER_ID) > 0 ? (
-                <button type="button" className="small-btn ghost" onClick={() => fair.markRead(PLAYER_ID)}>
-                  Tandai semua dibaca
-                </button>
-              ) : undefined
+              <div className="nt-foot">
+                <small>Notifikasi terhapus otomatis setelah 7 hari.</small>
+                <span>
+                  {fair.unreadFor(PLAYER_ID) > 0 && (
+                    <button type="button" className="small-btn ghost" onClick={() => fair.markRead(PLAYER_ID)}>
+                      Tandai dibaca
+                    </button>
+                  )}
+                  {fair.notifsFor(PLAYER_ID).length > 0 && (
+                    <button type="button" className="small-btn ghost" onClick={() => fair.deleteNotif(PLAYER_ID)}>
+                      🗑️ Hapus semua
+                    </button>
+                  )}
+                </span>
+              </div>
             }
           >
             <NotifList
               items={fair.notifsFor(PLAYER_ID)}
+              onDelete={(n) => fair.deleteNotif(PLAYER_ID, n.id)}
               empty="Belum ada notifikasi. Status lamaran, balasan chat, panggilan, undangan interview, dan kunjungan kantor dari HR muncul di sini."
               onPick={(n) => {
                 fair.markRead(PLAYER_ID, n.id);
