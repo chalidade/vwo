@@ -35,6 +35,8 @@ export interface LiveSelf {
   say: string | null;
   /** Bought the blue check. A demo badge: on a public broker anyone could claim it. */
   verified?: boolean;
+  /** The account's public fair tag, so others can add them as a friend. */
+  tag?: string | null;
 }
 
 interface Wire extends LiveSelf {
@@ -44,6 +46,7 @@ interface Wire extends LiveSelf {
 
 const FACINGS = new Set<Facing>(["front", "back", "left", "right"]);
 const SAFE = /^[#\w-]{1,24}$/;
+const TAG = /^[0-9a-f]{12}$/;
 
 /** Accept only well-formed messages: anyone can publish on a public broker. */
 export function parseWire(raw: string, knownFloor: (id: string) => boolean): (RemotePlayer & { look: Look }) | null {
@@ -72,6 +75,7 @@ export function parseWire(raw: string, knownFloor: (id: string) => boolean): (Re
     seatId: typeof m.seatId === "string" && /^[\w-]{1,80}$/.test(m.seatId) ? m.seatId : null,
     say: typeof m.say === "string" ? m.say.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 60) : null,
     verified: m.verified === true,
+    tag: typeof m.tag === "string" && TAG.test(m.tag) ? m.tag : null,
     look: look as unknown as Look,
   };
 }

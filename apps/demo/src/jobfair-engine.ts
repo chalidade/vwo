@@ -87,6 +87,8 @@ export interface FairVisitor extends AvatarState {
   remote?: boolean;
   /** Shows the blue check by their name. */
   verified?: boolean;
+  /** A real person's public fair tag, for adding them as a friend. */
+  tag?: string | null;
 }
 
 /** What another device says about its player, already checked by the live channel. */
@@ -100,6 +102,7 @@ export interface RemotePlayer {
   seatId: string | null;
   say: string | null;
   verified?: boolean;
+  tag?: string | null;
 }
 
 /** A recruiter behind a booth desk, or the organisers' staff at the info desk. */
@@ -2371,7 +2374,7 @@ export class DemoJobFair {
       this.visitors.set(id, v);
       this.log({ type: "arrive", name: `${p.name} (online)` });
     }
-    Object.assign(v, { displayName: `🌐 ${p.name}`, floorId: floor.id, x: p.x, y: p.y, facing: p.facing, seatId, verified: !!p.verified });
+    Object.assign(v, { displayName: `🌐 ${p.name}`, floorId: floor.id, x: p.x, y: p.y, facing: p.facing, seatId, verified: !!p.verified, tag: p.tag ?? null });
     const bubble = this.bubbles.get(id);
     if (p.say && bubble?.text !== p.say) this.say(id, p.say, 3000);
     else this.emit();

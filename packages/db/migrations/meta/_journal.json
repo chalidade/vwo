@@ -134,6 +134,13 @@
       "when": 1791594533544,
       "tag": "0018_stats_events",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791616247769,
+      "tag": "0019_social",
+      "breakpoints": true
     }
   ]
 }
