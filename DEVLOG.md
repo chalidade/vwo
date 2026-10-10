@@ -4,6 +4,23 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · early access sebagai panitia
+
+**Konteks:** owner minta tab Early Access punya pilihan ketiga, yaitu mencoba aplikasi sebagai panitia.
+
+**Yang berubah:**
+- Pilihan "Panitia" ditambahkan di tab 🧪 Early access (migrasi 0014 mengubah check constraint `early_access.role`).
+- Saat masuk lewat `/masuk-panitia`, akun panitia early access diperlakukan sebagai admin acara, sama seperti `ADMIN_EMAILS`. `currentUser()` menandai akun itu dengan `earlyOrganizer`, dan `isFairAdmin` mengakuinya.
+- Hanya admin utama (ADMIN_EMAILS atau super admin) yang bisa menambah, mengubah, atau mencabut panitia. Panitia early access tidak bisa mengangkat panitia lain.
+- Email undangan panitia mengarah ke `/masuk-panitia`.
+
+**Dicek:**
+- Di lokal, tester panitia mendapat `fairAdmin: true`, bisa membuka halaman panitia dan daftar pendaftaran, serta bisa menambah tester pelamar.
+- Tester panitia ditolak (403) saat mencoba menambah panitia lain atau mencabut dirinya sendiri.
+- Setelah admin utama mencabutnya, aksesnya hilang.
+
+---
+
 ## 2026-10-09 · kembali ke posisi terakhir di job fair
 
 **Konteks:** pembayaran Xendit sudah berhasil, tapi setelah redirect owner selalu kembali ke layar sambutan dan mulai lagi dari lantai pertama.

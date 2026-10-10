@@ -1,0 +1,2 @@
+ALTER TABLE "early_access" DROP CONSTRAINT "early_access_role_ck";--> statement-breakpoint
+ALTER TABLE "early_access" ADD CONSTRAINT "early_access_role_ck" CHECK ("early_access"."role" in ('seeker','company','organizer'));

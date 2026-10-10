@@ -4,7 +4,7 @@ import type { Db } from "./client";
 import { earlyAccess, fairBoothMembers } from "./jobfair-schema";
 import { users } from "./schema";
 
-export type EarlyRole = "seeker" | "company";
+export type EarlyRole = "seeker" | "company" | "organizer";
 
 const norm = (email: string) => email.trim().toLowerCase();
 

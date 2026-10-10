@@ -1,15 +1,21 @@
 import "server-only";
-import { SESSION_DAYS, sessionUser } from "@vwo/db";
+import { earlyAccessFor, SESSION_DAYS, sessionUser } from "@vwo/db";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { db } from "./db";
 
 export const SESSION_COOKIE = "vwo_session";
 
-/** The signed-in user for this request, or null. */
+/**
+ * The signed-in user for this request, or null. `earlyOrganizer` marks an early-access tester the
+ * organiser let in as panitia: they run the event like an admin.
+ */
 export async function currentUser() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  return sessionUser(db, token);
+  const user = await sessionUser(db, token);
+  if (!user) return null;
+  const early = await earlyAccessFor(db, user.email);
+  return { ...user, earlyOrganizer: early?.role === "organizer" };
 }
 
 export function setSessionCookie(res: NextResponse, token: string, expiresAt: Date) {
