@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type CompanyBooth, type FairFloorInfo, safeImage } from "@vwo/shared";
+import { type CompanyBooth, type FairFloorInfo, messageTime, safeImage } from "@vwo/shared";
 import { BoothLogo, type Look, Person } from "@vwo/ui";
 import { SEEKER_TITLES, levelOf } from "./fair/content";
 import { fair } from "./useFair";
@@ -70,6 +70,14 @@ export function SeekerPanel({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<SeekerTab>(startTab);
+  /** Applications opened to show their details and chat; the rest stay folded to one line. */
+  const [openApps, setOpenApps] = useState<Set<string>>(() => new Set());
+  const toggleApp = (id: string) =>
+    setOpenApps((was) => {
+      const next = new Set(was);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   const [form, setForm] = useState(profile);
   const [saved, setSaved] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -264,8 +272,10 @@ export function SeekerPanel({
                 <ul className="sp-list">
                   {applications.map((a) => {
                     const b = boothOf(a.boothId);
+                    const open = openApps.has(a.id);
+                    const last = a.messages?.[a.messages.length - 1];
                     return (
-                      <li key={a.id} style={{ ["--c" as string]: b?.color ?? "#64748b" }}>
+                      <li key={a.id} style={{ ["--c" as string]: b?.color ?? "#64748b" }} data-folded={open ? undefined : ""}>
                         <span className="sp-logo">{b?.logo}</span>
                         <span className="sp-main">
                           <b>{a.jobTitle}</b>
@@ -277,6 +287,12 @@ export function SeekerPanel({
                         <span className="status" data-status={a.status}>
                           {a.status}
                         </span>
+                        <button type="button" className="sp-fold" onClick={() => toggleApp(a.id)} aria-expanded={open}>
+                          {open ? "▴ Ciutkan" : `▾ Detail${a.messages?.length ? ` & chat (${a.messages.length})` : ""}`}
+                          {!open && last?.from === "company" && <span className="sp-fold-new">pesan baru dari HR</span>}
+                        </button>
+                        {open && (
+                          <>
                         {a.rating ? (
                           <span className="sp-rating">
                             <Stars value={a.rating} /> {a.feedback}
@@ -313,6 +329,8 @@ export function SeekerPanel({
                             Perusahaan
                           </button>
                         </span>
+                          </>
+                        )}
                       </li>
                     );
                   })}
@@ -366,6 +384,7 @@ function Chat({ app, onReply }: { app: FairApplication; onReply: (applicationId:
       {app.messages!.map((m, i) => (
         <div key={i} className="sp-bubble" data-me={m.from === "seeker" ? "" : undefined}>
           {m.text}
+          <time>{m.from === "seeker" ? "Kamu" : app.company} · {when(messageTime(m))}</time>
         </div>
       ))}
       <form

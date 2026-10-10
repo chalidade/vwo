@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { type Look, Person } from "@vwo/ui";
 import { BOT_CALL_LINES } from "./company";
 import { type CallKind, type RingSignal, connectPeer, getMedia, onSignal, sendSignal, stopMedia } from "./call";
+import { playTone } from "./ringtone";
 
 export type CallResult = { answered: boolean; seconds: number; result: "ended" | "declined" | "missed" };
 
@@ -139,6 +140,12 @@ export function CallScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // Ring while a call comes in; the caller hears the ringback tone (not for the demo's bots).
+  useEffect(() => {
+    if (phase === "incoming") return playTone("incoming");
+    if (phase === "ringing" && !bot) return playTone("ringback");
+  }, [phase, bot]);
 
   // Nobody picks up: give up after a while. A bot picks up after a couple of rings.
   useEffect(() => {

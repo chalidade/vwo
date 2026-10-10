@@ -38,7 +38,7 @@ export type FairApplicationInput = z.infer<typeof fairApplicationSchema>;
 
 /** Filled in below; declared here so the response type can carry the conversation. */
 interface ApplicationSharedFields {
-  messages?: { at: number; from: "company" | "seeker"; text: string }[];
+  messages?: { at: number; from: "company" | "seeker"; text: string; rt?: number }[];
   interview?: { at: number; mode: string; place?: string; note?: string; reply?: "hadir" | "jadwal-ulang"; repliedAt?: number; sentAt?: number };
   visit?: { at: number; address: string; note?: string; reply?: "hadir" | "jadwal-ulang"; repliedAt?: number; sentAt?: number };
   rating?: number;
@@ -67,7 +67,13 @@ export interface FairApplicationOut extends FairApplicationInput, ApplicationSha
 }
 
 // --- The conversation on one application, which the company and the applicant both add to.
-const message = z.object({ at: z.number().int().nonnegative(), from: z.enum(["company", "seeker"]), text: z.string().trim().min(1).max(600) });
+const message = z.object({
+  at: z.number().int().nonnegative(),
+  from: z.enum(["company", "seeker"]),
+  text: z.string().trim().min(1).max(600),
+  /** When the server received it; set by the server, so the order never depends on a device's clock. */
+  rt: z.number().int().nonnegative().optional(),
+});
 const interview = z.object({
   at: z.number().int().nonnegative(),
   mode: z.string().trim().max(60),
@@ -105,6 +111,9 @@ export const applicationSharedPutSchema = z.object({ as: z.enum(["company", "see
 
 const msgKey = (m: { at: number; from: string; text: string }) => `${m.at}|${m.from}|${m.text}`;
 
+/** When a chat message was sent: the server's time once it has it, else the device's. */
+export const messageTime = (m: { at: number; rt?: number }) => m.rt ?? m.at;
+
 /**
  * Fold one side's copy into the stored conversation. Each side only adds its own part: the company
  * its messages, the interview and office visit invitations, the rating and call log; the applicant its
@@ -113,8 +122,9 @@ const msgKey = (m: { at: number; from: string; text: string }) => `${m.at}|${m.f
 export function mergeShared(stored: ApplicationShared, incoming: ApplicationShared, as: "company" | "seeker", now = Date.now()): ApplicationShared {
   const out: ApplicationShared = { ...stored };
   const seen = new Set((stored.messages ?? []).map(msgKey));
-  const added = (incoming.messages ?? []).filter((m) => m.from === as && !seen.has(msgKey(m)));
-  if (added.length) out.messages = [...(stored.messages ?? []), ...added].sort((a, b) => a.at - b.at).slice(-300);
+  // New messages are stamped with the server's time and go after everything already stored.
+  const added = (incoming.messages ?? []).filter((m) => m.from === as && !seen.has(msgKey(m))).map((m, i) => ({ at: m.at, from: m.from, text: m.text, rt: now + i }));
+  if (added.length) out.messages = [...(stored.messages ?? []), ...added].slice(-300);
   if (as === "company") {
     if (incoming.interview) out.interview = invitation(stored.interview, incoming.interview);
     if (incoming.visit) out.visit = invitation(stored.visit, incoming.visit);

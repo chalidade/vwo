@@ -176,10 +176,16 @@ describe("live game applications", () => {
     ).toBe(true);
     const [after] = await myFairApplications(db, seeker);
     const shared = after!.shared as Record<string, unknown>;
+    // Stamped with the server's time, in the order the server received them.
     expect(shared.messages).toEqual([
-      { at: 1, from: "company", text: "Halo Sari" },
-      { at: 2, from: "seeker", text: "Siap" },
+      { at: 1, from: "company", text: "Halo Sari", rt: expect.any(Number) },
+      { at: 2, from: "seeker", text: "Siap", rt: expect.any(Number) },
     ]);
+    // A device with a clock running ahead doesn't jump its old message after newer ones.
+    await updateFairApplicationShared(db, { id, as: "company", userId: "00000000-0000-0000-0000-000000000000", incoming: { messages: [{ at: 9_999_999_999_999, from: "company", text: "jam salah" }] } });
+    await updateFairApplicationShared(db, { id, as: "seeker", userId: seeker, incoming: { messages: [{ at: 3, from: "seeker", text: "balasan" }] } });
+    const [ordered] = await myFairApplications(db, seeker);
+    expect(((ordered!.shared as Record<string, unknown>).messages as { text: string }[]).map((m) => m.text)).toEqual(["Halo Sari", "Siap", "jam salah", "balasan"]);
     expect(shared.interview).toEqual({ ...invite, reply: "hadir", repliedAt: expect.any(Number) });
     expect(shared.rating).toBe(4);
     expect(shared.statusAt).toEqual(expect.any(Number));

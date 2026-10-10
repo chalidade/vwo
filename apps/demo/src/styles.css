@@ -713,6 +713,10 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .sp-chat { grid-column: 1 / -1; display: grid; gap: 4px; padding: 6px; border-radius: 8px; background: #f5ede3; }
 .sp-bubble { justify-self: start; max-width: 88%; padding: 4px 8px; border-radius: 10px 10px 10px 2px; background: #fff; font-size: 12px; color: var(--text); }
 .sp-bubble[data-me] { justify-self: end; border-radius: 10px 10px 2px 10px; background: #fed7aa; }
+.sp-bubble time { display: block; margin-top: 2px; font-size: 10px; color: var(--muted, #8a7768); }
+.sp-bubble[data-me] time { text-align: right; }
+.sp-fold { grid-column: 1 / -1; justify-self: start; display: inline-flex; gap: 8px; align-items: center; padding: 3px 10px; font-size: 12px; font-weight: 700; background: #fff; color: var(--text); border-width: 2px; box-shadow: none; }
+.sp-fold-new { padding: 1px 6px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 11px; }
 .sp-reply { display: flex; gap: 4px; }
 .sp-reply input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; border-width: 2px; }
 .sp-reply button { padding: 2px 10px; font-size: 12px; border-width: 2px; }
