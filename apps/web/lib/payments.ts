@@ -1,5 +1,5 @@
 import "server-only";
-import { attachCheckout, createPayment, markClosed, markPaid, openPayment, type Payment, type PaymentKind, payRegistration, paymentById } from "@vwo/db";
+import { attachCheckout, createPayment, grantCoins, markClosed, markPaid, openPayment, type Payment, type PaymentKind, payRegistration, paymentById } from "@vwo/db";
 import { db } from "./db";
 import { settleInvoice } from "./company-doc";
 import { createXenditInvoice, getXenditInvoice, methodName, xenditEnabled } from "./xendit";
@@ -43,8 +43,10 @@ export async function startPayment(req: Request, user: { id: string; email: stri
   return { ...row, providerId: inv.id, checkoutUrl: inv.invoice_url };
 }
 
-/** What a confirmed payment unlocks on the server. Coins are added by the game when it claims them. */
+/** What a confirmed payment unlocks on the server: coins go into the ledger, a registration is paid, a bill is settled. */
 async function fulfil(p: Payment) {
+  const coins = (p.meta as { coins?: unknown }).coins;
+  if (p.kind === "coins" && typeof coins === "number" && coins > 0) await grantCoins(db, { userId: p.userId, amount: coins, reason: p.description, key: `pay:${p.id}` });
   if (p.kind === "registration") await payRegistration(db, p.ref, p.userId, p.method ?? "Xendit");
   if (p.kind === "invoice") await settleInvoice(p, p.userId);
 }

@@ -7,6 +7,7 @@ import { fail, readBody, sameOrigin } from "@/lib/http";
 import { mailEnabled } from "@/lib/mail";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
+import { liveCoins } from "@/lib/coins";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export async function POST(req: Request) {
   if ("error" in body) return body.error;
   const { boothId, jobId, ...rest } = body.data;
   try {
-    const row = await submitFairApplication(db, { userId: user.id, boothKey: boothId, jobKey: jobId, data: { boothId, jobId, ...rest } });
+    // The blue check companies see comes from the coin ledger, not from what the browser says.
+    const { verified } = await liveCoins(user.id);
+    const row = await submitFairApplication(db, { userId: user.id, boothKey: boothId, jobKey: jobId, data: { boothId, jobId, ...rest, verified } });
     return NextResponse.json({ application: applicationOut(row) }, { status: 201 });
   } catch (e) {
     if (e instanceof AlreadyAppliedError) return fail(409, "already_applied");
