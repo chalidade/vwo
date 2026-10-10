@@ -4,7 +4,7 @@
 // own Socket.IO server once the event moves to DigitalOcean. Only a nickname, the character's
 // look, where they stand and a short speech bubble are ever sent, and every message is checked.
 import type { MqttClient } from "mqtt";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { LIVE } from "./mode";
 import { hasRealtime, realtimeClient } from "./realtime";
 import type { Facing } from "@vwo/shared";
@@ -16,6 +16,9 @@ const TOPIC = "vwo-demo/v1";
 /** Peers that go quiet for this long have closed the tab or lost their connection. */
 const STALE_MS = 12_000;
 const HEARTBEAT_MS = 4_000;
+/** The whole-fair lobby hears from each peer this often (and on every floor change). */
+const LOBBY_HEARTBEAT_MS = 25_000;
+const LOBBY_STALE_MS = 70_000;
 /** Supabase counts every message, so the live trial sends position updates less often. */
 const MIN_GAP_MS = LIVE ? 250 : 120;
 
@@ -198,6 +201,7 @@ class MqttTransport implements Transport {
 /** The live trial's transport: a Supabase Realtime broadcast channel per room. */
 class SupabaseTransport implements Transport {
   private channel: RealtimeChannel | null = null;
+  private sb: SupabaseClient | null = null;
   private ready = false;
   private stopped = false;
   constructor(
@@ -212,6 +216,7 @@ class SupabaseTransport implements Transport {
   async connect(on: TransportEvents) {
     const sb = await realtimeClient();
     if (this.stopped || !sb) return;
+    this.sb = sb;
     const ch = sb.channel(`jobfair:${this.room}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "p" }, (m: { payload?: { id?: unknown; t?: unknown } }) => {
       const { id, t } = m.payload ?? {};
@@ -241,7 +246,8 @@ class SupabaseTransport implements Transport {
     this.stopped = true;
     this.send(id, "");
     this.ready = false;
-    void this.channel?.unsubscribe();
+    // Removed, not just left: walking back onto this floor later joins the same topic afresh.
+    if (this.channel) void this.sb?.removeChannel(this.channel);
     this.channel = null;
   }
 }
@@ -252,13 +258,30 @@ export function pickTransport(room: string, selfId: string): Transport | null {
   return hasRealtime() ? new SupabaseTransport(room, selfId) : null;
 }
 
+/**
+ * The fair's presence, in two lanes so a busy event doesn't send every step to everyone:
+ * - the lobby (the whole fair): who is here and on which floor, a slow heartbeat, a message on
+ *   every floor change, and the quick messages between job seekers;
+ * - the floor the player is on: every step, speech bubble and seat, to the people on that floor only.
+ * Realtime services bill each message once per receiver, so this keeps the cost close to
+ * "people per floor" instead of "everyone at the fair".
+ */
 export class LiveChannel {
   readonly id = peerId();
   status: LiveStatus = "connecting";
-  private transport: Transport | null = null;
+  private lobby: Transport | null = null;
+  private lane: Transport | null = null;
+  private laneFloor: string | null = null;
+  /** When we joined the current floor lane: peers there get a moment to say hello. */
+  private laneSince = 0;
+  /** Last time we heard from each peer on any lane, and on our floor lane. */
   private seen = new Map<string, number>();
+  private seenOnFloor = new Map<string, number>();
+  private peerFloor = new Map<string, { floorId: string; since: number }>();
   private last = "";
   private lastAt = 0;
+  private lobbyFloor: string | null = null;
+  private lobbyAt = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -274,21 +297,20 @@ export class LiveChannel {
   ) {}
 
   start() {
-    this.transport = this.makeTransport(this.room, this.id);
-    if (!this.transport) {
+    this.lobby = this.makeTransport(this.room, this.id);
+    if (!this.lobby) {
       this.setStatus("offline");
       return;
     }
-    void this.transport.connect({
+    void this.lobby.connect({
       status: (s) => {
         if (s === "online" && this.status !== "online") {
-          this.last = "";
           this.status = s;
-          this.publish(true);
+          this.publishLobby();
         }
         this.setStatus(s);
       },
-      message: (id, text) => this.receive(id, text),
+      message: (id, text) => this.receive(id, text, false),
       direct: (from, text) => {
         if (from === this.id || !SAFE.test(from) || !this.seen.has(from)) return;
         try {
@@ -299,21 +321,50 @@ export class LiveChannel {
       },
     });
     this.timer = setInterval(() => this.tick(), 1000);
+    this.tick();
   }
 
-  private receive(id: string, text: string) {
+  /** Join the lane of the floor we are on, leaving the old one. */
+  private joinFloor(floorId: string) {
+    if (this.laneFloor === floorId) return;
+    this.lane?.close(this.id);
+    this.laneFloor = floorId;
+    this.laneSince = Date.now();
+    this.seenOnFloor.clear();
+    const lane = this.makeTransport(`${this.room}~${floorId}`, this.id);
+    this.lane = lane;
+    if (!lane) return;
+    void lane.connect({
+      status: (s) => {
+        if (s === "online" && lane === this.lane) {
+          this.last = "";
+          this.publish(true);
+        }
+      },
+      message: (id, text) => lane === this.lane && this.receive(id, text, true),
+    });
+  }
+
+  private receive(id: string, text: string, onFloor: boolean) {
     if (id === this.id || !SAFE.test(id)) return;
     if (!text) {
-      this.drop(id);
+      // Leaving a floor lane only means they went to another floor; the lobby says when they leave.
+      if (onFloor) this.seenOnFloor.delete(id);
+      else this.drop(id);
       return;
     }
     const p = parseWire(text, this.knownFloor);
     if (!p || p.id !== id) return;
+    const now = Date.now();
     const isNew = !this.seen.has(id);
-    this.seen.set(id, Date.now());
+    const newOnFloor = onFloor && !this.seenOnFloor.has(id);
+    this.seen.set(id, now);
+    if (onFloor) this.seenOnFloor.set(id, now);
+    if (this.peerFloor.get(id)?.floorId !== p.floorId) this.peerFloor.set(id, { floorId: p.floorId, since: now });
     this.onPeer(p);
     // Say hello back so the newcomer sees us without waiting for our next heartbeat.
-    if (isNew) this.publish(true);
+    if (newOnFloor) this.publish(true);
+    else if (isNew && !onFloor) this.publishLobby();
     this.setStatus("online");
   }
 
@@ -323,6 +374,8 @@ export class LiveChannel {
   }
 
   private drop(id: string) {
+    this.seenOnFloor.delete(id);
+    this.peerFloor.delete(id);
     if (!this.seen.delete(id)) return;
     this.onGone(id);
     this.onStatus(this.status, this.seen.size);
@@ -330,18 +383,46 @@ export class LiveChannel {
 
   private tick() {
     const now = Date.now();
-    for (const [id, at] of this.seen) if (now - at > STALE_MS) this.drop(id);
+    const me = this.self();
+    if (me && this.lobby) this.joinFloor(me.floorId);
+    for (const [id, at] of this.seen) {
+      // Someone on our floor heartbeats there often; someone elsewhere only in the lobby.
+      const pf = this.peerFloor.get(id);
+      const here = pf?.floorId === this.laneFloor;
+      const floorAt = Math.max(this.seenOnFloor.get(id) ?? 0, this.laneSince, pf?.since ?? 0);
+      if (now - at > LOBBY_STALE_MS || (here && now - floorAt > STALE_MS)) this.drop(id);
+    }
     if (now - this.lastAt > HEARTBEAT_MS) this.publish(true);
+    if (me && (me.floorId !== this.lobbyFloor || now - this.lobbyAt > LOBBY_HEARTBEAT_MS)) this.publishLobby();
   }
 
-  /** Send our player's state; cheap to call every frame, it only sends on change. */
-  publish(force = false) {
-    const t = this.transport;
+  private wire(me: LiveSelf) {
+    const wire: Wire = { v: 1, id: this.id, ...me, x: Math.round(me.x * 100) / 100, y: Math.round(me.y * 100) / 100 };
+    return JSON.stringify(wire);
+  }
+
+  /** Tell the whole fair we are here and on which floor. */
+  private publishLobby() {
+    const t = this.lobby;
     const me = this.self();
     if (!t?.connected || !me) return;
+    this.lobbyFloor = me.floorId;
+    this.lobbyAt = Date.now();
+    t.send(this.id, this.wire({ ...me, say: null }));
+  }
+
+  /** Send our player's state to our floor; cheap to call every frame, it only sends on change. */
+  publish(force = false) {
+    const me = this.self();
+    if (!me) return;
+    if (me.floorId !== this.laneFloor && this.lobby) {
+      this.joinFloor(me.floorId);
+      this.publishLobby();
+    }
+    const t = this.lane;
+    if (!t?.connected) return;
     const now = Date.now();
-    const wire: Wire = { v: 1, id: this.id, ...me, x: Math.round(me.x * 100) / 100, y: Math.round(me.y * 100) / 100 };
-    const text = JSON.stringify(wire);
+    const text = this.wire(me);
     if (!force && (text === this.last || now - this.lastAt < MIN_GAP_MS)) return;
     this.last = text;
     this.lastAt = now;
@@ -350,7 +431,7 @@ export class LiveChannel {
 
   /** Send a small JSON message to one peer. False when we are not connected or they are gone. */
   sendTo(peer: string, data: unknown) {
-    const t = this.transport;
+    const t = this.lobby;
     if (!t?.connected || !t.direct || !this.seen.has(peer)) return false;
     t.direct(this.id, peer, JSON.stringify(data));
     return true;
@@ -358,8 +439,11 @@ export class LiveChannel {
 
   stop() {
     if (this.timer) clearInterval(this.timer);
-    this.transport?.close(this.id);
-    this.transport = null;
+    this.lane?.close(this.id);
+    this.lobby?.close(this.id);
+    this.lane = null;
+    this.lobby = null;
+    this.laneFloor = null;
     for (const id of [...this.seen.keys()]) this.drop(id);
   }
 }
