@@ -185,6 +185,8 @@ export interface AppMessage {
   at: number;
   from: "company" | "seeker";
   text: string;
+  /** Live: when the server received it. */
+  rt?: number;
 }
 
 export interface CallLog {
@@ -1588,7 +1590,8 @@ export class DemoJobFair {
   private takeShared(a: FairApplication, s: FairApplicationOut) {
     const key = (m: AppMessage) => `${m.at}|${m.from}|${m.text}`;
     const seen = new Set((s.messages ?? []).map(key));
-    a.messages = [...(s.messages ?? []), ...(a.messages ?? []).filter((m) => !seen.has(key(m)))].sort((x, y) => x.at - y.at);
+    // The server's copy is in the order it received them; ours not sent yet come after.
+    a.messages = [...(s.messages ?? []), ...(a.messages ?? []).filter((m) => !seen.has(key(m))).sort((x, y) => x.at - y.at)];
     if (s.interview) a.interview = s.interview;
     if (s.visit) a.visit = s.visit;
     if (s.rating !== undefined) a.rating = s.rating;

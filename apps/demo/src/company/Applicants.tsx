@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type CompanyBooth, safeImage, safeUrl } from "@vwo/shared";
+import { type CompanyBooth, messageTime, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
 import { CrashGuard } from "../crash";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
@@ -381,7 +381,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         {(a.messages ?? []).map((m, i) => (
           <div key={i} className="cp-bubble" data-me={m.from === "company" ? "" : undefined}>
             {m.text}
-            <span>{when(m.at)}</span>
+            <span>{when(messageTime(m))}</span>
           </div>
         ))}
         <div ref={chatEnd} />
