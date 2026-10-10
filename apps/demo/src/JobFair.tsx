@@ -199,7 +199,8 @@ export function JobFair() {
       // Private mode: it shows again next visit.
     }
   };
-  const [wallet, setWallet] = useState(false);
+  /** The wallet is open; "desk" when the info desk opened it, where coins can be bought too. */
+  const [wallet, setWallet] = useState<boolean | "desk">(false);
   const [stall, setStall] = useState<string | null>(null);
   const [psych, setPsych] = useState(false);
   const [seminar, setSeminar] = useState(false);
@@ -875,7 +876,7 @@ export function JobFair() {
             },
           };
         }),
-        { label: "🪙 Stand Koin", hint: "beli koin", onPick: () => { setTalk(null); goToCoinStand(); } },
+        { label: "🪙 Beli koin di sini", hint: "tanpa ke Stand Koin", onPick: () => { setTalk(null); setWallet("desk"); } },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     };
@@ -1506,7 +1507,7 @@ export function JobFair() {
           <WalletPanel
             player={me}
             stand={fair.fair.coinStand}
-            atStand={reach?.kind === "coins"}
+            atStand={wallet === "desk" || reach?.kind === "coins" || reach?.kind === "info"}
             canClaim={fair.canClaimDaily()}
             live={LIVE}
             onBuy={async (id, method) => {
@@ -1526,6 +1527,10 @@ export function JobFair() {
             onGoToStand={() => {
               setWallet(false);
               goToCoinStand();
+            }}
+            onGoToDesk={() => {
+              setWallet(false);
+              goTo(floor.id, desk.x + desk.width / 2, desk.y + desk.height + 0.6, () => setWallet("desk"));
             }}
             onClose={() => setWallet(false)}
           />

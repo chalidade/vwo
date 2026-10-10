@@ -309,8 +309,9 @@ export interface Consultant {
 /** Paid calls in the consultation lounge: how long a call may last and what starting it costs.
  *  A consultant costs more than a call between two job seekers. */
 export const LOUNGE_PLANS = [
+  { minutes: 2, coins: 3, consultCoins: 5 },
+  { minutes: 5, coins: 6, consultCoins: 10 },
   { minutes: 10, coins: 10, consultCoins: 20 },
-  { minutes: 15, coins: 14, consultCoins: 28 },
 ] as const;
 
 /** A food court stall: a real cafe or restaurant promoting its outlet and selling vouchers for it. */

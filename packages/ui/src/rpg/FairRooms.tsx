@@ -1,7 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
+import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, price, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
 import { useEffect, useRef } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -758,12 +758,7 @@ export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void
           <ul>
             {LOUNGE_PLANS.map((p) => (
               <li key={p.minutes}>
-                <i>{p.minutes} mnt</i> konsultan {p.consultCoins}🪙
-              </li>
-            ))}
-            {LOUNGE_PLANS.map((p) => (
-              <li key={`p${p.minutes}`}>
-                <i>{p.minutes} mnt</i> sesama {p.coins}🪙
+                <i>{p.minutes} mnt</i> konsultan {price(`consult.${p.minutes}`)}🪙 · sesama {price(`call.${p.minutes}`)}🪙
               </li>
             ))}
             <li>Panggilan berhenti otomatis saat waktu habis</li>

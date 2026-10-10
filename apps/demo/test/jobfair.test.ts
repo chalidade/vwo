@@ -776,10 +776,10 @@ describe("DemoJobFair", () => {
     expect(fair.player.coins).toBe(before - plan.consultCoins);
     expect(fair.startLoungeCall("peer", plan.minutes, "Rina")).toBe(true);
     expect(fair.player.coins).toBe(before - plan.consultCoins - plan.coins);
-    expect(fair.player.txns[0]?.reason).toBe("Telepon 10 menit dengan Rina");
+    expect(fair.player.txns[0]?.reason).toBe(`Telepon ${plan.minutes} menit dengan Rina`);
     expect(fair.startLoungeCall("peer", 99, "Rina")).toBe(false);
     fair.player.coins = 3;
-    expect(fair.startLoungeCall("consult", 15, "Bu Rina")).toBe(false);
+    expect(fair.startLoungeCall("consult", 10, "Bu Rina")).toBe(false);
     expect(fair.player.coins).toBe(3);
   });
 
@@ -863,7 +863,7 @@ describe("organiser price list", () => {
     fair.applyPrices({ "coin.apply": 9, "call.10": 12, "pack.koin-50": 15_000, "product.vip": 3_000_000, "product.tv": 0, "stand.premium": 20_000_000 });
     expect(price("coin.apply")).toBe(9);
     expect(price("coin.verify")).toBe(60);
-    expect(loungePlans()[0]).toEqual({ minutes: 10, coins: 12, consultCoins: 20 });
+    expect(loungePlans().find((p) => p.minutes === 10)).toEqual({ minutes: 10, coins: 12, consultCoins: 20 });
     expect(fair.fair.coinStand.packages[0]!.price).toBe("Rp15.000");
     expect(VIP_PRODUCT.price).toBe(3_000_000);
     expect(ACCESSORY_PRODUCTS.find((p) => p.id === "tv")!.price).toBe(0);
