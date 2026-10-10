@@ -42,7 +42,7 @@ export function OrgSeminars({ onToast }: { onToast: (t: string) => void }) {
               <span className="cp-job-main">
                 <b>{s.title}</b>
                 <span className="muted small">
-                  {s.speaker}, {s.role} · {s.slides.length} slide {fair.player.seminars.includes(s.id) && "· ✓ kamu sudah ikut"}
+                  {s.speaker}, {s.role} · {s.slides.length} slide · {fair.seminarCounts.get(s.id) ?? 0} peserta {fair.player.seminars.includes(s.id) && "· ✓ kamu sudah ikut"}
                 </span>
               </span>
               <span className="cp-job-tools">

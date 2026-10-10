@@ -127,6 +127,13 @@
       "when": 1791594150979,
       "tag": "0017_booth_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791594533544,
+      "tag": "0018_stats_events",
+      "breakpoints": true
     }
   ]
 }

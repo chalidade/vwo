@@ -346,6 +346,40 @@ export const fairReviews = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.boothKey] }), index("fair_reviews_booth_idx").on(t.boothKey), check("fair_reviews_stars_ck", sql`${t.stars} between 1 and 5`)],
 );
 
+/**
+ * Reach counters for the live game, per account and day so one account can't inflate them: booth
+ * visits (`visit:<booth>`), sponsor banners (`sponsor:<id>`), booth decorations (`acc:<booth>:<acc>`),
+ * promoters (`promo:<id>`), food court stalls (`stall:<id>`) and seminars (`seminar:<id>`).
+ */
+export const fairStats = pgTable(
+  "fair_stats",
+  {
+    key: text("key").notNull(),
+    what: text("what").notNull(),
+    userId: userRef("user_id"),
+    day: text("day").notNull(),
+    n: integer("n").notNull().default(0),
+    coins: integer("coins").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.what, t.userId, t.day] }), check("fair_stats_what_ck", sql`${t.what} in ('view', 'click', 'sold')`)],
+);
+
+/** What happened at the live fair, newest first, for the organiser's live feed. */
+export const fairEvents = pgTable(
+  "fair_events",
+  {
+    id: id(),
+    userId: userRef("user_id"),
+    type: text("type").notNull(),
+    name: text("name").notNull(),
+    company: text("company"),
+    jobTitle: text("job_title"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("fair_events_created_idx").on(t.createdAt)],
+);
+
 /** The organiser's price list: one row per price they changed (keys from @vwo/shared PRICE_CATALOG).
  *  Coins for job seekers, rupiah for companies. A key without a row costs its default. */
 export const fairPrices = pgTable(

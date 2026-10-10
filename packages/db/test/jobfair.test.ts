@@ -47,6 +47,11 @@ import {
   updateFairApplicationShared,
   setFairApplicationNotes,
   reviewBooth,
+  addStats,
+  statTotals,
+  claimMerch,
+  addEvents,
+  recentEvents,
   reviewTotals,
   myReviews,
   writeFairPlayer,
@@ -195,6 +200,27 @@ describe("live booth reviews", () => {
     expect(await reviewTotals(db)).toEqual({ "toko-kita": { count: 1, sum: 5 } });
     expect(await myReviews(db, seeker)).toEqual({ "toko-kita": 5 });
     await expect(reviewBooth(db, { userId: seeker, boothKey: "toko-kita", stars: 9 })).rejects.toThrow();
+  });
+});
+
+describe("live counters", () => {
+  it("caps what one account adds per day, and hands out merchandise once each while stock lasts", async () => {
+    for (let i = 0; i < 40; i++) await addStats(db, seeker, "2026-10-10", [{ key: "visit:toko-kita", what: "view" }]);
+    await addStats(db, seeker, "2026-10-10", [{ key: "stall:bakso", what: "sold", coins: 8 }, { key: "stall:bakso", what: "click" }]);
+    const t = await statTotals(db);
+    expect(t["visit:toko-kita"]).toEqual({ views: 30, clicks: 0, sold: 0, coins: 0 });
+    expect(t["stall:bakso"]).toEqual({ views: 0, clicks: 1, sold: 1, coins: 8 });
+    expect(Object.keys(await statTotals(db, ["stall:"]))).toEqual(["stall:bakso"]);
+    expect(await claimMerch(db, { userId: seeker, boothKey: "toko-kita", stock: 1, day: "2026-10-10" })).toBe("ok");
+    expect(await claimMerch(db, { userId: seeker, boothKey: "toko-kita", stock: 5, day: "2026-10-11" })).toBe("claimed");
+    const [{ id: other }] = (await db.insert(users).values({ email: "merch-taker@mail.example", displayName: "Tia" }).returning({ id: users.id })) as [{ id: string }];
+    expect(await claimMerch(db, { userId: other, boothKey: "toko-kita", stock: 1, day: "2026-10-10" })).toBe("gone");
+  });
+
+  it("keeps the live feed newest first", async () => {
+    await addEvents(db, seeker, [{ type: "arrive", name: "Sari" }]);
+    await addEvents(db, seeker, [{ type: "visit", name: "Sari", company: "TokoKita" }]);
+    expect((await recentEvents(db)).map((e) => e.type)).toEqual(["visit", "arrive"]);
   });
 });
 

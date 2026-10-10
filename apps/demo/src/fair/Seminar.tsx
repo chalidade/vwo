@@ -9,6 +9,7 @@ import { StageWatch } from "./StageWatch";
  *  through the slides with subtitles, then hands out a certificate. */
 export function SeminarView({
   attended,
+  attendees,
   sessions,
   viewerId,
   name,
@@ -18,6 +19,8 @@ export function SeminarView({
   onClose,
 }: {
   attended: string[];
+  /** How many have attended each seminar so far. */
+  attendees?: (id: string) => number;
   /** The organiser's programme. */
   sessions: SeminarSession[];
   /** Who is watching, for a live broadcast from the speaker page. */
@@ -85,6 +88,7 @@ export function SeminarView({
                   {" "}
                   · {s.speaker}, {s.role}
                   {s.id === liveSeminar(Date.now(), sessions).id ? " · 🔴 sedang di panggung" : ""}
+                  {attendees && attendees(s.id) > 0 ? ` · ${attendees(s.id)} peserta` : ""}
                 </span>
               </span>
               <button

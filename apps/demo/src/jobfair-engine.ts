@@ -127,6 +127,21 @@ export interface Interview {
 
 /** A notification between an applicant and a company's HR, kept with the saved state so the
  *  portal and the job fair see each other's in any open tab. */
+/** Live: one view, click or sale for the server's counters. */
+export interface StatHit {
+  key: string;
+  what: "view" | "click" | "sold";
+  coins?: number;
+}
+
+/** Live: a counter's totals as the server adds them up. */
+export interface StatHitTotal {
+  views: number;
+  clicks: number;
+  sold: number;
+  coins: number;
+}
+
 /** Live: review counts and star totals per booth, and the signed-in player's own stars. */
 export interface ServerReviews {
   totals: Record<string, { count: number; sum: number }>;
@@ -1323,6 +1338,7 @@ export class DemoJobFair {
       claims[ckey] = today;
       this.ad(key, "sold");
       const v = this.giveVoucher(`🎁 ${merch.name}`, b, "Tunjukkan di stand untuk mengambil");
+      this.onMerch?.(boothId, v.id);
       this.gainXp(3);
       return { ok: true, text: `${merch.name} jadi milikmu! Ambil di stand dengan menunjukkan voucher.`, voucher: v };
     }
@@ -1464,6 +1480,14 @@ export class DemoJobFair {
   onNote: ((a: FairApplication) => Promise<boolean>) | null = null;
   /** Live: the company read notifications; the app stores the marks for the booth on the server. */
   onBoothRead: ((boothId: string, read: BoothRead) => void) | null = null;
+  /** Live: a view, click or sale the player caused, for the server's counters. */
+  onStat: ((hit: StatHit) => void) | null = null;
+  /** Live: something the player did, for the organiser's live feed. */
+  onEvent: ((e: Omit<FairEvent, "at">) => void) | null = null;
+  /** Live: the player took a booth's merchandise; the server checks stock and hands it out. */
+  onMerch: ((boothId: string, voucherId: string) => void) | null = null;
+  /** How many attended each seminar (live: everyone, from the server). */
+  readonly seminarCounts = new Map<string, number>();
   /** Live: sends the player's review of a booth to the server. */
   onReview: ((boothId: string, stars: number) => void) | null = null;
   /** Live: every booth's rating from real reviews, and the player's own stars, from the server. */
@@ -1766,7 +1790,7 @@ export class DemoJobFair {
     v.seatId = null;
     const room = this.roomOf(floorId);
     if (room && !v.isBot) {
-      this.log({ type: "room", name: v.displayName, company: room.name });
+      this.log({ type: "room", name: v.displayName, company: room.name }, v.memberId);
       if (room.kind === "foodcourt") this.say(roomStaffId(room.id), `Selamat makan, ${v.displayName}! Tiap pesanan dapat voucher 🎟️`, 3000);
       else if (room.kind === "psikotes") this.say(roomStaffId(room.id), "Silakan duduk di meja yang kosong, lalu mulai tesnya.", 3000);
       else if (room.kind === "aula") this.say(roomStaffId(room.id), `Selamat datang di Aula, ${v.displayName}! Jadwal acara ada di papan kiri.`, 3000);
@@ -1868,7 +1892,7 @@ export class DemoJobFair {
     const pkg = this.fair.coinStand.packages.find((p) => p.id === packageId);
     if (!pkg) return null;
     this.earn(pkg.coins + pkg.bonus, `Beli ${pkg.coins}${pkg.bonus ? ` + ${pkg.bonus} bonus` : ""} koin (${method}, ${pkg.price})`);
-    this.log({ type: "coins", name: this.visitors.get(PLAYER_ID)?.displayName ?? "Kamu", company: pkg.price });
+    this.log({ type: "coins", name: this.visitors.get(PLAYER_ID)?.displayName ?? "Kamu", company: pkg.price }, PLAYER_ID);
     this.say("coin-staff", `Pembayaran ${pkg.price} berhasil! +${pkg.coins + pkg.bonus} koin 🪙`, 3000);
     this.emit();
     return pkg.coins + pkg.bonus;
@@ -2079,6 +2103,8 @@ export class DemoJobFair {
       a.coins += coins;
     }
     this.ads.set(key, a);
+    // Merchandise is counted by the server when it hands one out.
+    if (!(what === "sold" && key.endsWith(":giveaway"))) this.onStat?.({ key, what, coins: coins || undefined });
     this.persist();
     this.emit();
   }
@@ -2133,6 +2159,8 @@ export class DemoJobFair {
   attendSeminar(seminarId: string) {
     if (this.player.seminars.includes(seminarId)) return false;
     this.player.seminars.push(seminarId);
+    this.seminarCounts.set(seminarId, (this.seminarCounts.get(seminarId) ?? 0) + 1);
+    this.onStat?.({ key: `seminar:${seminarId}`, what: "view" });
     this.gainXp(XP.seminar);
     this.persist();
     return true;
@@ -2160,8 +2188,43 @@ export class DemoJobFair {
     }
     list.unshift({ at: this.now(), by: visitorId, stars, tag });
     this.reviews.set(boothId, list.slice(0, 40));
-    this.log({ type: "review", name: v.displayName, company: b.company, jobTitle: "★".repeat(stars) });
+    this.log({ type: "review", name: v.displayName, company: b.company, jobTitle: "★".repeat(stars) }, visitorId);
     if (!v.isBot && first) this.gainXp(XP.review);
+    this.persist();
+    this.emit();
+  }
+
+  /**
+   * Live: the server's counters replace this browser's: booth visits, sponsor views, decorations,
+   * promoters, stalls and seminars. Event admins also get the live feed.
+   */
+  setStats(stats: Record<string, StatHitTotal>, events?: FairEvent[]) {
+    this.visits.clear();
+    this.sponsorViews.clear();
+    this.seminarCounts.clear();
+    this.ads.clear();
+    for (const [k, t] of Object.entries(stats)) {
+      const at = k.indexOf(":");
+      const kind = k.slice(0, at);
+      const id = k.slice(at + 1);
+      if (kind === "visit") this.visits.set(id, t.views);
+      else if (kind === "sponsor") this.sponsorViews.set(id, t.views);
+      else if (kind === "seminar") this.seminarCounts.set(id, t.views);
+      else this.ads.set(k, { views: t.views, clicks: t.clicks, sold: t.sold, coins: t.coins });
+    }
+    if (events) this.events.splice(0, this.events.length, ...events.slice(0, 60));
+    this.emit();
+  }
+
+  /** Live: the server would not hand out the merchandise after all; take the voucher back. */
+  merchRefused(boothId: string, voucherId: string, reason: "already_claimed" | "out_of_stock") {
+    this.player.vouchers = this.player.vouchers.filter((v) => v.id !== voucherId);
+    const a = this.ads.get(`acc:${boothId}:giveaway`);
+    if (reason === "out_of_stock") {
+      const b = this.booth(boothId);
+      this.ads.set(`acc:${boothId}:giveaway`, { views: a?.views ?? 0, clicks: a?.clicks ?? 0, sold: b?.media?.merch?.stock ?? 50, coins: 0 });
+    }
+    this.notices.push(reason === "out_of_stock" ? "Yah, merchandise di stand ini sudah habis" : "Kamu sudah pernah ambil merchandise di stand ini");
     this.persist();
     this.emit();
   }
@@ -2276,7 +2339,7 @@ export class DemoJobFair {
     // A few bots are verified too, so the badge is something people recognise.
     else if (isBot && this.rand() < 0.25) v.verified = true;
     this.visitors.set(id, v);
-    this.log({ type: "arrive", name });
+    this.log({ type: "arrive", name }, id);
     if (!isBot) {
       const host = this.roomOf(floorId);
       const where = this.fair.floors.length ? `${hallName(this.fair, 0)} sampai ${hallName(this.fair, this.fair.floors.length - 1)}` : "";
@@ -2293,7 +2356,7 @@ export class DemoJobFair {
     if (v.isBot) this.visitedBy.delete(id);
     this.bubbles.delete(id);
     this.bots = this.bots.filter((b) => b.id !== id);
-    this.log({ type: "leave", name: v.displayName });
+    this.log({ type: "leave", name: v.displayName }, id);
     this.emit();
   }
 
@@ -2316,7 +2379,8 @@ export class DemoJobFair {
     this.visitedBy.set(visitorId, seen);
     this.persist();
     this.visits.set(boothId, (this.visits.get(boothId) ?? 0) + 1);
-    this.log({ type: "visit", name: v.displayName, company: b.company });
+    if (visitorId === PLAYER_ID) this.onStat?.({ key: `visit:${boothId}`, what: "view" });
+    this.log({ type: "visit", name: v.displayName, company: b.company }, visitorId);
     if (visitorId === PLAYER_ID) this.track("visit");
     this.emit();
   }
@@ -2327,8 +2391,9 @@ export class DemoJobFair {
     const sp = this.fair.sponsors.find((x) => x.id === sponsorId);
     if (!v || !sp) return;
     this.sponsorViews.set(sponsorId, (this.sponsorViews.get(sponsorId) ?? 0) + 1);
+    if (visitorId === PLAYER_ID) this.onStat?.({ key: `sponsor:${sponsorId}`, what: "view" });
     this.persist();
-    this.log({ type: "sponsor", name: v.displayName, company: sp.name });
+    this.log({ type: "sponsor", name: v.displayName, company: sp.name }, visitorId);
     this.emit();
   }
 
@@ -2374,7 +2439,7 @@ export class DemoJobFair {
     this.applications.unshift(a);
     this.notify(b.id, "apply", `${a.name} melamar ${job.title}`, a.id);
     if (visitorId === PLAYER_ID) this.track("apply");
-    this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title });
+    this.log({ type: "apply", name: a.name, company: b.company, jobTitle: job.title }, visitorId);
     this.persist();
     this.say(recruiterId(b.id), `Terima kasih, ${a.name}! Lamaran ${job.title} kami terima.`, 3200);
     if (!v.isBot) this.gainXp(XP.apply);
@@ -2753,9 +2818,11 @@ export class DemoJobFair {
     return n;
   }
 
-  private log(e: Omit<FairEvent, "at">) {
+  private log(e: Omit<FairEvent, "at">, by?: string) {
     this.events.unshift({ ...e, at: this.now() });
     this.events.length = Math.min(this.events.length, 60);
+    // Live: each player sends what they did themselves to the organiser's feed.
+    if (by === PLAYER_ID) this.onEvent?.(e);
   }
 
   private nextFlushAt = 0;

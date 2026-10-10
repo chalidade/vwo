@@ -11,6 +11,7 @@ import { startPaymentSync } from "./payments";
 import { syncPlayer } from "./player-sync";
 import { startPriceSync } from "./prices-sync";
 import { startReviewSync } from "./review-sync";
+import { startStatsSync } from "./stats-sync";
 import { startSharedSync } from "./shared-state";
 
 function useHash() {
@@ -36,6 +37,7 @@ function useLiveAccount() {
       syncPlayer(a);
       if (a) startPaymentSync();
       startReviewSync();
+      startStatsSync(!!a);
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
@@ -44,6 +46,7 @@ function useLiveAccount() {
       syncPlayer(a);
       if (a) startPaymentSync();
       startReviewSync();
+      startStatsSync(!!a);
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);
   }, []);

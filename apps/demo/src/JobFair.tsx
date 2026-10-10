@@ -1615,6 +1615,7 @@ export function JobFair() {
         {session && seminar && (
           <SeminarView
             attended={me.seminars}
+            attendees={(id) => fair.seminarCounts.get(id) ?? 0}
             sessions={fair.seminars()}
             viewerId={session.visitorId}
             name={profile.name || session.name}
