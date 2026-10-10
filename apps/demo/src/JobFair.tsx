@@ -80,6 +80,8 @@ import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reac
 import { NotifList } from "./fair/Notifs";
 import { Modal } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
+import { FriendsPanel, type FriendOnline } from "./fair/Friends";
+import { addFriend, friendOf, loadFriends, myTag, removeFriend, useFriends } from "./fair/friends";
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
 import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
@@ -248,6 +250,8 @@ export function JobFair() {
   const marks = useRef(new Map<string, number>());
   const muted = useRef(new Set<string>());
   const pingLimit = useRef(new PingLimiter());
+  const friends = useFriends();
+  const [friendsOpen, setFriendsOpen] = useState(false);
   const hud = useHud();
   const stageLive = useStageLive();
   savedSession = session;
@@ -255,6 +259,14 @@ export function JobFair() {
   // Calls and the stage broadcast need the relay servers; fetch them ahead so ringing isn't delayed.
   useEffect(() => {
     if (session) void loadRelay();
+  }, [session]);
+
+  // Friends: loaded on sign-in, and now and then for requests sent from other devices.
+  useEffect(() => {
+    if (!session) return;
+    void loadFriends();
+    const timer = window.setInterval(() => document.visibilityState === "visible" && void loadFriends(), 90_000);
+    return () => window.clearInterval(timer);
   }, [session]);
 
   // Remember where the player stands, so a reload or a trip to the payment page comes back here.
@@ -541,7 +553,7 @@ export function JobFair() {
         const v = fair.visitors.get(session.visitorId);
         if (!v) return null;
         const b = fair.bubbles.get(session.visitorId);
-        return { name: session.name, look: session.look, floorId: v.floorId, x: v.x, y: v.y, facing: v.facing, seatId: v.seatId ?? null, say: b && b.until > Date.now() ? b.text : null, verified: !!fair.player.verified };
+        return { name: session.name, look: session.look, floorId: v.floorId, x: v.x, y: v.y, facing: v.facing, seatId: v.seatId ?? null, say: b && b.until > Date.now() ? b.text : null, verified: !!fair.player.verified, tag: myTag() };
       },
       (p) => {
         remoteLooks.current.set(remoteId(p.id), p.look);
@@ -1045,6 +1057,13 @@ export function JobFair() {
     if (!ping || muted.current.has(memberId) || !fair.visitors.has(memberId)) return;
     if (ping.floorId && !fair.floors.some((f) => f.id === ping.floorId)) return;
     if (!pingLimit.current.allow(memberId)) return;
+    if (ping.key === "friendok") {
+      const v = fair.visitors.get(memberId)!;
+      // The demo keeps friends in this browser; the live site has it on the server already.
+      if (LIVE) void loadFriends();
+      else if (v.tag) void addFriend(v.tag, plainName(v));
+    }
+    if (ping.key === "friend" && LIVE) void loadFriends();
     showPing(memberId, ping);
   }
 
@@ -1060,7 +1079,11 @@ export function JobFair() {
     };
     const later = { label: "🙏 Nanti", onPick: answer("later") };
     const actions =
-      ping.key === "follow"
+      ping.key === "friend" && v.tag
+        ? [{ label: "⭐ Terima", primary: true, onPick: () => (close(), befriend(memberId)) }, { label: "🙏 Nanti", onPick: close }]
+        : ping.key === "friendok"
+          ? [{ label: "👥 Lihat teman", primary: true, onPick: () => (close(), setFriendsOpen(true)) }]
+          : ping.key === "follow"
         ? [{ label: "👣 Ikuti", primary: true, onPick: () => (close(), startFollow(memberId, true)) }, later]
         : ping.key === "floor" && ping.floorId
           ? [{ label: `🛗 Ke ${fair.stopOf(ping.floorId).name}`, primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), pickFloor(ping.floorId!)) }, later]
@@ -1078,6 +1101,27 @@ export function JobFair() {
     window.setTimeout(close, 30_000);
     mark(memberId);
     playPing();
+  }
+
+  /** Save a job seeker met here as a friend: a request they see at once, or a yes to theirs. */
+  function befriend(memberId: string) {
+    const v = fair.visitors.get(memberId);
+    if (!v?.tag) return;
+    const name = plainName(v);
+    void addFriend(v.tag, name).then((state) => {
+      if (!state) return setToast("Belum bisa menyimpan teman, coba lagi sebentar");
+      sendPing(memberId, { key: state === "friend" ? "friendok" : "friend" });
+      setToast(state === "friend" ? `⭐ ${name} sekarang temanmu` : `⭐ Permintaan teman terkirim ke ${name}`);
+    });
+  }
+
+  /** Friends at the fair right now, by their tag. */
+  function friendsOnline() {
+    const out = new Map<string, FriendOnline>();
+    for (const v of fair.visitors.values()) {
+      if (v.remote && v.tag && friendOf(v.tag)) out.set(v.tag, { memberId: v.memberId, where: floorLabel(v.floorId) });
+    }
+    return out;
   }
 
   function lookOfMember(memberId: string) {
@@ -1143,6 +1187,18 @@ export function JobFair() {
         ...PING_STARTERS.filter((k) => k !== "here").map((k) => ({ label: PING_TEXT[k](""), onPick: ping({ key: k }) })),
         { label: "📍 Kirim lokasiku", hint: floorLabel(fair.visitors.get(session.visitorId)?.floorId ?? v.floorId), onPick: () => (close(), sendHere(memberId)) },
         { label: "🛗 Ajak ke lantai…", onPick: floors },
+        ...(v.remote && v.tag
+          ? [
+              (() => {
+                const f = friendOf(v.tag);
+                return f?.state === "friend"
+                  ? { label: "✅ Sudah berteman", hint: "Lihat daftar teman", onPick: () => (close(), setFriendsOpen(true)) }
+                  : f?.state === "sent"
+                    ? { label: "⏳ Menunggu jawaban teman", onPick: close }
+                    : { label: f?.state === "received" ? "⭐ Terima pertemanan" : "⭐ Simpan jadi teman", onPick: () => (close(), befriend(memberId)) };
+              })(),
+            ]
+          : []),
         following
           ? { label: "✋ Berhenti mengikuti", onPick: () => (close(), setFollow(null)) }
           : { label: `👣 Ikuti ${name}`, onPick: () => (close(), startFollow(memberId, !!v.remote)) },
@@ -1504,6 +1560,32 @@ export function JobFair() {
         )}
 
         {session && (
+          <button type="button" className="hud hud-tr-btn rpg-box friends-btn hud-friends" onPointerDown={(e) => e.stopPropagation()} onClick={() => setFriendsOpen(true)} title="Teman" aria-label="Teman">
+            👥
+            {(() => {
+              const asking = friends.friends.filter((f) => f.state === "received").length;
+              const on = friendsOnline().size;
+              return asking + on > 0 ? <span className="hud-friends-n" data-ask={asking ? "" : undefined}>{asking || on}</span> : null;
+            })()}
+          </button>
+        )}
+        {session && friendsOpen && (
+          <FriendsPanel
+            friends={friends.friends}
+            online={friendsOnline()}
+            onVisit={(id) => (setFriendsOpen(false), walkToPerson(id))}
+            onMessage={(id) => (setFriendsOpen(false), talkToVisitor(id))}
+            onAccept={(f) => {
+              const on = friendsOnline().get(f.tag);
+              if (on) befriend(on.memberId);
+              else void addFriend(f.tag, f.name);
+            }}
+            onRemove={(f) => void removeFriend(f.tag)}
+            onClose={() => setFriendsOpen(false)}
+          />
+        )}
+
+        {session && (
           <button type="button" className="hud hud-tr-btn rpg-box guide-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGuide(true)} title="Panduan: cara memakai tiap fitur" aria-label="Panduan">
             ❓
           </button>
@@ -1668,6 +1750,7 @@ export function JobFair() {
             left={fair.gameCoinsLeft()}
             logos={fair.fair.booths.map((b) => ({ logo: b.logo, color: b.color }))}
             onReward={(game, coins) => fair.rewardGame(game, coins)}
+            myName={session?.name ?? "Kamu"}
             read={me.read ?? []}
             onRead={(id) => fair.readArticle(id)}
             roadmap={me.roadmap ?? {}}

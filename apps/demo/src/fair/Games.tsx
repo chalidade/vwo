@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CAREER_ARTICLES, CAREER_QUIZ, type CareerArticle, GAME_DAILY_CAP, stepKey } from "./content";
 import { Modal } from "./Modal";
 import { type Board, type Dir, canMove, coinsFor, newBoard, slide, spawn } from "./g2048";
+import { type Board as RankBoard, SCORE_GAMES, type ScoreGame, loadBoard, submitScore } from "./scores";
 
 type GameId = "quiz" | "catch" | "memory" | "2048";
 
@@ -30,6 +31,7 @@ export function SofaGames({
   onToggleStep,
   jobsFor,
   onGoToBooth,
+  myName,
   onClose,
 }: {
   /** Coins the games can still pay out today. */
@@ -48,15 +50,19 @@ export function SofaGames({
   /** Open jobs at the fair that match an article's profession. */
   jobsFor: (keywords: string[]) => RelatedJob[];
   onGoToBooth: (boothId: string) => void;
+  /** The player's name, for the demo's leaderboard. */
+  myName: string;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"play" | "read">("play");
+  const [tab, setTab] = useState<"play" | "read" | "rank">("play");
+  const [rankGame, setRankGame] = useState<ScoreGame>("2048");
   const [article, setArticle] = useState<CareerArticle | null>(null);
   const [game, setGame] = useState<GameId | null>(null);
-  const [result, setResult] = useState<{ name: string; score: string; coins: number; asked: number } | null>(null);
-  const finish = (id: GameId, score: string, coins: number) => {
+  const [result, setResult] = useState<{ name: string; score: string; coins: number; asked: number; ranked?: ScoreGame } | null>(null);
+  const finish = (id: GameId, score: string, coins: number, ranked?: { game: ScoreGame; score: number }) => {
     const g = GAMES.find((x) => x.id === id)!;
-    setResult({ name: g.name, score, asked: coins, coins: onReward(g.name, coins) });
+    if (ranked) void submitScore(ranked.game, ranked.score);
+    setResult({ name: g.name, score, asked: coins, coins: onReward(g.name, coins), ranked: ranked?.game });
     setGame(null);
   };
 
@@ -68,8 +74,19 @@ export function SofaGames({
       <button type="button" data-active={tab === "read" ? "" : undefined} onClick={() => setTab("read")}>
         📚 Pojok baca ({read.length}/{CAREER_ARTICLES.length})
       </button>
+      <button type="button" data-active={tab === "rank" ? "" : undefined} onClick={() => setTab("rank")}>
+        🏆 Peringkat
+      </button>
     </div>
   );
+
+  if (tab === "rank")
+    return (
+      <Modal title="🏆 Peringkat minggu ini" onClose={onClose} className="fx-games">
+        {tabs}
+        <Leaderboard game={rankGame} onGame={setRankGame} myName={myName} />
+      </Modal>
+    );
 
   if (tab === "read" || article)
     return (
@@ -126,15 +143,28 @@ export function SofaGames({
           <button type="button" className="mb-order jb-apply" onClick={() => setResult(null)}>
             Main lagi
           </button>
+          {result.ranked && (
+            <button
+              type="button"
+              className="mb-order lb-see"
+              onClick={() => {
+                setRankGame(result.ranked!);
+                setResult(null);
+                setTab("rank");
+              }}
+            >
+              🏆 Lihat peringkat minggu ini
+            </button>
+          )}
         </div>
       ) : game === "quiz" ? (
         <Quiz onDone={(right, total) => finish("quiz", `${right}/${total} benar`, right * 2)} />
       ) : game === "catch" ? (
-        <CatchCoins onDone={(score) => finish("catch", `${score} poin`, Math.min(10, Math.floor(score / 2)))} />
+        <CatchCoins onDone={(score) => finish("catch", `${score} poin`, Math.min(10, Math.floor(score / 2)), { game: "catch", score })} />
       ) : game === "2048" ? (
-        <Game2048 onDone={(best, score) => finish("2048", `ubin ${best} · skor ${score}`, coinsFor(best))} />
+        <Game2048 onDone={(best, score) => finish("2048", `ubin ${best} · skor ${score}`, coinsFor(best), { game: "2048", score })} />
       ) : game === "memory" ? (
-        <Memory logos={logos} onDone={(moves) => finish("memory", `selesai dalam ${moves} langkah`, moves <= 10 ? 6 : moves <= 14 ? 4 : 2)} />
+        <Memory logos={logos} onDone={(moves) => finish("memory", `selesai dalam ${moves} langkah`, moves <= 10 ? 6 : moves <= 14 ? 4 : 2, { game: "memory", score: moves })} />
       ) : (
         <>
           <p className="sp-summary">
@@ -155,6 +185,62 @@ export function SofaGames({
         </>
       )}
     </Modal>
+  );
+}
+
+/** The week's best players of one mini game; the board starts over every Monday. */
+function Leaderboard({ game, onGame, myName }: { game: ScoreGame; onGame: (g: ScoreGame) => void; myName: string }) {
+  const [board, setBoard] = useState<RankBoard | null | "loading">("loading");
+  useEffect(() => {
+    let gone = false;
+    setBoard("loading");
+    void loadBoard(game, myName).then((b) => !gone && setBoard(b));
+    return () => {
+      gone = true;
+    };
+  }, [game, myName]);
+  const unit = SCORE_GAMES.find((g) => g.id === game)!.unit;
+  const medal = (i: number) => ["🥇", "🥈", "🥉"][i] ?? `${i + 1}`;
+  return (
+    <div className="lb">
+      <div className="lb-games">
+        {SCORE_GAMES.map((g) => (
+          <button key={g.id} type="button" data-active={g.id === game ? "" : undefined} onClick={() => onGame(g.id)}>
+            {g.name}
+          </button>
+        ))}
+      </div>
+      {board === "loading" ? (
+        <p className="sp-muted">Memuat…</p>
+      ) : !board ? (
+        <p className="sp-muted">Peringkat belum bisa dimuat. Coba lagi sebentar.</p>
+      ) : (
+        <>
+          {board.top.length === 0 && <p className="sp-muted">Belum ada yang main minggu ini. Jadilah yang pertama!</p>}
+          <ol className="lb-list">
+            {board.top.slice(0, 10).map((r, i) => (
+              <li key={`${r.name}-${i}`} data-me={board.me && board.me.rank === i + 1 ? "" : undefined}>
+                <span className="lb-rank">{medal(i)}</span>
+                <span className="lb-name">{r.name}</span>
+                <span className="lb-best">
+                  {r.best.toLocaleString("id-ID")} <small>{unit}</small>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="lb-me">
+            {board.me ? (
+              <>
+                Kamu di peringkat <b>#{board.me.rank}</b> dengan {board.me.best.toLocaleString("id-ID")} {unit}.
+              </>
+            ) : (
+              "Main sekali minggu ini untuk masuk peringkat."
+            )}
+          </p>
+          <p className="sp-muted">{game === "memory" ? "Makin sedikit langkah makin tinggi." : "Skor terbaikmu minggu ini yang dihitung."} Peringkat mulai dari nol tiap Senin.</p>
+        </>
+      )}
+    </div>
   );
 }
 

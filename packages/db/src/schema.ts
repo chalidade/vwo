@@ -72,6 +72,9 @@ export const users = pgTable("users", {
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   displayName: text("display_name").notNull(),
   platformRole: platformRole("platform_role").notNull().default("user"),
+  /** A public handle shown to other players at the fair (in presence), so they can add this person
+   *  as a friend without ever seeing the account id or email. */
+  fairTag: text("fair_tag").notNull().unique().default(sql`substr(md5(random()::text || clock_timestamp()::text), 1, 12)`),
   createdAt: createdAt(),
 });
 

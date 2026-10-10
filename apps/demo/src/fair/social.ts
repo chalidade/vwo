@@ -15,7 +15,9 @@ export type PingKey =
   | "following"
   | "coming"
   | "thanks"
-  | "hiback";
+  | "hiback"
+  | "friend"
+  | "friendok";
 
 export interface Ping {
   key: PingKey;
@@ -38,6 +40,8 @@ export const PING_TEXT: Record<PingKey, (floor: string) => string> = {
   coming: () => "🏃 Aku ke sana!",
   thanks: () => "😊 Makasih!",
   hiback: () => "👋 Hai juga!",
+  friend: () => "⭐ Simpan aku jadi teman, yuk!",
+  friendok: () => "🤝 Sekarang kita berteman!",
 };
 
 /** What a sender can start with, in menu order. "floor" is offered per floor separately. */

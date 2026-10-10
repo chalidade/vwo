@@ -365,6 +365,24 @@ export const fairStats = pgTable(
   (t) => [primaryKey({ columns: [t.key, t.what, t.userId, t.day] }), check("fair_stats_what_ck", sql`${t.what} in ('view', 'click', 'sold')`)],
 );
 
+/** Each account's best mini game result per ISO week ("2026-W41"), for the weekly leaderboard.
+ *  2048 and catch keep the highest score, memory the fewest moves. */
+export const fairScores = pgTable(
+  "fair_scores",
+  {
+    userId: userRef("user_id"),
+    week: text("week").notNull(),
+    game: text("game").notNull(),
+    best: integer("best").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.week, t.game] }),
+    index("fair_scores_board_idx").on(t.week, t.game, t.best),
+    check("fair_scores_game_ck", sql`${t.game} in ('2048', 'catch', 'memory')`),
+  ],
+);
+
 /** What happened at the live fair, newest first, for the organiser's live feed. */
 export const fairEvents = pgTable(
   "fair_events",

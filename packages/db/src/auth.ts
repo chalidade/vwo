@@ -128,7 +128,7 @@ export async function createSession(db: Db, userId: string, userAgent?: string |
 export async function sessionUser(db: Db, token: string | undefined | null) {
   if (!token || token.length > 100) return null;
   const [row] = await db
-    .select({ id: users.id, email: users.email, name: users.displayName, role: users.platformRole, emailVerifiedAt: users.emailVerifiedAt, earlyRole: earlyAccess.role })
+    .select({ id: users.id, email: users.email, name: users.displayName, role: users.platformRole, emailVerifiedAt: users.emailVerifiedAt, fairTag: users.fairTag, earlyRole: earlyAccess.role })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     // The early-access list rides along, so a signed-in request costs one query, not two.
