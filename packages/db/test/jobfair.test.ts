@@ -147,7 +147,10 @@ describe("live game applications", () => {
     const [row] = await boothFairApplications(db, "toko-kita");
     expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "other-booth", status: "Shortlist" })).toBe(false);
     expect(await setFairApplicationStatus(db, { id: row!.id, boothKey: "toko-kita", status: "Shortlist" })).toBe(true);
-    expect((await myFairApplications(db, seeker))[0]!.status).toBe("Shortlist");
+    const [after] = await myFairApplications(db, seeker);
+    expect(after!.status).toBe("Shortlist");
+    // When it changed, for the applicant's notification.
+    expect((after!.shared as { statusAt?: number }).statusAt).toBeGreaterThan(Date.now() - 60_000);
   });
 
   it("keeps both sides of the conversation, and each side only writes its own part", async () => {
@@ -179,6 +182,13 @@ describe("live game applications", () => {
     ]);
     expect(shared.interview).toEqual({ ...invite, reply: "hadir", repliedAt: expect.any(Number) });
     expect(shared.rating).toBe(4);
+    expect(shared.statusAt).toEqual(expect.any(Number));
+    // After a passed interview the company invites an office visit; the applicant can only answer it.
+    const visit = { at: 50, address: "Jl. Sudirman 1, Jakarta", sentAt: 40 };
+    await updateFairApplicationShared(db, { id, as: "company", userId: "00000000-0000-0000-0000-000000000000", incoming: { visit } });
+    await updateFairApplicationShared(db, { id, as: "seeker", userId: seeker, incoming: { visit: { ...visit, address: "evil", reply: "jadwal-ulang" } } });
+    const [visited] = await myFairApplications(db, seeker);
+    expect((visited!.shared as Record<string, unknown>).visit).toEqual({ ...visit, reply: "jadwal-ulang", repliedAt: expect.any(Number) });
     // Someone else's account cannot write as this seeker.
     expect(await updateFairApplicationShared(db, { id, as: "seeker", userId: "00000000-0000-0000-0000-000000000000", incoming: {} })).toBe(false);
   });

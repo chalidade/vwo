@@ -39,11 +39,12 @@ export function boothFairApplications(db: Db, boothKey: string) {
   return db.select().from(fairApplications).where(eq(fairApplications.boothKey, boothKey)).orderBy(desc(fairApplications.createdAt)).limit(500);
 }
 
-/** The company's decision. Returns false when the application is not at that booth. */
+/** The company's decision, stamped with when it was made (for the applicant's notification). Returns false when the application is not at that booth. */
 export async function setFairApplicationStatus(db: Db, input: { id: string; boothKey: string; status: string }) {
+  const now = new Date();
   const rows = await db
     .update(fairApplications)
-    .set({ status: input.status, updatedAt: new Date() })
+    .set({ status: input.status, updatedAt: now, shared: sql`${fairApplications.shared} || jsonb_build_object('statusAt', ${now.getTime()}::bigint)` })
     .where(and(eq(fairApplications.id, input.id), eq(fairApplications.boothKey, input.boothKey)))
     .returning({ id: fairApplications.id });
   return rows.length > 0;

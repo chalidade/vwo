@@ -56,10 +56,13 @@ function pushShared(a: FairApplication) {
       const cut = (t: string | undefined, n: number) => (t === undefined ? undefined : t.trim().slice(0, n));
       const messages = (a.messages ?? []).filter((m) => m.text.trim()).slice(-300).map((m) => ({ ...m, text: m.text.trim().slice(0, 600) }));
       const iv = a.interview;
+      const v = a.visit;
       void sendShared(a.id, a.visitorId === PLAYER_ID ? "seeker" : "company", {
         messages,
-        interview: iv && { at: iv.at, mode: iv.mode.trim().slice(0, 60), place: cut(iv.place, 300), note: cut(iv.note, 600), reply: iv.reply },
+        interview: iv && { at: iv.at, mode: iv.mode.trim().slice(0, 60), place: cut(iv.place, 300), note: cut(iv.note, 600), reply: iv.reply, sentAt: iv.sentAt },
+        visit: v && v.address.trim() ? { at: v.at, address: v.address.trim().slice(0, 300), note: cut(v.note, 600), reply: v.reply, sentAt: v.sentAt } : undefined,
         rating: a.rating && a.rating >= 1 && a.rating <= 5 ? Math.round(a.rating) : undefined,
+        ratedAt: a.ratedAt,
         feedback: cut(a.feedback, 300),
         calls: a.calls?.slice(0, 100).map((c) => ({ ...c, seconds: Math.min(86_400, Math.max(0, Math.round(c.seconds))) })),
       });

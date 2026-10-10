@@ -110,7 +110,7 @@ export interface FairStaff {
   facing: Facing;
 }
 
-export type ApplicationStatus = "Terkirim" | "Dilihat" | "Shortlist" | "Diundang interview" | "Diterima" | "Belum cocok";
+export type ApplicationStatus = "Terkirim" | "Dilihat" | "Shortlist" | "Diundang interview" | "Lolos interview" | "Kunjungan kantor" | "Diterima" | "Belum cocok";
 
 /** An interview the company scheduled from its portal. */
 export interface Interview {
@@ -123,6 +123,19 @@ export interface Interview {
   reply?: "hadir" | "jadwal-ulang";
   /** Live: when the applicant answered, as the server recorded it. */
   repliedAt?: number;
+  /** When the company sent it; the chat message announcing it has the same time. */
+  sentAt?: number;
+}
+
+/** After a passed interview, the company invites the applicant to visit the office. */
+export interface OfficeVisit {
+  at: number;
+  /** The office's address. */
+  address: string;
+  note?: string;
+  reply?: "hadir" | "jadwal-ulang";
+  repliedAt?: number;
+  sentAt?: number;
 }
 
 /** A notification between an applicant and a company's HR, kept with the saved state so the
@@ -160,12 +173,12 @@ export interface FairNotif {
   /** PLAYER_ID for the job seeker, or a booth id for that company's HR. */
   to: string;
   appId?: string;
-  kind: "apply" | "chat" | "status" | "interview" | "call" | "confirm" | "rating";
+  kind: "apply" | "chat" | "status" | "interview" | "visit" | "call" | "confirm" | "rating";
   text: string;
   read?: boolean;
 }
 
-export const NOTIF_ICON: Record<FairNotif["kind"], string> = { apply: "📨", chat: "💬", status: "📋", interview: "📅", call: "📞", confirm: "✅", rating: "⭐" };
+export const NOTIF_ICON: Record<FairNotif["kind"], string> = { apply: "📨", chat: "💬", status: "📋", interview: "📅", visit: "🏢", call: "📞", confirm: "✅", rating: "⭐" };
 
 /** A chat message between the company and the applicant about one application. */
 export interface AppMessage {
@@ -428,8 +441,12 @@ export interface FairApplication {
   /** The company's private notes. */
   notes?: string;
   interview?: Interview;
+  visit?: OfficeVisit;
   messages?: AppMessage[];
   calls?: CallLog[];
+  /** When the company rated, and last changed the status (live: the server's clock). */
+  ratedAt?: number;
+  statusAt?: number;
   /** Last change, so two open tabs keep the newest copy. */
   updatedAt?: number;
   /** Live: the server's last change we took, on the server's clock, so a fast device clock can't hide newer answers. */
@@ -517,6 +534,8 @@ export interface PlayerState {
   daily?: DailyState;
   /** Booth decoration rewards taken, by key, with the day they were taken. */
   claims?: Record<string, string>;
+  /** Live: which notifications from HR the player read, saved with the account like a booth's. */
+  notifRead?: BoothRead;
 }
 
 export interface DailyState {
@@ -1548,7 +1567,10 @@ export class DemoJobFair {
         serverAt: s.updatedAt,
         messages: s.messages,
         interview: s.interview,
+        visit: s.visit,
         rating: s.rating,
+        ratedAt: s.ratedAt,
+        statusAt: s.statusAt,
         feedback: s.feedback,
         calls: s.calls,
         notes: s.notes,
@@ -1568,7 +1590,10 @@ export class DemoJobFair {
     const seen = new Set((s.messages ?? []).map(key));
     a.messages = [...(s.messages ?? []), ...(a.messages ?? []).filter((m) => !seen.has(key(m)))].sort((x, y) => x.at - y.at);
     if (s.interview) a.interview = s.interview;
+    if (s.visit) a.visit = s.visit;
     if (s.rating !== undefined) a.rating = s.rating;
+    if (s.ratedAt !== undefined) a.ratedAt = s.ratedAt;
+    if (s.statusAt !== undefined) a.statusAt = s.statusAt;
     if (s.feedback !== undefined) a.feedback = s.feedback;
     if (s.calls) a.calls = s.calls;
   }
@@ -1579,13 +1604,17 @@ export class DemoJobFair {
     for (const m of (after.messages ?? []).slice(seen)) if (m.from === "seeker") this.notify(after.boothId, "chat", `${after.name}: ${m.text.slice(0, 120)}`, after.id);
     if (after.interview?.reply && after.interview.reply !== before.interview?.reply)
       this.notify(after.boothId, "confirm", after.interview.reply === "hadir" ? `${after.name} konfirmasi hadir interview ${after.jobTitle}` : `${after.name} minta jadwal ulang interview ${after.jobTitle}`, after.id);
+    if (after.visit?.reply && after.visit.reply !== before.visit?.reply)
+      this.notify(after.boothId, "confirm", after.visit.reply === "hadir" ? `${after.name} konfirmasi hadir kunjungan kantor` : `${after.name} minta jadwal ulang kunjungan kantor`, after.id);
   }
 
   /** The company changed one of the player's applications in another tab (its portal): say what changed. */
   private tellPlayer(before: FairApplication, after: FairApplication) {
     const seen = before.messages?.length ?? 0;
     for (const m of (after.messages ?? []).slice(seen)) if (m.from === "company") this.notices.push(`💬 ${after.company}: ${m.text.slice(0, 80)}`);
-    if (after.interview && JSON.stringify(after.interview) !== JSON.stringify(before.interview) && !this.interviewAlerts.includes(after.id)) this.interviewAlerts.push(after.id);
+    const moved = (x?: { at: number; sentAt?: number }, y?: { at: number; sentAt?: number }) => !!x && (x.at !== y?.at || x.sentAt !== y?.sentAt);
+    if (moved(after.visit, before.visit) && !this.interviewAlerts.includes(`visit:${after.id}`)) this.interviewAlerts.push(`visit:${after.id}`);
+    else if (moved(after.interview, before.interview) && !this.interviewAlerts.includes(after.id)) this.interviewAlerts.push(after.id);
     else if (after.status !== before.status && after.status !== "Dilihat") this.notices.push(`📋 ${after.company}: lamaran ${after.jobTitle} kamu sekarang "${after.status}"`);
   }
 
@@ -2268,6 +2297,7 @@ export class DemoJobFair {
     if (!a) return;
     const before = a.rating ?? 0;
     a.rating = Math.max(1, Math.min(5, Math.round(stars)));
+    if (a.rating !== before) a.ratedAt = this.now();
     if (feedback) a.feedback = feedback;
     this.log({ type: "rate", name: a.name, company: a.company, jobTitle: "★".repeat(a.rating) });
     if (a.visitorId === PLAYER_ID && a.rating > before) this.gainXp((a.rating - before) * XP.ratedPerStar);
@@ -2481,6 +2511,7 @@ export class DemoJobFair {
     if (!a || a.status === status) return;
     a.status = status;
     a.updatedAt = this.now();
+    a.statusAt = a.updatedAt;
     this.onStatusChange?.(a);
     if (a.visitorId === PLAYER_ID && status !== "Dilihat" && !quiet) {
       this.notices.push(`📋 ${a.company}: lamaran ${a.jobTitle} kamu sekarang "${status}"`);
@@ -2647,21 +2678,48 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a) return;
     const moved = !!a.interview;
-    a.interview = { ...iv, reply: undefined };
+    const sentAt = this.now();
+    a.interview = { ...iv, reply: undefined, repliedAt: undefined, sentAt };
     if (a.visitorId === PLAYER_ID && !this.interviewAlerts.includes(a.id)) this.interviewAlerts.push(a.id);
     this.setStatus(a.id, "Diundang interview", true);
     const when = new Date(iv.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
     if (a.visitorId === PLAYER_ID) this.notify(PLAYER_ID, "interview", `${a.company} ${moved ? "mengubah jadwal" : "mengundang"} interview ${a.jobTitle}: ${when}`, a.id);
-    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`, true);
+    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`, true, sentAt);
     // Bots answer the invitation by themselves.
     if (a.isBot) this.after(4000 + this.rand() * 4000, () => this.answerInterview(a.id, this.rand() < 0.85 ? "hadir" : "jadwal-ulang"));
   }
 
+  /** After a passed interview, invite the applicant to visit the office, and tell them in the chat. */
+  scheduleVisit(applicationId: string, v: { at: number; address: string; note?: string }) {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a || !v.address.trim() || !Number.isFinite(v.at)) return;
+    const moved = !!a.visit;
+    const sentAt = this.now();
+    a.visit = { at: v.at, address: v.address.trim().slice(0, 300), note: v.note?.trim().slice(0, 600) || undefined, sentAt };
+    if (a.visitorId === PLAYER_ID && !this.interviewAlerts.includes(`visit:${a.id}`)) this.interviewAlerts.push(`visit:${a.id}`);
+    this.setStatus(a.id, "Kunjungan kantor", true);
+    const when = new Date(v.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    if (a.visitorId === PLAYER_ID) this.notify(PLAYER_ID, "visit", `${a.company} ${moved ? "mengubah jadwal" : "mengundang"} kunjungan kantor: ${when}`, a.id);
+    this.messageApplicant(a.id, `Selamat ${a.name}, kamu lolos interview ${a.jobTitle}! Kami mengundang kamu berkunjung ke kantor pada ${when} di ${a.visit.address}.${a.visit.note ? ` ${a.visit.note}` : ""}`, true, sentAt);
+    if (a.isBot) this.after(4000 + this.rand() * 4000, () => this.answerVisit(a.id, "hadir"));
+  }
+
+  /** The applicant answers the office visit invitation. */
+  answerVisit(applicationId: string, reply: "hadir" | "jadwal-ulang", note = "") {
+    const a = this.applications.find((x) => x.id === applicationId);
+    if (!a?.visit || a.visit.reply === reply) return;
+    a.visit.reply = reply;
+    const text = reply === "hadir" ? "Terima kasih, saya konfirmasi hadir di kunjungan kantor." : `Mohon maaf, bisakah jadwal kunjungan kantor diganti?${note.trim() ? ` ${note.trim()}` : ""}`;
+    (a.messages ??= []).push({ at: this.now(), from: "seeker", text });
+    this.notify(a.boothId, "confirm", reply === "hadir" ? `${a.name} konfirmasi hadir kunjungan kantor` : `${a.name} minta jadwal ulang kunjungan kantor`, a.id);
+    this.touch(a);
+  }
+
   /** A chat message from the company. Bots answer a moment later. */
-  messageApplicant(applicationId: string, text: string, quiet = false) {
+  messageApplicant(applicationId: string, text: string, quiet = false, at = this.now()) {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a || !text.trim()) return;
-    (a.messages ??= []).push({ at: this.now(), from: "company", text: text.trim().slice(0, 600) });
+    (a.messages ??= []).push({ at, from: "company", text: text.trim().slice(0, 600) });
     if (a.visitorId === PLAYER_ID) {
       this.notices.push(`💬 ${a.company}: ${text.trim().slice(0, 80)}`);
       if (!quiet) this.notify(PLAYER_ID, "chat", `${a.company}: ${text.trim().slice(0, 120)}`, a.id);
@@ -2714,7 +2772,8 @@ export class DemoJobFair {
   readonly inbox: FairNotif[] = [];
 
   private notify(to: string, kind: FairNotif["kind"], text: string, appId?: string) {
-    if (this.serverInbox && to !== PLAYER_ID) return;
+    // Live: everyone's notifications are worked out from the applications on the server.
+    if (this.serverInbox) return;
     // Another tab numbers its notifications too: add the time and a random tail so ids never clash.
     const id = `ntf-${this.now().toString(36)}-${++this.seq}-${Math.random().toString(36).slice(2, 6)}`;
     this.inbox.unshift({ id, at: this.now(), to, kind, text, appId });
@@ -2723,7 +2782,7 @@ export class DemoJobFair {
   }
 
   notifsFor(to: string) {
-    if (this.serverInbox && to !== PLAYER_ID) return this.boothNotifs(to);
+    if (this.serverInbox) return to === PLAYER_ID ? this.playerNotifs() : this.boothNotifs(to);
     return this.inbox.filter((n) => n.to === to);
   }
 
@@ -2754,7 +2813,43 @@ export class DemoJobFair {
           text: iv.reply === "hadir" ? `${a.name} konfirmasi hadir interview ${a.jobTitle}` : `${a.name} minta jadwal ulang interview ${a.jobTitle}`,
           appId: a.id,
         });
+      const v = a.visit;
+      if (v?.reply)
+        add({
+          id: `confirm-visit:${a.id}:${v.at}:${v.reply}`,
+          at: v.repliedAt ?? a.serverAt ?? a.at,
+          kind: "confirm",
+          text: v.reply === "hadir" ? `${a.name} konfirmasi hadir kunjungan kantor` : `${a.name} minta jadwal ulang kunjungan kantor`,
+          appId: a.id,
+        });
       for (const c of a.calls ?? []) if (!c.answered) add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `${a.name} tidak mengangkat panggilan ${c.kind === "video" ? "video" : "telepon"}`, appId: a.id });
+    }
+    return out.sort((x, y) => y.at - x.at).slice(0, 200);
+  }
+
+  /**
+   * Live: the job seeker's notifications from HR, worked out from their applications the same way:
+   * a new status, each message from the company, each interview or office visit invitation, a rating,
+   * each call they missed. The read marks are saved with the account, so they follow it to any device.
+   */
+  private playerNotifs(): FairNotif[] {
+    const read = this.player.notifRead ?? { all: 0, ids: [] };
+    const ids = new Set(read.ids);
+    const out: FairNotif[] = [];
+    const add = (n: Omit<FairNotif, "to" | "read">) => out.push({ ...n, to: PLAYER_ID, read: n.at <= read.all || ids.has(n.id) });
+    const when = (t: number) => new Date(t).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    for (const a of this.applications) {
+      if (a.visitorId !== PLAYER_ID) continue;
+      // Invitations have their own notification; the chat message announcing one is not repeated.
+      const announced = new Set([a.interview?.sentAt, a.visit?.sentAt]);
+      for (const m of a.messages ?? []) if (m.from === "company" && !announced.has(m.at)) add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.company}: ${m.text.slice(0, 120)}`, appId: a.id });
+      if (a.interview) add({ id: `interview:${a.id}:${a.interview.at}`, at: a.interview.sentAt ?? a.at, kind: "interview", text: `${a.company} mengundang interview ${a.jobTitle}: ${when(a.interview.at)}`, appId: a.id });
+      if (a.visit) add({ id: `visit:${a.id}:${a.visit.at}`, at: a.visit.sentAt ?? a.at, kind: "visit", text: `${a.company} mengundang kunjungan kantor: ${when(a.visit.at)}`, appId: a.id });
+      // Invited statuses are told by the invitation itself.
+      if (!["Terkirim", "Dilihat", "Diundang interview", "Kunjungan kantor"].includes(a.status))
+        add({ id: `status:${a.id}:${a.status}`, at: a.statusAt ?? a.at, kind: "status", text: `${a.company}: lamaran ${a.jobTitle} sekarang "${a.status}"`, appId: a.id });
+      if (a.rating) add({ id: `rating:${a.id}:${a.rating}`, at: a.ratedAt ?? a.at, kind: "rating", text: `${a.company} memberi ${"★".repeat(a.rating)} untuk lamaran ${a.jobTitle}`, appId: a.id });
+      for (const c of a.calls ?? []) if (!c.answered) add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `Panggilan ${c.kind === "video" ? "video" : "telepon"} tak terjawab dari ${a.company}`, appId: a.id });
     }
     return out.sort((x, y) => y.at - x.at).slice(0, 200);
   }
@@ -2770,15 +2865,22 @@ export class DemoJobFair {
 
   /** Mark one notification, or all of them for someone, as read. */
   markRead(to: string, id?: string) {
-    if (this.serverInbox && to !== PLAYER_ID) {
-      const have = this.boothRead.get(to) ?? { all: 0, ids: [] };
-      const list = this.boothNotifs(to);
+    if (this.serverInbox) {
+      const mine = to === PLAYER_ID;
+      const have = (mine ? this.player.notifRead : this.boothRead.get(to)) ?? { all: 0, ids: [] };
+      const list = mine ? this.playerNotifs() : this.boothNotifs(to);
       const next = id ? { all: have.all, ids: [...new Set([...have.ids, id])] } : { all: Math.max(have.all, ...list.map((n) => n.at)), ids: [] as string[] };
       // Only marks after `all` still matter.
       const at = new Map(list.map((n) => [n.id, n.at]));
       next.ids = next.ids.filter((x) => (at.get(x) ?? Infinity) > next.all).slice(-300);
-      this.boothRead.set(to, next);
-      this.onBoothRead?.(to, next);
+      if (mine) {
+        // Saved with the account's progress.
+        this.player.notifRead = next;
+        this.persist();
+      } else {
+        this.boothRead.set(to, next);
+        this.onBoothRead?.(to, next);
+      }
       this.emit();
       return;
     }

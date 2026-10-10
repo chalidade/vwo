@@ -89,6 +89,45 @@ describe("live company inbox and notes", () => {
     expect(fair.unreadFor(booth.id)).toBe(0);
   });
 
+  it("works the job seeker's notifications from HR out from their applications, read marks saved with the account", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    fair.serverInbox = true;
+    fair.mergeServer([app()], true);
+    expect(fair.notifsFor(PLAYER_ID)).toEqual([]);
+    fair.mergeServer(
+      [
+        app({
+          status: "Kunjungan kantor",
+          updatedAt: 6000,
+          statusAt: 5000,
+          messages: [
+            { at: 2000, from: "company", text: "Halo Sari, kami mengundang kamu interview" },
+            { at: 2100, from: "seeker", text: "Siap" },
+            { at: 4000, from: "company", text: "Selamat, kamu lolos" },
+            { at: 4500, from: "company", text: "Sampai jumpa" },
+          ],
+          interview: { at: 9000, mode: "Online", sentAt: 2000 },
+          visit: { at: 99000, address: "Jl. Sudirman 1", sentAt: 4000 },
+          rating: 4,
+          ratedAt: 3000,
+          calls: [{ at: 3500, kind: "voice", answered: false, seconds: 0 }],
+        }),
+      ],
+      true,
+    );
+    // The messages announcing an invitation are not repeated; an invited status is told by the invitation.
+    expect(fair.notifsFor(PLAYER_ID).map((n) => n.kind)).toEqual(["chat", "visit", "call", "rating", "interview"]);
+    expect(fair.unreadFor(PLAYER_ID)).toBe(5);
+    fair.markRead(PLAYER_ID, "chat:11111111-1111-1111-1111-111111111111:4500");
+    expect(fair.unreadFor(PLAYER_ID)).toBe(4);
+    fair.markRead(PLAYER_ID);
+    expect(fair.unreadFor(PLAYER_ID)).toBe(0);
+    expect(fair.progress().player.notifRead).toEqual({ all: 4500, ids: [] });
+    // Accepted later: a new notification, unread.
+    fair.mergeServer([app({ status: "Diterima", updatedAt: 8000, statusAt: 8000 })], true);
+    expect(fair.notifsFor(PLAYER_ID)[0]).toMatchObject({ kind: "status", read: false });
+  });
+
   it("keeps the company's notes from the server, but not over a note still being saved", async () => {
     const fair = new DemoJobFair(() => 0.5);
     fair.mergeServer([app({ notes: "Kandidat kuat" })], false);

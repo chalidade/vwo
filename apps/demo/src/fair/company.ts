@@ -53,7 +53,7 @@ export const PAY_METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mand
 export const rupiah = (n: number) => (n === 0 ? "Gratis" : `Rp ${n.toLocaleString("id-ID")}`);
 
 /** Where an application is in the hiring pipeline, in order. */
-export const PIPELINE = ["Terkirim", "Dilihat", "Shortlist", "Diundang interview", "Diterima", "Belum cocok"] as const;
+export const PIPELINE = ["Terkirim", "Dilihat", "Shortlist", "Diundang interview", "Lolos interview", "Kunjungan kantor", "Diterima", "Belum cocok"] as const;
 
 export const INTERVIEW_MODES = ["Video call", "Telepon", "Di stand", "Di kantor"] as const;
 

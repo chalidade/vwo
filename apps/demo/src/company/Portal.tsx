@@ -319,13 +319,21 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
   const rating = fair.companyRating(booth.id);
   const lv = levelOf(fair.companyXp(booth.id));
   const by = (s: string) => apps.filter((a) => a.status === s).length;
-  const upcoming = apps.filter((a) => a.interview).sort((a, b) => a.interview!.at - b.interview!.at);
+  // Interviews and office visits, soonest first.
+  const upcoming = apps
+    .flatMap((a) => [
+      ...(a.interview ? [{ a, at: a.interview.at, what: `Interview · ${a.interview.mode}` }] : []),
+      ...(a.visit ? [{ a, at: a.visit.at, what: "🏢 Kunjungan kantor" }] : []),
+    ])
+    .sort((x, y) => x.at - y.at);
   const unread = apps.filter((a) => a.messages?.length && a.messages[a.messages.length - 1]!.from === "seeker");
   const funnel = [
     ["Lamaran masuk", apps.length],
     ["Sudah dilihat", apps.length - by("Terkirim")],
-    ["Shortlist", by("Shortlist") + by("Diundang interview") + by("Diterima")],
-    ["Diundang interview", by("Diundang interview") + by("Diterima")],
+    ["Shortlist", by("Shortlist") + by("Diundang interview") + by("Lolos interview") + by("Kunjungan kantor") + by("Diterima")],
+    ["Diundang interview", by("Diundang interview") + by("Lolos interview") + by("Kunjungan kantor") + by("Diterima")],
+    ["Lolos interview", by("Lolos interview") + by("Kunjungan kantor") + by("Diterima")],
+    ["Kunjungan kantor", by("Kunjungan kantor") + by("Diterima")],
     ["Diterima", by("Diterima")],
   ] as const;
   const todo = [
@@ -345,6 +353,7 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
           ["Pelamar", apps.length],
           ["Perlu direview", by("Terkirim") + by("Dilihat")],
           ["Interview", by("Diundang interview")],
+          ["Kunjungan kantor", by("Kunjungan kantor")],
           ["Lowongan aktif", booth.jobs.filter((j) => !j.closed).length],
         ].map(([label, n]) => (
           <div key={label} className="card cp-kpi">
@@ -387,15 +396,15 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
           </p>
         </div>
         <div className="card">
-          <h2 className="cp-h2">Jadwal interview</h2>
+          <h2 className="cp-h2">Jadwal interview & kunjungan</h2>
           {upcoming.length === 0 ? (
             <p className="muted small">Belum ada. Undang pelamar dari tab Pelamar.</p>
           ) : (
             <ul className="cp-ul">
-              {upcoming.slice(0, 6).map((a) => (
-                <li key={a.id}>
-                  <b>{new Date(a.interview!.at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b> · {a.name} · {a.jobTitle} ·{" "}
-                  <span className="muted">{a.interview!.mode}</span>
+              {upcoming.slice(0, 6).map(({ a, at, what }) => (
+                <li key={`${a.id}:${what}`}>
+                  <b>{new Date(at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b> · {a.name} · {a.jobTitle} ·{" "}
+                  <span className="muted">{what}</span>
                 </li>
               ))}
             </ul>

@@ -14,6 +14,15 @@ const waNumber = (phone: string) => phone.replace(/\D/g, "").replace(/^0/, "62")
 
 type Sort = "new" | "match" | "psych" | "rating";
 
+const STAGE_LABEL: Partial<Record<ApplicationStatus, string>> = {
+  Shortlist: "⭐ Shortlist",
+  "Diundang interview": "📅 Interview",
+  "Lolos interview": "🎯 Lolos interview",
+  "Kunjungan kantor": "🏢 Kunjungan kantor",
+  Diterima: "✅ Terima",
+  "Belum cocok": "✕ Belum cocok",
+};
+
 /** Review applications: filter, read, rate, move through the pipeline, chat, call and invite to interview. */
 export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: string }) {
   const apps = fair.applications.filter((a) => a.boothId === booth.id);
@@ -141,6 +150,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
     const t = Number.isFinite(d.getTime()) ? d : tomorrow;
     return new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
+  const [visit, setVisit] = useState({ at: local(a.visit ? new Date(a.visit.at) : tomorrow), address: a.visit?.address ?? booth.address ?? "", note: a.visit?.note ?? "" });
   const [iv, setIv] = useState({ at: local(a.interview ? new Date(a.interview.at) : tomorrow), mode: a.interview?.mode ?? "Video call", place: a.interview?.place ?? "", note: a.interview?.note ?? "" });
   const chatEnd = useRef<HTMLDivElement>(null);
   // Braces matter: newer Chrome returns a promise from scrollIntoView, and React would call it as
@@ -235,9 +245,9 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
       {a.visitorId === PLAYER_ID && reachable && <p className="muted small">Pelamar ini kamu sendiri: buka job fair di tab lain browser ini untuk mengangkat panggilannya.</p>}
 
       <div className="cp-pipeline" role="group" aria-label="Status lamaran">
-        {(["Shortlist", "Diundang interview", "Diterima", "Belum cocok"] as ApplicationStatus[]).map((s) => (
+        {(["Shortlist", "Diundang interview", "Lolos interview", "Kunjungan kantor", "Diterima", "Belum cocok"] as ApplicationStatus[]).map((s) => (
           <button key={s} type="button" className="small-btn" data-status={s} data-active={a.status === s ? "" : undefined} onClick={() => fair.setStatus(a.id, s)}>
-            {s === "Shortlist" ? "⭐ Shortlist" : s === "Diundang interview" ? "📅 Interview" : s === "Diterima" ? "✅ Terima" : "✕ Belum cocok"}
+            {STAGE_LABEL[s] ?? s}
           </button>
         ))}
       </div>
@@ -327,6 +337,43 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         </label>
         <button type="submit">{a.interview ? "Ubah jadwal" : "Kirim undangan"}</button>
       </form>
+
+      {(a.visit || a.status === "Lolos interview" || a.status === "Kunjungan kantor" || a.status === "Diterima") && (
+        <>
+          <h3 className="cp-h3">Jadwalkan kunjungan kantor</h3>
+          {a.visit && (
+            <p className="cp-iv-reply" data-reply={a.visit.reply ?? "menunggu"}>
+              {a.visit.reply === "hadir" ? "✅ Pelamar konfirmasi hadir" : a.visit.reply === "jadwal-ulang" ? "🕑 Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
+              {new Date(a.visit.at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
+          <form
+            className="cp-form cp-iv"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const at = new Date(visit.at).getTime();
+              if (!Number.isFinite(at)) return flash("Isi waktu kunjungan dulu");
+              if (!visit.address.trim()) return flash("Isi alamat kantor dulu");
+              fair.scheduleVisit(a.id, { at, address: visit.address, note: visit.note });
+              flash("Undangan kunjungan kantor terkirim ke pelamar");
+            }}
+          >
+            <label>
+              Waktu
+              <input type="datetime-local" required value={visit.at} onChange={(e) => setVisit({ ...visit, at: e.target.value })} />
+            </label>
+            <label className="cp-span">
+              Alamat kantor
+              <input required maxLength={300} value={visit.address} onChange={(e) => setVisit({ ...visit, address: e.target.value })} placeholder="Jl. Sudirman No. 1, Jakarta Pusat" />
+            </label>
+            <label className="cp-span">
+              Pesan tambahan
+              <input maxLength={600} value={visit.note} onChange={(e) => setVisit({ ...visit, note: e.target.value })} placeholder="Bawa KTP, temui resepsionis lantai 3" />
+            </label>
+            <button type="submit">{a.visit ? "Ubah jadwal kunjungan" : "Kirim undangan kunjungan"}</button>
+          </form>
+        </>
+      )}
 
       <h3 className="cp-h3">Chat dengan pelamar</h3>
       <div className="cp-chat">

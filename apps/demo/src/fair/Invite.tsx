@@ -8,6 +8,10 @@ const ics = (t: number) => new Date(t).toISOString().replace(/[-:]/g, "").replac
 /** A calendar file for the interview, so the applicant can keep it in their own calendar. */
 function calendarHref(a: FairApplication) {
   const iv = a.interview!;
+  return calendarFile(a, iv.at, `Interview ${a.jobTitle} · ${a.company}`, iv.place || iv.mode, iv.note || `Interview via ${iv.mode}`);
+}
+
+function calendarFile(a: FairApplication, at: number, summary: string, location: string, description: string) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -15,11 +19,11 @@ function calendarHref(a: FairApplication) {
     "BEGIN:VEVENT",
     `UID:${a.id}@vwo.example`,
     `DTSTAMP:${ics(Date.now())}`,
-    `DTSTART:${ics(iv.at)}`,
-    `DTEND:${ics(iv.at + 45 * 60_000)}`,
-    `SUMMARY:Interview ${a.jobTitle} · ${a.company}`,
-    `LOCATION:${(iv.place || iv.mode).replace(/[,;]/g, " ")}`,
-    `DESCRIPTION:${(iv.note || `Interview via ${iv.mode}`).replace(/[,;\n]/g, " ")}`,
+    `DTSTART:${ics(at)}`,
+    `DTEND:${ics(at + 45 * 60_000)}`,
+    `SUMMARY:${summary.replace(/[,;\n]/g, " ")}`,
+    `LOCATION:${location.replace(/[,;\n]/g, " ")}`,
+    `DESCRIPTION:${description.replace(/[,;\n]/g, " ")}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];
@@ -79,6 +83,67 @@ export function InviteCard({ application: a, onOpen, onClose }: { application: F
       </div>
       <div className="iv-actions">
         <a className="small-btn ghost" href={calendarHref(a)} download={`interview-${a.company}.ics`}>
+          🗓️ Simpan ke kalender
+        </a>
+        <button type="button" className="mb-order jb-apply" onClick={onOpen}>
+          Lihat lamaran & chat
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** The invitation the applicant sees when a company, after a passed interview, invites them to its office. */
+export function VisitCard({ application: a, onOpen, onClose }: { application: FairApplication; onOpen: () => void; onClose: () => void }) {
+  const v = a.visit;
+  const b = fair.booth(a.boothId);
+  if (!v) return null;
+  const when = new Date(v.at);
+  return (
+    <Modal title="🏢 Undangan kunjungan kantor" onClose={onClose} className="iv-card">
+      <div className="iv-head" style={{ ["--c" as string]: b?.color ?? "#2563eb" }}>
+        {b ? <BoothLogo booth={b} className="iv-logo" /> : <span className="iv-logo">{a.company.slice(0, 2)}</span>}
+        <span>
+          <b>{a.company}</b>
+          <span className="sp-muted">🎉 Kamu lolos interview {a.jobTitle}! Yuk berkunjung ke kantor.</span>
+        </span>
+      </div>
+      <div className="iv-when">
+        <span className="iv-date">
+          <b>{when.toLocaleDateString("id-ID", { day: "numeric" })}</b>
+          {when.toLocaleDateString("id-ID", { month: "short" })}
+        </span>
+        <span>
+          <b>{when.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</b>
+          <span className="sp-muted">Pukul {when.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+        </span>
+      </div>
+      <p className="iv-line">
+        📍 {v.address}{" "}
+        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.address)}`} target="_blank" rel="noopener noreferrer">
+          Buka peta ↗
+        </a>
+      </p>
+      {v.note && <p className="iv-line iv-note">“{v.note}”</p>}
+      <p className="sp-muted iv-tip">Datang 15 menit lebih awal, berpakaian rapi, dan bawa CV serta KTP.</p>
+      <div className="iv-reply">
+        {v.reply === "hadir" ? (
+          <span className="iv-replied">✅ Kamu sudah konfirmasi hadir. HR mendapat notifikasinya.</span>
+        ) : v.reply === "jadwal-ulang" ? (
+          <span className="iv-replied">🕑 Kamu minta jadwal ulang. Tunggu HR mengirim jadwal baru.</span>
+        ) : (
+          <>
+            <button type="button" className="small-btn" onClick={() => fair.answerVisit(a.id, "hadir")}>
+              ✅ Konfirmasi hadir
+            </button>
+            <button type="button" className="small-btn ghost" onClick={() => fair.answerVisit(a.id, "jadwal-ulang")}>
+              🕑 Minta jadwal ulang
+            </button>
+          </>
+        )}
+      </div>
+      <div className="iv-actions">
+        <a className="small-btn ghost" href={calendarFile(a, v.at, `Kunjungan kantor ${a.company}`, v.address, v.note || `Kunjungan kantor setelah interview ${a.jobTitle}`)} download={`kunjungan-${a.company}.ics`}>
           🗓️ Simpan ke kalender
         </a>
         <button type="button" className="mb-order jb-apply" onClick={onOpen}>
