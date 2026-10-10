@@ -1452,3 +1452,8 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .fr-h { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .hud-friends-n { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #22c55e; color: #fff; font: 900 11px/18px system-ui, sans-serif; text-align: center; }
 .hud-friends-n[data-ask] { background: #f59e0b; }
+.sx-link { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 99px; background: #0009; color: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
+.sx-link[data-state="connected"] { background: #16a34acc; }
+.sx-link[data-state="failed"], .sx-link[data-state="disconnected"] { background: #dc2626cc; }
+.sf-link { font-size: 11px; opacity: 0.8; }
+.st-links { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; max-height: 140px; overflow: auto; }

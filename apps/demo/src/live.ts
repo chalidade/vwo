@@ -6,7 +6,7 @@
 import type { MqttClient } from "mqtt";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { LIVE } from "./mode";
-import { hasRealtime, realtimeClient } from "./realtime";
+import { closeChannel, hasRealtime, openChannel, realtimeClient } from "./realtime";
 import type { Facing } from "@vwo/shared";
 import type { Look } from "@vwo/ui";
 import type { RemotePlayer } from "./jobfair-engine";
@@ -221,7 +221,8 @@ class SupabaseTransport implements Transport {
     const sb = await realtimeClient();
     if (this.stopped || !sb) return;
     this.sb = sb;
-    const ch = sb.channel(`jobfair:${this.room}`, { config: { broadcast: { self: false } } });
+    const ch = await openChannel(sb, `jobfair:${this.room}`, { config: { broadcast: { self: false } } });
+    if (this.stopped) return;
     ch.on("broadcast", { event: "p" }, (m: { payload?: { id?: unknown; t?: unknown } }) => {
       const { id, t } = m.payload ?? {};
       if (typeof id === "string" && typeof t === "string" && t.length < 4000) on.message(id, t);
@@ -251,7 +252,7 @@ class SupabaseTransport implements Transport {
     this.send(id, "");
     this.ready = false;
     // Removed, not just left: walking back onto this floor later joins the same topic afresh.
-    if (this.channel) void this.sb?.removeChannel(this.channel);
+    if (this.channel && this.sb) closeChannel(this.sb, `jobfair:${this.room}`, this.channel);
     this.channel = null;
   }
 }

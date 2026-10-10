@@ -5,7 +5,7 @@
 // channel named after the call's random id. The audio and video go straight between the two devices.
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { LIVE } from "../mode";
-import { hasRealtime, realtimeClient } from "../realtime";
+import { closeChannel, hasRealtime, openChannel, realtimeClient } from "../realtime";
 
 export type CallKind = "video" | "voice";
 
@@ -61,18 +61,23 @@ const calls = new Map<string, Promise<RealtimeChannel | null>>();
 const inboxes = new Map<string, RealtimeChannel>();
 
 function subscribed(name: string, onMessage?: (s: CallSignal) => void): Promise<RealtimeChannel | null> {
-  return realtimeClient().then(
-    (sb) =>
-      new Promise((resolve) => {
-        if (!sb) return resolve(null);
-        const ch = sb.channel(name, { config: { broadcast: { self: false } } });
-        if (onMessage) ch.on("broadcast", { event: "s" }, (m: { payload?: unknown }) => isSignal(m.payload) && onMessage(m.payload));
-        ch.subscribe((status: string) => {
-          if (status === "SUBSCRIBED") resolve(ch);
-          else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") resolve(null);
-        });
-      }),
-  );
+  return realtimeClient().then(async (sb) => {
+    if (!sb) return null;
+    const ch = await openChannel(sb, name, { config: { broadcast: { self: false } } });
+    return new Promise<RealtimeChannel | null>((resolve) => {
+      if (onMessage) ch.on("broadcast", { event: "s" }, (m: { payload?: unknown }) => isSignal(m.payload) && onMessage(m.payload));
+      ch.subscribe((status: string) => {
+        if (status === "SUBSCRIBED") resolve(ch);
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") resolve(null);
+      });
+    });
+  });
+}
+
+/** Leave a channel opened with `subscribed` for good. */
+function unsubscribed(name: string, ch: RealtimeChannel | null | undefined) {
+  if (!ch) return;
+  void realtimeClient().then((sb) => sb && closeChannel(sb, name, ch));
 }
 
 /** The channel one call's signals go through; joined by the caller before ringing and by the callee on the ring. */
@@ -96,7 +101,7 @@ export async function joinCall(callId: string) {
 export function leaveCall(callId: string) {
   const ch = calls.get(callId);
   calls.delete(callId);
-  void ch?.then((c) => c?.unsubscribe());
+  void ch?.then((c) => unsubscribed(`jobfair:call:${callId}`, c));
 }
 
 async function sendRemote(s: CallSignal) {
@@ -104,7 +109,7 @@ async function sendRemote(s: CallSignal) {
     await callChannel(s.callId);
     const box = await subscribed(`jobfair:inbox:${s.to}`);
     await box?.send({ type: "broadcast", event: "s", payload: s });
-    setTimeout(() => void box?.unsubscribe(), 2000);
+    setTimeout(() => unsubscribed(`jobfair:inbox:${s.to}`, box), 2000);
     return;
   }
   const ch = await callChannel(s.callId);
@@ -126,7 +131,7 @@ export function listenForCalls(addresses: string[]) {
     }).then((ch) => ch && inboxes.set(a, ch));
   return () => {
     for (const a of mine) {
-      void inboxes.get(a)?.unsubscribe();
+      unsubscribed(`jobfair:inbox:${a}`, inboxes.get(a));
       inboxes.delete(a);
     }
   };
@@ -188,11 +193,44 @@ export function stopMedia(s: MediaStream | null) {
   s?.getTracks().forEach((t) => t.stop());
 }
 
+/** How a peer connection is doing, for the people waiting on it (and for anyone debugging a call). */
+export interface PeerInfo {
+  state: RTCPeerConnectionState | "waiting";
+  /** Once connected: straight between the two devices, or through the relay server. */
+  route?: "langsung" | "relay";
+}
+
+/** Which way the media goes once connected: the selected candidate pair, relay or not. */
+async function routeOf(pc: RTCPeerConnection): Promise<PeerInfo["route"]> {
+  try {
+    const stats = await pc.getStats();
+    let pair: { localCandidateId?: string; remoteCandidateId?: string } | undefined;
+    stats.forEach((r) => {
+      if (r.type === "transport" && r.selectedCandidatePairId) pair = stats.get(r.selectedCandidatePairId);
+    });
+    if (!pair) stats.forEach((r) => r.type === "candidate-pair" && r.nominated && r.state === "succeeded" && (pair = r));
+    if (!pair) return undefined;
+    const local = pair.localCandidateId ? stats.get(pair.localCandidateId) : undefined;
+    const remote = pair.remoteCandidateId ? stats.get(pair.remoteCandidateId) : undefined;
+    return local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "langsung";
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * One side of a WebRTC call. The caller makes the offer once the other side accepts;
  * candidates that arrive before the remote description are held until it is set.
  */
-export function connectPeer(opts: { callId: string; caller: boolean; kind: CallKind; local: MediaStream | null; onRemote: (s: MediaStream) => void; onState?: (s: RTCPeerConnectionState) => void }) {
+export function connectPeer(opts: {
+  callId: string;
+  caller: boolean;
+  kind: CallKind;
+  local: MediaStream | null;
+  onRemote: (s: MediaStream) => void;
+  onState?: (s: RTCPeerConnectionState) => void;
+  onInfo?: (i: PeerInfo) => void;
+}) {
   const pc = new RTCPeerConnection({ iceServers: iceServers() });
   // Relay credentials may still be on their way: take them before gathering any candidates.
   const ready = loadRelay().then(() => {
@@ -213,7 +251,13 @@ export function connectPeer(opts: { callId: string; caller: boolean; kind: CallK
   pc.onicecandidate = (e) => {
     if (e.candidate) sendSignal({ type: "ice", callId: opts.callId, candidate: e.candidate.toJSON() });
   };
-  pc.onconnectionstatechange = () => opts.onState?.(pc.connectionState);
+  opts.onInfo?.({ state: "waiting" });
+  pc.onconnectionstatechange = () => {
+    opts.onState?.(pc.connectionState);
+    const state = pc.connectionState;
+    if (state === "connected") void routeOf(pc).then((route) => opts.onInfo?.({ state, route }));
+    else opts.onInfo?.({ state });
+  };
   if (opts.local) for (const t of opts.local.getTracks()) pc.addTrack(t, opts.local);
   const kinds: ("audio" | "video")[] = opts.kind === "video" ? ["audio", "video"] : ["audio"];
   // Still receive what the other side sends when this side has no camera or microphone.

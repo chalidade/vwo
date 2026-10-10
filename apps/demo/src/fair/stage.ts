@@ -5,7 +5,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { hasRealtime, realtimeClient } from "../realtime";
-import { connectPeer, joinCall, leaveCall } from "./call";
+import { type PeerInfo, connectPeer, joinCall, leaveCall } from "./call";
 
 export interface StageChat {
   id: string;
@@ -190,37 +190,76 @@ export const BOT_CHAT = ["Suaranya jelas kak 👍", "Izin mencatat 📝", "Mater
 export const BOT_NAMES = ["Rina", "Dimas", "Putri", "Fajar", "Ayu", "Bagas", "Nadia", "Yoga"];
 
 /**
+ * Watch the speaker as one viewer: ask for the stream, and ask again when the speaker restarts
+ * (a new screen or microphone), when nothing connects within a while, or when the connection drops.
+ * Returns a function that leaves.
+ */
+export function watchStage(viewerId: string, name: string, onStream: (s: MediaStream | null) => void, onInfo?: (i: PeerInfo & { tries: number }) => void) {
+  let peer: { close(): void } | null = null;
+  let tries = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  const retryIn = (ms: number) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => !stopped && join(), ms);
+  };
+  const join = () => {
+    peer?.close();
+    onStream(null);
+    tries++;
+    peer = connectPeer({
+      callId: stageCallId(viewerId),
+      caller: false,
+      kind: "video",
+      local: null,
+      onRemote: (s) => onStream(new MediaStream(s.getTracks())),
+      onInfo: (i) => {
+        onInfo?.({ ...i, tries });
+        if (i.state === "connected") {
+          if (timer) clearTimeout(timer);
+          timer = null;
+        } else if (i.state === "failed" || i.state === "disconnected") retryIn(i.state === "failed" ? 1500 : 6000);
+      },
+    });
+    joinStage(viewerId, name);
+    // No answer from the speaker in time (a lost message, a busy network): ask again, slower each time.
+    retryIn(Math.min(30_000, 12_000 * tries));
+  };
+  const off = onStage((m) => {
+    if (m.type === "restart") {
+      tries = 0;
+      join();
+    }
+  });
+  join();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    off();
+    leaveStage(viewerId, name);
+    peer?.close();
+    onStream(null);
+  };
+}
+
+/**
  * The live broadcast as it plays on a floor's big screen: while `on` (the job seeker is in the room
  * the speaker broadcasts to), this tab joins as a viewer and gets the speaker's screen and voice.
  * Each tab joins under its own id, so two tabs watching never take each other's connection.
  */
 export function useStageFeed(live: StageLive | null, on: boolean, name: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [link, setLink] = useState<(PeerInfo & { tries: number }) | null>(null);
   const [viewerId] = useState(() => `feed-${Math.random().toString(36).slice(2, 10)}`);
   const key = on && live ? live.startedAt : null;
   useEffect(() => {
     if (key === null) {
       setStream(null);
+      setLink(null);
       return;
     }
-    let peer: { close(): void } | null = null;
-    const join = () => {
-      peer?.close();
-      setStream(null);
-      peer = connectPeer({ callId: stageCallId(viewerId), caller: false, kind: "video", local: null, onRemote: (s) => setStream(new MediaStream(s.getTracks())) });
-      joinStage(viewerId, name);
-    };
-    const off = onStage((m) => {
-      if (m.type === "restart") join();
-    });
-    join();
-    return () => {
-      off();
-      leaveStage(viewerId, name);
-      peer?.close();
-      setStream(null);
-    };
+    return watchStage(viewerId, name, setStream, setLink);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, viewerId]);
-  return stream;
+  return { stream, link };
 }

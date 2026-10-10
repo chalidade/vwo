@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import type { PeerInfo } from "./call";
 import type { StageLive } from "./stage";
+import { linkText } from "./StageWatch";
 
 /** The live broadcast in a corner of the screen while the job seeker is in the room it plays in:
  *  the speaker's shared screen and voice, without having to open the full viewer. */
-export function StageFeedPanel({ live, stream, onOpen }: { live: StageLive; stream: MediaStream | null; onOpen: () => void }) {
+export function StageFeedPanel({ live, stream, link, onOpen }: { live: StageLive; stream: MediaStream | null; link?: (PeerInfo & { tries: number }) | null; onOpen: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [blocked, setBlocked] = useState(false);
   const [small, setSmall] = useState(false);
@@ -45,6 +47,7 @@ export function StageFeedPanel({ live, stream, onOpen }: { live: StageLive; stre
         {!video && (
           <div className="sf-wait">
             {stream ? `🎙️ ${live.speaker} sedang berbicara` : live.screen ? "Menyambungkan layar pembicara…" : `🎤 ${live.speaker}`}
+            <div className="sf-link">{linkText(link ?? null)}</div>
           </div>
         )}
         {blocked && (
