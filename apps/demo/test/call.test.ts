@@ -25,7 +25,12 @@ vi.mock("../src/realtime", () => ({
       };
       return ch;
     },
+    async removeChannel(ch: { unsubscribe(): Promise<void> }) {
+      await ch.unsubscribe();
+    },
   }),
+  openChannel: async (sb: { channel(n: string): unknown }, name: string) => sb.channel(name),
+  closeChannel: (sb: { removeChannel(c: unknown): Promise<void> }, _name: string, ch: unknown) => void sb.removeChannel(ch),
 }));
 
 const { listenForCalls, newCallId, onSignal, sendSignal } = await import("../src/fair/call");
