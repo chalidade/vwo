@@ -4,6 +4,23 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · sewa stan food court lewat Xendit
+
+**Konteks:** menyewa stan kosong di Food Court masih pembayaran simulasi, dan stan baru hanya muncul di browser penyewa. Pengunjung lain tidak melihatnya.
+
+**Yang berubah:**
+- Di situs live, form "Sewa stan food court" kini membuka pembayaran Xendit, dengan harga dari server (`stall` di tabel harga).
+- Server mengecek slot masih kosong sebelum membuat tagihan.
+- Setelah Xendit mengonfirmasi, server sendiri yang membuka stan dan menyimpannya sebagai dokumen `stall:<id pembayaran>`, sehingga semua pengunjung melihatnya.
+- Kalau dua usaha membayar slot yang sama, yang kedua otomatis dapat slot kosong berikutnya. Penempatan dijaga dengan lock di database.
+- Penyewa mendapat notifikasi di game setelah pembayaran diterima.
+- Panitia tetap bisa melepas stan sewaan dari tab Food Court. Stan yang dilepas dicatat di `removedStalls` supaya tidak muncul lagi. Hanya panitia yang melihat siapa yang membayar.
+- Migrasi `0015` menambah jenis pembayaran `stall`.
+
+**Dites:** unit test engine untuk stan sewaan; uji end-to-end dengan Xendit tiruan mencakup slot terisi (409), input tidak valid (400), dua pembayaran untuk slot yang sama (yang kedua pindah ke slot 12), dan data pembayar hanya terlihat oleh panitia.
+
+---
+
 ## 2026-10-10 · saldo koin dihitung di server
 
 **Konteks:** pembelian koin sudah lewat Xendit, tapi saldo koin, riwayat, dan centang biru masih disimpan dari browser (`fair_players`). Siapa pun yang paham bisa mengubah angkanya sendiri.

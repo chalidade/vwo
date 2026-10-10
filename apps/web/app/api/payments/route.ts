@@ -1,5 +1,5 @@
-import { myPayments, type PaymentKind, readPrices, registrationById } from "@vwo/db";
-import { COIN_PACKAGES, priceFrom } from "@vwo/shared";
+import { myPayments, type PaymentKind, readFairState, readPrices, registrationById } from "@vwo/db";
+import { COIN_PACKAGES, freeStallSlotsOf, priceFrom, STALL_SLOTS } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { companyDoc, PRODUCT_IDS } from "@/lib/company-doc";
@@ -8,6 +8,7 @@ import { canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { type Purchase, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
 import { allow } from "@/lib/ratelimit";
+import { FOOD_COURT, stallInput, stallsIn } from "@/lib/stalls";
 import { XenditError } from "@/lib/xendit";
 import { currentUser } from "@/lib/session";
 
@@ -17,6 +18,7 @@ const schema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("coins"), pack: z.string().max(40) }),
   z.object({ kind: z.literal("registration"), id: z.string().uuid() }),
   z.object({ kind: z.literal("invoice"), booth: z.string().regex(/^[\w-]{1,80}$/), invoice: z.string().max(80) }),
+  z.object({ kind: z.literal("stall"), slot: z.number().int().min(0).max(STALL_SLOTS.length - 1), stall: stallInput }),
 ]);
 
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
@@ -25,7 +27,7 @@ const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
-  const kinds = new URL(req.url).searchParams.get("kind")?.split(",").filter((k): k is PaymentKind => ["coins", "registration", "invoice"].includes(k));
+  const kinds = new URL(req.url).searchParams.get("kind")?.split(",").filter((k): k is PaymentKind => ["coins", "registration", "invoice", "stall"].includes(k));
   let rows = await myPayments(db, user.id, kinds);
   if (rows.some((p) => p.status === "pending" && p.providerId) && (await allow(`pay-refresh:${user.id}`, 30, 600_000))) {
     rows = await Promise.all(rows.map((p) => (p.status === "pending" ? refresh(p).catch(() => p) : p)));
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ provider: provider(), payments: rows.map(paymentOut) }, { headers: { "Cache-Control": "no-store" } });
 }
 
-/** Pay for coins, a booth registration or a company invoice. The price is always the server's. */
+/** Pay for coins, a booth registration, a company invoice or a food court stand. The price is always the server's. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
@@ -55,6 +57,16 @@ export async function POST(req: Request) {
     if (!reg || reg.userId !== user.id) return fail(404, "not_found");
     if (reg.status !== "unpaid") return fail(409, "not_payable");
     purchase = { kind: "registration", ref: reg.id, amount: reg.price, description: `Pendaftaran stand ${reg.tier === "premium" ? "VIP" : "reguler"} · ${reg.company}`.slice(0, 200), back: "/daftar-perusahaan" };
+  } else if (b.kind === "stall") {
+    if (!freeStallSlotsOf(stallsIn(await readFairState(db))).includes(b.slot)) return fail(409, "slot_taken");
+    purchase = {
+      kind: "stall",
+      ref: `${FOOD_COURT}:${b.slot}`,
+      amount: priceFrom(prices, "stall"),
+      description: `Sewa stan food court · ${b.stall.name}`.slice(0, 200),
+      meta: { roomId: FOOD_COURT, slot: b.slot, input: b.stall },
+      back: "/play/#/jobfair",
+    };
   } else {
     if (!(await canManageBooth(user, b.booth))) return fail(403, "not_allowed");
     const inv = (await companyDoc(b.booth))?.invoices?.find((i) => i.id === b.invoice);

@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { stallPrice } from "../jobfair-engine";
+import { LIVE } from "../mode";
+import { pay } from "../payments";
+import { refreshShared } from "../shared-state";
 import { fair } from "../useFair";
 import { PAY_METHODS, rupiah } from "./company";
 import { Modal } from "./Modal";
@@ -7,7 +10,7 @@ import { Modal } from "./Modal";
 const COLORS = ["#ea580c", "#dc2626", "#ca8a04", "#16a34a", "#0d9488", "#2563eb", "#9333ea", "#7c2d12"];
 const EMOJIS = ["🍽️", "🍜", "🍛", "🍔", "🍕", "🍢", "🥟", "🧋", "☕", "🍰", "🥗", "🍦"];
 
-/** Renting an empty food court stand: the business, one voucher to sell, demo payment. */
+/** Renting an empty food court stand: the business, one voucher to sell, then payment (Xendit on the live site). */
 export function RentStall({ slot, onClose }: { slot: number; onClose: () => void }) {
   const [step, setStep] = useState<"form" | "pay" | "done">("form");
   const [name, setName] = useState("");
@@ -20,6 +23,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
   const [price, setPrice] = useState(8);
   const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const side = slot < 8 ? "dinding belakang" : slot < 12 ? "sisi kiri" : "sisi kanan";
 
   return (
@@ -95,15 +99,21 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
               </tr>
             </tbody>
           </table>
-          <label>
-            Metode pembayaran
-            <select value={method} onChange={(e) => setMethod(e.target.value)}>
-              {PAY_METHODS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </label>
-          <p className="muted small">Pembayaran di demo ini simulasi: tidak ada uang yang ditarik.</p>
+          {LIVE ? (
+            <p className="muted small">Kamu akan diarahkan ke halaman pembayaran Xendit (transfer bank, e-wallet, QRIS, atau kartu). Stan buka otomatis setelah pembayaran diterima.</p>
+          ) : (
+            <>
+              <label>
+                Metode pembayaran
+                <select value={method} onChange={(e) => setMethod(e.target.value)}>
+                  {PAY_METHODS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="muted small">Pembayaran di demo ini simulasi: tidak ada uang yang ditarik.</p>
+            </>
+          )}
           {error && <p className="bk-err">{error}</p>}
           <div className="row">
             <button type="button" className="ghost" onClick={() => setStep("form")}>
@@ -112,13 +122,25 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
             <button
               type="button"
               className="bk-go"
-              onClick={() => {
-                const r = fair.addStall(slot, { name, vendor, promo, emoji, color, deal: deal.trim() ? { title: deal, worth, price } : undefined });
+              disabled={busy}
+              onClick={async () => {
+                const dealIn = deal.trim() ? { title: deal, worth, price } : undefined;
+                if (LIVE) {
+                  setBusy(true);
+                  setError("");
+                  const r = await pay({ kind: "stall", slot, stall: { name, vendor, promo, emoji, color, deal: dealIn } });
+                  setBusy(false);
+                  if (!r.ok) return setError(r.error);
+                  if ("redirect" in r) return;
+                  refreshShared();
+                  return setStep("done");
+                }
+                const r = fair.addStall(slot, { name, vendor, promo, emoji, color, deal: dealIn });
                 if (!r) return setError("Maaf, stan ini baru saja disewa usaha lain. Pilih stan kosong lain.");
                 setStep("done");
               }}
             >
-              Bayar {rupiah(stallPrice())}
+              {busy ? "Membuka pembayaran…" : `Bayar ${rupiah(stallPrice())}`}
             </button>
           </div>
         </div>

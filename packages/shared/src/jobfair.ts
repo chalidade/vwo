@@ -429,6 +429,48 @@ export const STALL_SLOTS: { x: number; y: number }[] = [
 /** The slot a stall stands in. */
 export const stallSlot = (st: { slot?: number }, i: number) => st.slot ?? i;
 
+/** What a business fills in to open a food court stall (the organiser, or a renter paying for it). */
+export interface StallInput {
+  name: string;
+  emoji?: string;
+  color?: string;
+  vendor?: string;
+  promo?: string;
+  about?: string;
+  address?: string;
+  hours?: string;
+  deal?: { title: string; worth: string; price: number } | null;
+}
+
+/** A new stall from what the business filled in, every field trimmed to size. Null without a name. */
+export function makeStall(id: string, slot: number, input: StallInput): FoodStall | null {
+  const name = input.name.trim().slice(0, 40);
+  if (!name) return null;
+  const deal = input.deal && input.deal.title.trim() && input.deal.price > 0 ? input.deal : null;
+  return {
+    id,
+    slot,
+    name,
+    emoji: input.emoji?.trim().slice(0, 8) || "🍽️",
+    color: /^#[0-9a-f]{6}$/i.test(input.color ?? "") ? input.color! : "#ea580c",
+    vendor: input.vendor?.trim().slice(0, 30) || "Penjaga stan",
+    promo: input.promo?.trim().slice(0, 80) || `Promo spesial dari ${name}`,
+    about: input.about?.trim().slice(0, 300) || "",
+    address: input.address?.trim().slice(0, 120) || "",
+    hours: input.hours?.trim().slice(0, 40) || "",
+    website: "",
+    rating: 4.5,
+    menu: [],
+    deals: deal ? [{ id: `${id}-deal`, title: deal.title.trim().slice(0, 60), worth: deal.worth.trim().slice(0, 20) || "-", price: Math.min(200, Math.max(1, Math.round(deal.price))), terms: "Berlaku 30 hari." }] : [],
+  };
+}
+
+/** Free food court slots, given the stalls standing there. */
+export const freeStallSlotsOf = (stalls: { slot?: number }[]) => {
+  const taken = new Set(stalls.map((st, i) => stallSlot(st, i)));
+  return STALL_SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
+};
+
 /** Stall geometry in the food court, by slot. */
 export function stallRect(slot: number) {
   const s = STALL_SLOTS[slot] ?? STALL_SLOTS[0]!;
