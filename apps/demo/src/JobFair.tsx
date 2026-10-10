@@ -71,7 +71,7 @@ import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
-import { InviteCard } from "./fair/Invite";
+import { InviteCard, VisitCard } from "./fair/Invite";
 import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
 import { NotifList } from "./fair/Notifs";
 import { Modal } from "./fair/Modal";
@@ -308,7 +308,9 @@ export function JobFair() {
   }, [toast]);
 
   // A company scheduled an interview: show the invitation once, over everything but a call.
-  const invite = inviteId ? fair.applications.find((a) => a.id === inviteId) : undefined;
+  // An office visit invitation is queued as "visit:<application id>".
+  const inviteVisit = !!inviteId?.startsWith("visit:");
+  const invite = inviteId ? fair.applications.find((a) => a.id === inviteId.replace(/^visit:/, "")) : undefined;
   useEffect(() => {
     if (!inviteId && fair.interviewAlerts.length) setInviteId(fair.interviewAlerts.shift()!);
   });
@@ -1441,7 +1443,16 @@ export function JobFair() {
           />
         )}
 
-        {session && !ring && invite && (
+        {session && !ring && invite && (inviteVisit ? (
+          <VisitCard
+            application={invite}
+            onClose={() => setInviteId(null)}
+            onOpen={() => {
+              setInviteId(null);
+              setPanel("applications");
+            }}
+          />
+        ) : (
           <InviteCard
             application={invite}
             onClose={() => setInviteId(null)}
@@ -1450,7 +1461,7 @@ export function JobFair() {
               setPanel("applications");
             }}
           />
-        )}
+        ))}
 
         {ring && (
           <CallScreen
@@ -1628,12 +1639,13 @@ export function JobFair() {
           >
             <NotifList
               items={fair.notifsFor(PLAYER_ID)}
-              empty="Belum ada notifikasi. Balasan chat, panggilan, dan undangan interview dari HR muncul di sini."
+              empty="Belum ada notifikasi. Status lamaran, balasan chat, panggilan, undangan interview, dan kunjungan kantor dari HR muncul di sini."
               onPick={(n) => {
                 fair.markRead(PLAYER_ID, n.id);
                 setNotifs(false);
                 const app = n.appId ? fair.applications.find((x) => x.id === n.appId) : undefined;
                 if (n.kind === "interview" && app?.interview) setInviteId(app.id);
+                else if (n.kind === "visit" && app?.visit) setInviteId(`visit:${app.id}`);
                 else setPanel("applications");
               }}
             />

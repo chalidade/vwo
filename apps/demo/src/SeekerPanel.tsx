@@ -80,6 +80,7 @@ export function SeekerPanel({
   };
   const companies = new Set(applications.map((a) => a.boothId));
   const invited = applications.filter((a) => a.status === "Diundang interview").length;
+  const visits = applications.filter((a) => a.status === "Kunjungan kantor").length;
   const boothOf = (id: string) => booths.find((b) => b.id === id);
   const lv = levelOf(player.xp);
   const best = player.psych.reduce<number | null>((m, r) => Math.max(m ?? 0, Math.round((r.score / r.total) * 100)), null);
@@ -174,6 +175,7 @@ export function SeekerPanel({
                     [applications.length, "lamaran"],
                     [companies.size, "perusahaan"],
                     [invited, "undangan interview"],
+                    ...(visits ? [[visits, "kunjungan kantor"] as const] : []),
                     [visited.size, "stand dikunjungi"],
                     [avgRating ? `★${avgRating.toFixed(1)}` : "–", "rating dari perusahaan"],
                     [best != null ? best : "–", "nilai psikotes terbaik"],
@@ -251,6 +253,10 @@ export function SeekerPanel({
                     <>
                       , <b>{invited}</b> mengundangmu interview 🎉
                     </>
+                  ) : visits ? (
+                    <>
+                      , <b>{visits}</b> mengundangmu kunjungan kantor 🏢
+                    </>
                   ) : (
                     "."
                   )}
@@ -282,6 +288,19 @@ export function SeekerPanel({
                           <span className="sp-interview">
                             📅 Interview {a.interview.mode} · <b>{new Date(a.interview.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b>
                             {a.interview.place ? ` · ${a.interview.place}` : ""}
+                          </span>
+                        )}
+                        {a.visit && (
+                          <span className="sp-interview">
+                            🏢 Kunjungan kantor · <b>{new Date(a.visit.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b> · {a.visit.address}
+                            {a.visit.reply === "hadir" ? " · ✅ kamu hadir" : a.visit.reply === "jadwal-ulang" ? " · 🕑 minta jadwal ulang" : (
+                              <>
+                                {" "}
+                                <button type="button" className="small-btn" onClick={() => fair.answerVisit(a.id, "hadir")}>
+                                  Konfirmasi hadir
+                                </button>
+                              </>
+                            )}
                           </span>
                         )}
                         {(a.calls ?? []).some((c) => !c.answered) && <span className="sp-missed">📞 {a.company} mencoba menelepon kamu</span>}

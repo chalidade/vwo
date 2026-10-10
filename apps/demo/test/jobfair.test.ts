@@ -376,6 +376,27 @@ describe("DemoJobFair", () => {
     expect(fair.notices.at(-1)).toContain("tak terjawab");
   });
 
+  it("invites an applicant who passed the interview to visit the office", () => {
+    const c = clock();
+    const fair = new DemoJobFair(() => 0.5, c.now);
+    fair.join("Chalid", false, PLAYER_ID);
+    const a = fair.apply(PLAYER_ID, { boothId: "kopi-kita", jobId: fair.booth("kopi-kita")!.jobs[0]!.id })!;
+    fair.setStatus(a.id, "Lolos interview");
+    const at = c.now() + 2 * 86_400_000;
+    fair.scheduleVisit(a.id, { at, address: "Jl. Sudirman 1, Jakarta", note: "Bawa KTP" });
+    expect(a.status).toBe("Kunjungan kantor");
+    expect(a.visit).toMatchObject({ at, address: "Jl. Sudirman 1, Jakarta", note: "Bawa KTP" });
+    expect(a.messages?.at(-1)?.text).toContain("Jl. Sudirman 1");
+    expect(fair.interviewAlerts).toContain(`visit:${a.id}`);
+    expect(fair.notifsFor(PLAYER_ID)[0]?.kind).toBe("visit");
+    fair.answerVisit(a.id, "hadir");
+    expect(a.visit?.reply).toBe("hadir");
+    expect(fair.notifsFor("kopi-kita")[0]?.text).toContain("hadir kunjungan kantor");
+    // No address, no invitation.
+    fair.scheduleVisit(a.id, { at, address: "  " });
+    expect(a.visit?.address).toBe("Jl. Sudirman 1, Jakarta");
+  });
+
   it("takes newer application changes and company edits from another tab", () => {
     const c = clock();
     const tabA = new DemoJobFair(() => 0.5, c.now);

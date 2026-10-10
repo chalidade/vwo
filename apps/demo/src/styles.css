@@ -517,6 +517,8 @@ a.pc-cta { display: block; text-align: center; text-decoration: none; padding: 1
 /* ---- Application pipeline statuses ---- */
 .status[data-status="Shortlist"] { background: #fef3c7; color: #a16207; }
 .status[data-status="Diterima"] { background: #15803d; color: #fff; }
+.status[data-status="Lolos interview"] { background: #e0e7ff; color: #4338ca; }
+.status[data-status="Kunjungan kantor"] { background: #ede9fe; color: #6d28d9; }
 
 /* ---- Company portal ---- */
 .cp { display: grid; gap: 14px; color: var(--text); }
