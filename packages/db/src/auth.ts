@@ -5,7 +5,7 @@ import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client";
-import { emailTokens, seekerProfiles, sessions } from "./jobfair-schema";
+import { earlyAccess, emailTokens, seekerProfiles, sessions } from "./jobfair-schema";
 import { users } from "./schema";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: { N: number; r: number; p: number; maxmem: number }) => Promise<Buffer>;
@@ -128,9 +128,11 @@ export async function createSession(db: Db, userId: string, userAgent?: string |
 export async function sessionUser(db: Db, token: string | undefined | null) {
   if (!token || token.length > 100) return null;
   const [row] = await db
-    .select({ id: users.id, email: users.email, name: users.displayName, role: users.platformRole, emailVerifiedAt: users.emailVerifiedAt })
+    .select({ id: users.id, email: users.email, name: users.displayName, role: users.platformRole, emailVerifiedAt: users.emailVerifiedAt, earlyRole: earlyAccess.role })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
+    // The early-access list rides along, so a signed-in request costs one query, not two.
+    .leftJoin(earlyAccess, eq(earlyAccess.email, sql`lower(trim(${users.email}))`))
     .where(and(eq(sessions.tokenHash, sha256(token)), gt(sessions.expiresAt, new Date())));
   return row ?? null;
 }
