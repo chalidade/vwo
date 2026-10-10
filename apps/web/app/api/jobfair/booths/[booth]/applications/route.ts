@@ -1,10 +1,11 @@
-import { boothFairApplications, setFairApplicationNotes, setFairApplicationStatus } from "@vwo/db";
+import { boothFairApplications, fairApplicationById, setFairApplicationNotes, setFairApplicationStatus } from "@vwo/db";
 import { fairApplicationStatusSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { applicationOut, canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
+import { pushTo } from "@/lib/push";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ booth:
   const b = body.data;
   const ok = "notes" in b ? await setFairApplicationNotes(db, { id: b.id, boothKey: booth, notes: b.notes }) : await setFairApplicationStatus(db, { id: b.id, boothKey: booth, status: b.status });
   if (!ok) return fail(404, "not_found");
+  if (!("notes" in b)) {
+    // Tell the applicant on their phone, even with the app closed.
+    const row = await fairApplicationById(db, b.id);
+    const d = (row?.data ?? {}) as { company?: string; jobTitle?: string };
+    if (row) pushTo([row.userId], { title: `📋 ${d.company ?? "Lamaranmu"}`, body: `Lamaran ${d.jobTitle ?? ""} sekarang "${b.status}"`, url: "/play/#/jobfair", tag: `app-${row.id}` });
+  }
   return NextResponse.json({ ok: true });
 }

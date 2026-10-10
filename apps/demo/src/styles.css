@@ -1463,3 +1463,6 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .nt-del:hover { background: #f5f5f4; color: #57534e; }
 .nt-foot { display: flex; gap: 8px; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; }
 .nt-foot small { color: #78716c; }
+.push-card { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 10px; margin-bottom: 8px; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74; font-size: 13px; }
+.push-card[data-on] { background: #f0fdf4; border-color: #86efac; }
+.push-card button { flex: none; }

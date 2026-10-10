@@ -1,9 +1,10 @@
-import { addFriend, friendsOf, removeFriend } from "@vwo/db";
+import { addFriend, friendsOf, removeFriend, userIdByTag } from "@vwo/db";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
+import { pushTo } from "@/lib/push";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,9 @@ export async function POST(req: Request) {
   const state = await addFriend(db, user.id, body.data.tag);
   if (state === "not_found") return fail(404, "not_found");
   if (state === "self") return fail(400, "self");
+  const other = await userIdByTag(db, body.data.tag);
+  if (other)
+    pushTo([other.id], state === "friend" ? { title: "🤝 Teman baru", body: `${user.name} menerima pertemanan`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` } : { title: "⭐ Ajakan berteman", body: `${user.name} ingin berteman denganmu di job fair`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` });
   return NextResponse.json({ ok: true, state });
 }
 

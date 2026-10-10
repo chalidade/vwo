@@ -43,3 +43,40 @@ self.addEventListener("fetch", (e) => {
     ),
   );
 });
+
+// Notifications outside the app (Web Push): HR's replies, invitations, friend requests.
+self.addEventListener("push", (e) => {
+  let d = {};
+  try {
+    d = e.data ? e.data.json() : {};
+  } catch {
+    d = { body: e.data ? e.data.text() : "" };
+  }
+  const title = typeof d.title === "string" && d.title ? d.title : "Job Fair";
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof d.body === "string" ? d.body : "",
+      icon: "./icons/icon-192.png",
+      badge: "./icons/icon-192.png",
+      tag: typeof d.tag === "string" ? d.tag : undefined,
+      data: { url: typeof d.url === "string" && d.url.startsWith("/") ? d.url : "/play/" },
+    }),
+  );
+});
+
+// Tapping one opens the game (or brings an open tab of it to the front) where the news is.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || "/play/", self.location.origin).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((tabs) => {
+      for (const t of tabs) {
+        if (new URL(t.url).origin === self.location.origin && "focus" in t) {
+          t.navigate?.(url);
+          return t.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

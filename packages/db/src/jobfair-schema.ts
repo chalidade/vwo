@@ -383,6 +383,19 @@ export const fairScores = pgTable(
   ],
 );
 
+/** A browser or phone that asked for notifications outside the app (Web Push), per account. */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    endpoint: text("endpoint").primaryKey(),
+    userId: userRef("user_id"),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("push_subscriptions_user_idx").on(t.userId)],
+);
+
 /** What happened at the live fair, newest first, for the organiser's live feed. */
 export const fairEvents = pgTable(
   "fair_events",

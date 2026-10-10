@@ -3,6 +3,7 @@ import { BoothLogo } from "@vwo/ui";
 import type { CompanyBooth } from "@vwo/shared";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
+import { PushCard } from "../fair/PushCard";
 import { NotifList } from "../fair/Notifs";
 import { LIVE } from "../mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "../account";
@@ -268,6 +269,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
                     </button>
                   )}
                 </div>
+                <PushCard who="company" />
                 <NotifList
                   items={fair.notifsFor(booth.id)}
                   onDelete={(n) => fair.deleteNotif(booth.id, n.id)}

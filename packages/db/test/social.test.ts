@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addFriend, cleanupJunk, createDb, friendsOf, leaderboard, register, removeFriend, sessionUser, createSession, submitScore } from "../src";
+import { addFriend, cleanupJunk, deletePushSubscription, pushSubscriptionsOf, savePushSubscription, userIdByTag, createDb, friendsOf, leaderboard, register, removeFriend, sessionUser, createSession, submitScore } from "../src";
 
 const url = process.env.TEST_DATABASE_URL ?? "postgres://vwo:vwo@localhost:5432/vwo_test";
 const { db, close } = createDb(url);
@@ -79,5 +79,18 @@ describe("cleanup", () => {
     const left = await db.execute<{ n: number }>(sql`select count(*)::int as n from fair_events`);
     expect(left[0]!.n).toBe(1);
     expect((await db.execute<{ n: number }>(sql`select count(*)::int as n from sessions where user_id = ${citra}`))[0]!.n).toBe(1);
+  });
+});
+
+describe("push subscriptions", () => {
+  it("keeps at most ten devices per account and only the owner can remove one", async () => {
+    for (let i = 0; i < 12; i++) await savePushSubscription(db, { userId: ani, endpoint: `https://fcm.googleapis.com/fcm/send/a${i}`, p256dh: "k", auth: "a" });
+    expect(await pushSubscriptionsOf(db, [ani])).toHaveLength(10);
+    const one = (await pushSubscriptionsOf(db, [ani]))[0]!.endpoint;
+    await deletePushSubscription(db, { userId: budi, endpoint: one });
+    expect(await pushSubscriptionsOf(db, [ani])).toHaveLength(10);
+    await deletePushSubscription(db, { userId: ani, endpoint: one });
+    expect(await pushSubscriptionsOf(db, [ani])).toHaveLength(9);
+    expect((await userIdByTag(db, await tag(budi)))?.id).toBe(budi);
   });
 });
