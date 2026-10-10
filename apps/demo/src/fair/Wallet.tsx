@@ -22,11 +22,12 @@ export function WalletPanel({
   live,
   onClaim,
   onGoToStand,
+  onGoToDesk,
   onClose,
 }: {
   player: PlayerState;
   stand: CoinStandView;
-  /** At the coin stand you can buy; elsewhere you are pointed to it. */
+  /** At the coin stand or an info desk you can buy; elsewhere you are pointed to one. */
   atStand: boolean;
   canClaim: boolean;
   onBuy: (packageId: string, method: string) => BuyResult | Promise<BuyResult>;
@@ -34,6 +35,8 @@ export function WalletPanel({
   live?: boolean;
   onClaim: () => void;
   onGoToStand: () => void;
+  /** Walk to the info desk on this floor, which sells coins too. */
+  onGoToDesk?: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"buy" | "vouchers" | "history">("buy");
@@ -82,9 +85,14 @@ export function WalletPanel({
           {!atStand ? (
             <div className="fx-callout">
               <span>
-                Beli koin di <b>Stand Koin</b>, Lantai 2.
+                Beli koin di <b>meja informasi</b> lantai mana pun, atau di <b>Stand Koin</b>.
               </span>
-              <button type="button" className="mb-order" onClick={onGoToStand}>
+              {onGoToDesk && (
+                <button type="button" className="mb-order" onClick={onGoToDesk}>
+                  Antar ke meja informasi
+                </button>
+              )}
+              <button type="button" className="small-btn ghost" onClick={onGoToStand}>
                 Antar ke Stand Koin
               </button>
             </div>
