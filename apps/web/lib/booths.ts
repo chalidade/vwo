@@ -66,11 +66,19 @@ export async function placeBooth(input: NewBooth, userId: string): Promise<{ boo
   return { booth, pin };
 }
 
-/** Whether a booth stands in the event now: published and not removed, added by the organiser, or booked. */
-export async function boothStands(boothId: string) {
+/** A booth as it stands in the event now, with its company's own edits; null when it doesn't. */
+export async function boothNow(boothId: string): Promise<CompanyBooth | null> {
   const rows = await readFairState(db);
   const org = (rows.find((r) => r.key === "org")?.data ?? {}) as Org;
-  if (org.removed?.includes(boothId)) return false;
-  if (DEMO_JOB_FAIR.booths.some((b) => b.id === boothId) || org.added?.some((b) => b.id === boothId)) return true;
-  return rows.some((r) => r.key.startsWith("booking:") && (r.data as { booth?: CompanyBooth }).booth?.id === boothId);
+  if (org.removed?.includes(boothId)) return null;
+  const base =
+    DEMO_JOB_FAIR.booths.find((b) => b.id === boothId) ??
+    org.added?.find((b) => b.id === boothId) ??
+    rows.map((r) => (r.key.startsWith("booking:") ? (r.data as { booth?: CompanyBooth }).booth : undefined)).find((b) => b?.id === boothId);
+  if (!base) return null;
+  const doc = rows.find((r) => r.key === `company:${boothId}`)?.data as { edits?: Partial<CompanyBooth> } | undefined;
+  return { ...base, ...(doc?.edits ?? {}) };
 }
+
+/** Whether a booth stands in the event now: published and not removed, added by the organiser, or booked. */
+export const boothStands = async (boothId: string) => !!(await boothNow(boothId));

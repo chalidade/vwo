@@ -129,3 +129,39 @@ describe("live booth reviews", () => {
     expect(fair.companyRating(DEMO_JOB_FAIR.booths[1]!.id)).toEqual({ count: 0, average: 0 });
   });
 });
+
+describe("live counters", () => {
+  it("sends what the player did, and takes the server's totals", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const hits: unknown[] = [];
+    const events: unknown[] = [];
+    fair.onStat = (h) => hits.push(h);
+    fair.onEvent = (e) => events.push(e.type);
+    const booth = DEMO_JOB_FAIR.booths[0]!;
+    fair.join("Sari", false, PLAYER_ID);
+    fair.join("Tamu", false, "someone-else");
+    fair.visit(PLAYER_ID, booth.id);
+    fair.visit("someone-else", booth.id);
+    expect(hits).toEqual([{ key: `visit:${booth.id}`, what: "view" }]);
+    expect(events).toEqual(["arrive", "visit"]);
+    fair.setStats({ [`visit:${booth.id}`]: { views: 12, clicks: 0, sold: 0, coins: 0 }, "seminar:s1": { views: 4, clicks: 0, sold: 0, coins: 0 }, "stall:bakso": { views: 3, clicks: 1, sold: 2, coins: 16 } });
+    expect(fair.visits.get(booth.id)).toBe(12);
+    expect(fair.seminarCounts.get("s1")).toBe(4);
+    expect(fair.ads.get("stall:bakso")).toEqual({ views: 3, clicks: 1, sold: 2, coins: 16 });
+  });
+
+  it("takes merchandise back when the server says it is gone", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const booth = fair.booth(DEMO_JOB_FAIR.booths[0]!.id)!;
+    booth.accessories = [...(booth.accessories ?? []), "giveaway"];
+    let asked: [string, string] | null = null;
+    fair.onMerch = (b, v) => (asked = [b, v]);
+    const r = fair.useAccessory(booth.id, "giveaway", "claim");
+    expect(r.ok).toBe(true);
+    expect(asked![0]).toBe(booth.id);
+    expect(fair.player.vouchers.some((v) => v.id === asked![1])).toBe(true);
+    fair.merchRefused(booth.id, asked![1], "out_of_stock");
+    expect(fair.player.vouchers.some((v) => v.id === asked![1])).toBe(false);
+    expect(fair.useAccessory(booth.id, "giveaway", "claim").ok).toBe(false);
+  });
+});

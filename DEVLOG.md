@@ -4,6 +4,34 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · statistik, stok merchandise, feed aktivitas, dan peserta seminar di server
+
+**Konteks:** angka kunjungan stand, tayangan sponsor, statistik dekorasi/promotor/stan food court, stok merchandise, feed aktivitas panitia, dan jumlah peserta seminar hanya dihitung di browser masing-masing. Panitia dan perusahaan hanya melihat angka dari perangkatnya sendiri, dan stok merchandise bisa diambil melebihi jumlahnya.
+
+**Yang berubah:**
+- Tabel `fair_stats` (migrasi `0018`) menyimpan hitungan per akun per hari, dengan batas:
+  - maksimal 30 tayangan atau klik;
+  - maksimal 10 penjualan.
+
+  Dengan batas ini, satu akun tidak bisa menggelembungkan angka.
+- `/api/jobfair/stats`:
+  - Game mengirim hitungannya setiap 5 detik.
+  - Publik hanya melihat kunjungan stand, peserta seminar, dan jumlah merchandise yang sudah diambil.
+  - Perusahaan juga melihat statistik dekorasi dan promotor standnya sendiri.
+  - Panitia melihat semuanya, ditambah feed aktivitas dari tabel `fair_events`.
+- Merchandise diambil lewat `/api/jobfair/merch`. Server memeriksa stok yang diatur perusahaan dan memastikan satu akun hanya bisa mengambil sekali, dengan lock. Kalau ternyata habis, voucher di game ditarik kembali.
+- Jumlah peserta tiap seminar tampil di daftar seminar dan di halaman panitia.
+
+**Dites:** unit test engine dan database; uji end-to-end:
+- 40 kunjungan dari satu akun tercatat 30;
+- penjualan merchandise palsu, koin pada tayangan, key aneh, dan jenis event aneh ditolak 400;
+- tanpa login 401;
+- hasil GET sesuai peran;
+- dengan stok 2, akun ketiga mendapat `out_of_stock` dan pengambilan kedua mendapat `already_claimed`;
+- feed panitia menampilkan "Cici masuk" dari game.
+
+---
+
 ## 2026-10-10 · ulasan stand di server
 
 **Konteks:** bintang yang diberikan pencari kerja ke stand hanya tersimpan di browser masing-masing. Rating yang terlihat di situs live pun bercampur dengan ulasan karangan dari demo.
