@@ -54,7 +54,7 @@ export function startStatsSync(signedIn: boolean) {
       })
       .catch(() => undefined);
   };
-  window.setInterval(() => void send(), 5_000);
+  window.setInterval(() => void send(), 15_000);
   window.setInterval(() => document.visibilityState === "visible" && void pullStats(), 30_000);
   window.addEventListener("pagehide", () => void send(true));
 }

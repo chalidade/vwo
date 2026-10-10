@@ -1,5 +1,5 @@
 import "server-only";
-import { earlyAccessFor, SESSION_DAYS, sessionUser } from "@vwo/db";
+import { SESSION_DAYS, sessionUser } from "@vwo/db";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { db } from "./db";
@@ -14,8 +14,8 @@ export async function currentUser() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = await sessionUser(db, token);
   if (!user) return null;
-  const early = await earlyAccessFor(db, user.email);
-  return { ...user, earlyOrganizer: early?.role === "organizer" };
+  const { earlyRole, ...rest } = user;
+  return { ...rest, earlyOrganizer: earlyRole === "organizer" };
 }
 
 export function setSessionCookie(res: NextResponse, token: string, expiresAt: Date) {

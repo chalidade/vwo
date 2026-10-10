@@ -12,10 +12,12 @@ import {
   createSession,
   endSession,
   googleSignIn,
+  grantEarlyAccess,
   hashPassword,
   register,
   requestPasswordReset,
   resetPassword,
+  revokeEarlyAccess,
   sessionUser,
   verifyEmail,
   verifyPassword,
@@ -65,7 +67,10 @@ describe("accounts", () => {
     const { token } = await createSession(db, userId, "test");
     const rows = await db.select().from(sessions);
     expect(rows.some((r) => r.tokenHash === token)).toBe(false);
-    expect((await sessionUser(db, token))?.email).toBe("sari@mail.example");
+    expect(await sessionUser(db, token)).toMatchObject({ email: "sari@mail.example", earlyRole: null });
+    await grantEarlyAccess(db, { email: " Sari@Mail.example ", role: "organizer", addedBy: userId });
+    expect((await sessionUser(db, token))?.earlyRole).toBe("organizer");
+    await revokeEarlyAccess(db, "sari@mail.example");
     expect(await sessionUser(db, "bukan-token")).toBeNull();
     await endSession(db, token);
     expect(await sessionUser(db, token)).toBeNull();

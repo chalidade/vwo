@@ -181,7 +181,7 @@ export function JobFair() {
     const pull = () => void myApplications().then((r) => r.ok && fair.mergeServer(r.data.applications, true));
     pull();
     // Often enough for a chat with HR to feel live; a returning tab catches up at once.
-    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 12_000);
+    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 15_000);
     const back = () => document.visibilityState === "visible" && pull();
     document.addEventListener("visibilitychange", back);
     return () => {
