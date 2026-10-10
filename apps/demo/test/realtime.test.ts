@@ -10,8 +10,8 @@ describe("realtime channels", () => {
       removeChannel: () => new Promise<void>((r) => (done = () => (log.push("left"), r()))),
     } as never;
     closeChannel(sb, "jobfair:x", { unsubscribe: async () => {} });
-    const again = openChannel(sb, "jobfair:x", {});
-    const other = openChannel(sb, "jobfair:y", {});
+    const again = openChannel(sb, "jobfair:x", { config: {} });
+    const other = openChannel(sb, "jobfair:y", { config: {} });
     await other;
     expect(log).toEqual(["open jobfair:y"]);
     done();
