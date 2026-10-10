@@ -3,12 +3,14 @@ import { STAND_PRICES } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
 import { LIVE } from "../mode";
 import { fair } from "../useFair";
-import { PAY_METHODS, rupiah } from "./company";
+import { coinText } from "./company";
+import { CoinBalance, TopUp } from "./TopUp";
+import { coinPrice, koinText } from "@vwo/shared";
 import { Modal } from "./Modal";
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
 
-/** Booking an empty stand from the hall: company details, demo payment, then the portal code and PIN. */
+/** Booking an empty stand from the hall (demo): company details, payment with coins, then the portal code and PIN. */
 export function BookStand({ slot, onClose }: { slot: { floor: number; x: number; y: number }; onClose: () => void }) {
   const [step, setStep] = useState<"form" | "pay" | "done">("form");
   const [company, setCompany] = useState("");
@@ -17,7 +19,6 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
   const [email, setEmail] = useState("");
   const [color, setColor] = useState(COLORS[0]!);
   const [tier, setTier] = useState<"regular" | "premium">("regular");
-  const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [done, setDone] = useState<{ id: string; company: string; pin: string } | null>(null);
   const [error, setError] = useState("");
   const floorName = fair.fair.floors[slot.floor]?.name ?? "Aula";
@@ -59,7 +60,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             {(["regular", "premium"] as const).map((t) => (
               <button key={t} type="button" className="bk-tier" data-active={tier === t ? "" : undefined} onClick={() => setTier(t)}>
                 <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
-                <span>{rupiah(STAND_PRICES[t])}</span>
+                <span>{coinText(STAND_PRICES[t])}</span>
                 <small>{t === "premium" ? "Lampu sorot, karpet emas, LED berjalan" : "Panel, meja recruiter, roll-up banner"}</small>
               </button>
             ))}
@@ -87,7 +88,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             ))}
           </div>
           <button type="submit" className="bk-go">
-            Lanjut ke pembayaran · {rupiah(STAND_PRICES[tier])}
+            Lanjut ke pembayaran · {coinText(STAND_PRICES[tier])}
           </button>
         </form>
       )}
@@ -98,7 +99,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
             <tbody>
               <tr>
                 <td>{tier === "premium" ? "Stand VIP" : "Stand reguler"}</td>
-                <td>{rupiah(STAND_PRICES[tier])}</td>
+                <td>{coinText(STAND_PRICES[tier])}</td>
               </tr>
               <tr>
                 <td className="muted small">
@@ -108,15 +109,9 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
               </tr>
             </tbody>
           </table>
-          <label>
-            Metode pembayaran
-            <select value={method} onChange={(e) => setMethod(e.target.value)}>
-              {PAY_METHODS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-          </label>
-          <p className="muted small">Pembayaran di demo ini simulasi: tidak ada uang yang ditarik.</p>
+          <CoinBalance need={coinPrice(STAND_PRICES[tier])} />
+          {fair.player.coins < coinPrice(STAND_PRICES[tier]) && <TopUp back="/play/#/jobfair" need={coinPrice(STAND_PRICES[tier]) - fair.player.coins} compact />}
+          <p className="muted small">Sewa stand dibayar dengan koin. Demo: koin yang diisi tidak menarik uang sungguhan.</p>
           {error && <p className="bk-err">{error}</p>}
           <div className="row">
             <button type="button" className="ghost" onClick={() => setStep("form")}>
@@ -126,13 +121,16 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
               type="button"
               className="bk-go"
               onClick={() => {
-                const r = fair.bookStand({ company, industry, color, contact, email, tier, method, ...slot });
+                const need = coinPrice(STAND_PRICES[tier]);
+                if (fair.player.coins < need) return setError(`Koin belum cukup: kurang ${koinText(need - fair.player.coins)}. Isi koin dulu.`);
+                const r = fair.bookStand({ company, industry, color, contact, email, tier, method: "Koin", ...slot });
                 if (!r) return setError("Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.");
+                fair.payCoins(need, `Sewa stand ${tier === "premium" ? "VIP" : "reguler"} · ${company}`);
                 setDone({ id: r.booth.id, company: r.booth.company, pin: r.pin });
                 setStep("done");
               }}
             >
-              Bayar {rupiah(STAND_PRICES[tier])}
+              Bayar {coinText(STAND_PRICES[tier])}
             </button>
           </div>
         </div>
@@ -140,7 +138,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
 
       {step === "done" && done && (
         <div className="bk-form bk-done">
-          <p className="bk-ok">✓ Pembayaran diterima. Stand {done.company} sudah berdiri di {floorName}.</p>
+          <p className="bk-ok">✓ Sewa stand dibayar dengan koin. Stand {done.company} sudah berdiri di {floorName}.</p>
           <p className="small">
             {LIVE
               ? "Akunmu sudah jadi pengelola stand ini. Bagikan kode dan PIN ke rekan kerja supaya mereka bisa ikut mengelola dengan akun Google masing-masing:"

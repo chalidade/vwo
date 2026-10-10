@@ -1,12 +1,13 @@
 import { myPayments, type PaymentKind, readFairState, readPrices, registrationById } from "@vwo/db";
-import { COIN_PACKAGES, freeStallSlotsOf, priceFrom, STALL_SLOTS } from "@vwo/shared";
+import { ALL_COIN_PACKAGES, freeStallSlotsOf, priceFrom, STALL_SLOTS } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { companyDoc, PRODUCT_IDS } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
-import { type Purchase, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
+import { liveCoins } from "@/lib/coins";
+import { CoinsShortError, type Purchase, payWithCoins, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
 import { allow } from "@/lib/ratelimit";
 import { FOOD_COURT, stallInput, stallsIn } from "@/lib/stalls";
 import { XenditError } from "@/lib/xendit";
@@ -15,7 +16,8 @@ import { currentUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 const schema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("coins"), pack: z.string().max(40) }),
+  // Where the gateway sends the buyer back: the fair, a company's portal, or the registration page.
+  z.object({ kind: z.literal("coins"), pack: z.string().max(40), back: z.string().regex(/^\/(play\/#\/jobfair(\/company\/[\w-]{1,80})?|daftar-perusahaan)$/).optional() }),
   z.object({ kind: z.literal("registration"), id: z.string().uuid() }),
   z.object({ kind: z.literal("invoice"), booth: z.string().regex(/^[\w-]{1,80}$/), invoice: z.string().max(80) }),
   z.object({ kind: z.literal("stall"), slot: z.number().int().min(0).max(STALL_SLOTS.length - 1), stall: stallInput }),
@@ -35,7 +37,10 @@ export async function GET(req: Request) {
   return NextResponse.json({ provider: provider(), payments: rows.map(paymentOut) }, { headers: { "Cache-Control": "no-store" } });
 }
 
-/** Pay for coins, a booth registration, a company invoice or a food court stand. The price is always the server's. */
+/**
+ * Buy coins through the gateway, or pay for a booth registration, a company bill or a food court
+ * stand with coins. The price is always the server's.
+ */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
@@ -48,10 +53,11 @@ export async function POST(req: Request) {
   let purchase: Purchase;
 
   if (b.kind === "coins") {
-    const pkg = COIN_PACKAGES.find((p) => p.id === b.pack);
+    const pkg = ALL_COIN_PACKAGES.find((p) => p.id === b.pack);
     if (!pkg) return fail(404, "not_found");
     const amount = priceFrom(prices, `pack.${pkg.id}`);
-    purchase = { kind: "coins", ref: pkg.id, amount, description: `${pkg.coins}${pkg.bonus ? ` + ${pkg.bonus} bonus` : ""} koin Job Fair`, meta: { coins: pkg.coins + pkg.bonus }, back: "/play/#/jobfair" };
+    const n = (x: number) => x.toLocaleString("id-ID");
+    purchase = { kind: "coins", ref: pkg.id, amount, description: `${n(pkg.coins)}${pkg.bonus ? ` + ${n(pkg.bonus)} bonus` : ""} koin Job Fair`, meta: { coins: pkg.coins + pkg.bonus }, back: b.back ?? "/play/#/jobfair" };
   } else if (b.kind === "registration") {
     const reg = await registrationById(db, b.id);
     if (!reg || reg.userId !== user.id) return fail(404, "not_found");
@@ -86,6 +92,16 @@ export async function POST(req: Request) {
     };
   }
   if (purchase.amount <= 0) return fail(409, "not_payable");
+  if (purchase.kind !== "coins") {
+    try {
+      const p = await payWithCoins(user, purchase);
+      return NextResponse.json({ payment: paymentOut(p), provider: "koin", coins: await liveCoins(user.id) }, { status: 201 });
+    } catch (e) {
+      if (e instanceof CoinsShortError) return fail(409, "not_enough_coins", { needed: e.needed, ...(await liveCoins(user.id)) });
+      console.error("coin payment failed", e);
+      return fail(409, "not_delivered", { ...(await liveCoins(user.id)) });
+    }
+  }
   try {
     const p = await startPayment(req, user, purchase);
     return NextResponse.json({ payment: paymentOut(p), provider: p.provider }, { status: 201 });

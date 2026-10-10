@@ -63,8 +63,10 @@ export function App() {
   // In a room the game takes the whole screen; the way back home is on the title screen.
   const game = route === "jobfair";
   const home = !route.startsWith("jobfair");
+  // The organiser pages and the company portal use the light dashboard look.
+  const dash = route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route === "jobfair/speaker";
   return (
-    <div className={game ? "app app-game" : home ? "app app-home" : "app"}>
+    <div className={game ? "app app-game" : home ? "app app-home" : dash ? "app app-dash" : "app"}>
       {route === "jobfair" ? (
         <JobFair />
       ) : (route.startsWith("jobfair/admin") || route === "jobfair/speaker") && !organizer ? (

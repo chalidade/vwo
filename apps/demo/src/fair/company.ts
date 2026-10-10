@@ -1,8 +1,8 @@
 // The company portal's catalogue: what a company can buy for its booth, and how applicants are scored.
 import { BOOTH_ACCESSORIES } from "@vwo/ui";
-import { type CompanyBooth, type JobPosting, price } from "@vwo/shared";
+import { type CompanyBooth, coinPrice, type JobPosting, koinText, price } from "@vwo/shared";
 
-/** One thing a company can pay for. Prices are demo prices in rupiah; nothing is charged. */
+/** One thing a company can pay for. Prices are kept in rupiah and paid in coins (see coinText). */
 export interface CompanyProduct {
   id: string;
   name: string;
@@ -51,6 +51,9 @@ export const productOf = (id: string) => (id === VIP_PRODUCT.id ? VIP_PRODUCT : 
 export const PAY_METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mandiri", "Kartu kredit", "Transfer bank"] as const;
 
 export const rupiah = (n: number) => (n === 0 ? "Gratis" : `Rp ${n.toLocaleString("id-ID")}`);
+
+/** A company price (kept in rupiah by the organiser) as the coins it costs. */
+export const coinText = (rupiahPrice: number) => koinText(coinPrice(rupiahPrice));
 
 /** Where an application is in the hiring pipeline, in order. */
 export const PIPELINE = ["Terkirim", "Dilihat", "Shortlist", "Diundang interview", "Lolos interview", "Kunjungan kantor", "Diterima", "Belum cocok"] as const;

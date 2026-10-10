@@ -14,6 +14,7 @@ import {
   LOUNGE,
   LOUNGE_PLANS,
   type Prices,
+  BUSINESS_PACKAGES,
   price,
   priceTable,
   rp,
@@ -1907,6 +1908,13 @@ export class DemoJobFair {
     return true;
   }
 
+  /** The offline demo: a company or a food court business pays with the coins in this browser. */
+  payCoins(amount: number, reason: string) {
+    if (!this.spend(amount, reason)) return false;
+    this.emit();
+    return true;
+  }
+
   /** Without `op` the coins were already booked on the server (a paid top-up) or nowhere (the offline demo). */
   private earn(amount: number, reason: string, op?: CoinOp) {
     this.player.coins += amount;
@@ -1951,8 +1959,15 @@ export class DemoJobFair {
   }
 
   buyCoins(packageId: string, method: string) {
-    const pkg = this.fair.coinStand.packages.find((p) => p.id === packageId);
+    const biz = BUSINESS_PACKAGES.find((p) => p.id === packageId);
+    const pkg = this.fair.coinStand.packages.find((p) => p.id === packageId) ?? (biz && { ...biz, price: rp(price(`pack.${biz.id}`)) });
     if (!pkg) return null;
+    if (biz) {
+      const n = (x: number) => x.toLocaleString("id-ID");
+      this.earn(pkg.coins + pkg.bonus, `Isi ${n(pkg.coins)}${pkg.bonus ? ` + ${n(pkg.bonus)} bonus` : ""} koin perusahaan (${method}, ${pkg.price})`);
+      this.emit();
+      return pkg.coins + pkg.bonus;
+    }
     this.earn(pkg.coins + pkg.bonus, `Beli ${pkg.coins}${pkg.bonus ? ` + ${pkg.bonus} bonus` : ""} koin (${method}, ${pkg.price})`);
     this.log({ type: "coins", name: this.visitors.get(PLAYER_ID)?.displayName ?? "Kamu", company: pkg.price }, PLAYER_ID);
     this.say("coin-staff", `Pembayaran ${pkg.price} berhasil! +${pkg.coins + pkg.bonus} koin 🪙`, 3000);

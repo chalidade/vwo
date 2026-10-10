@@ -64,6 +64,11 @@ export async function markClosed(db: Db, id: string, status: "expired" | "failed
     .where(and(eq(fairPayments.id, id), eq(fairPayments.status, "pending")));
 }
 
+/** A coin payment whose purchase could not be handed over; its coins went back. */
+export async function markRefunded(db: Db, id: string) {
+  await db.update(fairPayments).set({ status: "refunded" }).where(eq(fairPayments.id, id));
+}
+
 export function myPayments(db: Db, userId: string, kinds?: PaymentKind[]) {
   return db
     .select()

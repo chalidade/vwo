@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rupiah } from "../fair/company";
+import { coinText, rupiah } from "../fair/company";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
@@ -95,7 +95,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
   const pick = free[slot];
   return (
     <li style={{ display: "block" }}>
-      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {r.tier === "premium" ? "👑 Stand VIP" : "Stand reguler"} · {rupiah(r.price)}
+      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {r.tier === "premium" ? "👑 Stand VIP" : "Stand reguler"} · {coinText(r.price)} (≈ {rupiah(r.price)})
       {r.method && <span className="muted small"> · dibayar via {r.method}</span>}
       <div className="muted small">
         {r.industry} · {r.city} · {r.website ? (

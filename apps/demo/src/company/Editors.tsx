@@ -3,7 +3,7 @@ import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fai
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
 import { readImageFile } from "../imageFile";
 import { staffLook } from "../JobFair";
-import { ACCESSORY_PRODUCTS, rupiah } from "../fair/company";
+import { ACCESSORY_PRODUCTS, coinText } from "../fair/company";
 import { fair } from "../useFair";
 import { GateEditor, MediaEditor } from "./MediaEditor";
 import { PromoterEditor } from "./PromoterEditor";
@@ -125,7 +125,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
                     {on.has(p.id) ? "✓ Dipasang" : "Pasang"}
                   </button>
                 ) : (
-                  <span className="cp-price">{rupiah(p.price)}</span>
+                  <span className="cp-price">{coinText(p.price)}</span>
                 )}
               </li>
             );

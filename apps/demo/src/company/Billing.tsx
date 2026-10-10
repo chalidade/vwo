@@ -1,387 +1,235 @@
-import { useEffect, useState } from "react";
-import type { CompanyBooth } from "@vwo/shared";
+import { useState } from "react";
+import { type CompanyBooth, coinPrice, koinText, rp } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
-import {
-  ACCESSORY_PRODUCTS,
-  PAY_METHODS,
-  PROMOTER_PRODUCT,
-  VIP_PRODUCT,
-  rupiah,
-} from "../fair/company";
+import { ACCESSORY_PRODUCTS, type CompanyProduct, PROMOTER_PRODUCT, VIP_PRODUCT } from "../fair/company";
+import { CoinBalance, TopUp } from "../fair/TopUp";
 import { fair } from "../useFair";
 import { LIVE } from "../mode";
-import { claimPaidCoins, type Gateway, pay, paymentGateway } from "../payments";
+import { claimPaidCoins, pay } from "../payments";
 import { flushShared } from "../shared-state";
 
-const day = (at: number) =>
-  new Date(at).toLocaleString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const day = (at: number) => new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const when = (at: number) => (at ? new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Awal");
 
-/** Pay for the VIP booth and decorations: through Xendit on the live site, a demo payment offline. */
+/** A company price in coins, with what it is worth in rupiah underneath. */
+function Price({ rupiah }: { rupiah: number }) {
+  return (
+    <span className="bl-price">
+      <b>{koinText(coinPrice(rupiah))}</b>
+      {rupiah > 0 && <small>≈ {rp(rupiah)}</small>}
+    </span>
+  );
+}
+
+/** Pay a bill with the coins on this account: the server's ledger on the live site, this browser's in the demo. */
+async function payBill(booth: CompanyBooth, inv: CompanyInvoice): Promise<string | null> {
+  if (!LIVE) {
+    const need = coinPrice(inv.total);
+    if (fair.player.coins < need) return `Koin belum cukup: perlu ${koinText(need)}, saldo ${koinText(fair.player.coins)}. Isi koin dulu.`;
+    fair.payCoins(need, `Tagihan ${inv.no} · ${booth.company}`);
+    fair.payInvoice(booth.id, inv.id, "Koin");
+    return null;
+  }
+  // The bill must be on the server before it can be paid.
+  await flushShared();
+  const r = await pay({ kind: "invoice", booth: booth.id, invoice: inv.id });
+  if (!r.ok) return r.error;
+  if ("redirect" in r) return null;
+  await claimPaidCoins();
+  return null;
+}
+
+/** Everything a company buys for its stand, paid with coins, and the coin top-up. */
 export function Billing({ booth }: { booth: CompanyBooth }) {
   const [cart, setCart] = useState<Set<string>>(new Set());
-  const [paying, setPaying] = useState<CompanyInvoice | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const invoices = fair.company.get(booth.id)?.invoices ?? [];
   const vip = booth.tier === "premium";
-  const pending = new Set(
-    invoices
-      .filter((i) => i.status === "Belum dibayar")
-      .flatMap((i) => i.items.map((x) => x.id)),
-  );
+  const pending = new Set(invoices.filter((i) => i.status === "Belum dibayar").flatMap((i) => i.items.map((x) => x.id)));
   const toggle = (id: string) => {
     const next = new Set(cart);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setCart(next);
   };
-  const items = [VIP_PRODUCT, PROMOTER_PRODUCT, ...ACCESSORY_PRODUCTS].filter(
-    (p) => cart.has(p.id),
-  );
+  const items = [VIP_PRODUCT, PROMOTER_PRODUCT, ...ACCESSORY_PRODUCTS].filter((p) => cart.has(p.id));
   const total = items.reduce((n, p) => n + p.price, 0);
-  const checkout = () => {
+  const need = coinPrice(total);
+  const open = invoices.filter((i) => i.status === "Belum dibayar");
+  const short = Math.max(0, need - fair.player.coins, ...open.map((i) => coinPrice(i.total) - fair.player.coins));
+
+  const run = async (inv: CompanyInvoice) => {
+    setBusy(inv.id);
+    setMsg(null);
+    const err = await payBill(booth, inv);
+    setBusy(null);
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: `${inv.no} lunas. ${inv.items.some((i) => i.id === "vip") ? "Stand kamu sekarang VIP. " : ""}Barang yang dibeli sudah dipasang di stand.` });
+  };
+  const checkout = async () => {
+    if (need > fair.player.coins) return setMsg({ ok: false, text: `Koin belum cukup: kurang ${koinText(need - fair.player.coins)}. Pilih paket isi koin di atas.` });
     const inv = fair.createInvoice(booth.id, [...cart]);
+    if (!inv) return;
     setCart(new Set());
-    if (inv) setPaying(inv);
+    await run(inv);
   };
 
+  const product = (p: CompanyProduct, owned: boolean, extra?: string) =>
+    owned ? (
+      <span className="cp-saved">{extra ?? "✓ Dimiliki"}</span>
+    ) : pending.has(p.id) ? (
+      <span className="bl-wait">Menunggu bayar</span>
+    ) : (
+      <label className="bl-pick" data-on={cart.has(p.id) ? "" : undefined}>
+        <input type="checkbox" checked={cart.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Beli ${p.name}`} />
+        <Price rupiah={p.price} />
+      </label>
+    );
+
   return (
-    <div className="cp-bill-grid">
-      <div className="cp-bill-main">
-        <div className="card cp-vip-card" data-vip={vip ? "" : undefined}>
-          <div className="cp-vip-crown">👑</div>
-          <h2 className="cp-h2">Stand VIP</h2>
-          <p>{VIP_PRODUCT.about}</p>
-          <ul className="cp-ul">
-            <li>
-              Stand lebih lebar dengan umbul-umbul brand di kiri dan kanan
-            </li>
-            <li>Gapura di pintu masuk, model dan tulisannya bisa diatur</li>
-            <li>Layar video besar yang memutar video perusahaan</li>
-            <li>Lampu sorot, karpet emas, LED berjalan, dan label 👑</li>
-            <li>Prioritas di layar informasi panitia</li>
-          </ul>
-          {vip ? (
-            <p className="cp-saved">✓ Stand kamu sudah VIP</p>
-          ) : pending.has("vip") ? (
-            <p className="muted">Menunggu pembayaran tagihan di bawah.</p>
-          ) : (
-            <label className="cp-check">
-              <input
-                type="checkbox"
-                checked={cart.has("vip")}
-                onChange={() => toggle("vip")}
-              />
-              <b>{rupiah(VIP_PRODUCT.price)}</b> / acara
-            </label>
-          )}
+    <div className="bl">
+      <section className="card bl-wallet">
+        <div className="bl-wallet-head">
+          <div>
+            <h2 className="cp-h2">Dompet koin perusahaan</h2>
+            <p className="muted small">Semua pembelian di job fair dibayar dengan koin: sewa stand, upgrade VIP, promotor, aksesoris, dan stan food court. Isi koin sekali, pakai kapan saja.</p>
+          </div>
+          <CoinBalance need={short > 0 ? fair.player.coins + short : undefined} />
         </div>
-        <div className="card">
-          <h2 className="cp-h2">📣 {PROMOTER_PRODUCT.name}</h2>
-          <p className="small" style={{ marginTop: 0 }}>
-            {PROMOTER_PRODUCT.about}
-          </p>
-          {fair.owns(booth.id, PROMOTER_PRODUCT.id) ? (
-            <p className="cp-saved">
-              ✓ Promotor kamu sedang berkeliling. Atur sapaannya di tab Booth.
-            </p>
-          ) : pending.has(PROMOTER_PRODUCT.id) ? (
-            <p className="muted">Menunggu pembayaran tagihan di bawah.</p>
-          ) : (
-            <label className="cp-check">
-              <input
-                type="checkbox"
-                checked={cart.has(PROMOTER_PRODUCT.id)}
-                onChange={() => toggle(PROMOTER_PRODUCT.id)}
-              />
-              <b>{rupiah(PROMOTER_PRODUCT.price)}</b> / acara
-            </label>
-          )}
-        </div>
-        <div className="card">
-          <h2 className="cp-h2">Aksesoris berbayar</h2>
-          <ul className="cp-acc">
-            {ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => {
-              const owned = fair.owns(booth.id, p.id);
-              return (
-                <li key={p.id}>
-                  <span className="cp-acc-emoji">{p.emoji}</span>
-                  <span className="cp-acc-main">
-                    <b>{p.name}</b>
-                    <span className="muted small">{rupiah(p.price)}</span>
-                  </span>
-                  {owned ? (
-                    <span className="cp-saved">
-                      {vip && p.id === "gapura"
-                        ? "👑 Termasuk VIP"
-                        : "Dimiliki"}
-                    </span>
-                  ) : pending.has(p.id) ? (
-                    <span className="muted small">Menunggu bayar</span>
-                  ) : (
-                    <input
-                      type="checkbox"
-                      checked={cart.has(p.id)}
-                      onChange={() => toggle(p.id)}
-                      aria-label={`Beli ${p.name}`}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </div>
-      <aside className="cp-bill-side">
-        <div className="card cp-cart">
-          <h2 className="cp-h2">🛒 Keranjang</h2>
-          {items.length === 0 ? (
-            <p className="muted small cp-empty">
-              Centang VIP, promotor, atau aksesoris di atas untuk dibeli.
-            </p>
-          ) : (
-            <>
-              <ul className="cp-lines">
-                {items.map((p) => (
-                  <li key={p.id}>
-                    <span className="cp-line-name">
-                      {p.emoji} {p.name}
-                    </span>
-                    <span className="cp-num">{rupiah(p.price)}</span>
-                    <button
-                      type="button"
-                      className="cp-line-x"
-                      onClick={() => toggle(p.id)}
-                      aria-label={`Hapus ${p.name}`}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="cp-total">
-                <span>Total ({items.length} item)</span>
-                <b>{rupiah(total)}</b>
-              </div>
-              <button type="button" className="cp-checkout" onClick={checkout}>
-                Buat tagihan · {rupiah(total)}
-              </button>
-            </>
-          )}
-        </div>
-        <div className="card cp-bills">
-          <h2 className="cp-h2">🧾 Tagihan</h2>
-          {invoices.length === 0 ? (
-            <p className="muted small cp-empty">Belum ada tagihan.</p>
-          ) : (
-            <ul className="cp-invoices">
-              {invoices.map((inv) => (
-                <li key={inv.id} data-status={inv.status}>
-                  <div className="cp-inv-head">
-                    <b>{inv.no}</b>
-                    <span className="cp-inv-status">
-                      {inv.status === "Lunas"
-                        ? `✓ Lunas${inv.method ? ` · ${inv.method}` : ""}`
-                        : inv.status}
-                    </span>
-                  </div>
-                  <div className="cp-inv-items muted small">
-                    {day(inv.at)} · {inv.items.map((i) => i.name).join(", ")}
-                  </div>
-                  <div className="cp-inv-foot">
-                    <b className="cp-num">{rupiah(inv.total)}</b>
-                    {inv.status === "Belum dibayar" && (
-                      <span className="row">
-                        <button
-                          type="button"
-                          className="small-btn ghost"
-                          onClick={() => fair.cancelInvoice(booth.id, inv.id)}
-                        >
-                          Batalkan
-                        </button>
-                        <button
-                          type="button"
-                          className="small-btn"
-                          onClick={() => setPaying(inv)}
-                        >
-                          Bayar
-                        </button>
-                      </span>
-                    )}
-                  </div>
+        <TopUp back={`/play/#/jobfair/company/${booth.id}`} need={short} />
+        {fair.player.txns.length > 0 && (
+          <details className="bl-history">
+            <summary>Riwayat koin</summary>
+            <ul>
+              {fair.player.txns.slice(0, 12).map((t, i) => (
+                <li key={i}>
+                  <span className="muted">{when(t.at)}</span>
+                  <span>{t.reason}</span>
+                  <b data-plus={t.amount > 0 ? "" : undefined}>
+                    {t.amount > 0 ? "+" : ""}
+                    {t.amount.toLocaleString("id-ID")}
+                  </b>
                 </li>
               ))}
             </ul>
-          )}
-        </div>
-      </aside>
-      {paying && (
-        <PayDialog
-          booth={booth}
-          invoice={paying}
-          onClose={() => setPaying(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function PayDialog({
-  booth,
-  invoice,
-  onClose,
-}: {
-  booth: CompanyBooth;
-  invoice: CompanyInvoice;
-  onClose: () => void;
-}) {
-  const [method, setMethod] = useState<string>(PAY_METHODS[0]);
-  const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [gateway, setGateway] = useState<Gateway | null>(null);
-  useEffect(() => {
-    if (LIVE) void paymentGateway().then(setGateway);
-  }, []);
-  const va = `8808${(invoice.total % 1e8).toString().padStart(8, "0")}`;
-  return (
-    <div className="cp-modal" onClick={onClose}>
-      <div
-        className="card cp-pay"
-        role="dialog"
-        aria-label="Pembayaran"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {done ? (
-          <>
-            <h2 className="cp-h2">✅ Pembayaran berhasil</h2>
-            <p>
-              {invoice.no} lunas.{" "}
-              {invoice.items.some((i) => i.id === "vip")
-                ? "Stand kamu sekarang VIP. "
-                : ""}
-              Aksesoris yang dibeli sudah dipasang di stand.
-            </p>
-            <button type="button" onClick={onClose}>
-              Selesai
-            </button>
-          </>
-        ) : LIVE ? (
-          <>
-            <h2 className="cp-h2">Bayar {invoice.no}</h2>
-            <p className="muted small">
-              Ditagihkan ke {booth.company} · Total{" "}
-              <b>{rupiah(invoice.total)}</b>
-            </p>
-            <p>
-              {gateway === "demo"
-                ? "Pembayaran online belum diaktifkan panitia: tagihan ditandai lunas tanpa uang ditarik (simulasi)."
-                : "Bayar lewat Xendit: QRIS, virtual account, e-wallet atau kartu kredit. Kamu akan dibawa ke halaman pembayaran yang aman, lalu kembali ke portal ini."}
-            </p>
-            {error && <p className="cp-warn">{error}</p>}
-            <div className="row">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  setError("");
-                  // The bill must be on the server before it can be paid.
-                  await flushShared();
-                  const r = await pay({ kind: "invoice", booth: booth.id, invoice: invoice.id });
-                  if (r.ok && "redirect" in r) return;
-                  setBusy(false);
-                  if (!r.ok) return setError(r.error);
-                  await claimPaidCoins();
-                  setDone(true);
-                }}
-              >
-                {busy ? "Memproses…" : `Bayar ${rupiah(invoice.total)}`}
-              </button>
-              <button type="button" className="ghost" onClick={onClose}>
-                Nanti
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="cp-h2">Bayar {invoice.no}</h2>
-            <p className="muted small">
-              Ditagihkan ke {booth.company} · Total{" "}
-              <b>{rupiah(invoice.total)}</b>
-            </p>
-            <div className="cp-methods">
-              {PAY_METHODS.map((m) => (
-                <label
-                  key={m}
-                  className="cp-method"
-                  data-active={method === m ? "" : undefined}
-                >
-                  <input
-                    type="radio"
-                    name="pay"
-                    checked={method === m}
-                    onChange={() => setMethod(m)}
-                  />
-                  {m}
-                </label>
-              ))}
-            </div>
-            <div className="cp-pay-box">
-              {method === "QRIS" ? (
-                <div className="cp-qr" aria-label="Kode QR contoh">
-                  {Array.from({ length: 49 }, (_, i) => (
-                    <span
-                      key={i}
-                      data-on={
-                        (i * 7 + invoice.total) % 3 === 0 ||
-                        [0, 1, 7, 8, 5, 6, 12, 13, 35, 36, 42, 43].includes(i)
-                          ? ""
-                          : undefined
-                      }
-                    />
-                  ))}
-                </div>
-              ) : method.startsWith("Virtual") ? (
-                <p>
-                  Nomor VA: <b className="cp-mono">{va}</b>
-                </p>
-              ) : method === "Kartu kredit" ? (
-                <p className="muted small">
-                  Form kartu muncul di sini pada versi asli (lewat payment
-                  gateway).
-                </p>
-              ) : (
-                <p>
-                  Transfer ke rekening panitia{" "}
-                  <b className="cp-mono">123-456-7890</b> a.n. Panitia Job Fair
-                </p>
-              )}
-            </div>
-            <p className="cp-warn">
-              Ini demo: tidak ada uang yang ditarik. Tombol di bawah langsung
-              menandai tagihan lunas.
-            </p>
-            <div className="row">
-              <button
-                type="button"
-                onClick={() => {
-                  if (fair.payInvoice(booth.id, invoice.id, method))
-                    setDone(true);
-                }}
-              >
-                Saya sudah bayar (demo)
-              </button>
-              <button type="button" className="ghost" onClick={onClose}>
-                Nanti
-              </button>
-            </div>
-          </>
+          </details>
         )}
+      </section>
+
+      <div className="bl-grid">
+        <div className="bl-main">
+          <section className="card bl-vip" data-vip={vip ? "" : undefined}>
+            <div className="bl-vip-top">
+              <span className="bl-vip-crown">👑</span>
+              <div>
+                <h2 className="cp-h2">Stand VIP</h2>
+                <p className="small muted">{VIP_PRODUCT.about}</p>
+              </div>
+            </div>
+            <ul className="bl-feats">
+              <li>Stand lebih lebar, umbul-umbul brand kiri dan kanan</li>
+              <li>Gapura di pintu masuk, model dan tulisannya bisa diatur</li>
+              <li>Layar video besar untuk video perusahaan</li>
+              <li>Lampu sorot, karpet emas, LED berjalan, label 👑</li>
+              <li>Prioritas di layar informasi panitia</li>
+            </ul>
+            <div className="bl-row-end">{product(VIP_PRODUCT, vip, "✓ Stand kamu sudah VIP")}</div>
+          </section>
+
+          <section className="card">
+            <div className="bl-line">
+              <span className="bl-emoji">📣</span>
+              <span className="bl-line-main">
+                <b>{PROMOTER_PRODUCT.name}</b>
+                <span className="small muted">{PROMOTER_PRODUCT.about}</span>
+              </span>
+              {product(PROMOTER_PRODUCT, fair.owns(booth.id, PROMOTER_PRODUCT.id), "✓ Sedang berkeliling")}
+            </div>
+          </section>
+
+          <section className="card">
+            <h2 className="cp-h2">Aksesoris stand</h2>
+            <ul className="bl-acc">
+              {ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => (
+                <li key={p.id} className="bl-line">
+                  <span className="bl-emoji">{p.emoji}</span>
+                  <span className="bl-line-main">
+                    <b>{p.name}</b>
+                    <span className="small muted">{p.about}</span>
+                  </span>
+                  {product(p, fair.owns(booth.id, p.id), vip && p.id === "gapura" ? "👑 Termasuk VIP" : undefined)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <aside className="bl-side">
+          <section className="card bl-cart">
+            <h2 className="cp-h2">🛒 Keranjang</h2>
+            {items.length === 0 ? (
+              <p className="muted small">Centang VIP, promotor, atau aksesoris untuk dibeli dengan koin.</p>
+            ) : (
+              <>
+                <ul className="bl-lines">
+                  {items.map((p) => (
+                    <li key={p.id}>
+                      <span>
+                        {p.emoji} {p.name}
+                      </span>
+                      <span className="bl-num">{koinText(coinPrice(p.price))}</span>
+                      <button type="button" className="bl-x" onClick={() => toggle(p.id)} aria-label={`Hapus ${p.name}`}>
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="bl-total">
+                  <span>Total</span>
+                  <b>{koinText(need)}</b>
+                </div>
+                <button type="button" className="bl-pay" disabled={!!busy} onClick={() => void checkout()}>
+                  {busy ? "Memproses…" : need > fair.player.coins ? `Koin kurang ${koinText(need - fair.player.coins)}` : `Bayar ${koinText(need)}`}
+                </button>
+              </>
+            )}
+            {msg && <p className={msg.ok ? "cp-saved" : "cp-warn"}>{msg.text}</p>}
+          </section>
+
+          <section className="card">
+            <h2 className="cp-h2">🧾 Riwayat pembelian</h2>
+            {invoices.length === 0 ? (
+              <p className="muted small">Belum ada pembelian.</p>
+            ) : (
+              <ul className="bl-invoices">
+                {invoices.map((inv) => (
+                  <li key={inv.id} data-status={inv.status}>
+                    <div className="bl-inv-head">
+                      <b>{inv.no}</b>
+                      <span className="bl-inv-status">{inv.status === "Lunas" ? `✓ Lunas${inv.method ? ` · ${inv.method}` : ""}` : inv.status}</span>
+                    </div>
+                    <div className="muted small">
+                      {day(inv.at)} · {inv.items.map((i) => i.name).join(", ")}
+                    </div>
+                    <div className="bl-inv-foot">
+                      <b className="bl-num">{koinText(coinPrice(inv.total))}</b>
+                      {inv.status === "Belum dibayar" && (
+                        <span className="row">
+                          <button type="button" className="small-btn ghost" onClick={() => fair.cancelInvoice(booth.id, inv.id)}>
+                            Batalkan
+                          </button>
+                          <button type="button" className="small-btn" disabled={!!busy} onClick={() => void run(inv)}>
+                            {busy === inv.id ? "Memproses…" : "Bayar dengan koin"}
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
   );

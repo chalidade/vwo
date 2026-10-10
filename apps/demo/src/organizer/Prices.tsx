@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { COIN_PACKAGES, PRICE_CATALOG, PRICE_GROUPS, type Prices, price } from "@vwo/shared";
+import { ALL_COIN_PACKAGES, coinsFor, PRICE_CATALOG, PRICE_GROUPS, type Prices, price, priceTable } from "@vwo/shared";
 import { rupiah } from "../fair/company";
 import { savePrices } from "../prices-sync";
 import { useFair } from "../useFair";
@@ -14,13 +14,16 @@ export function OrgPrices({ onToast }: { onToast: (t: string) => void }) {
   const [error, setError] = useState("");
   const value = (key: string) => draft[key] ?? price(key);
   const changed = Object.keys(draft).filter((k) => draft[k] !== price(k));
+  // Company prices in coins, at the coin value being edited.
+  const table = { ...priceTable(), ...draft };
+  const COMPANY = new Set(["Sewa stand", "Upgrade & paket VIP", "Printilan booth"]);
 
   return (
     <div className="org">
       <div className="card">
         <h2 className="cp-h2">💰 Daftar harga</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Semua harga di job fair dalam satu tabel. Koin dipakai pencari kerja; rupiah dibayar perusahaan dan untuk beli koin. Ubah angkanya lalu simpan: harga baru langsung berlaku untuk semua pengunjung. Tagihan yang sudah dibuat tetap memakai harga lama. Tiket lantai dan ruangan diatur di tab 🏢 Lantai, harga voucher makan di tab 🍜 Food Court.
+          Semua harga di job fair dalam satu tabel. Pembeli selalu membayar dengan koin. Harga perusahaan ditulis dalam rupiah lalu dibayar dengan koin senilai "Nilai 1 koin"; koin sendiri dibeli lewat paket koin (Xendit). Ubah angkanya lalu simpan: harga baru langsung berlaku untuk semua pengunjung. Tagihan yang sudah dibuat tetap memakai harga lama. Tiket lantai dan ruangan diatur di tab 🏢 Lantai, harga voucher makan di tab 🍜 Food Court.
         </p>
         {PRICE_GROUPS.map((group) => (
           <section key={group} className="pr-group">
@@ -38,13 +41,14 @@ export function OrgPrices({ onToast }: { onToast: (t: string) => void }) {
                 <tbody>
                   {PRICE_CATALOG.filter((p) => p.group === group).map((p) => {
                     const v = value(p.key);
-                    const pack = COIN_PACKAGES.find((c) => `pack.${c.id}` === p.key);
+                    const pack = ALL_COIN_PACKAGES.find((c) => `pack.${c.id}` === p.key);
                     return (
                       <tr key={p.key} data-changed={draft[p.key] !== undefined && draft[p.key] !== price(p.key) ? "" : undefined}>
                         <td>
                           {p.label}
                           {p.note && <span className="muted small"> · {p.note}</span>}
                           {pack && v > 0 && <span className="muted small"> · ≈ {rupiah(Math.round(v / (pack.coins + pack.bonus)))} per koin</span>}
+                          {COMPANY.has(group) && v > 0 && <span className="pr-koin"> = {coinsFor(table, v).toLocaleString("id-ID")} 🪙</span>}
                         </td>
                         <td className="muted small">{p.unit === "koin" ? "koin" : "Rp"}</td>
                         <td className="muted small">{show(p.unit, p.default)}</td>

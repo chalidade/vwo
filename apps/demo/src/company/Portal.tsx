@@ -13,18 +13,24 @@ import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
+import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 
 const TABS = [
-  ["overview", "📊 Ringkasan"],
-  ["applicants", "📋 Pelamar"],
-  ["jobs", "💼 Lowongan"],
-  ["booth", "🎨 Booth"],
-  ["profile", "🏢 Profil"],
-  ["faq", "❓ FAQ"],
-  ["billing", "👑 VIP & tagihan"],
+  ["overview", "📊", "Ringkasan"],
+  ["applicants", "📋", "Pelamar"],
+  ["jobs", "💼", "Lowongan"],
+  ["booth", "🎨", "Tampilan booth"],
+  ["profile", "🏢", "Profil perusahaan"],
+  ["faq", "❓", "FAQ"],
+  ["billing", "🪙", "Koin & belanja"],
 ] as const;
 export type PortalTab = (typeof TABS)[number][0];
+const GROUPS: { label: string; ids: PortalTab[] }[] = [
+  { label: "Rekrutmen", ids: ["overview", "applicants", "jobs"] },
+  { label: "Stand", ids: ["booth", "profile", "faq"] },
+  { label: "Keuangan", ids: ["billing"] },
+];
 
 const TAB_KEY = "vwo:company-tab";
 const loadTab = (): PortalTab => {
@@ -237,71 +243,88 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
   const unread = fair.unreadFor(booth.id);
   const server = useServerApplicants(booth.id);
 
-  return (
-    <main className="cp">
-      <header className="cp-head card" style={{ ["--c" as string]: booth.color }}>
-        <BoothLogo booth={booth} className="cp-logo cp-logo-big" />
-        <div className="cp-head-text">
-          <h1 className="cp-h1">
-            {booth.company} {booth.tier === "premium" && <span className="cp-vip">👑 VIP</span>}
-          </h1>
-          <span className="muted small">
-            {booth.industry} · Stand di {fair.fair.floors[booth.floor]?.name} · Recruiter {booth.recruiter}
-          </span>
-        </div>
-        <div className="cp-head-links">
-          <span className="nt-bell-wrap">
-            <button type="button" className="small-btn ghost nt-bell" onClick={() => setBell((b) => !b)} aria-expanded={bell} aria-label={`Notifikasi${unread ? `, ${unread} belum dibaca` : ""}`}>
-              🔔{unread > 0 && <span className="cp-count">{unread}</span>}
-            </button>
-            {bell && (
-              <div className="card nt-pop" role="dialog" aria-label="Notifikasi">
-                <div className="nt-pop-head">
-                  <b>Notifikasi</b>
-                  {unread > 0 && (
-                    <button type="button" className="small-btn ghost" onClick={() => fair.markRead(booth.id)}>
-                      Tandai semua dibaca
-                    </button>
-                  )}
-                  {fair.notifsFor(booth.id).length > 0 && (
-                    <button type="button" className="small-btn ghost" onClick={() => fair.deleteNotif(booth.id)}>
-                      🗑️ Hapus semua
-                    </button>
-                  )}
-                </div>
-                <PushCard who="company" />
-                <NotifList
-                  items={fair.notifsFor(booth.id)}
-                  onDelete={(n) => fair.deleteNotif(booth.id, n.id)}
-                  empty="Belum ada notifikasi. Lamaran baru, balasan chat, dan konfirmasi interview dari pelamar muncul di sini."
-                  onPick={(n) => {
-                    fair.markRead(booth.id, n.id);
-                    setBell(false);
-                    if (n.appId) setFocus({ id: n.appId, n: Date.now() });
-                    setTab("applicants");
-                  }}
-                />
-              </div>
+  const bellPop = (
+    <span className="nt-bell-wrap">
+      <button type="button" className="small-btn ghost nt-bell" onClick={() => setBell((b) => !b)} aria-expanded={bell} aria-label={`Notifikasi${unread ? `, ${unread} belum dibaca` : ""}`}>
+        🔔{unread > 0 && <span className="cp-count">{unread}</span>}
+      </button>
+      {bell && (
+        <div className="card nt-pop" role="dialog" aria-label="Notifikasi">
+          <div className="nt-pop-head">
+            <b>Notifikasi</b>
+            {unread > 0 && (
+              <button type="button" className="small-btn ghost" onClick={() => fair.markRead(booth.id)}>
+                Tandai semua dibaca
+              </button>
             )}
-          </span>
-          <a className="small-btn cp-link" href="#/jobfair">
-            🎪 Lihat di job fair
-          </a>
-          {onOut && (
-            <button type="button" className="small-btn ghost" onClick={onOut}>
-              {LIVE ? "Ganti stand" : "Keluar"}
-            </button>
-          )}
+            {fair.notifsFor(booth.id).length > 0 && (
+              <button type="button" className="small-btn ghost" onClick={() => fair.deleteNotif(booth.id)}>
+                🗑️ Hapus semua
+              </button>
+            )}
+          </div>
+          <PushCard who="company" />
+          <NotifList
+            items={fair.notifsFor(booth.id)}
+            onDelete={(n) => fair.deleteNotif(booth.id, n.id)}
+            empty="Belum ada notifikasi. Lamaran baru, balasan chat, dan konfirmasi interview dari pelamar muncul di sini."
+            onPick={(n) => {
+              fair.markRead(booth.id, n.id);
+              setBell(false);
+              if (n.appId) setFocus({ id: n.appId, n: Date.now() });
+              setTab("applicants");
+            }}
+          />
         </div>
-      </header>
-      <nav className="cp-tabs" role="tablist">
-        {TABS.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} data-active={tab === id ? "" : undefined} onClick={() => setTab(id)}>
-            {label}
-            {id === "applicants" && fresh > 0 && <span className="cp-count">{fresh}</span>}
-          </button>
-        ))}
-      </nav>
+      )}
+    </span>
+  );
+
+  return (
+    <main className="cp cp-dash">
+      <DashShell
+        accent={booth.color}
+        brand={
+          <>
+            <BoothLogo booth={booth} className="cp-logo" />
+            <span className="dash-brand-text">
+              <b>{booth.company}</b>
+              <span>{booth.tier === "premium" ? "👑 Stand VIP" : "Stand reguler"}</span>
+            </span>
+          </>
+        }
+        title={
+          <>
+            {booth.company} {booth.tier === "premium" && <span className="cp-vip">👑 VIP</span>}
+          </>
+        }
+        subtitle={`${booth.industry} · Stand di ${fair.fair.floors[booth.floor]?.name ?? "aula"} · Recruiter ${booth.recruiter}`}
+        groups={GROUPS.map((g) => ({
+          label: g.label,
+          items: g.ids.map((id) => {
+            const t = TABS.find(([x]) => x === id)!;
+            return { id, icon: t[1], label: t[2], count: id === "applicants" ? fresh : undefined };
+          }),
+        }))}
+        active={tab}
+        onPick={setTab}
+        actions={
+          <>
+            <button type="button" className="dash-coins" onClick={() => setTab("billing")} title="Saldo koin perusahaan">
+              🪙 {fair.player.coins.toLocaleString("id-ID")}
+            </button>
+            {bellPop}
+            <a className="small-btn cp-link" href="#/jobfair">
+              🎪 Lihat di job fair
+            </a>
+            {onOut && (
+              <button type="button" className="small-btn ghost" onClick={onOut}>
+                {LIVE ? "Ganti stand" : "Keluar"}
+              </button>
+            )}
+          </>
+        }
+      >
       {server && server !== "ok" && (
         <p className="card cp-server-note" role="status">
           {server === "signin"
@@ -318,6 +341,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
       {tab === "profile" && <ProfileEditor booth={booth} />}
       {tab === "faq" && <FaqEditor booth={booth} />}
       {tab === "billing" && <Billing booth={booth} />}
+      </DashShell>
     </main>
   );
 }

@@ -119,3 +119,17 @@
 .rg-steps li::before { content: counter(step) ". "; counter-increment: step; }
 .rg-steps { counter-reset: step; }
 @media (max-width: 640px) { .rg-grid, .rg-tiers { grid-template-columns: 1fr; } }
+
+/* Registration: the coin wallet companies pay with. */
+.rg-wallet-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.rg-wallet-head > div { flex: 1; min-width: 220px; }
+.rg-balance { display: grid; justify-items: end; font-size: 26px; font-weight: 900; color: var(--cs-yellow); white-space: nowrap; }
+.rg-balance small { font-size: 12px; font-weight: 700; color: #fca5a5; }
+.rg-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.rg-pack { position: relative; display: grid; gap: 4px; text-align: left; padding: 14px; border-radius: 14px; border: 1px solid rgb(255 255 255 / 0.14); background: #111118; color: var(--cs-ink); font: inherit; cursor: pointer; }
+.rg-pack:hover:not(:disabled) { border-color: var(--cs-yellow); }
+.rg-pack[data-best] { border-color: var(--cs-yellow); box-shadow: 0 0 0 1px var(--cs-yellow) inset; }
+.rg-pack b { font-size: 18px; }
+.rg-pack small { color: var(--cs-mute); font-size: 12px; }
+.rg-pack span { margin-top: 6px; font-weight: 800; color: var(--cs-yellow); }
+.rg-pack-tag { position: absolute; top: -9px; right: 10px; margin: 0 !important; padding: 2px 8px; border-radius: 99px; background: var(--cs-yellow); color: #111 !important; font-size: 11px; }

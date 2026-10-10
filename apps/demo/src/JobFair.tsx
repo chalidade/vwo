@@ -1553,22 +1553,24 @@ export function JobFair() {
         </div>
 
         {session && (
-          // The bell sits where the mini map used to be: one less button in the bottom bar.
-          <button type="button" className="hud hud-tr-btn rpg-box notif-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setNotifs(true)} title="Notifikasi dari HR" aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}>
-            🔔
-            {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
-          </button>
-        )}
-
-        {session && (
-          <button type="button" className="hud hud-tr-btn rpg-box friends-btn hud-friends" onPointerDown={(e) => e.stopPropagation()} onClick={() => setFriendsOpen(true)} title="Teman" aria-label="Teman">
-            👥
-            {(() => {
-              const asking = friends.friends.filter((f) => f.state === "received").length;
-              const on = friendsOnline().size;
-              return asking + on > 0 ? <span className="hud-friends-n" data-ask={asking ? "" : undefined}>{asking || on}</span> : null;
-            })()}
-          </button>
+          // Friends, help and the bell share one bar, the same height as the floor pill on the left.
+          <div className="hud hud-tr-bar rpg-box" onPointerDown={(e) => e.stopPropagation()}>
+            <button type="button" className="hud-ic friends-btn hud-friends" onClick={() => setFriendsOpen(true)} title="Teman" aria-label="Teman">
+              👥
+              {(() => {
+                const asking = friends.friends.filter((f) => f.state === "received").length;
+                const on = friendsOnline().size;
+                return asking + on > 0 ? <span className="hud-friends-n" data-ask={asking ? "" : undefined}>{asking || on}</span> : null;
+              })()}
+            </button>
+            <button type="button" className="hud-ic guide-btn" onClick={() => setGuide(true)} title="Panduan: cara memakai tiap fitur" aria-label="Panduan">
+              ❓
+            </button>
+            <button type="button" className="hud-ic notif-btn" onClick={() => setNotifs(true)} title="Notifikasi dari HR" aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}>
+              🔔
+              {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
+            </button>
+          </div>
         )}
         {session && friendsOpen && (
           <FriendsPanel
@@ -1586,11 +1588,6 @@ export function JobFair() {
           />
         )}
 
-        {session && (
-          <button type="button" className="hud hud-tr-btn rpg-box guide-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGuide(true)} title="Panduan: cara memakai tiap fitur" aria-label="Panduan">
-            ❓
-          </button>
-        )}
         {session && guide && <GuidePanel place={place} onClose={() => setGuide(false)} />}
         {session && intro && !guide && (
           <PlaceIntro

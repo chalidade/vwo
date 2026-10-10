@@ -12,21 +12,27 @@ import { OrgRegistrations } from "./organizer/Registrations";
 import { OrgSeminars } from "./organizer/Seminars";
 import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
+import { DashShell } from "./Dash";
 
 const TABS = [
-  ["live", "📡 Live"],
-  ["floors", "🏢 Lantai"],
-  ["booths", "🏬 Stand"],
-  ["registrations", "📝 Pendaftaran"],
-  ["early", "🧪 Early access"],
-  ["ads", "📣 Iklan"],
-  ["prices", "💰 Harga"],
-  ["psych", "🧠 Psikotes"],
-  ["seminar", "🎤 Seminar"],
-  ["aula", "🏛️ Aula"],
-  ["food", "🍜 Food Court"],
+  ["live", "📡", "Live"],
+  ["floors", "🏢", "Lantai"],
+  ["booths", "🏬", "Stand"],
+  ["registrations", "📝", "Pendaftaran"],
+  ["early", "🧪", "Early access"],
+  ["ads", "📣", "Iklan & pendapatan"],
+  ["prices", "💰", "Harga & koin"],
+  ["psych", "🧠", "Psikotes"],
+  ["seminar", "🎤", "Seminar"],
+  ["aula", "🏛️", "Aula"],
+  ["food", "🍜", "Food Court"],
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
+const GROUPS: { label: string; ids: OrgTab[] }[] = [
+  { label: "Pantau", ids: ["live", "registrations", "early"] },
+  { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food"] },
+  { label: "Bisnis", ids: ["ads", "prices"] },
+];
 
 const TAB_KEY = "vwo:org-tab";
 const loadTab = (): OrgTab => {
@@ -60,43 +66,48 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
   }, [toast]);
 
   return (
-    <main className="cp org-hub">
-      <header className="card cp-head" style={{ ["--c" as string]: "#f97316" }}>
-        <span className="cp-logo cp-logo-big">🎪</span>
-        <div className="cp-head-text">
-          <h1 className="cp-h1">Panitia · {fair.fair.name}</h1>
-          <span className="muted small">{LIVE ? "Perubahan tersimpan di server dan langsung tampil untuk semua pengunjung." : "Data demo tersimpan di browser ini. Perubahan langsung tampil di job fair."}</span>
-        </div>
-        <div className="cp-head-links">
-          <a className="small-btn cp-link" href="#/jobfair">
-            🎪 Buka job fair
-          </a>
-          <a className="small-btn ghost cp-link" href="#/jobfair/company">
-            🏢 Portal perusahaan
-          </a>
-          <a className="small-btn ghost cp-link" href="#/jobfair/speaker">
-            🎤 Pembicara
-          </a>
-          {!LIVE && (
-          <button
-            type="button"
-            className="small-btn ghost"
-            onClick={() => {
-              if (confirm("Hapus semua data demo job fair (lamaran, kunjungan, pengaturan panitia) di browser ini?")) fair.reset();
-            }}
-          >
-            Hapus data demo
-          </button>
-          )}
-        </div>
-      </header>
-      <nav className="cp-tabs" role="tablist">
-        {TABS.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} data-active={tab === id ? "" : undefined} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </nav>
+    <main className="cp cp-dash org-hub">
+      <DashShell
+        accent="#f97316"
+        brand={
+          <>
+            <span className="cp-logo">🎪</span>
+            <span className="dash-brand-text">
+              <b>Panitia</b>
+              <span>{fair.fair.name}</span>
+            </span>
+          </>
+        }
+        title={`Panitia · ${fair.fair.name}`}
+        subtitle={LIVE ? "Perubahan tersimpan di server dan langsung tampil untuk semua pengunjung." : "Data demo tersimpan di browser ini. Perubahan langsung tampil di job fair."}
+        groups={GROUPS.map((g) => ({ label: g.label, items: g.ids.map((id) => ({ id, icon: TABS.find(([x]) => x === id)![1], label: TABS.find(([x]) => x === id)![2] })) }))}
+        active={tab}
+        onPick={setTab}
+        actions={
+          <>
+            <a className="small-btn cp-link" href="#/jobfair">
+              🎪 Buka job fair
+            </a>
+            <a className="small-btn ghost cp-link" href="#/jobfair/company">
+              🏢 Portal perusahaan
+            </a>
+            <a className="small-btn ghost cp-link" href="#/jobfair/speaker">
+              🎤 Pembicara
+            </a>
+            {!LIVE && (
+              <button
+                type="button"
+                className="small-btn ghost"
+                onClick={() => {
+                  if (confirm("Hapus semua data demo job fair (lamaran, kunjungan, pengaturan panitia) di browser ini?")) fair.reset();
+                }}
+              >
+                Hapus data demo
+              </button>
+            )}
+          </>
+        }
+      >
       {tab === "live" && <OrgLive />}
       {tab === "floors" && <OrgFloors onToast={setToast} />}
       {tab === "booths" && <OrgBooths onToast={setToast} />}
@@ -108,6 +119,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
       {tab === "seminar" && <OrgSeminars onToast={setToast} />}
       {tab === "aula" && <OrgAula onToast={setToast} />}
       {tab === "food" && <OrgFoodCourt onToast={setToast} />}
+      </DashShell>
       {toast && <div className="cp-toast">{toast}</div>}
     </main>
   );

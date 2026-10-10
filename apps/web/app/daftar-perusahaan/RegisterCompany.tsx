@@ -7,6 +7,8 @@ export interface RegistrationView {
   company: string;
   tier: string;
   price: number;
+  /** What the registration costs in coins at today's coin value. */
+  coins: number;
   status: string;
   boothKey: string | null;
   pin: string | null;
@@ -16,6 +18,7 @@ export interface RegistrationView {
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+const koin = (n: number) => `${n.toLocaleString("id-ID")} koin`;
 const STATUS: Record<string, string> = { unpaid: "Menunggu pembayaran", paid: "Menunggu verifikasi panitia", verified: "Terverifikasi", rejected: "Ditolak" };
 
 const ERRORS: Record<string, string> = {
@@ -26,12 +29,24 @@ const ERRORS: Record<string, string> = {
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
   not_payable: "Pendaftaran ini sudah dibayar atau tidak bisa dibayar lagi. Muat ulang halaman.",
   gateway_error: "Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.",
+  not_delivered: "Pembayaran gagal diproses. Koinmu sudah dikembalikan; coba lagi.",
 };
+
+type Pack = { id: string; coins: number; bonus: number; price: number };
 
 async function post(path: string, body: unknown) {
   try {
     const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = (await r.json().catch(() => ({}))) as { error?: string; registration?: RegistrationView & { createdAt: string }; payment?: { status: string; checkoutUrl: string | null }; code?: string };
+    const d = (await r.json().catch(() => ({}))) as {
+      error?: string;
+      registration?: RegistrationView & { createdAt: string };
+      payment?: { status: string; checkoutUrl: string | null };
+      code?: string;
+      coins?: { balance: number };
+      balance?: number;
+      needed?: number;
+    };
+    if (d.error === "not_enough_coins") return { ok: false as const, error: `Koin belum cukup: perlu ${koin(d.needed ?? 0)}, saldo ${koin(d.balance ?? 0)}. Isi koin dulu di atas.`, balance: d.balance };
     const msg = ERRORS[d.error ?? ""] ?? "Gagal. Coba lagi sebentar lagi.";
     return r.ok ? { ok: true as const, data: d } : { ok: false as const, error: d.code ? `${msg} (kode: ${d.code})` : msg };
   } catch {
@@ -43,6 +58,9 @@ export function RegisterCompany({
   email,
   name,
   prices,
+  coins,
+  balance: startBalance,
+  packs,
   initial,
   gateway,
   back,
@@ -50,6 +68,9 @@ export function RegisterCompany({
   email: string;
   name: string;
   prices: { regular: number; premium: number };
+  coins: { regular: number; premium: number };
+  balance: number;
+  packs: Pack[];
   initial: RegistrationView[];
   /** xendit: pay on Xendit's checkout page. demo: no gateway set up, nothing is charged. */
   gateway: "xendit" | "demo";
@@ -64,47 +85,86 @@ export function RegisterCompany({
   const [color, setColor] = useState(COLORS[0]!);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [balance, setBalance] = useState(startBalance);
+  const [buying, setBuying] = useState<string | null>(null);
+  const need = open?.status === "unpaid" ? open.coins : showForm && !open ? coins[tier] : 0;
+  const short = Math.max(0, need - balance);
+  const best = short > 0 ? (packs.find((p) => p.coins >= short) ?? packs[packs.length - 1]) : undefined;
+  const buy = async (id: string) => {
+    setBuying(id);
+    setError("");
+    const res = await post("/api/payments", { kind: "coins", pack: id, back: "/daftar-perusahaan" });
+    if (!res.ok) return setBuying(null), setError(res.error);
+    const p = res.data.payment;
+    if (p?.checkoutUrl && p.status === "pending") return void (window.location.href = p.checkoutUrl);
+    // No gateway set up: the coins are booked at once.
+    window.location.reload();
+  };
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => (setF({ ...f, [k]: e.target.value }), setError(""));
 
   return (
     <>
+      <div className="rg-card rg-wallet">
+        <div className="rg-wallet-head">
+          <div>
+            <h2>Saldo koin</h2>
+            <p className="cs-sub" style={{ margin: "4px 0 0", fontSize: 14 }}>
+              Sewa stand dan semua pembelian di job fair dibayar dengan koin. Isi koin sekali, sisanya bisa dipakai untuk upgrade VIP, promotor, dan aksesoris stand.
+            </p>
+          </div>
+          <strong className="rg-balance" data-short={short ? "" : undefined}>
+            🪙 {balance.toLocaleString("id-ID")}
+            {short > 0 && <small>kurang {koin(short)}</small>}
+          </strong>
+        </div>
+        {back === "ok" && <p className="cs-sub" style={{ margin: "10px 0 0", fontSize: 13 }}>Pembayaran isi koin sedang dikonfirmasi. Muat ulang halaman ini sebentar lagi kalau saldo belum bertambah.</p>}
+        {back === "gagal" && <p className="rg-err">Isi koin belum selesai. Kamu bisa coba lagi.</p>}
+        <div className="rg-packs">
+          {packs.map((p) => (
+            <button key={p.id} type="button" className="rg-pack" data-best={best?.id === p.id ? "" : undefined} disabled={!!buying} onClick={() => void buy(p.id)}>
+              {best?.id === p.id && <span className="rg-pack-tag">Pas untuk paketmu</span>}
+              <b>🪙 {p.coins.toLocaleString("id-ID")}</b>
+              <small>{p.bonus ? `termasuk bonus ${p.bonus.toLocaleString("id-ID")}` : "tanpa bonus"}</small>
+              <span>{buying === p.id ? "Memproses…" : rupiah(p.price)}</span>
+            </button>
+          ))}
+        </div>
+        <p className="cs-sub" style={{ margin: "10px 0 0", fontSize: 13 }}>
+          {gateway === "xendit" ? "Isi koin lewat Xendit: QRIS, virtual account, e-wallet atau kartu kredit." : "Pembayaran isi koin saat ini masih simulasi: tidak ada uang yang ditarik."}
+        </p>
+      </div>
       {list.map((r) => (
         <div key={r.id} className="rg-card">
           <h2>
             {r.company} <span className="rg-status" data-s={r.status}>{STATUS[r.status] ?? r.status}</span>
           </h2>
           <p className="cs-sub" style={{ margin: "4px 0 0", fontSize: 14 }}>
-            {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {rupiah(r.price)} · didaftarkan {new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+            {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {koin(r.coins)} (≈ {rupiah(r.price)}) · didaftarkan {new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
           </p>
           {r.status === "unpaid" && (
             <div style={{ marginTop: 14 }}>
-              {back === "gagal" && <p className="rg-err">Pembayaran belum selesai. Kamu bisa coba bayar lagi.</p>}
-              {back === "ok" && <p className="cs-sub" style={{ margin: "0 0 10px", fontSize: 13 }}>Pembayaran sedang dikonfirmasi. Muat ulang halaman ini sebentar lagi.</p>}
               <p className="cs-sub" style={{ margin: "0 0 10px", fontSize: 13 }}>
-                {gateway === "xendit"
-                  ? "Bayar lewat Xendit: QRIS, virtual account, e-wallet atau kartu kredit. Kamu akan dibawa ke halaman pembayaran yang aman."
-                  : "Pembayaran saat ini masih simulasi: tidak ada uang yang ditarik."}
+                Bayar {koin(r.coins)} dari saldo koin. {r.coins > balance ? "Isi koin dulu di atas." : ""}
               </p>
               <button
                 type="button"
                 className="cs-btn primary"
                 style={{ border: 0, cursor: "pointer" }}
-                disabled={busy}
+                disabled={busy || r.coins > balance}
                 onClick={async () => {
                   setBusy(true);
                   const res = await post("/api/payments", { kind: "registration", id: r.id });
-                  if (!res.ok) return setBusy(false), setError(res.error);
-                  const p = res.data.payment;
-                  if (p?.status === "paid") {
-                    setBusy(false);
-                    return setList(list.map((x) => (x.id === r.id ? { ...x, status: "paid" } : x)));
-                  }
-                  if (p?.checkoutUrl) return void (window.location.href = p.checkoutUrl);
                   setBusy(false);
-                  setError("Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.");
+                  if (!res.ok) {
+                    if (typeof res.balance === "number") setBalance(res.balance);
+                    return setError(res.error);
+                  }
+                  if (res.data.coins) setBalance(res.data.coins.balance);
+                  if (res.data.payment?.status === "paid") return setList(list.map((x) => (x.id === r.id ? { ...x, status: "paid" } : x)));
+                  setError("Pembayaran belum berhasil. Coba lagi sebentar lagi.");
                 }}
               >
-                {busy ? "Memproses…" : `Bayar ${rupiah(r.price)}`}
+                {busy ? "Memproses…" : r.coins > balance ? `Koin kurang ${koin(r.coins - balance)}` : `Bayar ${koin(r.coins)}`}
               </button>
             </div>
           )}
@@ -145,7 +205,7 @@ export function RegisterCompany({
             setBusy(false);
             if (!res.ok) return setError(res.error);
             const r = res.data.registration!;
-            setList([{ ...r, createdAt: new Date(r.createdAt).getTime() }, ...list]);
+            setList([{ ...r, coins: coins[r.tier === "premium" ? "premium" : "regular"], createdAt: new Date(r.createdAt).getTime() }, ...list]);
             setShowForm(false);
           }}
         >
@@ -154,7 +214,8 @@ export function RegisterCompany({
             {(["regular", "premium"] as const).map((t) => (
               <button key={t} type="button" className="rg-tier" data-on={tier === t ? "" : undefined} onClick={() => setTier(t)}>
                 <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
-                <strong>{rupiah(prices[t])}</strong>
+                <strong>{koin(coins[t])}</strong>
+                <small style={{ display: "block", marginBottom: 6 }}>≈ {rupiah(prices[t])}</small>
                 <small>{t === "premium" ? "Stand lebih lebar, layar video, lampu sorot, LED berjalan, posisi teratas" : "Panel, meja recruiter, roll-up banner, lowongan tanpa batas"}</small>
               </button>
             ))}
@@ -211,7 +272,7 @@ export function RegisterCompany({
           </p>
           {error && <p className="rg-err">{error}</p>}
           <button type="submit" className="cs-btn primary" style={{ border: 0, cursor: "pointer" }} disabled={busy}>
-            {busy ? "Mengirim…" : `Lanjut ke pembayaran · ${rupiah(prices[tier])}`}
+            {busy ? "Mengirim…" : `Lanjut ke pembayaran · ${koin(coins[tier])}`}
           </button>
         </form>
       )}

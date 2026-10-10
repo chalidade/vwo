@@ -1,5 +1,7 @@
 import "server-only";
-import { attachCheckout, createPayment, grantCoins, markClosed, markPaid, openPayment, type Payment, type PaymentKind, payRegistration, paymentById } from "@vwo/db";
+import { attachCheckout, createPayment, grantCoins, markClosed, markPaid, markRefunded, NotEnoughCoinsError, openPayment, type Payment, type PaymentKind, payRegistration, paymentById, readPrices, spendCoins } from "@vwo/db";
+import { coinsFor } from "@vwo/shared";
+import { liveCoins } from "./coins";
 import { db } from "./db";
 import { settleInvoice } from "./company-doc";
 import { placeRentedStall } from "./stalls";
@@ -42,6 +44,59 @@ export async function startPayment(req: Request, user: { id: string; email: stri
   });
   await attachCheckout(db, row.id, inv.id, inv.invoice_url);
   return { ...row, providerId: inv.id, checkoutUrl: inv.invoice_url };
+}
+
+export class CoinsShortError extends Error {
+  constructor(
+    readonly balance: number,
+    readonly needed: number,
+  ) {
+    super("not enough coins");
+  }
+}
+
+/**
+ * Pay for a booth registration, a company bill or a food court stand with coins from the account's
+ * ledger. The coin price comes from the server's rupiah price and the organiser's coin value. The
+ * charge is keyed to the thing bought (a bill or registration is never charged twice); if what was
+ * bought can't be handed over, the coins go back.
+ */
+export async function payWithCoins(user: { id: string }, p: Purchase): Promise<Payment> {
+  const coins = coinsFor(await readPrices(db), p.amount);
+  await liveCoins(user.id);
+  const row = await createPayment(db, { userId: user.id, kind: p.kind, ref: p.ref, description: `${p.description} · ${coins.toLocaleString("id-ID")} koin`.slice(0, 200), amount: coins, meta: { ...p.meta, rupiah: p.amount, coins }, provider: "koin" });
+  // A bill can be charged once ever; a registration or a stand once per attempt (a second attempt
+  // on a registration that is already paid gets its coins back below).
+  const key = p.kind === "invoice" ? `buy:invoice:${p.ref}` : `buy:${p.kind}:${row.id}`;
+  try {
+    const charged = await spendCoins(db, { userId: user.id, amount: coins, reason: p.description.slice(0, 120), key, refId: row.id });
+    if (!charged) {
+      await markClosed(db, row.id, "failed");
+      throw new CoinsShortError(-1, coins);
+    }
+  } catch (e) {
+    if (e instanceof NotEnoughCoinsError) {
+      await markClosed(db, row.id, "failed");
+      throw new CoinsShortError(e.balance, e.needed);
+    }
+    throw e;
+  }
+  const paid = (await markPaid(db, row.id, "Koin"))!;
+  let ok = true;
+  try {
+    if (p.kind === "registration") ok = await payRegistration(db, p.ref, user.id, "Koin");
+    else if (p.kind === "invoice") await settleInvoice(paid, user.id);
+    else if (p.kind === "stall") ok = !!(await placeRentedStall(paid));
+  } catch (e) {
+    console.error("coin purchase not delivered", row.id, e);
+    ok = false;
+  }
+  if (!ok) {
+    await grantCoins(db, { userId: user.id, amount: coins, reason: `Pengembalian: ${p.description}`.slice(0, 120), key: `refund:${row.id}` });
+    await markRefunded(db, row.id);
+    throw new Error("purchase_failed");
+  }
+  return paid;
 }
 
 /** What a confirmed payment unlocks on the server: coins go into the ledger, a registration is paid, a bill is settled, a rented stand opens. */

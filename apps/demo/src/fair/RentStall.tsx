@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { stallPrice } from "../jobfair-engine";
 import { LIVE } from "../mode";
-import { pay } from "../payments";
+import { claimPaidCoins, pay } from "../payments";
 import { refreshShared } from "../shared-state";
 import { fair } from "../useFair";
-import { PAY_METHODS, rupiah } from "./company";
+import { coinText } from "./company";
 import { Modal } from "./Modal";
+import { CoinBalance, TopUp } from "./TopUp";
+import { coinPrice, koinText, rp } from "@vwo/shared";
 
 const COLORS = ["#ea580c", "#dc2626", "#ca8a04", "#16a34a", "#0d9488", "#2563eb", "#9333ea", "#7c2d12"];
 const EMOJIS = ["🍽️", "🍜", "🍛", "🍔", "🍕", "🍢", "🥟", "🧋", "☕", "🍰", "🥗", "🍦"];
 
-/** Renting an empty food court stand: the business, one voucher to sell, then payment (Xendit on the live site). */
+/** Renting an empty food court stand: the business, one voucher to sell, then payment with coins (topped up here if short). */
 export function RentStall({ slot, onClose }: { slot: number; onClose: () => void }) {
   const [step, setStep] = useState<"form" | "pay" | "done">("form");
   const [name, setName] = useState("");
@@ -21,7 +23,6 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
   const [deal, setDeal] = useState("");
   const [worth, setWorth] = useState("");
   const [price, setPrice] = useState(8);
-  const [method, setMethod] = useState<string>(PAY_METHODS[0]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const side = slot < 8 ? "dinding belakang" : slot < 12 ? "sisi kiri" : "sisi kanan";
@@ -37,7 +38,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
           }}
         >
           <p className="bk-place">
-            📍 Food Court, {side} · <b>tersedia</b> · {rupiah(stallPrice())} per acara
+            📍 Food Court, {side} · <b>tersedia</b> · {coinText(stallPrice())} per acara
           </p>
           <label>
             Nama usaha
@@ -82,7 +83,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
             </div>
           )}
           <button type="submit" className="bk-go">
-            Lanjut ke pembayaran · {rupiah(stallPrice())}
+            Lanjut ke pembayaran · {coinText(stallPrice())}
           </button>
         </form>
       )}
@@ -95,25 +96,17 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
                 <td>
                   Sewa stan food court · {emoji} {name}
                 </td>
-                <td>{rupiah(stallPrice())}</td>
+                <td>
+                  <b>{coinText(stallPrice())}</b>
+                  <br />
+                  <span className="muted small">≈ {rp(stallPrice())}</span>
+                </td>
               </tr>
             </tbody>
           </table>
-          {LIVE ? (
-            <p className="muted small">Kamu akan diarahkan ke halaman pembayaran Xendit (transfer bank, e-wallet, QRIS, atau kartu). Stan buka otomatis setelah pembayaran diterima.</p>
-          ) : (
-            <>
-              <label>
-                Metode pembayaran
-                <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                  {PAY_METHODS.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </label>
-              <p className="muted small">Pembayaran di demo ini simulasi: tidak ada uang yang ditarik.</p>
-            </>
-          )}
+          <CoinBalance need={coinPrice(stallPrice())} />
+          {fair.player.coins < coinPrice(stallPrice()) && <TopUp back="/play/#/jobfair" need={coinPrice(stallPrice()) - fair.player.coins} compact />}
+          <p className="muted small">Sewa stan dibayar dengan koin. Stan langsung buka di Food Court setelah dibayar.</p>
           {error && <p className="bk-err">{error}</p>}
           <div className="row">
             <button type="button" className="ghost" onClick={() => setStep("form")}>
@@ -132,15 +125,19 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
                   setBusy(false);
                   if (!r.ok) return setError(r.error);
                   if ("redirect" in r) return;
+                  await claimPaidCoins();
                   refreshShared();
                   return setStep("done");
                 }
+                const need = coinPrice(stallPrice());
+                if (fair.player.coins < need) return setError(`Koin belum cukup: kurang ${koinText(need - fair.player.coins)}. Isi koin dulu.`);
                 const r = fair.addStall(slot, { name, vendor, promo, emoji, color, deal: dealIn });
                 if (!r) return setError("Maaf, stan ini baru saja disewa usaha lain. Pilih stan kosong lain.");
+                fair.payCoins(need, `Sewa stan food court · ${name}`);
                 setStep("done");
               }}
             >
-              {busy ? "Membuka pembayaran…" : `Bayar ${rupiah(stallPrice())}`}
+              {busy ? "Memproses…" : `Bayar ${coinText(stallPrice())}`}
             </button>
           </div>
         </div>
@@ -149,7 +146,7 @@ export function RentStall({ slot, onClose }: { slot: number; onClose: () => void
       {step === "done" && (
         <div className="bk-form bk-done">
           <p className="bk-ok">
-            ✓ Pembayaran diterima. Stan {emoji} {name} sudah buka di Food Court.
+            ✓ Sewa stan dibayar dengan koin. Stan {emoji} {name} sudah buka di Food Court.
           </p>
           <p className="small">Panitia bisa mengubah atau melepas stan ini dari halaman admin, tab Food Court.</p>
           <button type="button" className="ghost" onClick={onClose}>
