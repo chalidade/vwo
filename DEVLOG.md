@@ -4,6 +4,21 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · API tidak lagi menggantung saat koneksi database putus
+
+**Konteks:** login panitia dan form early access sempat loading terus. Semua endpoint API, termasuk `/api/health`, gagal selama beberapa menit, lalu pulih sendiri. Supabase tetap sehat dengan trafik kecil.
+
+**Dugaan penyebab:** setiap instance Vercel hanya punya satu koneksi database tanpa batas waktu. Dengan fluid compute, satu instance melayani banyak request sekaligus. Kalau koneksinya macet (misalnya instance bangun lagi memegang socket yang sudah ditutup pooler), semua request di instance itu ikut menunggu.
+
+**Yang berubah:**
+- Klien database di Vercel kini punya 4 koneksi, ditambah tiga batas waktu:
+  - koneksi yang menganggur ditutup setelah 20 detik;
+  - setiap koneksi diganti setelah 5 menit;
+  - percobaan menyambung dihentikan setelah 10 detik.
+- Pengiriman email (undangan early access, verifikasi) dihentikan setelah 10 detik, supaya layanan email yang lambat tidak membuat halaman menunggu.
+
+---
+
 ## 2026-10-10 · statistik, stok merchandise, feed aktivitas, dan peserta seminar di server
 
 **Konteks:** angka kunjungan stand, tayangan sponsor, statistik dekorasi/promotor/stan food court, stok merchandise, feed aktivitas panitia, dan jumlah peserta seminar hanya dihitung di browser masing-masing. Panitia dan perusahaan hanya melihat angka dari perangkatnya sendiri, dan stok merchandise bisa diambil melebihi jumlahnya.

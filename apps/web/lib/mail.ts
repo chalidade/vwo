@@ -19,6 +19,8 @@ export async function sendMail(to: string, subject: string, text: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from: process.env.MAIL_FROM ?? "jobfair <noreply@vwo.example>", to, subject, text }),
+    // A slow mail service must not keep the page waiting (inviting a tester, signing up).
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`mail failed: ${res.status}`);
 }
