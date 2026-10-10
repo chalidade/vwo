@@ -154,6 +154,9 @@ const legsOf = (look: Look) => (look.outfit === 'dress' ? look.skin : look.pants
 const hatOf = (look: Look) => look.hatColor ?? '#f97316'
 /** Hair that shows below a hat: no top tufts, just what frames the face. */
 const longHair = (s: HairStyle) => s === 'long' || s === 'bob' || s === 'pigtails'
+/** Chibi proportions: the head is drawn at r=13 and blown up around the neck, so hair, hats and
+ * faces all grow together while the body stays small. */
+const HEAD = 'translate(22 31) scale(1.16) translate(-22 -31)'
 const BODY = 'M12 37q0-6 6-6h8q6 0 6 6v10.5q0 2-2 2H14q-2 0-2-2Z'
 const SIDE_BODY = 'M14 37q0-6 5-6h6q5 0 5 6v10.5q0 2-2 2H16q-2 0-2-2Z'
 
@@ -292,6 +295,7 @@ function Front({ look }: { look: Look }) {
   return (
     <>
       {/* Hair that falls behind the shoulders. */}
+      <g transform={HEAD}>
       {style === 'long' && <path d="M8.5 18c-1.5 9-1 17 2.5 25h22c3.5-8 4-16 2.5-25Z" style={fill(hair)} {...ink} />}
       {style === 'bob' && <path d="M8.5 18c-1 6-.5 11 1.5 15h24c2-4 2.5-9 1.5-15Z" style={fill(hair)} {...ink} />}
       {style === 'pigtails' && (
@@ -301,6 +305,7 @@ function Front({ look }: { look: Look }) {
         </g>
       )}
       {style === 'ponytail' && <path d="M33 14c7 4 7 15 3 22-1-6-3-11-6-14Z" style={fill(hair)} {...ink} />}
+      </g>
 
       <Legs look={look} />
       {/* Arms. */}
@@ -326,12 +331,14 @@ function Front({ look }: { look: Look }) {
       )}
 
       {/* Head. */}
-      <circle cx="22" cy="20" r="13" style={fill(skin)} {...ink} />
-      <HeadLight />
-      <FaceFront look={look} />
-      <HairFront look={look} />
-      {look.style !== 'bald' && !look.hat && <HairGloss />}
-      {look.hat && <HatFront hat={look.hat} color={hatOf(look)} />}
+      <g transform={HEAD}>
+        <circle cx="22" cy="20" r="13" style={fill(skin)} {...ink} />
+        <HeadLight />
+        <FaceFront look={look} />
+        <HairFront look={look} />
+        {look.style !== 'bald' && !look.hat && <HairGloss />}
+        {look.hat && <HatFront hat={look.hat} color={hatOf(look)} />}
+      </g>
     </>
   )
 }
@@ -502,6 +509,22 @@ function TorsoFront({ look }: { look: Look }) {
   }
 }
 
+const BLUSH = '#ff7f9a'
+
+/** A big glossy chibi eye: dark ink, a warm iris glow at the bottom and two catchlights. */
+function Eye({ cx, calm = false, narrow = false }: { cx: number; calm?: boolean; narrow?: boolean }) {
+  const rx = narrow ? 1.9 : 2.3
+  const ry = calm ? 1.7 : 3
+  return (
+    <g className="pg-eye">
+      <ellipse cx={cx} cy="22.4" rx={rx} ry={ry} fill={INK} />
+      {!calm && <ellipse cx={cx} cy={22.4 + ry * 0.45} rx={rx * 0.7} ry={ry * 0.38} fill="#8b5a3c" opacity="0.85" />}
+      <circle cx={cx + rx * 0.3} cy={22.4 - ry * 0.4} r={calm ? 0.6 : 0.95} fill="white" />
+      {!calm && <circle cx={cx - rx * 0.4} cy={22.4 + ry * 0.35} r="0.45" fill="white" opacity="0.9" />}
+    </g>
+  )
+}
+
 function FaceFront({ look }: { look: Look }) {
   return (
     <g className="pg-face">
@@ -512,14 +535,12 @@ function FaceFront({ look }: { look: Look }) {
         </g>
       ) : (
         <g className="pg-eyes">
-          <ellipse className="pg-eye" cx="17" cy="22" rx="1.8" ry={look.face === 'calm' ? 1.6 : 2.5} fill={INK} />
-          <ellipse className="pg-eye" cx="27" cy="22" rx="1.8" ry={look.face === 'calm' ? 1.6 : 2.5} fill={INK} />
-          <circle cx="17.6" cy="21" r="0.65" fill="white" />
-          <circle cx="27.6" cy="21" r="0.65" fill="white" />
+          <Eye cx={17} calm={look.face === 'calm'} />
+          <Eye cx={27} calm={look.face === 'calm'} />
         </g>
       )}
-      <ellipse cx="13.8" cy="26" rx="2" ry="1.2" fill="#fb7185" opacity="0.4" />
-      <ellipse cx="30.2" cy="26" rx="2" ry="1.2" fill="#fb7185" opacity="0.4" />
+      <ellipse cx="13.4" cy="26.2" rx="2.5" ry="1.4" fill={BLUSH} opacity="0.5" />
+      <ellipse cx="30.6" cy="26.2" rx="2.5" ry="1.4" fill={BLUSH} opacity="0.5" />
       {look.freckles && (
         <g fill="#b45309" opacity="0.5">
           <circle cx="14.5" cy="24.5" r="0.6" />
@@ -794,6 +815,7 @@ function Back({ look }: { look: Look }) {
       {look.prop === 'skateboard' && <Skateboard x={34} y={44} />}
       <NeckShadow />
       {/* The back of the head is all hair (or skin, for the bald). */}
+      <g transform={HEAD}>
       <circle cx="22" cy="20" r="13" style={fill(style === 'bald' ? look.skin : hair)} {...ink} />
       <HeadLight />
       {(style === 'long' || style === 'bob') && (
@@ -803,6 +825,7 @@ function Back({ look }: { look: Look }) {
           {...ink}
         />
       )}
+      </g>
       {/* The backpack hangs below the hair, as in a real back view. */}
       {look.backpack && (
         <>
@@ -811,6 +834,7 @@ function Back({ look }: { look: Look }) {
           <path d="M20 43.5v1.6" stroke={INK} strokeWidth="1" />
         </>
       )}
+      <g transform={HEAD}>
       {style === 'ponytail' && <path d="M19 27q3 12 3 13 0-1 3-13Z" style={fill(hair)} {...ink} />}
       {style === 'braid' && <Braid x={22} y={31} n={4} f={{ ...fill(hair), ...ink }} />}
       {style === 'buns' && !look.hat && (
@@ -833,6 +857,7 @@ function Back({ look }: { look: Look }) {
         </>
       )}
       {look.hat && <HatFront hat={look.hat} color={hatOf(look)} back />}
+      </g>
     </>
   )
 }
@@ -845,12 +870,14 @@ function Side({ look }: { look: Look }) {
   return (
     <>
       {/* Behind: long hair, ponytail, backpack. */}
+      <g transform={HEAD}>
       {(style === 'long' || style === 'bob') && (
         <path d={style === 'long' ? 'M11 18q-4 13-1 25h9q-3-12-1-24Z' : 'M11 18q-3 8-1 15h9q-2-8 0-14Z'} {...f} />
       )}
       {style === 'ponytail' && <path d="M12 14c-7 4-7 15-3 21 1-6 3-10 6-13Z" {...f} />}
       {style === 'braid' && <Braid x={12} y={26} n={4} f={f} />}
       {style === 'pigtails' && <path d="M12 22c-5 3-6 11-3 15 2-4 4-8 5-12Z" {...f} />}
+      </g>
       {look.backpack && (
         <>
           <rect x="8" y="33" width="9" height="14.5" rx="3.5" style={fill(look.backpack)} {...ink} />
@@ -885,6 +912,7 @@ function Side({ look }: { look: Look }) {
 
       <NeckShadow cx={23} />
       {/* Head in profile: face to the right, hair over the back. */}
+      <g transform={HEAD}>
       <circle cx="23" cy="20" r="13" style={fill(skin)} {...ink} />
       <HeadLight cx={23} />
       <g className="pg-face">
@@ -892,11 +920,10 @@ function Side({ look }: { look: Look }) {
           <path d="M27.5 22.5q2-2.4 4 0" fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round" />
         ) : (
           <g className="pg-eyes">
-            <ellipse className="pg-eye" cx="29.5" cy="22" rx="1.6" ry={look.face === 'calm' ? 1.5 : 2.4} fill={INK} />
-            <circle cx="30" cy="21" r="0.6" fill="white" />
+            <Eye cx={29.5} calm={look.face === 'calm'} narrow />
           </g>
         )}
-        <ellipse cx="31" cy="26" rx="1.8" ry="1.1" fill="#fb7185" opacity="0.4" />
+        <ellipse cx="31" cy="26.2" rx="2.1" ry="1.3" fill={BLUSH} opacity="0.5" />
         {look.mustache ? (
           <path d="M31 27.2q2.5-1.6 4 .2-2 1-4-.2Z" style={fill(hair)} />
         ) : (
@@ -932,6 +959,7 @@ function Side({ look }: { look: Look }) {
       {style === 'buns' && !look.hat && <circle cx="18" cy="5.5" r="4.4" {...f} />}
       {style !== 'bald' && !look.hat && <HairGloss x={1} />}
       {look.hat && <HatSide hat={look.hat} color={hatOf(look)} />}
+      </g>
     </>
   )
 }

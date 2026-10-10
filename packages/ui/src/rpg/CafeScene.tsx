@@ -120,6 +120,8 @@ export interface CafeSceneProps {
   showFreeSeats?: boolean;
   /** A seat within reach: gets a bouncing arrow. */
   highlightSeatId?: string | null;
+  /** People to point out (someone who just pinged the player, or who the player follows). */
+  markedMemberIds?: ReadonlySet<string>;
   onSeatClick?: (seatId: string) => void;
   onTileClick?: (x: number, y: number) => void;
   onAvatarClick?: (memberId: string) => void;
@@ -175,6 +177,7 @@ export function CafeScene({
   onSeatClick,
   onTileClick,
   onAvatarClick,
+  markedMemberIds,
   onBaristaClick,
   onMenuClick,
   onNpcClick,
@@ -424,6 +427,7 @@ export function CafeScene({
           style={breath(a.memberId)}
         >
           {!seat && <div className="rpg-shadow" />}
+          {markedMemberIds?.has(a.memberId) && <div className="rpg-mark-ring" />}
           <div className="pg-flip" style={{ transform: `scaleX(${facing === "left" ? -1 : 1})` }}>
             <Figure look={lookOf(a)} dir={DIR[facing]} seated={!!seat} flat={!self} />
           </div>
@@ -438,6 +442,7 @@ export function CafeScene({
             </div>
           )}
           {bubbles[a.memberId] ? <div className="rpg-say">{bubbles[a.memberId]}</div> : emote && <div className="rpg-emote">{emote}</div>}
+          {markedMemberIds?.has(a.memberId) && !bubbles[a.memberId] && <div className="rpg-mark" />}
         </div>
       ),
     });

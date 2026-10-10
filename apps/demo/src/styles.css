@@ -1382,3 +1382,22 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .gd-ico { font-size: 22px; line-height: 1.2; }
 .gd-intro-card .mb-nav { display: flex; gap: 8px; justify-content: flex-end; }
 .reach-hint { display: inline-flex; gap: 8px; align-items: center; }
+
+/* Quick messages from other job seekers: cards at the top, hard to miss. */
+.pings { position: absolute; z-index: 9; top: 64px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100% - 24px)); display: grid; gap: 8px; pointer-events: none; }
+.ping { pointer-events: auto; position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 10px 34px 10px 10px; background: #fff7ed; border-color: #ec4899; box-shadow: 0 4px 0 #9d174d, 0 10px 30px rgb(0 0 0 / 0.3); animation: ping-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.ping-face { flex: none; width: 46px; height: 46px; border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: flex-start; background: radial-gradient(circle at 50% 70%, #fde68a, #fbcfe8); border: 2.5px solid #3b2a20; }
+.ping-face svg { margin-top: -1px; }
+.ping-main { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.ping-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.ping-where { font-size: 11px; color: #9a3412; font-weight: 700; }
+.ping-text { font-size: 15px; font-weight: 800; color: #3b2a20; }
+.ping-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.ping-actions button { padding: 4px 10px; font-size: 13px; background: #fff; color: var(--text); box-shadow: 0 2px 0 #3b2a20; border-width: 2px; }
+.ping-actions button[data-primary] { background: #ec4899; color: #fff; }
+.ping-x { position: absolute; top: 6px; right: 6px; padding: 0 7px; font-size: 13px; background: transparent; color: #9a3412; box-shadow: none; border: 0; }
+@keyframes ping-in { from { transform: translateY(-18px) scale(0.9); opacity: 0; } }
+.follow-bar { position: absolute; z-index: 7; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 6px 8px 6px 12px; font-size: 13px; white-space: nowrap; max-width: calc(100% - 24px); background: #fdf2f8; border-color: #ec4899; }
+.follow-bar > span { overflow: hidden; text-overflow: ellipsis; }
+.follow-bar button { padding: 3px 10px; font-size: 12px; background: #fff; color: var(--text); box-shadow: 0 2px 0 #3b2a20; border-width: 2px; }
+@media (max-width: 640px) { .pings, .follow-bar { top: 58px; } }
