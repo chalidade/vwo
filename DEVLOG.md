@@ -4,6 +4,19 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-09 · kembali ke posisi terakhir di job fair
+
+**Konteks:** pembayaran Xendit sudah berhasil, tapi setelah redirect owner selalu kembali ke layar sambutan dan mulai lagi dari lantai pertama.
+
+**Yang berubah:**
+- Lantai dan posisi pemain disimpan di localStorage per akun setiap 2 detik, dan juga saat tab ditutup atau disembunyikan.
+- Saat masuk lagi, pemain langsung ditaruh di tempat terakhirnya, selama lantainya masih ada dan titiknya tidak tertutup stand. Posisi yang lebih tua dari 14 hari diabaikan.
+- Kalau pemain keluar dari aplikasi tanpa menekan Keluar (menutup tab, membayar, reload), layar sambutan dilewati dan pemain langsung masuk. Tombol Keluar atau Ganti akun membuat layar sambutan muncul lagi.
+
+**Dicek:** di lokal, posisi setelah berjalan sama persis setelah reload, layar sambutan tidak muncul, dan posisi yang disimpan di Lantai 3 dibuka tepat di Lantai 3.
+
+---
+
 ## 2026-10-09 · kode error Xendit tampil saat bayar gagal
 
 **Konteks:** owner mencoba beli koin dan mendapat "Halaman pembayaran belum bisa dibuat". Tes webhook dari dashboard Xendit sudah berhasil (200, token cocok), jadi masalahnya ada saat membuat invoice.
