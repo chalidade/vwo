@@ -50,13 +50,13 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                   <div key={b.id} className="org-slot" style={{ ["--c" as string]: b.color }}>
                     <span className="cp-logo">{b.logo}</span>
                     <b className="org-slot-name">
-                      {b.company} {b.tier === "premium" && "👑"}
+                      {b.company} {b.tier === "premium" && <span className="cp-vip">VIP</span>}
                     </b>
                     <span className="muted small">
                       {slotName(sl.x, sl.y)} · {apps} pelamar · {fair.peopleAt(b.id)} di stand
                     </span>
                     <span className="small org-login">
-                      🔑 <code>{b.id}</code> · PIN {LIVE && !fair.hasCompanyPin(b.id) ? <span className="muted">belum diatur</span> : <code>{fair.companyPin(b.id)}</code>}
+                      <code>{b.id}</code> · PIN {LIVE && !fair.hasCompanyPin(b.id) ? <span className="muted">belum diatur</span> : <code>{fair.companyPin(b.id)}</code>}
                     </span>
                     <span className="org-slot-tools">
                       <button type="button" className="small-btn" onClick={() => setConfig(b.id)}>
@@ -112,7 +112,7 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
               <li key={bk.id}>
                 <span className="cp-job-main">
                   <b>
-                    {bk.company} {bk.tier === "premium" && "👑"}
+                    {bk.company} {bk.tier === "premium" && <span className="cp-vip">VIP</span>}
                   </b>
                   <span className="muted small">
                     {bk.contact} · {bk.email} · {coinText(bk.price)} lunas via {bk.method} · {new Date(bk.at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -278,7 +278,7 @@ function ConfigureBooth({ booth, onClose, onDone }: { booth: CompanyBooth; onClo
         <div className="cp-span bk-tiers">
           {(["regular", "premium"] as const).map((t) => (
             <button key={t} type="button" className="bk-tier" data-active={tier === t ? "" : undefined} onClick={() => setTier(t)}>
-              <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
+              <b>{t === "premium" ? "Stand VIP" : "Stand reguler"}</b>
               <small>{t === "premium" ? "Lebih lebar, umbul-umbul, gapura, layar video besar" : "Panel, meja recruiter, roll-up banner"}</small>
             </button>
           ))}
@@ -319,14 +319,14 @@ function ConfigureBooth({ booth, onClose, onDone }: { booth: CompanyBooth; onClo
         </div>
         {hasVideo && (
           <label className="cp-span">
-            📺 Link video (YouTube atau .mp4){tier === "premium" ? ", diputar di layar besar VIP" : ", diputar di TV stand"}
+            Link video (YouTube atau .mp4){tier === "premium" ? ", diputar di layar besar VIP" : ", diputar di TV stand"}
             <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://youtu.be/... (kosong = slideshow profil)" />
           </label>
         )}
         {gated && (
           <>
             <label>
-              🎋 Model gapura
+              Model gapura
               <select value={gate} onChange={(e) => setGate(e.target.value as GateStyle)}>
                 {(Object.keys(GATE_STYLES) as GateStyle[]).map((g) => (
                   <option key={g} value={g}>

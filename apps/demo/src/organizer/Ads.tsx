@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { Promoter, SponsorView } from "@vwo/shared";
 import { ACCESSORY_PRODUCTS, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
@@ -32,8 +33,8 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const limit = fair.walkerLimit();
   const owners = (id: string) => [...fair.company.values()].filter((c) => c.owned.includes(id)).length;
   const rates = [
-    { name: "🏬 Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium").length, note: `${fair.freeSlots().length} stand kosong` },
-    { name: "👑 Stand VIP", price: STAND_PRICES.premium, sold: fair.fair.booths.filter((b) => b.tier === "premium").length + owners(VIP_PRODUCT.id) },
+    { name: "Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium").length, note: `${fair.freeSlots().length} stand kosong` },
+    { name: "Stand VIP", price: STAND_PRICES.premium, sold: fair.fair.booths.filter((b) => b.tier === "premium").length + owners(VIP_PRODUCT.id) },
     { name: `${PROMOTER_PRODUCT.emoji} ${PROMOTER_PRODUCT.name}`, price: PROMOTER_PRODUCT.price, sold: owners(PROMOTER_PRODUCT.id) },
     ...ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => ({ name: `${p.emoji} ${p.name}`, price: p.price, sold: owners(p.id) })),
   ];
@@ -57,13 +58,13 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       </div>
       <nav className="org-jump" aria-label="Bagian halaman iklan">
         {[
-          ["ad-walkers", "🚶 Jumlah keliling"],
-          ["ad-promoters", "🧑‍💼 Promotor"],
-          ["ad-sponsors", "🏷️ Sponsor"],
-          ["ad-rates", "💰 Tarif"],
-          ["ad-report", "📊 Laporan"],
-          ["ad-announce", "📢 Pengumuman"],
-          ["ad-banner", "🎪 Banner aula"],
+          ["ad-walkers", "Jumlah keliling"],
+          ["ad-promoters", "Promotor"],
+          ["ad-sponsors", "Sponsor"],
+          ["ad-rates", "Tarif"],
+          ["ad-report", "Laporan"],
+          ["ad-announce", "Pengumuman"],
+          ["ad-banner", "Banner aula"],
         ].map(([id, label]) => (
           <button key={id} type="button" className="small-btn ghost" onClick={() => jump(id!)}>
             {label}
@@ -72,7 +73,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       </nav>
 
       <div className="card" id="ad-walkers">
-        <h2 className="cp-h2">🚶 Promotor keliling di peta</h2>
+        <h2 className="cp-h2">Promotor keliling di peta</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
           Atur berapa promotor panitia yang berjalan dan menawari pengunjung sekaligus. Promotor milik perusahaan (berbayar) selalu ikut keliling dan tidak dihitung di sini.
         </p>
@@ -94,7 +95,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
         </p>
       </div>
       <div className="card" id="ad-announce">
-        <h2 className="cp-h2">📢 Pengumuman ke semua pengunjung</h2>
+        <h2 className="cp-h2">Pengumuman ke semua pengunjung</h2>
         {ann && (
           <p className="org-ann">
             <b>Sedang tampil:</b> {ann.text} <span className="muted small">· {new Date(ann.at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -127,7 +128,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       <div className="card" id="ad-promoters">
         <div className="org-row org-row-head">
           <h2 className="cp-h2" style={{ margin: 0 }}>
-            🧑‍💼 NPC promotor
+            NPC promotor
           </h2>
           <button type="button" className="small-btn" onClick={() => setEditing(newPromoter())}>
             ＋ Tambah promotor
@@ -147,7 +148,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                   </b>
                   <span className="small">{p.headline}</span>
                   <span className="muted small">
-                    {floorName(p.level)} · {p.walks ? "🚶 Keliling" : "🧍 Berdiri"} · 👁 {a?.views ?? 0} · 👆 {a?.clicks ?? 0} ({pct(a?.clicks ?? 0, a?.views ?? 0)})
+                    {floorName(p.level)} · {p.walks ? "Keliling" : "Berdiri"} · {a?.views ?? 0} dilihat · {a?.clicks ?? 0} klik ({pct(a?.clicks ?? 0, a?.views ?? 0)})
                     {p.code && ` · kode ${p.code}`}
                   </span>
                 </span>
@@ -159,7 +160,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                     Ubah
                   </button>
                   <button type="button" className="small-btn ghost" onClick={() => confirm(`Hapus promotor ${p.brand}?`) && fair.removePromoter(p.id)} aria-label={`Hapus ${p.brand}`}>
-                    🗑
+                    <Trash2 size={16} aria-hidden />
                   </button>
                 </span>
               </li>
@@ -170,7 +171,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
 
       {companyPromoters.length > 0 && (
         <div className="card">
-          <h2 className="cp-h2">💼 Promotor milik perusahaan</h2>
+          <h2 className="cp-h2">Promotor milik perusahaan</h2>
           <p className="muted small">Dibeli perusahaan lewat portal perusahaan. Isinya diatur perusahaan sendiri.</p>
           <ul className="org-cards">
             {companyPromoters.map((p) => {
@@ -184,7 +185,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                     </b>
                     <span className="small">{p.headline}</span>
                     <span className="muted small">
-                      {floorName(p.level)} · 🚶 Keliling · 👁 {a?.views ?? 0} · 👆 {a?.clicks ?? 0} ({pct(a?.clicks ?? 0, a?.views ?? 0)})
+                      {floorName(p.level)} · Keliling · {a?.views ?? 0} dilihat · {a?.clicks ?? 0} klik ({pct(a?.clicks ?? 0, a?.views ?? 0)})
                     </span>
                   </span>
                 </li>
@@ -195,7 +196,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       )}
 
       <div className="card" id="ad-sponsors">
-        <h2 className="cp-h2">🏷️ Banner sponsor</h2>
+        <h2 className="cp-h2">Banner sponsor</h2>
         <ul className="org-cards">
           {fair.fair.sponsors.map((sp) => (
             <li key={sp.id} style={{ ["--c" as string]: sp.color }}>
@@ -206,7 +207,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                 </b>
                 <span className="small">{sp.tagline}</span>
                 <span className="muted small">
-                  {fair.fair.floors[sp.floor]?.name} · 👁 {fair.sponsorViews.get(sp.id) ?? 0} dilihat {sp.promo && `· promo ${sp.promo}`}
+                  {fair.fair.floors[sp.floor]?.name} · {fair.sponsorViews.get(sp.id) ?? 0} dilihat {sp.promo && `· promo ${sp.promo}`}
                 </span>
               </span>
               <span className="org-card-tools">
@@ -220,7 +221,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       </div>
 
       <div className="card" id="ad-rates">
-        <h2 className="cp-h2">💰 Tarif dan slot terjual</h2>
+        <h2 className="cp-h2">Tarif dan slot terjual</h2>
         <div className="org-scroll">
           <table className="list cp-table">
             <thead>
@@ -249,7 +250,7 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
       </div>
 
       <div className="card" id="ad-report">
-        <h2 className="cp-h2">📊 Laporan iklan lain</h2>
+        <h2 className="cp-h2">Laporan iklan lain</h2>
         <div className="org-scroll">
           <table className="list cp-table">
             <thead>
@@ -271,13 +272,13 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                     <td>{a?.views ?? 0}</td>
                     <td>{a?.clicks ?? 0}</td>
                     <td>
-                      {a?.sold ?? 0} voucher · {a?.coins ?? 0} 🪙
+                      {a?.sold ?? 0} voucher · {a?.coins ?? 0} koin
                     </td>
                   </tr>
                 );
               })}
               <tr>
-                <td>✨ Aksesoris premium semua stand</td>
+                <td>Aksesoris premium semua stand</td>
                 <td>{decorTotal.views}</td>
                 <td>{decorTotal.clicks}</td>
                 <td>{decorTotal.sold} diklaim</td>
@@ -377,8 +378,8 @@ function PromoterForm({ p, isNew, onClose, onSave }: { p: Promoter; isNew: boole
         <label>
           Cara promosi
           <select value={f.walks ? "walk" : "stand"} onChange={(e) => set("walks", e.target.value === "walk" ? true : undefined)}>
-            <option value="walk">🚶 Keliling, mendatangi pengunjung</option>
-            <option value="stand">🧍 Berdiri di satu titik</option>
+            <option value="walk">Keliling, mendatangi pengunjung</option>
+            <option value="stand">Berdiri di satu titik</option>
           </select>
         </label>
         {!f.walks && (
@@ -496,7 +497,7 @@ function HallBannerCard({ onToast }: { onToast: (t: string) => void }) {
   const [subs, setSubs] = useState(floors.map((_, i) => fair.org.banner?.subtitles?.[i] ?? ""));
   return (
     <div className="card" id="ad-banner">
-      <h2 className="cp-h2">🎪 Banner aula</h2>
+      <h2 className="cp-h2">Banner aula</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
         Spanduk besar di dinding belakang tiap lantai aula. Kosongkan untuk memakai nama acara dan nama lantai.
       </p>

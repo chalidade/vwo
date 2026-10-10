@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { SeminarSession } from "../fair/content";
 import { useStageLive } from "../fair/stage";
@@ -14,10 +15,10 @@ export function OrgSeminars({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card org-stagecard">
-        <h2 className="cp-h2">🎤 Panggung pembicara</h2>
+        <h2 className="cp-h2">Panggung pembicara</h2>
         {live ? (
           <p>
-            <span className="st-live">● LIVE</span> <b>{live.title}</b> oleh {live.speaker} · 👥 {live.viewers} penonton · {live.screen ? "berbagi layar" : "presentasi slide"}
+            <span className="st-live">● LIVE</span> <b>{live.title}</b> oleh {live.speaker} · {live.viewers} penonton · {live.screen ? "berbagi layar" : "presentasi slide"}
           </p>
         ) : (
           <p className="muted small">Belum ada yang siaran. Saat siaran, pengunjung yang duduk di Ruang Seminar langsung melihat layar pembicara dan bisa chat serta bertanya.</p>
@@ -50,7 +51,7 @@ export function OrgSeminars({ onToast }: { onToast: (t: string) => void }) {
                   Ubah
                 </button>
                 <button type="button" className="small-btn ghost" disabled={sessions.length <= 1} onClick={() => confirm(`Hapus sesi ${s.title}?`) && fair.removeSeminar(s.id)} aria-label={`Hapus ${s.title}`}>
-                  🗑
+                  <Trash2 size={16} aria-hidden />
                 </button>
               </span>
             </li>
@@ -119,7 +120,7 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
             <textarea rows={3} value={x.pointsText} onChange={(e) => setSlide(i, { pointsText: e.target.value })} placeholder="Poin, satu per baris" aria-label={`Poin slide ${i + 1}`} />
             <input value={x.say} onChange={(e) => setSlide(i, { say: e.target.value })} placeholder="Yang diucapkan pembicara (teks CC)" maxLength={200} aria-label={`Ucapan slide ${i + 1}`} />
             <button type="button" className="small-btn ghost" disabled={slides.length <= 1} onClick={() => setSlides(slides.filter((_, j) => j !== i))}>
-              🗑 Hapus slide
+              Hapus slide
             </button>
           </fieldset>
         ))}

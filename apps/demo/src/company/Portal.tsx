@@ -13,7 +13,7 @@ import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
-import { Bell, Briefcase, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Tent, Users, Wallet } from "lucide-react";
+import { Bell, Briefcase, Coins, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 
@@ -118,7 +118,7 @@ function ClaimBooth({ code: start, mine, admin }: { code: string; mine: string[]
           location.hash = `#/jobfair/company/${id}`;
         }}
       >
-        <h1 className="cp-h1">🏢 Portal perusahaan</h1>
+        <h1 className="cp-h1">Portal perusahaan</h1>
         {booths.length > 0 && (
           <>
             <p className="muted small" style={{ marginTop: 0 }}>
@@ -130,7 +130,7 @@ function ClaimBooth({ code: start, mine, admin }: { code: string; mine: string[]
                   <BoothLogo booth={b} className="cp-logo" />
                   <span>
                     <b>
-                      {b.company} {b.tier === "premium" && "👑"}
+                      {b.company} {b.tier === "premium" && <span className="cp-vip">VIP</span>}
                     </b>
                     <span className="muted small">{b.id}</span>
                   </span>
@@ -179,7 +179,7 @@ function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) 
           onIn(b.id);
         }}
       >
-        <h1 className="cp-h1">🏢 Masuk portal perusahaan</h1>
+        <h1 className="cp-h1">Masuk portal perusahaan</h1>
         <p className="muted small" style={{ marginTop: 0 }}>
           Kelola stand, lowongan, dan pelamar di {fair.fair.name}. Kode dan PIN dikirim panitia, atau kamu dapat saat booking stand kosong di peta.
         </p>
@@ -212,7 +212,7 @@ function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) 
                 <BoothLogo booth={b} className="cp-logo" />
                 <span>
                   <b>
-                    {b.company} {b.tier === "premium" && "👑"}
+                    {b.company} {b.tier === "premium" && <span className="cp-vip">VIP</span>}
                   </b>
                   <span className="muted small">
                     {b.id} · PIN {fair.companyPin(b.id)}
@@ -260,7 +260,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
             )}
             {fair.notifsFor(booth.id).length > 0 && (
               <button type="button" className="small-btn ghost" onClick={() => fair.deleteNotif(booth.id)}>
-                🗑️ Hapus semua
+                Hapus semua
               </button>
             )}
           </div>
@@ -290,13 +290,13 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
             <BoothLogo booth={booth} className="cp-logo" />
             <span className="dash-brand-text">
               <b>{booth.company}</b>
-              <span>{booth.tier === "premium" ? "👑 Stand VIP" : "Stand reguler"}</span>
+              <span>{booth.tier === "premium" ? "Stand VIP" : "Stand reguler"}</span>
             </span>
           </>
         }
         title={
           <>
-            {booth.company} {booth.tier === "premium" && <span className="cp-vip">👑 VIP</span>}
+            {booth.company} {booth.tier === "premium" && <span className="cp-vip">VIP</span>}
           </>
         }
         primary={["overview", "applicants", "jobs", "billing"]}
@@ -313,7 +313,8 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
         quick={
           <>
             <button type="button" className="dash-coins" onClick={() => setTab("billing")} title="Saldo koin perusahaan">
-              🪙 {fair.player.coins.toLocaleString("id-ID")}
+              <Coins size={16} aria-hidden />
+              {fair.player.coins.toLocaleString("id-ID")}
             </button>
             {bellPop}
           </>
@@ -361,7 +362,7 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
   const upcoming = apps
     .flatMap((a) => [
       ...(a.interview ? [{ a, at: a.interview.at, what: `Interview · ${a.interview.mode}` }] : []),
-      ...(a.visit ? [{ a, at: a.visit.at, what: "🏢 Kunjungan kantor" }] : []),
+      ...(a.visit ? [{ a, at: a.visit.at, what: "Kunjungan kantor" }] : []),
     ])
     .sort((x, y) => x.at - y.at);
   const unread = apps.filter((a) => a.messages?.length && a.messages[a.messages.length - 1]!.from === "seeker");
@@ -449,7 +450,7 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
           )}
           {unread.length > 0 && (
             <button type="button" className="small-btn" onClick={() => onTab("applicants")}>
-              💬 {unread.length} balasan pelamar
+              {unread.length} balasan pelamar
             </button>
           )}
         </div>

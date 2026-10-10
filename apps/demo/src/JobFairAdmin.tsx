@@ -72,7 +72,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         accent="#f97316"
         brand={
           <>
-            <span className="cp-logo">🎪</span>
+            <span className="cp-logo"><Tent size={18} aria-hidden /></span>
             <span className="dash-brand-text">
               <b>Panitia</b>
               <span>{fair.fair.name}</span>

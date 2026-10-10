@@ -1,3 +1,4 @@
+import { Crown, Megaphone } from "lucide-react";
 import { useState } from "react";
 import { type CompanyBooth, coinPrice, koinText, rp } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
@@ -120,7 +121,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
         <div className="bl-main">
           <section className="card bl-vip" data-vip={vip ? "" : undefined}>
             <div className="bl-vip-top">
-              <span className="bl-vip-crown">👑</span>
+              <span className="bl-vip-crown"><Crown size={22} aria-hidden /></span>
               <div>
                 <h2 className="cp-h2">Stand VIP</h2>
                 <p className="small muted">{VIP_PRODUCT.about}</p>
@@ -130,7 +131,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
               <li>Stand lebih lebar, umbul-umbul brand kiri dan kanan</li>
               <li>Gapura di pintu masuk, model dan tulisannya bisa diatur</li>
               <li>Layar video besar untuk video perusahaan</li>
-              <li>Lampu sorot, karpet emas, LED berjalan, label 👑</li>
+              <li>Lampu sorot, karpet emas, LED berjalan, label VIP</li>
               <li>Prioritas di layar informasi panitia</li>
             </ul>
             <div className="bl-row-end">{product(VIP_PRODUCT, vip, "✓ Stand kamu sudah VIP")}</div>
@@ -138,7 +139,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
 
           <section className="card">
             <div className="bl-line">
-              <span className="bl-emoji">📣</span>
+              <span className="bl-emoji"><Megaphone size={20} aria-hidden /></span>
               <span className="bl-line-main">
                 <b>{PROMOTER_PRODUCT.name}</b>
                 <span className="small muted">{PROMOTER_PRODUCT.about}</span>
@@ -157,7 +158,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
                     <b>{p.name}</b>
                     <span className="small muted">{p.about}</span>
                   </span>
-                  {product(p, fair.owns(booth.id, p.id), vip && p.id === "gapura" ? "👑 Termasuk VIP" : undefined)}
+                  {product(p, fair.owns(booth.id, p.id), vip && p.id === "gapura" ? "Termasuk VIP" : undefined)}
                 </li>
               ))}
             </ul>
@@ -166,7 +167,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
 
         <aside className="bl-side">
           <section className="card bl-cart">
-            <h2 className="cp-h2">🛒 Keranjang</h2>
+            <h2 className="cp-h2">Keranjang</h2>
             {items.length === 0 ? (
               <p className="muted small">Centang VIP, promotor, atau aksesoris untuk dibeli dengan koin.</p>
             ) : (
@@ -197,7 +198,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
           </section>
 
           <section className="card">
-            <h2 className="cp-h2">🧾 Riwayat pembelian</h2>
+            <h2 className="cp-h2">Riwayat pembelian</h2>
             {invoices.length === 0 ? (
               <p className="muted small">Belum ada pembelian.</p>
             ) : (

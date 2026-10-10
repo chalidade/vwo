@@ -88,7 +88,7 @@ export function OrgLive() {
             {[...booths].sort((a, b) => a.floor - b.floor).map((b) => (
               <tr key={b.id}>
                 <td>
-                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span title="Stand VIP">👑</span>}
+                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span className="cp-vip" title="Stand VIP">VIP</span>}
                 </td>
                 <td>{fair.fair.floors[b.floor]?.name}</td>
                 <td>{b.recruiter}</td>
@@ -141,7 +141,7 @@ export function OrgLive() {
                     {a.psych != null && (
                       <>
                         <br />
-                        <span className="muted small">🧠 Psikotes {a.psych}</span>
+                        <span className="muted small">Psikotes {a.psych}</span>
                       </>
                     )}
                   </td>

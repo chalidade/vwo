@@ -1,3 +1,4 @@
+import { Mic } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type PeerInfo, connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
@@ -240,7 +241,7 @@ export function SpeakerStage() {
   return (
     <main className="cp st">
       <header className="card cp-head st-head">
-        <span className="cp-logo cp-logo-big">🎤</span>
+        <span className="cp-logo cp-logo-big"><Mic size={22} aria-hidden /></span>
         <div className="cp-head-text">
           <h1 className="cp-h1">Panggung pembicara</h1>
           {live && <span className="st-live st-live-head">● LIVE {mmss(seconds)}</span>}
@@ -261,8 +262,8 @@ export function SpeakerStage() {
             <label>
               Tempat
               <select value={venue} disabled={live} onChange={(e) => (setVenue(e.target.value as "seminar" | "aula"), setSlide(0))}>
-                <option value="seminar">🎤 Ruang Seminar</option>
-                <option value="aula">🏛️ Panggung Aula (sambutan, talkshow)</option>
+                <option value="seminar">Ruang Seminar</option>
+                <option value="aula">Panggung Aula (sambutan, talkshow)</option>
               </select>
             </label>
             {venue === "aula" ? (
@@ -298,7 +299,7 @@ export function SpeakerStage() {
                 </span>
               ))}
             </div>
-            {screen && <span className="st-tag">🖥️ Layar kamu dibagikan</span>}
+            {screen && <span className="st-tag">Layar kamu dibagikan</span>}
           </div>
           {!screen && (
             <div className="mb-nav st-slidenav">
@@ -313,13 +314,13 @@ export function SpeakerStage() {
               </button>
             </div>
           )}
-          {!screen && <p className="st-say muted small">💬 Catatan pembicara: {session.slides[slide]?.say}</p>}
+          {!screen && <p className="st-say muted small">Catatan pembicara: {session.slides[slide]?.say}</p>}
           <div className="st-controls">
             <button type="button" className="st-btn" data-on={screen ? "" : undefined} onClick={() => void shareScreen()}>
-              🖥️ {screen ? "Stop share" : "Share layar"}
+              {screen ? "Stop share" : "Share layar"}
             </button>
             <button type="button" className="st-btn" data-on={mic ? "" : undefined} onClick={() => void toggleMic()}>
-              {mic ? "🎙️ Mic nyala" : "🔇 Mic mati"}
+              {mic ? "Mic nyala" : "Mic mati"}
             </button>
             {live ? (
               <button type="button" className="st-btn st-end" onClick={end}>
@@ -327,14 +328,14 @@ export function SpeakerStage() {
               </button>
             ) : (
               <button type="button" className="st-btn st-go" onClick={goLive}>
-                🔴 Mulai siaran
+                Mulai siaran
               </button>
             )}
           </div>
           {warn && <p className="cp-warn">{warn}</p>}
           {LIVE ? (
             <p className="muted small st-note">
-              👥 {viewerCount} penonton. Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
+              {viewerCount} penonton. Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
             </p>
           ) : null}
           {viewerCount > 0 && (
@@ -354,7 +355,7 @@ export function SpeakerStage() {
           {!LIVE && (
             <>
               <p className="muted small st-note">
-                👥 {viewerCount} penonton dari tab lain{bots && live ? ` + ${botCrowd} penonton bot demo` : ""}. Demo ini tanpa server: siaran sampai ke tab lain di browser yang sama (buka{" "}
+                {viewerCount} penonton dari tab lain{bots && live ? ` + ${botCrowd} penonton bot demo` : ""}. Demo ini tanpa server: siaran sampai ke tab lain di browser yang sama (buka{" "}
                 <a href="#/jobfair" target="_blank" rel="noreferrer">
                   job fair
                 </a>{" "}
@@ -370,10 +371,10 @@ export function SpeakerStage() {
         <section className="card st-side">
           <nav className="cp-tabs st-tabs">
             <button type="button" data-active={tab === "chat" ? "" : undefined} onClick={() => setTab("chat")}>
-              💬 Chat
+              Chat
             </button>
             <button type="button" data-active={tab === "qa" ? "" : undefined} onClick={() => setTab("qa")}>
-              ❓ Q&A {open > 0 && <span className="cp-count">{open}</span>}
+              Q&A {open > 0 && <span className="cp-count">{open}</span>}
             </button>
           </nav>
           <ul className="st-chat">
