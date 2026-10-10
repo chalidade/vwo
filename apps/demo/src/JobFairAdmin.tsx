@@ -12,20 +12,21 @@ import { OrgRegistrations } from "./organizer/Registrations";
 import { OrgSeminars } from "./organizer/Seminars";
 import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
+import { BadgeDollarSign, Brain, Building2, ClipboardList, FlaskConical, Landmark, Layers, Megaphone, Mic, Presentation, Radio, Store, Tent, Trash2, UtensilsCrossed } from "lucide-react";
 import { DashShell } from "./Dash";
 
 const TABS = [
-  ["live", "📡", "Live"],
-  ["floors", "🏢", "Lantai"],
-  ["booths", "🏬", "Stand"],
-  ["registrations", "📝", "Pendaftaran"],
-  ["early", "🧪", "Early access"],
-  ["ads", "📣", "Iklan & pendapatan"],
-  ["prices", "💰", "Harga & koin"],
-  ["psych", "🧠", "Psikotes"],
-  ["seminar", "🎤", "Seminar"],
-  ["aula", "🏛️", "Aula"],
-  ["food", "🍜", "Food Court"],
+  ["live", Radio, "Live"],
+  ["floors", Layers, "Lantai"],
+  ["booths", Store, "Stand"],
+  ["registrations", ClipboardList, "Pendaftaran"],
+  ["early", FlaskConical, "Early access"],
+  ["ads", Megaphone, "Iklan & pendapatan"],
+  ["prices", BadgeDollarSign, "Harga & koin"],
+  ["psych", Brain, "Psikotes"],
+  ["seminar", Presentation, "Seminar"],
+  ["aula", Landmark, "Aula"],
+  ["food", UtensilsCrossed, "Food Court"],
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: OrgTab[] }[] = [
@@ -79,6 +80,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
           </>
         }
         title={`Panitia · ${fair.fair.name}`}
+        primary={["live", "registrations", "booths", "prices"]}
         subtitle={LIVE ? "Perubahan tersimpan di server dan langsung tampil untuk semua pengunjung." : "Data demo tersimpan di browser ini. Perubahan langsung tampil di job fair."}
         groups={GROUPS.map((g) => ({ label: g.label, items: g.ids.map((id) => ({ id, icon: TABS.find(([x]) => x === id)![1], label: TABS.find(([x]) => x === id)![2] })) }))}
         active={tab}
@@ -86,13 +88,13 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         actions={
           <>
             <a className="small-btn cp-link" href="#/jobfair">
-              🎪 Buka job fair
+              <Tent size={16} aria-hidden /> Buka job fair
             </a>
             <a className="small-btn ghost cp-link" href="#/jobfair/company">
-              🏢 Portal perusahaan
+              <Building2 size={16} aria-hidden /> Portal perusahaan
             </a>
             <a className="small-btn ghost cp-link" href="#/jobfair/speaker">
-              🎤 Pembicara
+              <Mic size={16} aria-hidden /> Pembicara
             </a>
             {!LIVE && (
               <button
@@ -102,7 +104,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
                   if (confirm("Hapus semua data demo job fair (lamaran, kunjungan, pengaturan panitia) di browser ini?")) fair.reset();
                 }}
               >
-                Hapus data demo
+                <Trash2 size={16} aria-hidden /> Hapus data demo
               </button>
             )}
           </>

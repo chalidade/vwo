@@ -13,17 +13,18 @@ import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
+import { Bell, Briefcase, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 
 const TABS = [
-  ["overview", "📊", "Ringkasan"],
-  ["applicants", "📋", "Pelamar"],
-  ["jobs", "💼", "Lowongan"],
-  ["booth", "🎨", "Tampilan booth"],
-  ["profile", "🏢", "Profil perusahaan"],
-  ["faq", "❓", "FAQ"],
-  ["billing", "🪙", "Koin & belanja"],
+  ["overview", LayoutDashboard, "Ringkasan"],
+  ["applicants", Users, "Pelamar"],
+  ["jobs", Briefcase, "Lowongan"],
+  ["booth", Palette, "Tampilan booth"],
+  ["profile", Building2, "Profil perusahaan"],
+  ["faq", CircleHelp, "FAQ"],
+  ["billing", Wallet, "Koin & belanja"],
 ] as const;
 export type PortalTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: PortalTab[] }[] = [
@@ -246,7 +247,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
   const bellPop = (
     <span className="nt-bell-wrap">
       <button type="button" className="small-btn ghost nt-bell" onClick={() => setBell((b) => !b)} aria-expanded={bell} aria-label={`Notifikasi${unread ? `, ${unread} belum dibaca` : ""}`}>
-        🔔{unread > 0 && <span className="cp-count">{unread}</span>}
+        <Bell size={17} aria-hidden />{unread > 0 && <span className="cp-count">{unread}</span>}
       </button>
       {bell && (
         <div className="card nt-pop" role="dialog" aria-label="Notifikasi">
@@ -298,6 +299,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
             {booth.company} {booth.tier === "premium" && <span className="cp-vip">👑 VIP</span>}
           </>
         }
+        primary={["overview", "applicants", "jobs", "billing"]}
         subtitle={`${booth.industry} · Stand di ${fair.fair.floors[booth.floor]?.name ?? "aula"} · Recruiter ${booth.recruiter}`}
         groups={GROUPS.map((g) => ({
           label: g.label,
@@ -308,18 +310,22 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
         }))}
         active={tab}
         onPick={setTab}
-        actions={
+        quick={
           <>
             <button type="button" className="dash-coins" onClick={() => setTab("billing")} title="Saldo koin perusahaan">
               🪙 {fair.player.coins.toLocaleString("id-ID")}
             </button>
             {bellPop}
+          </>
+        }
+        actions={
+          <>
             <a className="small-btn cp-link" href="#/jobfair">
-              🎪 Lihat di job fair
+              <Tent size={16} aria-hidden /> Lihat di job fair
             </a>
             {onOut && (
               <button type="button" className="small-btn ghost" onClick={onOut}>
-                {LIVE ? "Ganti stand" : "Keluar"}
+                <LogOut size={16} aria-hidden /> {LIVE ? "Ganti stand" : "Keluar"}
               </button>
             )}
           </>
