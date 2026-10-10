@@ -68,7 +68,7 @@ import { LiveChannel, type LiveStatus } from "./live";
 import { COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
 import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
-import { type RingSignal, canCallOtherTabs, listenForCalls, newCallId, onSignal, sendSignal } from "./fair/call";
+import { type RingSignal, canCallOtherTabs, listenForCalls, loadRelay, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard, VisitCard } from "./fair/Invite";
@@ -229,6 +229,11 @@ export function JobFair() {
   const hud = useHud();
   const stageLive = useStageLive();
   savedSession = session;
+
+  // Calls and the stage broadcast need the relay servers; fetch them ahead so ringing isn't delayed.
+  useEffect(() => {
+    if (session) void loadRelay();
+  }, [session]);
 
   // Remember where the player stands, so a reload or a trip to the payment page comes back here.
   useEffect(() => {

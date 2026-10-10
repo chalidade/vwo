@@ -92,6 +92,15 @@ export function CallScreen({
     setPhase("live");
   };
 
+  // Live only once audio can actually flow; a call that can't get through says so instead of a silent timer.
+  const [failed, setFailed] = useState(false);
+  const onState = (st: RTCPeerConnectionState) => {
+    if (st === "connected") {
+      setFailed(false);
+      goLive();
+    } else if (st === "failed") setFailed(true);
+  };
+
   // The caller's camera starts while it rings, like a real call app.
   useEffect(() => {
     if (incoming) return;
@@ -121,11 +130,8 @@ export function CallScreen({
             caller: true,
             kind,
             local: localRef.current,
-            onRemote: (r) => {
-              setRemote(r);
-              goLive();
-            },
-            onState: (st) => st === "connected" && goLive(),
+            onRemote: setRemote,
+            onState,
           });
         } else if (s.type === "decline") finish("declined", false);
         else if (s.type === "hangup") finish(liveRef.current ? "ended" : "missed", false);
@@ -182,11 +188,8 @@ export function CallScreen({
       caller: false,
       kind,
       local: s,
-      onRemote: (r) => {
-        setRemote(r);
-        goLive();
-      },
-      onState: (st) => st === "connected" && goLive(),
+      onRemote: setRemote,
+      onState,
     });
     sendSignal({ type: "accept", callId });
   };
@@ -206,8 +209,10 @@ export function CallScreen({
         : "Panggilan masuk..."
       : phase === "ringing"
         ? "Memanggil..."
-        : phase === "connecting"
-          ? "Menyambungkan..."
+        : failed
+          ? "Tidak tersambung: jaringan memblokir panggilan. Coba Wi-Fi lain atau data seluler."
+          : phase === "connecting"
+            ? "Menyambungkan..."
           : mmss(seconds);
 
   const avatar = (
