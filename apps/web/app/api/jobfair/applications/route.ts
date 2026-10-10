@@ -1,4 +1,4 @@
-import { AlreadyAppliedError, TooManyApplicationsError, myFairApplications, submitFairApplication } from "@vwo/db";
+import { AlreadyAppliedError, TooManyApplicationsError, boothMemberIds, myFairApplications, submitFairApplication } from "@vwo/db";
 import { fairApplicationSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -6,6 +6,7 @@ import { applicationOut } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { mailEnabled } from "@/lib/mail";
 import { allow } from "@/lib/ratelimit";
+import { pushTo } from "@/lib/push";
 import { currentUser } from "@/lib/session";
 import { liveCoins } from "@/lib/coins";
 
@@ -34,6 +35,8 @@ export async function POST(req: Request) {
     // The blue check companies see comes from the coin ledger, not from what the browser says.
     const { verified } = await liveCoins(user.id);
     const row = await submitFairApplication(db, { userId: user.id, boothKey: boothId, jobKey: jobId, data: { boothId, jobId, ...rest, verified } });
+    const d = row.data as { name?: string; jobTitle?: string };
+    pushTo(await boothMemberIds(db, boothId), { title: "📨 Lamaran baru", body: `${d.name ?? "Pelamar"} melamar ${d.jobTitle ?? "lowongan"}`, url: `/play/#/jobfair/company/${boothId}`, tag: `app-${row.id}` });
     return NextResponse.json({ application: applicationOut(row) }, { status: 201 });
   } catch (e) {
     if (e instanceof AlreadyAppliedError) return fail(409, "already_applied");

@@ -156,3 +156,23 @@ function answered<T extends Invitation>(stored: T, incoming: Invitation | undefi
   const changed = stored.reply !== incoming.reply;
   return { ...stored, reply: incoming.reply, repliedAt: changed ? now : stored.repliedAt };
 }
+
+/** What one side's update brought the other side, worth a notification outside the app; null when nothing. */
+export function sharedNews(before: ApplicationShared, after: ApplicationShared, as: "company" | "seeker"): { kind: "chat" | "interview" | "visit" | "call" | "rating" | "confirm"; text: string } | null {
+  const had = new Set((before.messages ?? []).map(msgKey));
+  const added = (after.messages ?? []).filter((m) => m.from === as && !had.has(msgKey(m)));
+  if (as === "company") {
+    if (after.interview && after.interview.at !== before.interview?.at) return { kind: "interview", text: "Kamu diundang interview" };
+    if (after.visit && after.visit.at !== before.visit?.at) return { kind: "visit", text: "Kamu diundang kunjungan kantor" };
+    const oldCalls = new Set((before.calls ?? []).map((c) => c.at));
+    if ((after.calls ?? []).some((c) => !oldCalls.has(c.at) && !c.answered)) return { kind: "call", text: "Ada panggilan tak terjawab dari HR" };
+    if (added.length) return { kind: "chat", text: added.at(-1)!.text.slice(0, 140) };
+    if (after.rating && after.rating !== before.rating) return { kind: "rating", text: `HR memberi ${"★".repeat(after.rating)} untuk lamaranmu` };
+    return null;
+  }
+  const reply = (a?: { at: number; reply?: string }, b?: { at: number; reply?: string }) => !!a?.reply && (a.reply !== b?.reply || a.at !== b?.at);
+  if (reply(after.interview, before.interview)) return { kind: "confirm", text: after.interview!.reply === "hadir" ? "Pelamar konfirmasi hadir interview" : "Pelamar minta jadwal ulang interview" };
+  if (reply(after.visit, before.visit)) return { kind: "confirm", text: after.visit!.reply === "hadir" ? "Pelamar konfirmasi hadir kunjungan kantor" : "Pelamar minta jadwal ulang kunjungan kantor" };
+  if (added.length) return { kind: "chat", text: added.at(-1)!.text.slice(0, 140) };
+  return null;
+}

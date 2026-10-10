@@ -141,6 +141,13 @@
       "when": 1791616247769,
       "tag": "0019_social",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791618395317,
+      "tag": "0020_web_push",
+      "breakpoints": true
     }
   ]
 }

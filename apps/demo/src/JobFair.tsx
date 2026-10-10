@@ -78,6 +78,7 @@ import { LevelBar } from "./fair/Modal";
 import { InviteCard, VisitCard } from "./fair/Invite";
 import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
 import { NotifList } from "./fair/Notifs";
+import { PushCard } from "./fair/PushCard";
 import { Modal } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
 import { FriendsPanel, type FriendOnline } from "./fair/Friends";
@@ -1973,6 +1974,7 @@ export function JobFair() {
               </div>
             }
           >
+            <PushCard who="seeker" />
             <NotifList
               items={fair.notifsFor(PLAYER_ID)}
               onDelete={(n) => fair.deleteNotif(PLAYER_ID, n.id)}
