@@ -440,6 +440,17 @@ export interface PsychResult {
 }
 
 /** The player's game state: coins, vouchers, tickets, XP, and what they did in the rooms. */
+/** A coin change the server checks and books (live site). The amounts for free coins are the server's own. */
+export type CoinOp =
+  | { op: "daily"; day: string }
+  | { op: "mission"; day: string; id: string }
+  | { op: "bonus"; day: string }
+  | { op: "game"; day: string; coins: number }
+  | { op: "balloon"; day: string; booth: string; coins: number }
+  | { op: "cashback"; day: string; coins: number }
+  | { op: "verified" }
+  | { op: "spend"; amount: number; reason: string };
+
 export interface PlayerState {
   coins: number;
   txns: CoinTxn[];
@@ -1313,7 +1324,7 @@ export class DemoJobFair {
       if (claims[ckey] === today) return { ok: false, text: "Balon di stand ini sudah kamu pecahkan hari ini" };
       claims[ckey] = today;
       const coins = 1 + Math.floor(this.rand() * 3);
-      this.earn(coins, `Balon di stand ${b.company}`);
+      this.earn(coins, `Balon di stand ${b.company}`, { op: "balloon", day: today, booth: boothId, coins });
       this.ad(key, "click");
       return { ok: true, text: `Pop! Kamu dapat ${coins} koin 🎈`, coins };
     }
@@ -1533,6 +1544,7 @@ export class DemoJobFair {
 
   /** Live: take the account's saved progress (from another device), or start fresh with null. */
   loadProgress(p: PlayerProgress | null) {
+    this.ledgerSeq = -1;
     // Replace, not merge: nothing from the account that played here before may carry over.
     for (const k of Object.keys(this.player)) delete (this.player as unknown as Record<string, unknown>)[k];
     Object.assign(this.player, freshPlayer(), p?.player ?? {});
@@ -1754,20 +1766,43 @@ export class DemoJobFair {
 
   // --- Coins, vouchers and XP (the player only; bots don't pay).
 
-  private spend(amount: number, reason: string) {
+  /** Live: every coin the player earns or spends is also sent to the server's ledger, which has the final say. */
+  onCoins: ((op: CoinOp) => void) | null = null;
+  /** The ledger's entry count last applied, so an older answer from the server is ignored. */
+  private ledgerSeq = -1;
+
+  private spend(amount: number, reason: string, op: CoinOp = { op: "spend", amount, reason }) {
     if (this.player.coins < amount) return false;
     this.player.coins -= amount;
     this.player.txns.unshift({ at: this.now(), amount: -amount, reason });
     this.player.txns.length = Math.min(this.player.txns.length, 50);
+    this.onCoins?.(op);
     this.persist();
     return true;
   }
 
-  private earn(amount: number, reason: string) {
+  /** Without `op` the coins were already booked on the server (a paid top-up) or nowhere (the offline demo). */
+  private earn(amount: number, reason: string, op?: CoinOp) {
     this.player.coins += amount;
     this.player.txns.unshift({ at: this.now(), amount, reason });
     this.player.txns.length = Math.min(this.player.txns.length, 50);
+    if (op) this.onCoins?.(op);
     this.persist();
+  }
+
+  /** Live: the balance, history and blue check as the server's ledger has them. */
+  setLedger(c: { balance: number; verified: boolean; seq: number; txns: CoinTxn[] }) {
+    if (c.seq < this.ledgerSeq) return;
+    this.ledgerSeq = c.seq;
+    const p = this.player;
+    if (p.coins === c.balance && !!p.verified === c.verified && JSON.stringify(p.txns) === JSON.stringify(c.txns)) return;
+    p.coins = c.balance;
+    p.verified = c.verified;
+    p.txns = c.txns.slice(0, 50);
+    const me = this.visitors.get(PLAYER_ID);
+    if (me) me.verified = c.verified;
+    this.persist();
+    this.emit();
   }
 
   gainXp(amount: number) {
@@ -1804,7 +1839,7 @@ export class DemoJobFair {
     this.player.streak = this.player.dailyOn === yesterday ? (this.player.streak ?? 0) + 1 : 1;
     this.player.dailyOn = this.today();
     const bonus = streakBonus(this.player.streak);
-    this.earn(price("coin.daily") + bonus, bonus ? `Koin gratis harian + bonus ${this.player.streak} hari beruntun` : "Koin gratis harian");
+    this.earn(price("coin.daily") + bonus, bonus ? `Koin gratis harian + bonus ${this.player.streak} hari beruntun` : "Koin gratis harian", { op: "daily", day: this.today() });
     this.emit();
     return price("coin.daily") + bonus;
   }
@@ -1841,7 +1876,7 @@ export class DemoJobFair {
     const m = this.missions().find((x) => x.id === id);
     if (!m || m.claimed || m.progress < m.target) return false;
     this.dailyState().claimed.push(m.id);
-    this.earn(m.coins, `Misi: ${m.title}`);
+    this.earn(m.coins, `Misi: ${m.title}`, { op: "mission", day: this.dailyState().day, id: m.id });
     this.gainXp(m.xp);
     return true;
   }
@@ -1850,7 +1885,7 @@ export class DemoJobFair {
     const s = this.dailyState();
     if (s.bonus || !this.missions().every((m) => m.claimed)) return false;
     s.bonus = true;
-    this.earn(MISSIONS_BONUS, "Bonus semua misi harian");
+    this.earn(MISSIONS_BONUS, "Bonus semua misi harian", { op: "bonus", day: s.day });
     this.emit();
     return true;
   }
@@ -1860,7 +1895,7 @@ export class DemoJobFair {
     const s = this.dailyState();
     const give = Math.max(0, Math.min(Math.floor(coins), GAME_DAILY_CAP - s.gameCoins));
     s.gameCoins += give;
-    if (give) this.earn(give, `Mini game: ${game}`);
+    if (give) this.earn(give, `Mini game: ${game}`, { op: "game", day: s.day, coins: give });
     this.track("game");
     return give;
   }
@@ -1960,7 +1995,7 @@ export class DemoJobFair {
     this.player.meals++;
     if (bonus.kind === "coins" && bonus.coins) {
       bonus.used = true;
-      this.earn(bonus.coins, `Cashback dari ${stall.name}`);
+      this.earn(bonus.coins, `Cashback dari ${stall.name}`, { op: "cashback", day: this.today(), coins: bonus.coins });
     }
     this.ad(`stall:${stall.id}`, "sold", deal.price);
     this.track("promo");
@@ -2005,7 +2040,7 @@ export class DemoJobFair {
   /** Buy the blue verified check with coins. */
   buyVerified() {
     if (this.player.verified) return true;
-    if (!this.spend(price("coin.verify"), "Centang biru (verified)")) return false;
+    if (!this.spend(price("coin.verify"), "Centang biru (verified)", { op: "verified" })) return false;
     this.player.verified = true;
     const v = this.visitors.get(PLAYER_ID);
     if (v) v.verified = true;

@@ -6,6 +6,7 @@ import { CompanyPortal } from "./company/Portal";
 import { SpeakerStage } from "./organizer/Speaker";
 import { LIVE } from "./mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
+import { startCoinSync } from "./coin-sync";
 import { startPaymentSync } from "./payments";
 import { syncPlayer } from "./player-sync";
 import { startPriceSync } from "./prices-sync";
@@ -30,12 +31,14 @@ function useLiveAccount() {
       const a = currentAccount();
       setAccount(a);
       startSharedSync(!!a?.fairAdmin, a?.booths ?? []);
+      if (a) startCoinSync();
       syncPlayer(a);
       if (a) startPaymentSync();
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
       startSharedSync(!!a?.fairAdmin, a?.booths ?? []);
+      if (a) startCoinSync();
       syncPlayer(a);
       if (a) startPaymentSync();
     });

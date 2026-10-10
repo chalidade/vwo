@@ -5,6 +5,7 @@ import type { Account } from "./account";
 import { type Character, loadCharacter, saveCharacter } from "./CharacterCreator";
 import type { PlayerProgress } from "./jobfair-engine";
 import { loadProfile, saveProfile, type SeekerProfile } from "./profile";
+import { coinsPending } from "./coin-sync";
 import { fair } from "./useFair";
 
 interface Saved extends Partial<PlayerProgress> {
@@ -46,6 +47,13 @@ function setOwner(id: string) {
 
 const snapshot = (): Saved => ({ ...fair.progress(), profile: loadProfile(), character: loadCharacter() });
 
+type Ledger = Parameters<typeof fair.setLedger>[0];
+
+/** The server's ledger balance that came with a save or load, unless coin changes are still on their way. */
+function ledger(c: Ledger | undefined) {
+  if (c && !coinsPending()) fair.setLedger(c);
+}
+
 function adopt(d: Saved | null) {
   fair.loadProgress(d?.player ? { player: d.player, stamps: d.stamps ?? [], inbox: d.inbox ?? [] } : null);
   if (d?.profile) saveProfile(d.profile);
@@ -74,7 +82,7 @@ export function syncPlayer(account: Account | null) {
     try {
       const r = await fetch("/api/jobfair/progress", { credentials: "same-origin" });
       if (gone || !r.ok) return;
-      const d = (await r.json()) as { data: Saved | null; rev: number };
+      const d = (await r.json()) as { data: Saved | null; rev: number; coins?: Ledger };
       if (first) {
         if (d.data) adopt(d.data);
         // Nothing saved yet: keep this browser's progress only if it was this account's (or nobody's).
@@ -82,6 +90,7 @@ export function syncPlayer(account: Account | null) {
         setOwner(id);
         rev = d.rev;
         sent = d.data ? JSON.stringify(snapshot()) : "";
+        ledger(d.coins);
         ready = true;
         waiting.splice(0).forEach((fn) => fn());
         return;
@@ -112,10 +121,11 @@ export function syncPlayer(account: Account | null) {
         body: `{"rev":${rev},"data":${json}}`,
       });
       if (gone) return;
-      const d = (await r.json().catch(() => ({}))) as { rev?: number; data?: Saved | null };
+      const d = (await r.json().catch(() => ({}))) as { rev?: number; data?: Saved | null; coins?: Ledger };
       if (r.ok && typeof d.rev === "number") {
         rev = d.rev;
         sent = json;
+        ledger(d.coins);
       } else if (r.status === 409 && typeof d.rev === "number") {
         // Another device saved first: its copy wins, and this device carries on from it.
         adopt(d.data ?? null);

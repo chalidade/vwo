@@ -4,6 +4,30 @@ Catatan progres proyek, entri terbaru di atas. Dokumen desain ada di `docs/desig
 
 ---
 
+## 2026-10-10 · saldo koin dihitung di server
+
+**Konteks:** pembelian koin sudah lewat Xendit, tapi saldo koin, riwayat, dan centang biru masih disimpan dari browser (`fair_players`). Siapa pun yang paham bisa mengubah angkanya sendiri.
+
+**Yang berubah:**
+- Saldo kini dihitung dari tabel `coin_ledger` yang sudah ada sejak awal tapi belum dipakai. Endpoint baru `/api/jobfair/coins` mencatat setiap perubahan dengan aturan dari server:
+  - koin harian sekali sehari, beserta bonus beruntun yang dihitung server;
+  - misi hanya untuk misi hari itu, masing-masing sekali, dan bonus misi hanya kalau semua misi sudah diklaim;
+  - mini game maksimal 30 koin sehari;
+  - balon dan cashback maksimal 15 koin sehari;
+  - pengeluaran dan centang biru harus punya saldo cukup.
+- Koin yang dibeli lewat Xendit langsung dicatat di ledger begitu Xendit mengonfirmasi.
+- Aturan misi dipindah ke `packages/shared/src/coin-rules.ts` supaya game dan server memakai aturan yang sama.
+- Saat progress disimpan atau dimuat, koin, riwayat, dan centang biru selalu diganti dengan angka dari ledger. Status centang biru di lamaran yang dilihat perusahaan juga diambil dari ledger.
+- Game tetap langsung menambah atau mengurangi koin di layar, lalu menyesuaikan dengan jawaban server. Kalau server menolak, koinnya kembali.
+- Akun yang dibuat sebelum 10 Oktober membawa saldo lamanya (maksimal 1000) dan centang birunya. Akun baru mendapat koin sambutan dari daftar harga.
+
+**Dicek:**
+- Tes database untuk pembukaan saldo, streak, dan batas per hari.
+- Di lokal: koin harian kedua kali bernilai 0, tanggal lama ditolak, misi palsu ditolak, mini game berhenti di 30, dan belanja melebihi saldo ditolak.
+- Simpanan progress palsu berisi 99999 koin tetap tersimpan 45, dan HUD game menampilkan 45.
+
+---
+
 ## 2026-10-10 · early access sebagai panitia
 
 **Konteks:** owner minta tab Early Access punya pilihan ketiga, yaitu mencoba aplikasi sebagai panitia.

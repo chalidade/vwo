@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { fail, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
+import { type CoinState } from "@vwo/db";
+import { liveCoins } from "@/lib/coins";
 
 export const dynamic = "force-dynamic";
 
@@ -11,17 +13,27 @@ export const dynamic = "force-dynamic";
 const MAX_BYTES = 400_000;
 const PARTS = new Set(["player", "stamps", "inbox", "profile", "character"]);
 
+type Saved = { player?: Record<string, unknown> } & Record<string, unknown>;
+
+/** Coins, their history and the blue check always come from the ledger, whatever was saved. */
+function withLedger(data: unknown, coins: CoinState) {
+  if (!data || typeof data !== "object") return data;
+  const d = data as Saved;
+  if (!d.player || typeof d.player !== "object") return d;
+  return { ...d, player: { ...d.player, coins: coins.balance, verified: coins.verified, txns: coins.txns } };
+}
+
 /** The signed-in account's game progress, for whichever device they open the job fair on. */
 export async function GET() {
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
-  const row = await readFairPlayer(db, user.id);
-  return NextResponse.json(row ?? { data: null, rev: 0 }, { headers: { "Cache-Control": "no-store" } });
+  const [row, coins] = await Promise.all([readFairPlayer(db, user.id), liveCoins(user.id)]);
+  return NextResponse.json(row ? { ...row, data: withLedger(row.data, coins), coins } : { data: null, rev: 0, coins }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
  * Save it. Only ever read back by the same account, so the document is checked for shape and size,
- * not field by field. A save on top of an older revision gets 409 with what is stored now.
+ * not field by field; the coin balance in it is replaced by the ledger's. A save on top of an older revision gets 409 with what is stored now.
  */
 export async function PUT(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
@@ -39,8 +51,9 @@ export async function PUT(req: Request) {
   const { rev, data } = body;
   if (!Number.isInteger(rev) || (rev as number) < 0 || !data || typeof data !== "object" || Array.isArray(data)) return fail(400, "invalid_input");
   if (Object.keys(data).some((k) => !PARTS.has(k))) return fail(400, "invalid_input");
-  const next = await writeFairPlayer(db, { userId: user.id, rev: rev as number, data });
-  if (next !== null) return NextResponse.json({ rev: next });
+  const coins = await liveCoins(user.id);
+  const next = await writeFairPlayer(db, { userId: user.id, rev: rev as number, data: withLedger(data, coins) as object });
+  if (next !== null) return NextResponse.json({ rev: next, coins });
   const now = await readFairPlayer(db, user.id);
-  return NextResponse.json({ error: "conflict", ...(now ?? { data: null, rev: 0 }) }, { status: 409 });
+  return NextResponse.json({ error: "conflict", ...(now ? { ...now, data: withLedger(now.data, coins) } : { data: null, rev: 0 }), coins }, { status: 409 });
 }

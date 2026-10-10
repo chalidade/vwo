@@ -13,3 +13,4 @@ export * from "./fair-prices";
 export * from "./company-registrations";
 export * from "./early-access";
 export * from "./fair-payments";
+export * from "./fair-coins";

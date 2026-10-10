@@ -8,3 +8,4 @@ export * from "./jobfair";
 export * from "./auth";
 export * from "./fair-api";
 export * from "./pricing";
+export * from "./coin-rules";

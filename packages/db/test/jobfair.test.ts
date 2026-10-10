@@ -4,6 +4,10 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  coinState,
+  coinsUnder,
+  dailyStreakBefore,
+  ensureCoinOpening,
   attachCheckout,
   claimPayment,
   createPayment,
@@ -266,5 +270,23 @@ describe("payments", () => {
     expect(await paidInvoicesOf(db, "data_raya")).toEqual([]);
     await markPaid(db, inv.id, null);
     expect((await paidInvoicesOf(db, "data_raya")).map((x) => x.ref)).toEqual(["data_raya:inv-1"]);
+  });
+});
+
+describe("live coin ledger", () => {
+  it("opens once, counts streaks and caps by key prefix", async () => {
+    const [u] = await db.insert(users).values({ email: "ledger@example.com", displayName: "Ledger" }).returning();
+    await ensureCoinOpening(db, u!.id, 50);
+    await ensureCoinOpening(db, u!.id, 50);
+    expect(await coinState(db, u!.id)).toMatchObject({ balance: 50, verified: false, seq: 1 });
+    await grantCoins(db, { userId: u!.id, amount: 20, reason: "harian", key: `daily:${u!.id}:2026-10-08` });
+    await grantCoins(db, { userId: u!.id, amount: 20, reason: "harian", key: `daily:${u!.id}:2026-10-09` });
+    expect(await dailyStreakBefore(db, u!.id, "2026-10-10")).toBe(2);
+    expect(await dailyStreakBefore(db, u!.id, "2026-10-12")).toBe(0);
+    await grantCoins(db, { userId: u!.id, amount: 7, reason: "game", key: `game:${u!.id}:2026-10-10:a` });
+    expect(await coinsUnder(db, u!.id, `game:${u!.id}:2026-10-10:`)).toBe(7);
+    expect(await coinsUnder(db, u!.id, `game:${u!.id}:2026-10-1_:`)).toBe(0);
+    await spendCoins(db, { userId: u!.id, amount: 60, reason: "Centang biru", key: `verified:${u!.id}` });
+    expect(await coinState(db, u!.id)).toMatchObject({ balance: 37, verified: true, seq: 5 });
   });
 });
