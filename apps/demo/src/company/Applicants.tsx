@@ -1,3 +1,4 @@
+import { MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type CompanyBooth, messageTime, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
@@ -16,9 +17,9 @@ type Sort = "new" | "match" | "psych" | "rating";
 
 const STAGE_LABEL: Partial<Record<ApplicationStatus, string>> = {
   Shortlist: "⭐ Shortlist",
-  "Diundang interview": "📅 Interview",
-  "Lolos interview": "🎯 Lolos interview",
-  "Kunjungan kantor": "🏢 Kunjungan kantor",
+  "Diundang interview": "Interview",
+  "Lolos interview": "Lolos interview",
+  "Kunjungan kantor": "Kunjungan kantor",
   Diterima: "✅ Terima",
   "Belum cocok": "✕ Belum cocok",
 };
@@ -112,7 +113,7 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
                         {a.name}
                         {a.verified && <span className="rpg-check">✔</span>}
                         {a.visitorId === PLAYER_ID && <span className="cp-you">kamu</span>}
-                        {last?.from === "seeker" && <span className="cp-new">💬</span>}
+                        {last?.from === "seeker" && <span className="cp-new"><MessageCircle size={14} aria-hidden /></span>}
                       </b>
                       <span className="muted small">
                         {a.jobTitle} · {when(a.at)}
@@ -220,15 +221,15 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
 
       <div className="cp-call-row">
         <button type="button" onClick={() => startCall("video")} disabled={!reachable}>
-          🎥 Video call
+          Video call
         </button>
         <button type="button" onClick={() => startCall("voice")} disabled={!reachable}>
-          📞 Telepon
+          Telepon
         </button>
         {a.phone && (
           <>
             <a className="small-btn ghost cp-link" href={`tel:${a.phone}`}>
-              📱 {a.phone}
+              {a.phone}
             </a>
             <a className="small-btn ghost cp-link" href={`https://wa.me/${waNumber(a.phone)}`} target="_blank" rel="noopener noreferrer">
               WhatsApp
@@ -237,7 +238,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
         )}
         {/^[^\s@?&#]+@[^\s@?&#]+$/.test(a.email) && (
           <a className="small-btn ghost cp-link" href={`mailto:${a.email}?subject=${encodeURIComponent(`Lamaran ${a.jobTitle} - ${booth.company}`)}`}>
-            ✉️ Email
+            Email
           </a>
         )}
       </div>
@@ -301,7 +302,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
       <h3 className="cp-h3">Jadwalkan interview</h3>
       {a.interview && (
         <p className="cp-iv-reply" data-reply={a.interview.reply ?? "menunggu"}>
-          {a.interview.reply === "hadir" ? "✅ Pelamar konfirmasi hadir" : a.interview.reply === "jadwal-ulang" ? "🕑 Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
+          {a.interview.reply === "hadir" ? "✓ Pelamar konfirmasi hadir" : a.interview.reply === "jadwal-ulang" ? "Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
           {new Date(a.interview.at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
         </p>
       )}
@@ -343,7 +344,7 @@ function Detail({ booth, app: a, match, onBack }: { booth: CompanyBooth; app: Fa
           <h3 className="cp-h3">Jadwalkan kunjungan kantor</h3>
           {a.visit && (
             <p className="cp-iv-reply" data-reply={a.visit.reply ?? "menunggu"}>
-              {a.visit.reply === "hadir" ? "✅ Pelamar konfirmasi hadir" : a.visit.reply === "jadwal-ulang" ? "🕑 Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
+              {a.visit.reply === "hadir" ? "✓ Pelamar konfirmasi hadir" : a.visit.reply === "jadwal-ulang" ? "Pelamar minta jadwal ulang: kirim jadwal baru di bawah" : "⏳ Menunggu konfirmasi pelamar"} ·{" "}
               {new Date(a.visit.at).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
             </p>
           )}

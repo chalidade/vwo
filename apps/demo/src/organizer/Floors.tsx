@@ -16,7 +16,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card">
-        <h2 className="cp-h2">🏢 Lantai gedung</h2>
+        <h2 className="cp-h2">Lantai gedung</h2>
         <p className="muted small">
           Urutan dari atas ke bawah seperti tombol lift. Lantai booth berisi 6 tempat stand yang bisa dipesan perusahaan. Isi harga 0 untuk lantai gratis, atau jumlah koin untuk lantai berbayar. Lantai {stops[0]?.level != null ? stops[0].level + 1 : 1} tempat pengunjung datang selalu gratis.
         </p>
@@ -46,7 +46,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
                       {st.emoji} {st.label}
                     </span>
                   )}
-                  <span className="muted small">{hall >= 0 ? `💼 Lantai booth · ${booths}/6 stand terisi` : "Ruangan"}</span>
+                  <span className="muted small">{hall >= 0 ? `Lantai booth · ${booths}/6 stand terisi` : "Ruangan"}</span>
                 </div>
                 <label className="fl-price">
                   {st.floorId === entrance ? (
@@ -68,7 +68,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
                         }}
                       />
                       <span className="fl-tag" data-paid={price ? "" : undefined}>
-                        {price ? "🪙 koin" : "Gratis"}
+                        {price ? "koin" : "Gratis"}
                       </span>
                     </>
                   )}
@@ -111,7 +111,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
       </div>
 
       <div className="card">
-        <h2 className="cp-h2">＋ Tambah lantai booth</h2>
+        <h2 className="cp-h2">Tambah lantai booth</h2>
         <p className="muted small">Lantai baru muncul di atas lantai booth teratas, lengkap dengan meja informasi dan 6 tempat stand kosong. Ruangan di atasnya ikut naik satu lantai.</p>
         <form
           className="org-row"

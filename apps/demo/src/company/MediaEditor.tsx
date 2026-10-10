@@ -100,14 +100,14 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
         >
           {has("tv") && (
             <label className="cp-span">
-              📺 Link video perusahaan (YouTube atau .mp4){booth.tier === "premium" && " · diputar di layar besar VIP"}
+              Link video perusahaan (YouTube atau .mp4){booth.tier === "premium" && " · diputar di layar besar VIP"}
               <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://youtu.be/... (kosong = slideshow profil)" />
             </label>
           )}
           {has("standee") && (
             <>
               <div className="cp-span">
-                <span className="muted small">🐣 Pilih maskot</span>
+                <span className="muted small">Pilih maskot</span>
                 <div className="cp-mascots">
                   {MASCOT_KINDS.map((k) => (
                     <button key={k.id} type="button" className="cp-mascot" data-active={mascot === k.id ? "" : undefined} onClick={() => setMascot(k.id)} title={k.about}>
@@ -126,7 +126,7 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
                 <input value={mascotLine} onChange={(e) => setMascotLine(e.target.value)} maxLength={140} />
               </label>
               <label className="cp-span">
-                📄 Halaman brosur (satu per baris: Judul | isi)
+                Halaman brosur (satu per baris: Judul | isi)
                 <textarea rows={4} value={brochure} onChange={(e) => setBrochure(e.target.value)} />
               </label>
             </>
@@ -134,7 +134,7 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
           {has("giveaway") && (
             <>
               <label>
-                🎁 Nama merchandise
+                Nama merchandise
                 <input value={merchName} onChange={(e) => setMerchName(e.target.value)} maxLength={60} />
               </label>
               <label>
@@ -145,19 +145,19 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
           )}
           {has("coffee") && (
             <label>
-              ☕ Menu kopi gratis
+              Menu kopi gratis
               <input value={coffee} onChange={(e) => setCoffee(e.target.value)} maxLength={60} />
             </label>
           )}
           {has("photobooth") && (
             <label>
-              📸 Hashtag bingkai foto
+              Hashtag bingkai foto
               <input value={hashtag} onChange={(e) => setHashtag(e.target.value)} maxLength={40} />
             </label>
           )}
           {has("beanbag") && (
             <label className="cp-span">
-              🛋️ Cerita karyawan (satu per baris: Nama | Jabatan | cerita)
+              Cerita karyawan (satu per baris: Nama | Jabatan | cerita)
               <textarea rows={4} value={stories} onChange={(e) => setStories(e.target.value)} />
             </label>
           )}
@@ -179,7 +179,7 @@ export function GateEditor({ booth }: { booth: CompanyBooth }) {
   const current: GateStyle = booth.media?.gate ?? (booth.tier === "premium" ? "klasik" : "janur");
   return (
     <div className="card">
-      <h2 className="cp-h2">🎋 Gapura stand</h2>
+      <h2 className="cp-h2">Gapura stand</h2>
       <div className="cp-themes">
         {(Object.keys(GATE_STYLES) as GateStyle[]).map((g) => (
           <button key={g} type="button" className="cp-theme" data-active={current === g ? "" : undefined} onClick={() => fair.configureBooth(booth.id, { media: { gate: g } })}>

@@ -20,12 +20,12 @@ export function PromoterEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (
   if (!fair.owns(booth.id, PROMOTER_PRODUCT.id))
     return (
       <div className="card">
-        <h2 className="cp-h2">📣 NPC promotor keliling</h2>
+        <h2 className="cp-h2">NPC promotor keliling</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
           {PROMOTER_PRODUCT.about}
         </p>
         <button type="button" onClick={() => onTab("billing")}>
-          🛒 Beli promotor · {coinText(PROMOTER_PRODUCT.price)}
+          Beli promotor · {coinText(PROMOTER_PRODUCT.price)}
         </button>
       </div>
     );
@@ -53,7 +53,7 @@ export function PromoterEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (
         setTimeout(() => setSaved(false), 2500);
       }}
     >
-      <h2 className="cp-h2 cp-span">📣 Promotor keliling kamu</h2>
+      <h2 className="cp-h2 cp-span">Promotor keliling kamu</h2>
       <p className="muted small cp-span" style={{ margin: 0 }}>
         Berkeliling di {fair.fair.floors[booth.floor]?.name}, mendatangi pelamar, lalu tombolnya membuka lowonganmu. Didatangi {stats?.views ?? 0} kali · {stats?.clicks ?? 0} klik.
       </p>

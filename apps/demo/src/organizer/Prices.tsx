@@ -4,7 +4,7 @@ import { rupiah } from "../fair/company";
 import { savePrices } from "../prices-sync";
 import { useFair } from "../useFair";
 
-const show = (unit: string, n: number) => (unit === "koin" ? `${n} 🪙` : rupiah(n));
+const show = (unit: string, n: number) => (unit === "koin" ? `${n} koin` : rupiah(n));
 
 /** The organiser's price list: every price in the event in one table, changed and saved together. */
 export function OrgPrices({ onToast }: { onToast: (t: string) => void }) {
@@ -48,7 +48,7 @@ export function OrgPrices({ onToast }: { onToast: (t: string) => void }) {
                     </div>
                     <div className="pr-edit">
                       <label className="pr-field">
-                        <span className="pr-unit">{p.unit === "koin" ? "🪙" : "Rp"}</span>
+                        <span className="pr-unit">{p.unit === "koin" ? "Koin" : "Rp"}</span>
                         <input
                           type="text"
                           inputMode="numeric"

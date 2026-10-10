@@ -1,3 +1,4 @@
+import { Palette, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
@@ -61,7 +62,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
   return (
     <div className="cp-grid">
       <div className="card cp-wide">
-        <h2 className="cp-h2">Pratinjau stand {booth.tier === "premium" && "👑"}</h2>
+        <h2 className="cp-h2">Pratinjau stand {booth.tier === "premium" && <span className="cp-vip">VIP</span>}</h2>
         <BoothPreview booth={booth} />
         <p className="muted small">Semua perubahan langsung terlihat oleh pengunjung job fair.</p>
       </div>
@@ -88,7 +89,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
             <button key={c} type="button" className="cp-color" style={{ background: c }} data-active={booth.color === c ? "" : undefined} onClick={() => fair.editBooth(booth.id, { color: c })} aria-label={`Warna ${c}`} />
           ))}
           <label className="cp-color cp-color-pick" title="Warna lain">
-            🎨
+            <Palette size={18} aria-hidden />
             <input type="color" value={booth.color} onChange={(e) => fair.editBooth(booth.id, { color: e.target.value })} aria-label="Pilih warna lain" />
           </label>
         </div>
@@ -109,7 +110,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
                   <span className="muted small">{p.about}</span>
                 </span>
                 {p.id === "gapura" && booth.tier === "premium" ? (
-                  <span className="cp-price">👑 Termasuk VIP</span>
+                  <span className="cp-price">Termasuk VIP</span>
                 ) : owned ? (
                   <button
                     type="button"
@@ -134,7 +135,7 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
         {full && <p className="cp-warn">Lantai stand sudah penuh: lepas satu barang lantai dulu.</p>}
         {toBuy.length > 0 && (
           <button type="button" onClick={() => onTab("billing")}>
-            🛒 Beli aksesoris
+            Beli aksesoris
           </button>
         )}
       </div>
@@ -307,7 +308,7 @@ export function FaqEditor({ booth }: { booth: CompanyBooth }) {
               ↓
             </button>
             <button type="button" className="small-btn ghost" onClick={() => setItems(items.filter((_, j) => j !== i))} aria-label="Hapus">
-              🗑
+              <Trash2 size={16} aria-hidden />
             </button>
           </div>
         </div>
@@ -368,7 +369,7 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
                   flash(fair.deleteJob(booth.id, j.id) === "closed" ? "Sudah ada pelamar, jadi lowongan ditutup (riwayat pelamar tetap ada)" : "Lowongan dihapus");
                 }}
               >
-                🗑
+                <Trash2 size={16} aria-hidden />
               </button>
             </div>
           </li>
@@ -465,7 +466,7 @@ function LogoUpload({ booth }: { booth: CompanyBooth }) {
         <span className="muted small">PNG, JPG, atau WebP. Gambar dipotong persegi dan tampil bulat di papan nama stand.</span>
         <div className="row">
           <label className="small-btn cp-file">
-            🖼️ {booth.logoImg ? "Ganti logo" : "Upload logo"}
+            {booth.logoImg ? "Ganti logo" : "Upload logo"}
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -505,7 +506,7 @@ function VipEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab
   const [saved, flash] = useSaved();
   return (
     <div className="card cp-vip-card" data-locked={vip ? undefined : ""}>
-      <h2 className="cp-h2">👑 Tampilan VIP {!vip && <span className="cp-lock">Khusus VIP</span>}</h2>
+      <h2 className="cp-h2">Tampilan VIP {!vip && <span className="cp-lock">Khusus VIP</span>}</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
         {vip ? "Pilih gaya stand supaya beda dari stand VIP lain. Langsung tampil di job fair." : "Stand VIP bisa memilih salah satu gaya ini, lengkap dengan layar video, lounge, dan gapura."}
       </p>
@@ -557,7 +558,7 @@ function VipEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab
         </form>
       ) : (
         <button type="button" onClick={() => onTab("billing")}>
-          👑 Upgrade ke VIP
+          Upgrade ke VIP
         </button>
       )}
     </div>

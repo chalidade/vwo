@@ -1,13 +1,14 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type AulaEvent, DEFAULT_RUNDOWN } from "../jobfair-engine";
 import { useStageLive } from "../fair/stage";
 import { fair } from "../useFair";
 
 const KINDS: [AulaEvent["kind"], string][] = [
-  ["sambutan", "🎙️ Sambutan"],
-  ["talkshow", "💬 Talkshow"],
-  ["hiburan", "🎸 Hiburan"],
-  ["doorprize", "🎁 Door prize"],
+  ["sambutan", "Sambutan"],
+  ["talkshow", "Talkshow"],
+  ["hiburan", "Hiburan"],
+  ["doorprize", "Door prize"],
   ["info", "ℹ️ Info"],
 ];
 
@@ -21,13 +22,13 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card org-stagecard">
-        <h2 className="cp-h2">🏛️ Aula Utama · Lantai 1</h2>
+        <h2 className="cp-h2">Aula Utama · Lantai 1</h2>
         <p className="muted small">
           Panggung untuk sambutan, talkshow, hiburan, dan door prize. Jadwal di bawah tampil di layar LED panggung, papan jadwal, dan papan info Aula. Meeting point ada di pojok kiri bawah.
         </p>
         {live?.venue === "aula" ? (
           <p>
-            <span className="st-live">● LIVE</span> <b>{live.title}</b> oleh {live.speaker} di panggung Aula · 👥 {live.viewers} penonton
+            <span className="st-live">● LIVE</span> <b>{live.title}</b> oleh {live.speaker} di panggung Aula · {live.viewers} penonton
           </p>
         ) : (
           <p className="small">{current ? <>Sedang berlangsung: <b>{current.title}</b> ({current.start}–{current.end})</> : "Tidak ada acara yang berlangsung sekarang."}</p>
@@ -61,7 +62,7 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
                 ))}
               </select>
               <button type="button" className="small-btn ghost" onClick={() => setRows((r) => r.filter((_, k) => k !== i))} aria-label={`Hapus ${e.title || "acara"}`}>
-                🗑
+                <Trash2 size={16} aria-hidden />
               </button>
             </div>
           ))}

@@ -18,7 +18,7 @@ export function OrgFoodCourt({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card">
-        <h2 className="cp-h2">🍜 Stan food court</h2>
+        <h2 className="cp-h2">Stan food court</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
           {STALL_SLOTS.length} tempat stan: 8 di dinding belakang, 4 di sisi kiri, 3 di sisi kanan. {free} kosong. Stan kosong tampil di peta dengan tanda "Sewa stan" dan bisa disewa usaha sendiri seharga {coinText(stallPrice())} (≈ {rupiah(stallPrice())}).
         </p>

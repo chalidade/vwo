@@ -58,7 +58,7 @@ export function OrgRegistrations({ onToast }: { onToast: (t: string) => void }) 
   return (
     <div className="org">
       <div className="card">
-        <h2 className="cp-h2">📝 Pendaftaran perusahaan</h2>
+        <h2 className="cp-h2">Pendaftaran perusahaan</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
           Perusahaan mendaftar lewat <b>jobfair.co.id/daftar-perusahaan</b>, memilih paket, lalu membayar. Cek website, email kantor, dan nomor HP-nya. Kalau benar perusahaan nyata, pilih tempat stand lalu verifikasi: booth langsung berdiri dan perusahaan menerima kode dan PIN lewat email dan halaman pendaftarannya.
         </p>
@@ -95,7 +95,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
   const pick = free[slot];
   return (
     <li style={{ display: "block" }}>
-      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {r.tier === "premium" ? "👑 Stand VIP" : "Stand reguler"} · {coinText(r.price)} (≈ {rupiah(r.price)})
+      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {coinText(r.price)} (≈ {rupiah(r.price)})
       {r.method && <span className="muted small"> · dibayar via {r.method}</span>}
       <div className="muted small">
         {r.industry} · {r.city} · {r.website ? (
@@ -111,7 +111,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
       </div>
       {r.status === "verified" && (
         <div className="small">
-          🔑 Kode <code>{r.boothKey}</code> · PIN <code>{r.pin}</code>
+          Kode <code>{r.boothKey}</code> · PIN <code>{r.pin}</code>
         </div>
       )}
       {r.status === "rejected" && <div className="small bk-err">Ditolak: {r.note}</div>}

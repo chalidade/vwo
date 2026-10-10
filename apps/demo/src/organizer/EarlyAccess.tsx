@@ -20,7 +20,7 @@ async function call<T>(path: string, init?: { method: string; body?: unknown }):
   }
 }
 
-const ROLE = { seeker: "🎒 Pelamar", company: "🏢 Perusahaan", organizer: "🛠️ Panitia" } as const;
+const ROLE = { seeker: "Pelamar", company: "Perusahaan", organizer: "Panitia" } as const;
 
 /** People who may try the app before launch: as a job seeker, a company running a trial booth, or panitia. */
 export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
@@ -69,7 +69,7 @@ export function OrgEarlyAccess({ onToast }: { onToast: (t: string) => void }) {
   return (
     <div className="org">
       <div className="card">
-        <h2 className="cp-h2">🧪 Early access</h2>
+        <h2 className="cp-h2">Early access</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
           Email yang terdaftar di sini bisa masuk ke jobfair sebelum rilis untuk mencoba sistem. Pelamar masuk lewat <b>jobfair.co.id/masuk</b>. Perusahaan mendapat satu stand percobaan dan masuk lewat <b>jobfair.co.id/masuk-perusahaan</b>, tanpa PIN. Semua masuk dengan akun Google yang emailnya sama.
         </p>

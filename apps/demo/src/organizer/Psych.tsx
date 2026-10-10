@@ -99,7 +99,7 @@ export function OrgPsych({ onToast }: { onToast: (t: string) => void }) {
                       setOpen(null);
                     }}
                   >
-                    🗑 Hapus soal
+                    Hapus soal
                   </button>
                 </div>
               )}
@@ -160,7 +160,7 @@ export function OrgPsych({ onToast }: { onToast: (t: string) => void }) {
                       <span className="muted small">{new Date(r.at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                     </td>
                     <td>{r.score}</td>
-                    <td>{r.score >= cfg.pass * 100 ? "🏅 Lulus" : <span className="muted">Belum lulus</span>}</td>
+                    <td>{r.score >= cfg.pass * 100 ? "Lulus" : <span className="muted">Belum lulus</span>}</td>
                   </tr>
                 ))}
               </tbody>
