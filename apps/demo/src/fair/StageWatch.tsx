@@ -1,26 +1,72 @@
 import { useEffect, useRef, useState } from "react";
 import { StageSlide } from "../organizer/Speaker";
-import { connectPeer } from "./call";
+import type { PeerInfo } from "./call";
 import type { SeminarSession } from "./content";
-import { type StageChat, type StageLive, joinStage, leaveStage, onStage, sendStage, stageCallId } from "./stage";
+import { type StageChat, type StageLive, onStage, sendStage, watchStage } from "./stage";
 
 let chatN = 0;
 
-function Media({ stream }: { stream: MediaStream }) {
-  const ref = useRef<HTMLVideoElement>(null);
+/** Play a stream with sound when the browser allows it; phones often want a tap first, so until then
+ *  it plays muted (the screen still shows) with a button to turn the sound on. */
+function usePlay(stream: MediaStream) {
+  const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  const [blocked, setBlocked] = useState(false);
   useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream;
+    const el = ref.current;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream;
+    el.muted = false;
+    el.play()
+      .then(() => setBlocked(false))
+      .catch(() => {
+        el.muted = true;
+        setBlocked(true);
+        void el.play().catch(() => {});
+      });
   }, [stream]);
-  return <video ref={ref} autoPlay playsInline />;
+  const unmute = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.muted = false;
+    void el.play().then(() => setBlocked(false)).catch(() => {});
+  };
+  const button = blocked ? (
+    <button type="button" className="sf-sound" onClick={unmute}>
+      🔇 Nyalakan suara
+    </button>
+  ) : null;
+  return { ref, button };
+}
+
+function Media({ stream }: { stream: MediaStream }) {
+  const { ref, button } = usePlay(stream);
+  return (
+    <>
+      <video ref={ref} autoPlay playsInline />
+      {button}
+    </>
+  );
 }
 
 /** The speaker's voice when they present slides instead of a screen. */
 function Sound({ stream }: { stream: MediaStream }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream;
-  }, [stream]);
-  return <audio ref={ref} autoPlay />;
+  const { ref, button } = usePlay(stream);
+  return (
+    <>
+      <audio ref={ref} autoPlay />
+      {button}
+    </>
+  );
+}
+
+/** One line on how the connection to the speaker is going, so a stuck stream says why. */
+export function linkText(i: (PeerInfo & { tries?: number }) | null) {
+  if (!i || i.state === "waiting" || i.state === "new") return i?.tries && i.tries > 1 ? `Menghubungi pembicara lagi (percobaan ${i.tries})…` : "Menghubungi pembicara…";
+  if (i.state === "connecting") return "Menyambungkan…";
+  if (i.state === "connected") return i.route === "relay" ? "Tersambung lewat server relay" : "Tersambung langsung";
+  if (i.state === "disconnected") return "Sambungan terputus, menyambung ulang…";
+  if (i.state === "failed") return "Gagal tersambung, mencoba lagi…";
+  return "Siaran ditutup";
 }
 
 /** A job seeker watches a speaker who is live: their shared screen (or slides), chat and Q&A. */
@@ -52,28 +98,20 @@ export function StageWatch({
   const [showChat, setShowChat] = useState(true);
   const [watched, setWatched] = useState(0);
   const [claps, setClaps] = useState<{ id: number; x: number; e: string }[]>([]);
-  const peer = useRef<{ close(): void } | null>(null);
+  const [link, setLink] = useState<(PeerInfo & { tries: number }) | null>(null);
 
   useEffect(() => {
-    const join = () => {
-      peer.current?.close();
-      setRemote(null);
-      peer.current = connectPeer({ callId: stageCallId(viewerId), caller: false, kind: "video", local: null, onRemote: (s) => setRemote(new MediaStream(s.getTracks())) });
-      joinStage(viewerId, name);
-    };
+    const leave = watchStage(viewerId, name, setRemote, setLink);
     const off = onStage((m) => {
-      if (m.type === "restart") join();
-      else if (m.type === "history" && m.to === viewerId) setChat(m.chat);
+      if (m.type === "history" && m.to === viewerId) setChat(m.chat);
       else if (m.type === "chat") setChat((l) => [...l.filter((x) => x.id !== m.chat.id), m.chat].slice(-200));
       else if (m.type === "react") setClaps((l) => [...l.slice(-6), { id: Date.now() + Math.random(), x: 10 + Math.random() * 75, e: m.e }]);
     });
-    join();
     const t = setInterval(() => setWatched((n) => n + 1), 1000);
     return () => {
       off();
       clearInterval(t);
-      leaveStage(viewerId, name);
-      peer.current?.close();
+      leave();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -116,6 +154,9 @@ export function StageWatch({
         </div>
         <div className="sx-stage">
           {live.screen && <div className="sx-share">🖥️ {live.speaker} sedang berbagi layar</div>}
+          <div className="sx-link" data-state={link?.state ?? "waiting"}>
+            {linkText(link)}
+          </div>
           {hasVideo ? <Media stream={remote!} /> : live.screen ? <div className="st-wait">Menyambungkan layar pembicara…</div> : <StageSlide session={session} slide={live.slide} />}
           {remote && !hasVideo && remote.getAudioTracks().length > 0 && <Sound stream={remote} />}
           <div className="sx-claps" aria-hidden>

@@ -1361,7 +1361,7 @@ export function JobFair() {
     if (stageLive && stageLive.venue !== "aula") {
       const sem = list.find((x) => x.id === stageLive.sessionId);
       const sl = sem?.slides[stageLive.slide];
-      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined, stream: feed };
+      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined, stream: feed.stream };
     }
     const now = Date.now();
     const s = liveSeminar(now, list);
@@ -1378,7 +1378,7 @@ export function JobFair() {
       now: current,
       next,
       over,
-      live: stageLive?.venue === "aula" ? { title: stageLive.title, speaker: stageLive.speaker, stream: feed } : null,
+      live: stageLive?.venue === "aula" ? { title: stageLive.title, speaker: stageLive.speaker, stream: feed.stream } : null,
       rundown: fair.rundown().map((e) => ({ start: e.start, title: e.title, on: e.id === current?.id })),
       announcement: announcement?.text,
     };
@@ -1602,7 +1602,7 @@ export function JobFair() {
           />
         )}
 
-        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed} onOpen={() => setSeminar(true)} />}
+        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed.stream} link={feed.link} onOpen={() => setSeminar(true)} />}
 
         <div className="hud-bottom">
           {talk ? (

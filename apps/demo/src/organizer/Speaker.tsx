@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { connectPeer, leaveCall, stopMedia } from "../fair/call";
+import { type PeerInfo, connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
 import { BOT_CHAT, BOT_NAMES, BOT_QUESTIONS, type StageChat, onStage, sendStage, stageCallId } from "../fair/stage";
 import { LIVE } from "../mode";
@@ -62,6 +62,8 @@ export function SpeakerStage() {
   const [slide, setSlide] = useState(0);
   const [chat, setChat] = useState<StageChat[]>([]);
   const [viewers, setViewers] = useState<Record<string, string>>({});
+  /** How the connection to each viewer is going, so the speaker can see who actually gets the stream. */
+  const [links, setLinks] = useState<Record<string, PeerInfo>>({});
   const [tab, setTab] = useState<"chat" | "qa">("chat");
   const [text, setText] = useState("");
   // The live site has only real visitors, so no demo audience there unless the speaker turns it on.
@@ -95,7 +97,10 @@ export function SpeakerStage() {
 
   const connect = (viewerId: string) => {
     peers.current.get(viewerId)?.close();
-    peers.current.set(viewerId, connectPeer({ callId: stageCallId(viewerId), caller: true, kind: "video", local: out.current, onRemote: () => {} }));
+    peers.current.set(
+      viewerId,
+      connectPeer({ callId: stageCallId(viewerId), caller: true, kind: "video", local: out.current, onRemote: () => {}, onInfo: (i) => setLinks((l) => ({ ...l, [viewerId]: i })) }),
+    );
   };
 
   const post = (c: Omit<StageChat, "id" | "at">) => {
@@ -121,6 +126,10 @@ export function SpeakerStage() {
           leaveCall(stageCallId(m.viewerId));
           setViewers((v) => {
             const { [m.viewerId]: _, ...rest } = v;
+            return rest;
+          });
+          setLinks((l) => {
+            const { [m.viewerId]: _, ...rest } = l;
             return rest;
           });
         } else if (m.type === "chat") setChat((l) => [...l.filter((x) => x.id !== m.chat.id).slice(-199), m.chat]);
@@ -327,7 +336,22 @@ export function SpeakerStage() {
             <p className="muted small st-note">
               👥 {viewerCount} penonton. Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
             </p>
-          ) : (
+          ) : null}
+          {viewerCount > 0 && (
+            <ul className="st-links small">
+              {Object.entries(viewers).map(([id, who]) => {
+                const l = links[id];
+                const ok = l?.state === "connected";
+                const bad = l?.state === "failed" || l?.state === "disconnected";
+                return (
+                  <li key={id} data-ok={ok ? "" : undefined} data-bad={bad ? "" : undefined}>
+                    {ok ? "🟢" : bad ? "🔴" : "🟡"} {who || "Penonton"} · {ok ? (l.route === "relay" ? "lewat relay" : "langsung") : bad ? "gagal, menunggu sambung ulang" : "menyambungkan"}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {!LIVE && (
             <>
               <p className="muted small st-note">
                 👥 {viewerCount} penonton dari tab lain{bots && live ? ` + ${botCrowd} penonton bot demo` : ""}. Demo ini tanpa server: siaran sampai ke tab lain di browser yang sama (buka{" "}
