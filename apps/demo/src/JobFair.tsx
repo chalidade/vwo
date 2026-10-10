@@ -27,6 +27,7 @@ import {
   loungeBoardSpot,
   loungeSpot,
   safeImage,
+  vipSeatBooth,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -63,7 +64,7 @@ import { applyErrorText, myApplications, sendApplication as sendToServer } from 
 import { LIVE } from "./mode";
 import { claimPaidCoins, pay } from "./payments";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, stallStaffId } from "./jobfair-engine";
+import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, spgId, spgName, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus, pickTransport } from "./live";
 import { PING_REPLIES, PING_STARTERS, PING_TEXT, type Ping, PingLimiter, parsePing } from "./fair/social";
 import { FollowBar, type PingCardView, PingCards } from "./fair/Pings";
@@ -135,6 +136,11 @@ const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh:
 /** Recruiters wear a jacket in their company's colour; the organisers wear navy. */
 export function staffLook(name: string, color: string): Look {
   return { ...lookFor(`staff:${name}`), outfit: "jacket", shirt: color, hat: undefined };
+}
+
+/** A VIP booth's SPG: a neat blazer in the company colour, hair up, a big smile. */
+export function spgLook(name: string, color: string): Look {
+  return { ...lookFor(`spg:${name}`), outfit: "blazer", shirt: color, accent: "#fde68a", pants: "#1f2937", shoes: "#111827", style: name.length % 2 ? "bun" : "ponytail", face: "happy", hat: undefined, glasses: false, mustache: false, backpack: undefined, prop: undefined };
 }
 
 /** Floor arrows pointing to the lift, laid in the aisles of each kind of floor. */
@@ -712,7 +718,9 @@ export function JobFair() {
     const me = savedSession && fair.visitors.get(savedSession.visitorId);
     if (!me?.seatId) return;
     const r = fair.roomOf(me.floorId);
+    const vip = vipSeatBooth(me.seatId);
     if (r) startActivity(r);
+    else if (vip && fair.booth(vip)) talkToRecruiter(fair.booth(vip)!, spgName(vip));
     else setGames(true);
   }
 
@@ -800,8 +808,18 @@ export function JobFair() {
     if (!savedSession) return;
     if (!fair.sit(savedSession.visitorId, seatId)) return;
     const r = fair.roomOf(fair.visitors.get(savedSession.visitorId)!.floorId);
+    const vip = vipSeatBooth(seatId);
     if (r) startActivity(r);
-    else {
+    else if (vip && fair.booth(vip)) {
+      // The SPG walks over and sits down next to the player, then talks.
+      const b = fair.booth(vip)!;
+      fair.track("sofa");
+      fair.say(spgId(b.id), "Selamat datang di lounge VIP! 😊", 2400);
+      window.setTimeout(() => {
+        const me = savedSession && fair.visitors.get(savedSession.visitorId);
+        if (me?.seatId === seatId) talkToRecruiter(b, spgName(b.id));
+      }, 1800);
+    } else {
       fair.track("sofa");
       setGames(true);
     }
@@ -813,7 +831,11 @@ export function JobFair() {
     else if (r.kind === "seminar") setSeminar(true);
     else if (r.kind === "aula") stageLive?.venue === "aula" ? setSeminar(true) : setAula("jadwal");
     else if (r.kind === "konsultasi") setLounge({ mode: "peer" });
-    else if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Voucher aman, nanti makan di outletnya 😋" : "Lihat-lihat promo dulu ah", 2200);
+    else {
+      // The food court: sit down, eat, and play a mini game while at it.
+      if (savedSession) fair.say(savedSession.visitorId, me.meals ? "Voucher aman, sambil makan main game ah 😋" : "Istirahat sambil main game ah 🎮", 2200);
+      setGames(true);
+    }
   }
 
   /** A paid floor (a room, or a booth floor the organiser put a price on) asks for a ticket first. */
@@ -865,12 +887,15 @@ export function JobFair() {
   /** "Lantai 2" for a floor id. */
   const shortName = (floorId: string) => fair.stopOf(floorId).name;
 
-  function talkToRecruiter(b: CompanyBooth) {
+  /** The booth's dialog: from the recruiter at the desk, or from the SPG keeping the player company
+   *  in a VIP lounge (same questions, jobs and applying). */
+  function talkToRecruiter(b: CompanyBooth, spg?: string) {
     const me = session && fair.visitors.get(session.visitorId);
-    if (me) fair.move(me.memberId, me.x, me.y, "back");
+    if (me && !me.seatId) fair.move(me.memberId, me.x, me.y, "back");
+    const host = spg ?? b.recruiter;
     const open = openJobs(b).filter((j) => !appliedIdsNow().has(j.id)).length;
     const main = (pages: string[]): Talk => ({
-      speaker: `${b.recruiter} · ${b.company}`,
+      speaker: `${host} · ${b.company}`,
       pages,
       choices: [
         { label: "Tanya-tanya", onPick: () => setTalk(faq()) },
@@ -882,7 +907,7 @@ export function JobFair() {
       ],
     });
     const faq = (): Talk => ({
-      speaker: `${b.recruiter} · ${b.company}`,
+      speaker: `${host} · ${b.company}`,
       pages: ["Silakan, mau tanya apa?"],
       choices: [
         ...b.faq.map((f) => ({ label: f.q, onPick: () => setTalk(main([f.a, "Ada lagi yang mau ditanyakan?"])) })),
@@ -893,7 +918,9 @@ export function JobFair() {
     const lv = levelOf(fair.companyXp(b.id)).level;
     setTalk(
       main([
-        `Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`,
+        spg
+          ? `Halo, ${session?.name ?? ""}! Aku ${spg}, temani kamu di lounge VIP ${b.company}. Santai dulu ya, ini minumannya ☕`
+          : `Halo, ${session?.name ?? ""}! Aku ${b.recruiter} dari ${b.company}.`,
         `${b.about} Saat ini kami buka ${openJobs(b).length} posisi.`,
         `Pelamar memberi kami ★${rating.average.toFixed(1)} dari ${rating.count} ulasan (Lv ${lv} · ${COMPANY_TITLES[lv - 1]}).`,
       ]),
@@ -1342,6 +1369,7 @@ export function JobFair() {
         : room?.kind === "aula" && s.id === roomStaffId(room.id) && stageLive?.venue === "aula"
           ? stageLive.speaker
           : s.name;
+    if (s.id.startsWith("spg:")) return { id: s.id, name: `✨ ${s.name}`, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, seated: s.seated, look: spgLook(s.name, b?.color ?? "#be185d") };
     return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
   const avatars: AvatarState[] = [...fair.visitors.values()];
@@ -1398,6 +1426,10 @@ export function JobFair() {
                 const ci = room?.consultants?.findIndex((x) => consultantId(x.id) === id) ?? -1;
                 if (ci >= 0) goTo(floor.id, loungeSpot(ci, "front").x, loungeSpot(ci, "front").y, () => setLounge({ mode: "consult", index: ci }));
                 else if (b) goToBooth(b);
+                else if (id.startsWith("spg:")) {
+                  const vb = fair.booth(id.slice(4));
+                  if (vb) talkToRecruiter(vb, spgName(vb.id));
+                }
                 else if (pr) goToPromoter(pr);
                 else if (id === "coin-staff") goToCoinStand();
                 else if (st >= 0) goToStall(st);
@@ -1485,13 +1517,13 @@ export function JobFair() {
         <div className="hud-bottom">
           {talk ? (
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
-          ) : reach?.kind === "seated" && reach.room.kind !== "foodcourt" ? (
+          ) : reach?.kind === "seated" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => startActivity(reach.room)}>
-              {reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : reach.room.kind === "konsultasi" ? "📞 Telepon seseorang" : "📝 Kerjakan psikotes"}
+              {reach.room.kind === "foodcourt" ? "🎮 Main game sambil makan" : reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : reach.room.kind === "konsultasi" ? "📞 Telepon seseorang" : "📝 Kerjakan psikotes"}
             </button>
           ) : reach?.kind === "sofa" ? (
-            <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGames(true)}>
-              🎮 Main mini game
+            <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={seatedAction}>
+              {vipSeatBooth(self?.seatId ?? "") ? `💬 Ngobrol dengan ${spgName(vipSeatBooth(self!.seatId!)!)}` : "🎮 Main mini game"}
             </button>
           ) : reach && reachHint(reach.kind) ? (
             <button type="button" className="rpg-box seated-btn reach-hint" onPointerDown={(e) => e.stopPropagation()} onClick={interact}>

@@ -179,6 +179,24 @@ export function vipLounge(b: BoothShape) {
   return { x: b.x + BOOTH_W + 0.3, y: b.y + 0.55, width: VIP_WING - 0.6, height: 0.95 };
 }
 
+/** The two armchairs of a VIP lounge: a visitor can sit in one, and the booth's SPG takes the other. */
+export function vipSeats(b: BoothShape & { id: string }): SeatView[] {
+  const l = vipLounge(b);
+  return [0.36, 1.54].map((dx, i) => ({
+    id: `${b.id}-vip-${"AB"[i]}`,
+    label: `Lounge VIP ${"AB"[i]}`,
+    tableId: null,
+    x: l.x + dx,
+    y: b.y + 1.0,
+    isActive: true,
+    sofa: true,
+    facing: "front" as const,
+  }));
+}
+
+/** The booth a VIP lounge seat belongs to, from the seat's id. */
+export const vipSeatBooth = (seatId: string) => /^(.+)-vip-[AB]$/.exec(seatId)?.[1] ?? null;
+
 /** Solid parts of a booth: the back wall, the desk, the roll-up banner, and the gate's posts.
  *  VIP booths add the lounge and velvet ropes across the front of both wings. */
 export function boothParts(b: BoothShape) {
@@ -672,6 +690,8 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   if (floor === 0) add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
   objects.push(liftObject(id));
   const seats: SeatView[] = [];
+  for (const b of fair.booths) if (b.floor === floor && b.tier === "premium") seats.push(...vipSeats(b));
+  let sofas = 0;
   for (const o of fair.decor) {
     if (o.floor !== floor) continue;
     if (o.spriteKey === "sofa" || o.spriteKey === "sofa-left") {
@@ -679,7 +699,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
       const right = o.spriteKey === "sofa";
       add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: true });
       add({ type: "blocked", x: right ? o.x : o.x + o.width - 0.3, y: o.y, width: 0.3, height: o.height, spriteKey: "invisible", isWalkable: false });
-      seats.push(...sofaSeats(id, seats.length / 2 + 1, o, right));
+      seats.push(...sofaSeats(id, ++sofas, o, right));
       continue;
     }
     add({ type: "decor", x: o.x, y: o.y, width: o.width, height: o.height, spriteKey: o.spriteKey, isWalkable: o.isWalkable ?? false });
@@ -812,6 +832,11 @@ export const DEMO_JOB_FAIR: JobFairView = {
     { floor: 0, spriteKey: "sofa", x: 29.9, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "sofa-left", x: 34.3, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "plant", x: 32.1, y: 16.4, width: 1, height: 1 },
+    // A second corner to sit and play, between the coin stand and the info desk.
+    { floor: 0, spriteKey: "rug-plain", x: 10.2, y: 16.2, width: 6, height: 3.6, isWalkable: true },
+    { floor: 0, spriteKey: "sofa", x: 10.5, y: 16.6, width: 1, height: 2.4 },
+    { floor: 0, spriteKey: "sofa-left", x: 14.9, y: 16.6, width: 1, height: 2.4 },
+    { floor: 0, spriteKey: "plant", x: 12.7, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "lamp", x: 17.4, y: 20.4, width: 0.8, height: 0.8 },
     { floor: 0, spriteKey: "lamp", x: 27.4, y: 20.4, width: 0.8, height: 0.8 },
     // Upper floors: one big lounge in the middle.
@@ -824,6 +849,13 @@ export const DEMO_JOB_FAIR: JobFairView = {
       { floor, spriteKey: "sofa", x: 17.3, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "sofa-left", x: 27.7, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "plant", x: 22.5, y: 16.4, width: 1, height: 1 },
+      // Two more corners to rest and play, on either side of the big one.
+      ...[1.6, 31.6].flatMap((x) => [
+        { floor, spriteKey: "rug-plain", x, y: 16.2, width: 6, height: 3.6, isWalkable: true },
+        { floor, spriteKey: "sofa", x: x + 0.3, y: 16.6, width: 1, height: 2.4 },
+        { floor, spriteKey: "sofa-left", x: x + 4.7, y: 16.6, width: 1, height: 2.4 },
+        { floor, spriteKey: "plant", x: x + 2.5, y: 16.4, width: 1, height: 1 },
+      ]),
       { floor, spriteKey: "lamp", x: 33.6, y: 20.4, width: 0.8, height: 0.8 },
     ]),
   ],

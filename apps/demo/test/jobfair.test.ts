@@ -47,11 +47,14 @@ describe("DemoJobFair", () => {
       expect(findPath(fair.floors[sp.floor]!, starts[sp.floor]!, front), sp.id).not.toBeNull();
     }
     // Sofas in each hall's lounge are seats you can walk to.
-    for (const f of halls) {
-      const sofas = f.seats.filter((st) => st.sofa);
-      expect(sofas.length, f.id).toBe(4);
+    // Every hall has several corners to sit and play: 2 lounges on the ground floor, 3 above.
+    halls.forEach((f, i) => {
+      const sofas = f.seats.filter((st) => st.sofa && !st.id.includes("-vip-"));
+      expect(sofas.length, f.id).toBe(i === 0 ? 8 : 12);
       for (const st of sofas) expect(findPath(f, LIFT_FRONT, st), st.id).not.toBeNull();
-    }
+      // The VIP lounge chairs are reached from just in front of them.
+      for (const st of f.seats.filter((x) => x.id.includes("-vip-"))) expect(findPath(f, LIFT_FRONT, { x: st.x, y: st.y + 0.75 }), st.id).not.toBeNull();
+    });
     expect(DEMO_JOB_FAIR.booths.filter((b) => b.tier === "premium")).toHaveLength(6);
     // Each room floor: every seat and stall from the lift.
     for (const room of DEMO_JOB_FAIR.rooms) {
