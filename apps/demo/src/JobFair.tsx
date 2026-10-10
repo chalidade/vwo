@@ -72,6 +72,7 @@ import { type RingSignal, canCallOtherTabs, listenForCalls, newCallId, onSignal,
 import { LiftPanel } from "./fair/Lift";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard } from "./fair/Invite";
+import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
 import { NotifList } from "./fair/Notifs";
 import { Modal } from "./fair/Modal";
 import { SofaGames } from "./fair/Games";
@@ -182,6 +183,9 @@ export function JobFair() {
   const [editLook, setEditLook] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState<string | null>(null);
+  /** The guide is open, and the place whose introduction is showing (once, the first time in). */
+  const [guide, setGuide] = useState(false);
+  const [intro, setIntro] = useState<GuidePlace | null>(null);
   // The organiser's announcement stays on screen until the visitor closes it; a new one shows again.
   const announcement = fair.org.announcement;
   const [annSeen, setAnnSeenRaw] = useState<number>(() => {
@@ -259,7 +263,7 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs || lounge || loungeCall);
+  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs || lounge || loungeCall || guide || intro);
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -280,6 +284,16 @@ export function JobFair() {
   const desk = infoDeskOn(fair.fair, floor.id);
   /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
   const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
+  const place: GuidePlace = room ? room.kind : "hall";
+  // The first time in a place (after the welcome), say what it is for and how to use it.
+  useEffect(() => {
+    if (!session || talk || intro || guide) return;
+    const who = account?.email ?? "guest";
+    if (placeSeen(who, place)) return;
+    markPlaceSeen(who, place);
+    setIntro(place);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, place, talk]);
   const feed = useStageFeed(stageLive, liveHere && !seminar, session?.name ?? "Pengunjung");
   const me = fair.player;
   const seeker = levelOf(me.xp);
@@ -1248,6 +1262,23 @@ export function JobFair() {
           </button>
         )}
 
+        {session && (
+          <button type="button" className="hud hud-tr-btn rpg-box guide-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGuide(true)} title="Panduan: cara memakai tiap fitur" aria-label="Panduan">
+            ❓
+          </button>
+        )}
+        {session && guide && <GuidePanel place={place} onClose={() => setGuide(false)} />}
+        {session && intro && !guide && (
+          <PlaceIntro
+            place={intro}
+            onClose={() => setIntro(null)}
+            onMore={() => {
+              setIntro(null);
+              setGuide(true);
+            }}
+          />
+        )}
+
         {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed} onOpen={() => setSeminar(true)} />}
 
         <div className="hud-bottom">
@@ -1261,9 +1292,13 @@ export function JobFair() {
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => setGames(true)}>
               🎮 Main mini game
             </button>
+          ) : reach && reachHint(reach.kind) ? (
+            <button type="button" className="rpg-box seated-btn reach-hint" onPointerDown={(e) => e.stopPropagation()} onClick={interact}>
+              {reachHint(reach.kind)} <span className="rpg-kbd">E</span>
+            </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 lift di pojok kanan bawah
+              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 lift di pojok kanan bawah · ❓ panduan
             </div>
           ) : null}
         </div>

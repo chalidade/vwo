@@ -76,6 +76,7 @@ h1 { margin: 0; }
 .hud-tl[data-collapsed] { padding: 6px 10px; }
 .hud-tr { cursor: pointer; }
 .hud-tr-btn { top: 12px; right: 12px; width: 44px; height: 44px; padding: 0; font-size: 20px; background: var(--surface); box-shadow: none; }
+.hud-tr-btn.guide-btn { right: 64px; }
 .hud-stats { display: flex; gap: 12px; font-size: 13px; margin-top: 2px; }
 .hud-floors { display: flex; gap: 6px; margin-top: 6px; }
 .hud-floors button { padding: 2px 8px; font-size: 12px; background: #fff; color: var(--text); box-shadow: 0 2px 0 #3b2a20; }
@@ -1362,3 +1363,16 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .pr-table th:nth-child(4) { width: 210px; }
 
 .crash-detail { white-space: pre-wrap; word-break: break-word; font-size: 11px; opacity: 0.75; margin: 0 0 10px; max-height: 8em; overflow: auto; }
+
+/* The guide and each place's first-time introduction. */
+.gd-place { display: grid; gap: 10px; }
+.gd-intro { display: flex; gap: 10px; align-items: center; margin: 0; }
+.gd-intro > span:last-child { display: grid; gap: 2px; font-size: 14px; }
+.gd-big { font-size: 34px; line-height: 1; }
+.gd-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.gd-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gd-features li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; background: #fff; border: 2px solid #ead2bd; border-radius: 10px; }
+.gd-features li > span:last-child { display: grid; gap: 2px; font-size: 13px; }
+.gd-ico { font-size: 22px; line-height: 1.2; }
+.gd-intro-card .mb-nav { display: flex; gap: 8px; justify-content: flex-end; }
+.reach-hint { display: inline-flex; gap: 8px; align-items: center; }
