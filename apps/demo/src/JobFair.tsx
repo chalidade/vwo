@@ -489,7 +489,10 @@ export function JobFair() {
         route.current = null;
         goal.current = null;
         if (followRef.current) setFollow(null);
-        if (me.seatId) fair.stand(me.memberId);
+        if (me.seatId) {
+          fair.stand(me.memberId);
+          return;
+        }
       }
       else if (route.current) {
         const path = route.current;
@@ -650,9 +653,14 @@ export function JobFair() {
 
   /** Route toward the goal: straight there on this floor, or to the lift when it is on another floor. */
   function planRoute() {
-    const me = savedSession && fair.visitors.get(savedSession.visitorId);
+    let me = savedSession && fair.visitors.get(savedSession.visitorId);
     const g = goal.current;
     if (!me || !g) return;
+    // Get up first: a walled-in seat (a VIP lounge armchair) has no path out until we step off it.
+    if (me.seatId) {
+      fair.stand(me.memberId);
+      me = fair.visitors.get(me.memberId)!;
+    }
     const f = fair.floor(me.floorId);
     if (g.floorId === me.floorId) {
       // A chair tucked under a desk may not be on the walk grid; the last step onto it is fine.
