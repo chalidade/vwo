@@ -3,6 +3,7 @@ import { useState } from "react";
 import { type CompanyBooth, coinPrice, koinText, rp } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
 import { ACCESSORY_PRODUCTS, type CompanyProduct, PROMOTER_PRODUCT, VIP_PRODUCT } from "../fair/company";
+import { InvoicesPanel } from "../fair/Invoices";
 import { CoinBalance, TopUp } from "../fair/TopUp";
 import { fair } from "../useFair";
 import { LIVE } from "../mode";
@@ -65,7 +66,11 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
     setMsg(null);
     const err = await payBill(booth, inv);
     setBusy(null);
-    setMsg(err ? { ok: false, text: err } : { ok: true, text: `${inv.no} lunas. ${inv.items.some((i) => i.id === "vip") ? "Stand kamu sekarang VIP. " : ""}Barang yang dibeli sudah dipasang di stand.` });
+    setMsg(
+      err
+        ? { ok: false, text: err }
+        : { ok: true, text: `${inv.no} lunas. ${inv.items.some((i) => i.id === "vip") ? "Stand kamu sekarang VIP. " : ""}Barang yang dibeli sudah dipasang di stand.` },
+    );
   };
   const checkout = async () => {
     if (need > fair.player.coins) return setMsg({ ok: false, text: `Koin belum cukup: kurang ${koinText(need - fair.player.coins)}. Pilih paket isi koin di atas.` });
@@ -93,7 +98,9 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
         <div className="bl-wallet-head">
           <div>
             <h2 className="cp-h2">Dompet koin perusahaan</h2>
-            <p className="muted small">Semua pembelian di job fair dibayar dengan koin: sewa stand, upgrade VIP, promotor, aksesoris, dan stan food court. Isi koin sekali, pakai kapan saja.</p>
+            <p className="muted small">
+              Semua pembelian di job fair dibayar dengan koin: sewa stand, upgrade VIP, promotor, aksesoris, dan stan food court. Isi koin sekali, pakai kapan saja.
+            </p>
           </div>
           <CoinBalance need={short > 0 ? fair.player.coins + short : undefined} />
         </div>
@@ -117,11 +124,21 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
         )}
       </section>
 
+      <section className="card">
+        <h2 className="cp-h2">Invoice & tagihan resmi</h2>
+        <p className="muted small">
+          Setiap pembelian koin mendapat invoice bernomor yang bisa dicetak atau disimpan sebagai PDF. Perusahaan dan instansi juga bisa membayar lewat transfer bank atau termin.
+        </p>
+        <InvoicesPanel booth={booth.id} />
+      </section>
+
       <div className="bl-grid">
         <div className="bl-main">
           <section className="card bl-vip" data-vip={vip ? "" : undefined}>
             <div className="bl-vip-top">
-              <span className="bl-vip-crown"><Crown size={22} aria-hidden /></span>
+              <span className="bl-vip-crown">
+                <Crown size={22} aria-hidden />
+              </span>
               <div>
                 <h2 className="cp-h2">Stand VIP</h2>
                 <p className="small muted">{VIP_PRODUCT.about}</p>
@@ -139,7 +156,9 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
 
           <section className="card">
             <div className="bl-line">
-              <span className="bl-emoji"><Megaphone size={20} aria-hidden /></span>
+              <span className="bl-emoji">
+                <Megaphone size={20} aria-hidden />
+              </span>
               <span className="bl-line-main">
                 <b>{PROMOTER_PRODUCT.name}</b>
                 <span className="small muted">{PROMOTER_PRODUCT.about}</span>

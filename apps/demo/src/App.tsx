@@ -59,6 +59,8 @@ function useLiveAccount() {
 const JobFair = lazy(() => import("./JobFair").then((m) => ({ default: m.JobFair })));
 const JobFairAdmin = lazy(() => import("./JobFairAdmin").then((m) => ({ default: m.JobFairAdmin })));
 const CompanyPortal = lazy(() => import("./company/Portal").then((m) => ({ default: m.CompanyPortal })));
+const InvoicePage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicePage })));
+const InvoicesPage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicesPage })));
 const SpeakerStage = lazy(() => import("./organizer/Speaker").then((m) => ({ default: m.SpeakerStage })));
 
 export function App() {
@@ -73,7 +75,7 @@ export function App() {
   const lite = route === "ringan";
   const home = !route.startsWith("jobfair") && !lite;
   // The organiser pages and the company portal use the light dashboard look.
-  const dash = route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route === "jobfair/speaker";
+  const dash = route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route.startsWith("jobfair/invoice") || route === "jobfair/speaker";
   return (
     <div className={game ? "app app-game" : home ? "app app-home" : dash ? "app app-dash" : lite ? "app app-lite" : "app"}>
       <Suspense fallback={<p className="app-loading">Memuat…</p>}>
@@ -91,6 +93,10 @@ export function App() {
           <JobFairAdmin tab={route.split("/")[2]} />
         ) : route === "jobfair/speaker" ? (
           <SpeakerStage />
+        ) : route.startsWith("jobfair/invoice/") ? (
+          <InvoicePage id={route.split("/")[2] ?? ""} />
+        ) : route === "jobfair/invoices" ? (
+          <InvoicesPage />
         ) : route.startsWith("jobfair/company") ? (
           <CompanyPortal boothId={route.split("/")[2]} />
         ) : (

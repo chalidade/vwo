@@ -54,7 +54,15 @@ export function WalletPanel({
   const open = player.vouchers.filter((v) => !v.used);
 
   return (
-    <Modal title={<>🪙 Dompet koin · <b className="fx-coins">{player.coins}</b></>} onClose={onClose} className="fx-wallet">
+    <Modal
+      title={
+        <>
+          🪙 Dompet koin · <b className="fx-coins">{player.coins}</b>
+        </>
+      }
+      onClose={onClose}
+      className="fx-wallet"
+    >
       <div className="mb-tabs fx-tabs">
         {(
           [
@@ -70,9 +78,7 @@ export function WalletPanel({
       </div>
       {tab === "buy" && (
         <>
-          <p className="sp-summary">
-            Koin dipakai untuk melamar ({price("coin.apply")} koin per lamaran) dan masuk ruangan premium seperti Ruang Psikotes dan Ruang Seminar.
-          </p>
+          <p className="sp-summary">Koin dipakai untuk melamar ({price("coin.apply")} koin per lamaran) dan masuk ruangan premium seperti Ruang Psikotes dan Ruang Seminar.</p>
           <div className="fx-daily">
             <span>
               🎁 Koin gratis harian +{price("coin.daily") + streakBonus((player.streak ?? 0) + 1)}
@@ -177,6 +183,11 @@ export function WalletPanel({
             ))}
           </ul>
         ))}
+      {tab === "history" && live && (
+        <p className="sp-muted">
+          Invoice resmi pembelian koin (bisa dicetak atau disimpan PDF) ada di <a href="#/jobfair/invoices">halaman invoice</a>.
+        </p>
+      )}
       {tab === "history" && (
         <ul className="fx-history">
           {player.txns.map((t, i) => (

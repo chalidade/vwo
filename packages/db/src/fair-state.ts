@@ -1,10 +1,17 @@
 // The live game's shared event setup, one JSON document per key ("org", "company:<booth id>").
-import { eq, sql } from "drizzle-orm";
+// Keys under "billing:" (the organiser's seller and bank details, buyers' invoice details) are
+// private: the setup read below never returns them, only their own key reads do.
+import { eq, notLike, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairState } from "./jobfair-schema";
 
+export const PRIVATE_STATE_PREFIX = "billing:";
+
 export function readFairState(db: Db) {
-  return db.select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt }).from(fairState);
+  return db
+    .select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt })
+    .from(fairState)
+    .where(notLike(fairState.key, `${PRIVATE_STATE_PREFIX}%`));
 }
 
 export async function readFairStateKey(db: Db, key: string) {

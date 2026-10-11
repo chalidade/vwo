@@ -28,6 +28,21 @@ export async function readBody<T extends z.ZodTypeAny>(req: Request, schema: T):
   return { data: parsed.data };
 }
 
+/** Like readBody, for bodies that may carry a file: anything over `max` characters is refused before parsing. */
+export async function readSizedBody<T extends z.ZodTypeAny>(req: Request, schema: T, max: number): Promise<{ data: z.infer<T> } | { error: NextResponse }> {
+  const text = await req.text();
+  if (text.length > max) return { error: fail(413, "too_large") };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { error: fail(400, "invalid_input") };
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) return { error: fail(400, "invalid_input", { fields: parsed.error.flatten().fieldErrors }) };
+  return { data: parsed.data };
+}
+
 /**
  * The client's address as our proxy saw it. Vercel and Caddy both set X-Forwarded-For themselves;
  * if anything in front ever appends instead, the last entry is the one our proxy added, while the
