@@ -133,7 +133,7 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
   return (
     <div className="cp-modal" onClick={onClose}>
       <form
-        className="card cp-form org-add org-sem-form"
+        className="card cp-form org-add"
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
