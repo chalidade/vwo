@@ -20,7 +20,16 @@ export interface JobPosting {
   deadline?: string;
   /** How many people the company wants to hire. */
   quota?: number;
+  /** Optional details Kemnaker asks for when a vacancy is reported (wajib lapor lowongan). */
+  education?: string;
+  major?: string;
+  experience?: string;
+  /** Kabupaten or kota from the regions list (taxonomy.ts); the province follows from it. */
+  city?: string;
 }
+
+/** Lowest schooling a vacancy can ask for, as Indonesian job forms list it. */
+export const EDUCATION_LEVELS = ["SD", "SMP", "SMA/SMK", "D1", "D2", "D3", "D4", "S1", "S2", "S3"] as const;
 
 /** Vacancies still taking applications. */
 export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.closed);

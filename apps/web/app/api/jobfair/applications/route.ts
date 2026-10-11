@@ -9,6 +9,7 @@ import { allow } from "@/lib/ratelimit";
 import { pushTo } from "@/lib/push";
 import { currentUser } from "@/lib/session";
 import { liveCoins } from "@/lib/coins";
+import { notifyBoothHook } from "@/lib/ats-hook";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     const { verified } = await liveCoins(user.id);
     const row = await submitFairApplication(db, { userId: user.id, boothKey: boothId, jobKey: jobId, data: { boothId, jobId, ...rest, verified } });
     const d = row.data as { name?: string; jobTitle?: string };
+    notifyBoothHook(boothId, "application.created", row);
     pushTo(await boothMemberIds(db, boothId), { title: "📨 Lamaran baru", body: `${d.name ?? "Pelamar"} melamar ${d.jobTitle ?? "lowongan"}`, url: `/play/#/jobfair/company/${boothId}`, tag: `app-${row.id}` });
     return NextResponse.json({ application: applicationOut(row) }, { status: 201 });
   } catch (e) {

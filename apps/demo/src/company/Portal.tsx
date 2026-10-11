@@ -15,15 +15,17 @@ import { TalentPool } from "./TalentPool";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
 import { Report } from "./Report";
-import { Bell, Briefcase, Coins, Building2, CircleHelp, Contact, FileChartColumn, LayoutDashboard, LogOut, Palette, Tent, Users, Wallet } from "lucide-react";
+import { Bell, Briefcase, Coins, Building2, CircleHelp, Contact, FileChartColumn, LayoutDashboard, LogOut, Palette, Plug, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
+import { Integrations } from "./Integrations";
 
 const TABS = [
   ["overview", LayoutDashboard, "Ringkasan"],
   ["applicants", Users, "Pelamar"],
   ["pool", Contact, "Talent pool"],
   ["jobs", Briefcase, "Lowongan"],
+  ["integrations", Plug, "Ekspor & ATS"],
   ["report", FileChartColumn, "Laporan"],
   ["booth", Palette, "Tampilan booth"],
   ["profile", Building2, "Profil perusahaan"],
@@ -32,7 +34,7 @@ const TABS = [
 ] as const;
 export type PortalTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: PortalTab[] }[] = [
-  { label: "Rekrutmen", ids: ["overview", "applicants", "pool", "jobs", "report"] },
+  { label: "Rekrutmen", ids: ["overview", "applicants", "pool", "jobs", "integrations", "report"] },
   { label: "Stand", ids: ["booth", "profile", "faq"] },
   { label: "Keuangan", ids: ["billing"] },
 ];
@@ -357,6 +359,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
         />
       )}
       {tab === "jobs" && <JobsEditor booth={booth} />}
+      {tab === "integrations" && <Integrations booth={booth} />}
       {tab === "booth" && <BoothEditor booth={booth} onTab={setTab} />}
       {tab === "profile" && <ProfileEditor booth={booth} />}
       {tab === "faq" && <FaqEditor booth={booth} />}

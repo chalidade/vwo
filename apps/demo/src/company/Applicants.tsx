@@ -1,4 +1,4 @@
-import { MessageCircle } from "lucide-react";
+import { FileSpreadsheet, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type CompanyBooth, hasSkill, inPlace, messageTime, placeSkillFacets, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
@@ -100,6 +100,15 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
           </select>
           <button type="button" className="small-btn ghost" onClick={exportCsv} disabled={!list.length}>
             ⬇ CSV
+          </button>
+          <button
+            type="button"
+            className="small-btn ghost"
+            title="Excel rapi: ringkasan dan satu sheet per lowongan, untuk pelamar yang tampil di filter ini"
+            onClick={() => void import("../fair/exports").then((m) => m.saveApplicants(booth, list, score))}
+            disabled={!list.length}
+          >
+            <FileSpreadsheet size={14} aria-hidden /> Excel
           </button>
         </div>
         {list.length === 0 ? (
