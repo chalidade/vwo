@@ -5,6 +5,7 @@
 // round, to suggest candidates for a company's vacancy (see talent-pool.ts).
 import { type CompanyBooth, type JobPosting, openJobs } from "./jobfair";
 import { featuredFirst } from "./booth-packages";
+import { EDUCATION_LIST, LOCATION_LIST, NATIONWIDE, parseList } from "./job-lists";
 import { parseSkills, placeName } from "./taxonomy";
 
 export interface ProfileHints {
@@ -66,6 +67,14 @@ const level = (s: string) => LEVELS.find(([re]) => re.test(s))?.[1] ?? 0;
 /** The schooling level a text names, 2 (SMA/SMK) to 6 (S3); 0 when it names none. */
 export const educationLevel = level;
 
+/** The lowest schooling a vacancy accepts: from its picked levels ("SMA/SMK, D3" → 2), else from its text. */
+function wantedLevel(job: JobPosting, text: string) {
+  const picked = parseList(EDUCATION_LIST, job.education)
+    .map(level)
+    .filter((n) => n > 0);
+  return picked.length ? Math.min(...picked) : level(text);
+}
+
 /** "Kota Jakarta Selatan" → "jakarta selatan": the place as a job's location would name it. */
 const cityOf = (s: string) =>
   placeName(s)
@@ -86,7 +95,8 @@ function sameCity(city: string, location: string) {
 export function scoreJob(p: ProfileHints, booth: CompanyBooth, job: JobPosting): JobMatch {
   const why: string[] = [];
   let score = 0;
-  const text = `${job.title} ${job.requirements.join(" ")} ${job.description ?? ""}`;
+  // The study fields picked for the vacancy count like its requirements.
+  const text = `${job.title} ${job.requirements.join(" ")} ${job.major ?? ""} ${job.description ?? ""}`;
   const jobWords = new Set(words(text));
   const titleWords = new Set(words(job.title));
   const industryWords = new Set(words(booth.industry));
@@ -117,16 +127,24 @@ export function scoreJob(p: ProfileHints, booth: CompanyBooth, job: JobPosting):
   // Place and level only help a job that already fits; they never make an unrelated job look good.
   if (relevant) {
     const city = cityOf(p.city ?? "");
+    const places = parseList(LOCATION_LIST, job.city);
     const loc = job.location.toLowerCase();
+    const place = places.find((pl) => sameCity(city, cityOf(pl)));
     if (/remote/.test(loc)) {
       score += 1;
       why.push("remote");
-    } else if (sameCity(city, loc)) {
+    } else if (place) {
+      score += 2;
+      why.push(placeName(place));
+    } else if (!places.length && sameCity(city, loc)) {
       score += 2;
       why.push(job.location.replace(/\s*\(.*\)/, ""));
+    } else if (places.includes(NATIONWIDE)) {
+      score += 1;
+      why.push("seluruh Indonesia");
     }
     const mine = level(p.education ?? "");
-    const want = level(text);
+    const want = wantedLevel(job, text);
     const student = STUDENT.test(`${p.headline ?? ""} ${p.education ?? ""}`);
     if (student && job.type === "Magang") {
       score += 2;
@@ -143,7 +161,9 @@ export function recommendJobs(p: ProfileHints, booths: CompanyBooth[], applied: 
   const out: JobMatch[] = [];
   for (const b of booths) for (const j of openJobs(b)) if (!applied.has(j.id)) out.push(scoreJob(p, b, j));
   return featuredFirst(
-    out.filter((m) => m.score > 0).sort((a, b) => b.score - a.score || (b.booth.tier === "premium" ? 1 : 0) - (a.booth.tier === "premium" ? 1 : 0) || a.job.title.localeCompare(b.job.title)),
+    out
+      .filter((m) => m.score > 0)
+      .sort((a, b) => b.score - a.score || (b.booth.tier === "premium" ? 1 : 0) - (a.booth.tier === "premium" ? 1 : 0) || a.job.title.localeCompare(b.job.title)),
   ).slice(0, limit);
 }
 
