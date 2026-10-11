@@ -11,6 +11,7 @@ import type { SeekerProfile } from "./profile";
 import { readImageFile } from "./imageFile";
 import { canRecommend, recommendBooths, recommendJobs } from "./fair/recommend";
 import { ViralTab } from "./fair/Viral";
+import { RegionPicker, SkillPicker } from "./pickers";
 
 export type SeekerTab = "profile" | "match" | "invite" | "applications" | "stamps";
 
@@ -19,10 +20,10 @@ const FIELDS: { key: Exclude<keyof SeekerProfile, "contactable">; label: string;
   { key: "headline", label: "Status", placeholder: "Fresh graduate Teknik Informatika" },
   { key: "email", label: "Email", type: "email", placeholder: "nama@email.com" },
   { key: "phone", label: "No. HP", type: "tel", placeholder: "08xx" },
-  { key: "city", label: "Domisili", placeholder: "Jakarta" },
+  { key: "city", label: "Domisili" },
   { key: "education", label: "Pendidikan", placeholder: "S1 Informatika, 2025" },
   { key: "campus", label: "Kampus / sekolah", placeholder: "Universitas Indonesia" },
-  { key: "skills", label: "Keahlian", placeholder: "React, Excel, desain" },
+  { key: "skills", label: "Keahlian" },
   { key: "cvUrl", label: "Link CV", type: "url", placeholder: "https://" },
 ];
 
@@ -85,6 +86,10 @@ export function SeekerPanel({
     });
   const [form, setForm] = useState(profile);
   const [saved, setSaved] = useState(false);
+  const setField = (key: "skills" | "city", v: string) => {
+    setForm((was) => ({ ...was, [key]: v }));
+    setSaved(false);
+  };
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photo = safeImage(profile.photo);
   const setPhoto = (p: string | undefined) => {
@@ -212,21 +217,31 @@ export function SeekerPanel({
                   setSaved(true);
                 }}
               >
-                {FIELDS.map((f) => (
-                  <label key={f.key} className="sp-field">
-                    <span>{f.label}</span>
-                    <input
-                      type={f.type ?? "text"}
-                      value={form[f.key] ?? ""}
-                      placeholder={f.placeholder}
-                      maxLength={f.key === "cvUrl" ? 300 : 80}
-                      onChange={(e) => {
-                        setForm({ ...form, [f.key]: e.target.value });
-                        setSaved(false);
-                      }}
-                    />
-                  </label>
-                ))}
+                {FIELDS.map((f) =>
+                  f.key === "skills" || f.key === "city" ? (
+                    <div key={f.key} className="sp-field">
+                      {f.key === "skills" ? (
+                        <SkillPicker label={f.label} value={form.skills} onChange={(v) => setField("skills", v)} />
+                      ) : (
+                        <RegionPicker label={f.label} value={form.city} onChange={(v) => setField("city", v)} />
+                      )}
+                    </div>
+                  ) : (
+                    <label key={f.key} className="sp-field">
+                      <span>{f.label}</span>
+                      <input
+                        type={f.type ?? "text"}
+                        value={form[f.key] ?? ""}
+                        placeholder={f.placeholder}
+                        maxLength={f.key === "cvUrl" ? 300 : 80}
+                        onChange={(e) => {
+                          setForm({ ...form, [f.key]: e.target.value });
+                          setSaved(false);
+                        }}
+                      />
+                    </label>
+                  ),
+                )}
                 <label className="sp-consent">
                   <input
                     type="checkbox"
@@ -317,42 +332,49 @@ export function SeekerPanel({
                         </button>
                         {open && (
                           <>
-                        {a.rating ? (
-                          <span className="sp-rating">
-                            <Stars value={a.rating} /> {a.feedback}
-                          </span>
-                        ) : (
-                          <span className="sp-rating sp-muted">Menunggu penilaian perusahaan…</span>
-                        )}
-                        {a.interview && (
-                          <span className="sp-interview">
-                            📅 Interview {a.interview.mode} · <b>{new Date(a.interview.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b>
-                            {a.interview.place ? ` · ${a.interview.place}` : ""}
-                          </span>
-                        )}
-                        {a.visit && (
-                          <span className="sp-interview">
-                            🏢 Kunjungan kantor · <b>{new Date(a.visit.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b> · {a.visit.address}
-                            {a.visit.reply === "hadir" ? " · ✅ kamu hadir" : a.visit.reply === "jadwal-ulang" ? " · 🕑 minta jadwal ulang" : (
-                              <>
-                                {" "}
-                                <button type="button" className="small-btn" onClick={() => fair.answerVisit(a.id, "hadir")}>
-                                  Konfirmasi hadir
-                                </button>
-                              </>
+                            {a.rating ? (
+                              <span className="sp-rating">
+                                <Stars value={a.rating} /> {a.feedback}
+                              </span>
+                            ) : (
+                              <span className="sp-rating sp-muted">Menunggu penilaian perusahaan…</span>
                             )}
-                          </span>
-                        )}
-                        {(a.calls ?? []).some((c) => !c.answered) && <span className="sp-missed">📞 {a.company} mencoba menelepon kamu</span>}
-                        {(a.messages ?? []).length > 0 && <Chat app={a} onReply={onReply} />}
-                        <span className="sp-links">
-                          <button type="button" onClick={() => onOpenJob(a.boothId, a.jobId)}>
-                            Lowongan
-                          </button>
-                          <button type="button" onClick={() => onOpenCompany(a.boothId)}>
-                            Perusahaan
-                          </button>
-                        </span>
+                            {a.interview && (
+                              <span className="sp-interview">
+                                📅 Interview {a.interview.mode} ·{" "}
+                                <b>{new Date(a.interview.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b>
+                                {a.interview.place ? ` · ${a.interview.place}` : ""}
+                              </span>
+                            )}
+                            {a.visit && (
+                              <span className="sp-interview">
+                                🏢 Kunjungan kantor ·{" "}
+                                <b>{new Date(a.visit.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</b> ·{" "}
+                                {a.visit.address}
+                                {a.visit.reply === "hadir" ? (
+                                  " · ✅ kamu hadir"
+                                ) : a.visit.reply === "jadwal-ulang" ? (
+                                  " · 🕑 minta jadwal ulang"
+                                ) : (
+                                  <>
+                                    {" "}
+                                    <button type="button" className="small-btn" onClick={() => fair.answerVisit(a.id, "hadir")}>
+                                      Konfirmasi hadir
+                                    </button>
+                                  </>
+                                )}
+                              </span>
+                            )}
+                            {(a.calls ?? []).some((c) => !c.answered) && <span className="sp-missed">📞 {a.company} mencoba menelepon kamu</span>}
+                            {(a.messages ?? []).length > 0 && <Chat app={a} onReply={onReply} />}
+                            <span className="sp-links">
+                              <button type="button" onClick={() => onOpenJob(a.boothId, a.jobId)}>
+                                Lowongan
+                              </button>
+                              <button type="button" onClick={() => onOpenCompany(a.boothId)}>
+                                Perusahaan
+                              </button>
+                            </span>
                           </>
                         )}
                       </li>
@@ -454,14 +476,25 @@ export function SeekerPanel({
                 return (
                   <section key={f.name} className="sp-floor">
                     <h4 className="sp-floor-title">
-                      {f.name} · {f.theme} <span className="sp-muted">{got}/{here.length}</span>
+                      {f.name} · {f.theme}{" "}
+                      <span className="sp-muted">
+                        {got}/{here.length}
+                      </span>
                     </h4>
                     <div className="sp-stamps">
                       {here.map((b) => {
                         const got = visited.has(b.id);
                         const n = applications.filter((a) => a.boothId === b.id).length;
                         return (
-                          <button key={b.id} type="button" className="sp-stamp" data-got={got ? "" : undefined} style={{ ["--c" as string]: b.color }} onClick={() => onGoTo(b.id)} title={`Antar ke stand ${b.company}`}>
+                          <button
+                            key={b.id}
+                            type="button"
+                            className="sp-stamp"
+                            data-got={got ? "" : undefined}
+                            style={{ ["--c" as string]: b.color }}
+                            onClick={() => onGoTo(b.id)}
+                            title={`Antar ke stand ${b.company}`}
+                          >
                             {got ? <BoothLogo booth={b} className="sp-stamp-mark" /> : <span className="sp-stamp-mark">?</span>}
                             <b>{b.company}</b>
                             <Stars value={companyRating(b.id).average} />
@@ -548,7 +581,9 @@ function Chat({ app, onReply }: { app: FairApplication; onReply: (applicationId:
       {app.messages!.map((m, i) => (
         <div key={i} className="sp-bubble" data-me={m.from === "seeker" ? "" : undefined}>
           {m.text}
-          <time>{m.from === "seeker" ? "Kamu" : app.company} · {when(messageTime(m))}</time>
+          <time>
+            {m.from === "seeker" ? "Kamu" : app.company} · {when(messageTime(m))}
+          </time>
         </div>
       ))}
       <form

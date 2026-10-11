@@ -4,6 +4,7 @@
 // so it also works offline and in the light mode. The server runs the same scoring the other way
 // round, to suggest candidates for a company's vacancy (see talent-pool.ts).
 import { type CompanyBooth, type JobPosting, openJobs } from "./jobfair";
+import { parseSkills, placeName } from "./taxonomy";
 
 export interface ProfileHints {
   headline?: string;
@@ -44,12 +45,9 @@ export function words(text: string) {
     .filter((w) => (w.length >= 3 || SHORT.has(w)) && !STOP.has(w));
 }
 
-/** The skills the seeker listed, comma or line separated, each as words. */
+/** The skills the seeker picked (comma separated, list spellings), each as words. */
 function skillList(s: string) {
-  return s
-    .split(/[,;\n/]+/)
-    .map((x) => x.trim())
-    .filter(Boolean)
+  return parseSkills(s)
     .map((label) => ({ label, words: words(label) }))
     .filter((x) => x.words.length);
 }
@@ -67,12 +65,21 @@ const level = (s: string) => LEVELS.find(([re]) => re.test(s))?.[1] ?? 0;
 /** The schooling level a text names, 2 (SMA/SMK) to 6 (S3); 0 when it names none. */
 export const educationLevel = level;
 
+/** "Kota Jakarta Selatan" → "jakarta selatan": the place as a job's location would name it. */
 const cityOf = (s: string) =>
-  s
+  placeName(s)
     .toLowerCase()
     .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z ]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+
+/** The whole place name in the location, or its first word ("Jakarta" for any part of Jakarta). */
+function sameCity(city: string, location: string) {
+  if (!city) return false;
+  const first = city.split(" ")[0]!;
+  return location.includes(city) || (first.length >= 4 && new RegExp(`\\b${first}\\b`).test(location));
+}
 
 /** How well one vacancy suits the profile; 0 when nothing matches. */
 export function scoreJob(p: ProfileHints, booth: CompanyBooth, job: JobPosting): JobMatch {
@@ -113,7 +120,7 @@ export function scoreJob(p: ProfileHints, booth: CompanyBooth, job: JobPosting):
     if (/remote/.test(loc)) {
       score += 1;
       why.push("remote");
-    } else if (city && city.split(" ").some((c) => c.length >= 3 && loc.includes(c))) {
+    } else if (sameCity(city, loc)) {
       score += 2;
       why.push(job.location.replace(/\s*\(.*\)/, ""));
     }
