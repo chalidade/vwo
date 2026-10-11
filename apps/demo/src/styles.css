@@ -2453,3 +2453,33 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 @media (max-width: 640px) { .game-fair .hud-bl { bottom: calc(8px + env(safe-area-inset-bottom)); } }
 /* Game popups: above the menu (z-index), clear of the home indicator. */
 .game .mb-backdrop { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+/* ---- seminar-schedule: seminar dates, registration and reminders ---- */
+.sem-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sem-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: #fff; border: 2px solid #ead2bd; font-size: 13px; }
+.sem-list li[data-on] { border-color: #15803d; background: #f0fdf4; }
+.sem-list li[data-phase="ended"] { opacity: 0.65; }
+.sem-main { display: grid; gap: 2px; min-width: 0; }
+.sem-main b { overflow-wrap: anywhere; }
+.sem-when { font-weight: 700; font-size: 12px; color: #7c2d12; }
+.sem-live { margin-right: 6px; color: #dc2626; }
+.sem-tag { margin-right: 6px; padding: 0 6px; border-radius: 999px; background: #e7e5e4; color: #44403c; font-size: 11px; }
+.sem-tools { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.sem-tools .small-btn { display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; font-size: 12px; white-space: nowrap; text-decoration: none; }
+.sem-tools a.small-btn { border: 2px solid #3b2a20; border-radius: 10px; background: #fff; color: inherit; }
+.sem-tools .small-btn[data-on] { background: #fff1f2; border-color: #9f1239; color: #9f1239; }
+.sem-msg { margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: #f0fdf4; color: #14532d; font-size: 13px; }
+.sem-msg[data-error] { background: #fef2f2; color: #991b1b; }
+@media (max-width: 480px) {
+  .sem-list li { grid-template-columns: minmax(0, 1fr); }
+  .sem-tools { justify-content: flex-start; }
+  .sem-tools .small-btn { min-height: 34px; }
+}
+/* Organiser: the session's date and time in the list, and the schedule fields in the form. */
+.org-sem-when { font-size: 13px; font-weight: 600; }
+.org-sem-when[data-none] { font-weight: 400; font-style: italic; color: var(--muted); }
+.org-sem-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 8px 10px 10px; border-radius: 10px; border: 2px solid var(--line); background: #fff; }
+.org-sem-time legend { padding: 0 4px; font-weight: 800; font-size: 13px; }
+.org-sem-time label { min-width: 0; }
+.org-sem-time input { width: 100%; min-width: 0; box-sizing: border-box; }
+.org-sem-time p { grid-column: 1 / -1; margin: 0; }
+.org-sem-error { margin: 0; color: #991b1b; font-size: 13px; }

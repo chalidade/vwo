@@ -10,10 +10,11 @@ import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
 import { readImageFile } from "./imageFile";
 import { canRecommend, recommendBooths, recommendJobs } from "./fair/recommend";
+import { SeminarSchedule } from "./fair/SeminarSchedule";
 import { ViralTab } from "./fair/Viral";
 import { RegionPicker, SkillPicker } from "./pickers";
 
-export type SeekerTab = "profile" | "match" | "invite" | "applications" | "stamps";
+export type SeekerTab = "profile" | "match" | "seminar" | "invite" | "applications" | "stamps";
 
 const FIELDS: { key: Exclude<keyof SeekerProfile, "contactable">; label: string; placeholder?: string; type?: string }[] = [
   { key: "name", label: "Nama lengkap" },
@@ -121,6 +122,7 @@ export function SeekerPanel({
             [
               ["profile", "👤 Profil"],
               ["match", "✨ Cocok"],
+              ["seminar", fair.seminarRegs().length ? `🎤 Seminar (${fair.seminarRegs().length})` : "🎤 Seminar"],
               ["invite", "🎉 Ajak & lencana"],
               ["applications", `📋 Lamaran (${applications.length})`],
               ["stamps", `🏅 Stempel (${visited.size}/${stands.length})`],
@@ -457,6 +459,12 @@ export function SeekerPanel({
                 })()
               )}
             </div>
+          )}
+          {tab === "seminar" && (
+            <>
+              <p className="sp-summary">Pilih seminar yang ingin kamu ikuti. Yang sudah didaftar diingatkan lewat email dan notifikasi H-1 dan 15 menit sebelum mulai.</p>
+              <SeminarSchedule />
+            </>
           )}
           {tab === "invite" && (
             <ViralTab
