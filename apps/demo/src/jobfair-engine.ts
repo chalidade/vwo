@@ -66,6 +66,9 @@ import {
   remindDayFor,
   toggleRemind,
   wibDay,
+  registerBlock,
+  seminarReminders,
+  seminarSlots,
   type BoothTier,
   FEATURED_PRODUCT_ID,
   canOpenAnotherJob,
@@ -550,6 +553,8 @@ export interface PlayerState {
   notifRead?: BoothRead;
   /** Aula rundown items the player asked to be reminded of, per WIB day (the server emails them that morning). */
   remind?: RemindList;
+  /** Demo: seminar sessions the player registered for. The live site keeps these on the server. */
+  semreg?: string[];
 }
 
 export interface DailyState {
@@ -1377,10 +1382,64 @@ export class DemoJobFair {
     return this.player.remind[day]?.includes(id) ? day : null;
   }
 
-  /** The player's interviews, office visits and reminded Aula items on `day` (WIB, today by default). */
+  /** The player's interviews, office visits, reminded Aula items and registered seminars on `day` (WIB, today by default). */
   myReminders(day = wibDay(this.now())): Reminder[] {
     const mine = this.applications.filter((a) => a.visitorId === PLAYER_ID);
-    return dueReminders({ day, applications: mine, remind: this.player.remind, rundown: this.rundown() });
+    const extra = seminarReminders(seminarSlots({ seminars: this.seminars() }), this.seminarRegs(), day);
+    return dueReminders({ day, applications: mine, remind: this.player.remind, rundown: this.rundown(), extra });
+  }
+
+  // ---- Seminar registration ("Daftar" / "Batal") ----------------------------------------
+
+  /** Live: the server's word on who registered; null until it is known (the demo keeps them in `player.semreg`). */
+  private liveSemRegs: string[] | null = null;
+  /** How many registered for each session (live: from the server). */
+  readonly seminarRegCounts = new Map<string, number>();
+
+  /** The sessions the player registered for. */
+  seminarRegs(): string[] {
+    return this.liveSemRegs ?? this.player.semreg ?? [];
+  }
+
+  /** How many registered for a session (the demo only knows about this player). */
+  seminarRegCount(id: string) {
+    return this.seminarRegCounts.get(id) ?? (this.seminarRegs().includes(id) ? 1 : 0);
+  }
+
+  /** Live: the server's counts and this account's registrations replace this browser's. */
+  setSeminarRegs(mine: string[], counts: Record<string, number>) {
+    this.liveSemRegs = mine;
+    this.seminarRegCounts.clear();
+    for (const [id, n] of Object.entries(counts)) this.seminarRegCounts.set(id, n);
+    this.emit();
+  }
+
+  /** Live: one registration the server confirmed. */
+  seminarRegChanged(id: string, registered: boolean, count: number) {
+    const was = this.seminarRegs().filter((x) => x !== id);
+    this.liveSemRegs = registered ? [...was, id] : was;
+    this.seminarRegCounts.set(id, count);
+    this.emit();
+  }
+
+  /** Demo: register or cancel in this browser, with the same rules the server applies. */
+  toggleSeminarRegLocal(id: string): { ok: true; registered: boolean } | { ok: false; error: string } {
+    const slot = seminarSlots({ seminars: this.seminars() }).find((s) => s.id === id);
+    if (!slot) return { ok: false, error: "not_found" };
+    const mine = this.player.semreg ?? [];
+    const count = this.seminarRegCount(id);
+    if (mine.includes(id)) {
+      this.player.semreg = mine.filter((x) => x !== id);
+      this.seminarRegCounts.set(id, Math.max(0, count - 1));
+    } else {
+      const block = registerBlock(slot, count, this.now());
+      if (block) return { ok: false, error: block };
+      this.player.semreg = [...mine, id].slice(-50);
+      this.seminarRegCounts.set(id, count + 1);
+    }
+    this.persist();
+    this.emit();
+    return { ok: true, registered: this.player.semreg.includes(id) };
   }
 
   // ---- Booth decorations visitors can use ------------------------------------------------

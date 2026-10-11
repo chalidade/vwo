@@ -1,7 +1,9 @@
 import { Mic } from "lucide-react";
+import { cleanSchedule, seminarPhase, sortByStart } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
 import { type PeerInfo, connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
+import { announceLive } from "../fair/seminar-reg";
 import { BOT_CHAT, BOT_NAMES, BOT_QUESTIONS, type StageChat, onStage, sendStage, stageCallId } from "../fair/stage";
 import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
@@ -48,7 +50,10 @@ export function StageSlide({ session, slide }: { session: SeminarSession; slide:
 export function SpeakerStage() {
   useFair();
   const sessions = fair.seminars();
-  const [sessionId, setSessionId] = useState(sessions[0]!.id);
+  // Start on the session that is on the schedule now, or the next one.
+  const [sessionId, setSessionId] = useState(
+    () => sortByStart(sessions.map((s) => ({ ...s, ...cleanSchedule(s) }))).find((s) => s.startAt !== undefined && seminarPhase(s, Date.now()) !== "ended")?.id ?? sessions[0]!.id,
+  );
   const picked = sessions.find((s) => s.id === sessionId) ?? sessions[0]!;
   // On the Aula stage the speaker opens an item of the rundown (a speech, a talk show) instead of a seminar.
   const [venue, setVenue] = useState<"seminar" | "aula">("seminar");
@@ -224,6 +229,8 @@ export function SpeakerStage() {
     setLive(true);
     now.current.live = true;
     beat();
+    // Seekers registered for this session get a push that it is starting.
+    if (venue === "seminar") announceLive(session.id);
   };
 
   const end = () => {

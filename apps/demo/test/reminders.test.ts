@@ -40,3 +40,40 @@ describe("reminders in the game", () => {
     expect(b.remindedOn("talk2")).toBe("2026-10-11");
   });
 });
+
+describe("seminar registration in the game", () => {
+  const session = (id: string, patch: object = {}) => ({ id, title: `Sesi ${id}`, speaker: "Kak Nadia", role: "HR", slides: [{ title: "a", points: ["b"], say: "c" }], ...patch });
+
+  it("registers for a dated session with seats, refuses full, undated and finished ones, and reminds", () => {
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => NOW,
+    );
+    fair.saveSeminar(session("cv", { startAt: NOW + 3_600_000, minutes: 60, capacity: 1 }));
+    fair.saveSeminar(session("tbd"));
+    fair.saveSeminar(session("old", { startAt: NOW - 2 * 3_600_000, minutes: 60 }));
+    expect(fair.toggleSeminarRegLocal("tbd")).toEqual({ ok: false, error: "unscheduled" });
+    expect(fair.toggleSeminarRegLocal("old")).toEqual({ ok: false, error: "ended" });
+    expect(fair.toggleSeminarRegLocal("cv")).toEqual({ ok: true, registered: true });
+    expect(fair.seminarRegCount("cv")).toBe(1);
+    expect(fair.myReminders().map((r) => [r.kind, wibClock(r.at)])).toEqual([["seminar", "10.30"]]);
+    expect(fair.toggleSeminarRegLocal("cv")).toEqual({ ok: true, registered: false });
+    expect(fair.myReminders()).toEqual([]);
+    // Someone else took the only seat (the live site's count).
+    fair.setSeminarRegs([], { cv: 1 });
+    expect(fair.toggleSeminarRegLocal("cv")).toEqual({ ok: false, error: "full" });
+  });
+
+  it("live: the server's registrations replace the browser's", () => {
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => NOW,
+    );
+    fair.saveSeminar(session("cv", { startAt: NOW + 3_600_000 }));
+    fair.setSeminarRegs(["cv"], { cv: 7 });
+    expect(fair.seminarRegCount("cv")).toBe(7);
+    fair.seminarRegChanged("cv", false, 6);
+    expect(fair.seminarRegs()).toEqual([]);
+    expect(fair.seminarRegCount("cv")).toBe(6);
+  });
+});

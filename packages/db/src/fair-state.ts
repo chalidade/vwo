@@ -1,18 +1,21 @@
 // The live game's shared event setup, one JSON document per key ("org", "company:<booth id>").
-// Keys under "billing:" (the organiser's seller and bank details, buyers' invoice details) are
-// private: the setup read below never returns them, only their own key reads do.
+// Keys under "billing:" (the organiser's seller and bank details, buyers' invoice details) and
+// "semreg:" (who registered for a seminar, see seminar-registrations.ts) are private: the setup read
+// below never returns them, only their own key reads do.
 import { and, eq, notLike, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairState } from "./jobfair-schema";
 
 export const PRIVATE_STATE_PREFIX = "billing:";
+/** One document per seminar session listing who registered: the organiser's export reads it, nobody else. */
+export const SEMINAR_REG_PREFIX = "semreg:";
 
-/** The event setup. Seekers' offers ("offers:<user id>", see fair-pool.ts) are personal and left out, and so are billing details. */
+/** The event setup. Seekers' offers ("offers:<user id>", see fair-pool.ts) are personal and left out, and so are billing details and seminar registrations. */
 export function readFairState(db: Db) {
   return db
     .select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt })
     .from(fairState)
-    .where(and(sql`${fairState.key} not like 'offers:%'`, notLike(fairState.key, `${PRIVATE_STATE_PREFIX}%`)));
+    .where(and(sql`${fairState.key} not like 'offers:%'`, notLike(fairState.key, `${PRIVATE_STATE_PREFIX}%`), notLike(fairState.key, `${SEMINAR_REG_PREFIX}%`)));
 }
 
 export async function readFairStateKey(db: Db, key: string) {

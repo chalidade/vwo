@@ -17,3 +17,4 @@ export * from "./taxonomy";
 export * from "./recommend";
 export * from "./talent-pool";
 export * from "./booth-report";
+export * from "./seminars";

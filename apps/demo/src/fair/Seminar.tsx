@@ -1,15 +1,15 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { type Look, Person } from "@vwo/ui";
+import { cleanSchedule, seminarPhase } from "@vwo/shared";
 import { type SeminarSession, lineMs, liveSeminar, seminarScript } from "./content";
 import { Modal } from "./Modal";
 import { useStageLive } from "./stage";
+import { SeminarSchedule } from "./SeminarSchedule";
 import { StageWatch } from "./StageWatch";
 
 /** Watching a seminar from a seat, like a video call: the facilitator shares their screen and talks
  *  through the slides with subtitles, then hands out a certificate. */
 export function SeminarView({
-  attended,
-  attendees,
   sessions,
   viewerId,
   name,
@@ -32,7 +32,10 @@ export function SeminarView({
   onFinish: (id: string) => void;
   onClose: () => void;
 }) {
-  const [session, setSession] = useState<SeminarSession>(() => liveSeminar(Date.now(), sessions));
+  // The session on the schedule right now, else the one the stage loop is playing.
+  const [session, setSession] = useState<SeminarSession>(
+    () => sessions.find((s) => seminarPhase({ ...s, ...cleanSchedule(s) }, Date.now()) === "live") ?? liveSeminar(Date.now(), sessions),
+  );
   const [picking, setPicking] = useState(false);
   const [done, setDone] = useState(false);
   const live = useStageLive();
@@ -78,33 +81,14 @@ export function SeminarView({
   if (picking)
     return (
       <Modal title="🎤 Jadwal seminar" onClose={() => setPicking(false)} className="fx-seminar">
-        <p className="sp-summary">Tiap sesi selesai dapat e-sertifikat dan XP.</p>
-        <ul className="fx-sessions">
-          {sessions.map((s) => (
-            <li key={s.id}>
-              <span>
-                <b>{s.title}</b>
-                <span className="sp-muted">
-                  {" "}
-                  · {s.speaker}, {s.role}
-                  {s.id === liveSeminar(Date.now(), sessions).id ? " · 🔴 sedang di panggung" : ""}
-                  {attendees && attendees(s.id) > 0 ? ` · ${attendees(s.id)} peserta` : ""}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="mb-order"
-                onClick={() => {
-                  setSession(s);
-                  setDone(false);
-                  setPicking(false);
-                }}
-              >
-                {attended.includes(s.id) ? "✓ Ulangi" : "Ikuti"}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <p className="sp-summary">Daftar sesi yang ingin kamu ikuti supaya diingatkan H-1 dan 15 menit sebelum mulai. Tiap sesi selesai dapat e-sertifikat dan XP.</p>
+        <SeminarSchedule
+          onWatch={(s) => {
+            setSession(s);
+            setDone(false);
+            setPicking(false);
+          }}
+        />
       </Modal>
     );
 

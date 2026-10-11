@@ -222,3 +222,17 @@ export const saveApplicants = (booth: CompanyBooth, apps: FairApplication[], sco
   download(`pelamar-${booth.id}-${stamp()}.xlsx`, applicantsXlsx(booth, apps, score));
 export const saveLapor = (booths: Pick<CompanyBooth, "company" | "jobs">[], file: string, kind: "xlsx" | "csv") =>
   kind === "xlsx" ? download(`${file}-${stamp()}.xlsx`, laporXlsx(booths)) : download(`${file}-${stamp()}.csv`, laporCsv(booths), "text/csv;charset=utf-8");
+
+/** Who registered for a seminar session, as a workbook for the organiser (attendance list, certificates). */
+export function seminarRegistrantsXlsx(rows: { name: string; email: string; at: number }[]) {
+  const columns: Column[] = [
+    { header: "No", type: "int", width: 6 },
+    { header: "Nama", width: 26 },
+    { header: "Email", width: 30 },
+    { header: "Waktu daftar", type: "datetime", width: 18 },
+  ];
+  return xlsx([{ name: "Pendaftar", columns, rows: rows.map((r, i) => [i + 1, r.name, r.email, new Date(r.at)]) }]);
+}
+
+export const saveSeminarRegistrants = (id: string, rows: { name: string; email: string; at: number }[]) =>
+  download(`pendaftar-seminar-${id}-${stamp()}.xlsx`, seminarRegistrantsXlsx(rows));

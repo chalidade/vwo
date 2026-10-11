@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canManageBooth, isFairAdmin } from "@/lib/fair";
 import { fail, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
+import { kickSeminarPushes } from "@/lib/seminars";
 import { rentedOut } from "@/lib/stalls";
 import { currentUser } from "@/lib/session";
 
@@ -41,6 +42,8 @@ export async function GET() {
     if (r.key === "org") {
       const { pins, bookings: _b, ...rest } = data;
       org = admin ? data : rest;
+      // Seminar pushes ("15 minutes to go", "starting") ride on visitors' reads; see lib/seminars.ts.
+      kickSeminarPushes(data);
     } else if (r.key.startsWith("booking:")) {
       // A stand a company booked itself: everyone sees the booth, admins also the booking and PIN.
       bookings.push(admin ? { booth: data.booth, booking: data.booking, pin: data.pin } : { booth: data.booth });
