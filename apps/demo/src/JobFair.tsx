@@ -93,6 +93,7 @@ import { PsychTest } from "./fair/PsychTest";
 import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
 import { WalletPanel } from "./fair/Wallet";
+import { staffLook } from "./fair/staff-look";
 import { BookStand } from "./fair/BookStand";
 import { RentStall } from "./fair/RentStall";
 import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
@@ -137,9 +138,6 @@ const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
 const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh: "😄", heart: "❤️" };
 
 /** Recruiters wear a jacket in their company's colour; the organisers wear navy. */
-export function staffLook(name: string, color: string): Look {
-  return { ...lookFor(`staff:${name}`), outfit: "jacket", shirt: color, hat: undefined };
-}
 
 /** A VIP booth's SPG: a neat blazer in the company colour, hair up, a big smile. */
 export function spgLook(name: string, color: string): Look {

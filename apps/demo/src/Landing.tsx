@@ -141,6 +141,22 @@ function useFairWhileVisible(ref: RefObject<HTMLElement | null>, everyMs = 125) 
 }
 
 /** How many people are in the job fair, refreshed now and then. */
+/** Slow connection, data saver or a small phone: say there is a light list mode without the game. */
+function slowDevice() {
+  const n = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string }; deviceMemory?: number };
+  return !!n.connection?.saveData || /(^|-)2g$/.test(n.connection?.effectiveType ?? "") || (n.deviceMemory !== undefined && n.deviceMemory <= 2);
+}
+
+function LiteHint() {
+  const slow = slowDevice();
+  return (
+    <p className="lp-lite lp-in" data-slow={slow ? "" : undefined} style={{ ["--d" as string]: 3 }}>
+      {slow ? "Koneksi atau HP-mu sepertinya lambat. " : "HP lemot atau kuota terbatas? "}
+      <a href="#/ringan">Buka mode ringan tanpa game</a>
+    </p>
+  );
+}
+
 function OnlineCount() {
   const ref = useRef<HTMLSpanElement>(null);
   useFairWhileVisible(ref, 2000);
@@ -294,6 +310,7 @@ export function Landing() {
                 Saya perusahaan
               </a>
             </div>
+            <LiteHint />
             <ul className="lp-trust lp-in" style={{ ["--d" as string]: 4 }}>
               {["Gratis untuk pencari kerja", "Tanpa antre", "Lamar dalam 2 ketukan"].map((t) => (
                 <li key={t}>
