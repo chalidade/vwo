@@ -14,3 +14,4 @@ export * from "./reminders";
 export * from "./taxonomy";
 export * from "./recommend";
 export * from "./talent-pool";
+export * from "./booth-report";

@@ -2068,3 +2068,49 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .tp-cands li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .tp-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .tp-why { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--text); }
+
+/* Company portal: the post-event report ("Laporan"), on screen and printed as a PDF. Monochrome. */
+.rp { display: grid; gap: 16px; min-width: 0; }
+.rp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+.rp-bar .small-btn { display: inline-flex; align-items: center; gap: 6px; }
+.rp-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rp-pick select { max-width: min(360px, 60vw); }
+.rp-head { display: grid; gap: 2px; }
+.rp-head p { margin: 0; }
+.rp-title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.rp-kpis .cp-kpi .stat { font-size: 22px; overflow-wrap: anywhere; }
+.rp-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .rp-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.rp-card { min-width: 0; }
+.rp-bars { display: grid; gap: 6px; }
+.rp-row { display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 40px; gap: 10px; align-items: center; font-size: 13px; }
+.rp-row[data-dim] { color: var(--muted); }
+.rp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-row b { text-align: right; font-variant-numeric: tabular-nums; }
+.rp-track { display: block; height: 10px; border-radius: 3px; background: #f1f2f4; overflow: hidden; }
+.rp-track > span { display: block; height: 100%; background: #111827; }
+.rp-row[data-dim] .rp-track > span { background: #9ca3af; }
+.rp-demo { display: grid; gap: 8px 28px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.rp-demo .cp-h3 { margin: 10px 0 6px; }
+.rp-table td:not(:first-child), .rp-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rp-facts { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.rp-delta { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--text); }
+.rp-delta[data-good="false"] { color: var(--muted); }
+.rp-foot { margin: 0; }
+@media (max-width: 520px) { .rp-row { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr) 34px; } }
+
+/* "Unduh PDF" prints only the report: no sidebar, top bar or buttons, cards kept whole on a page. */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body:has(.rp) { background: #fff; }
+  body:has(.rp) .app-dash { background: #fff; min-height: 0; }
+  body:has(.rp) :is(.dash-side, .dash-top, .dash-tabbar, .dash-sheet-wrap, .cp-toast, .nt-pop, .rp-noprint) { display: none !important; }
+  body:has(.rp) .dash { display: block; min-height: 0; }
+  body:has(.rp) .dash-body { padding: 0; max-width: none; }
+  .rp { gap: 10px; color: #000; }
+  .rp .card { box-shadow: none; border-color: #d1d5db; break-inside: avoid; }
+  .rp-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .rp-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .rp-demo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rp-track, .rp-track > span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

@@ -9,10 +9,11 @@ import { OrgPrices } from "./organizer/Prices";
 import { OrgPsych } from "./organizer/Psych";
 import { OrgEarlyAccess } from "./organizer/EarlyAccess";
 import { OrgRegistrations } from "./organizer/Registrations";
+import { OrgReports } from "./organizer/Reports";
 import { OrgSeminars } from "./organizer/Seminars";
 import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
-import { BadgeDollarSign, Brain, Building2, ClipboardList, FlaskConical, Landmark, Layers, Megaphone, Mic, Presentation, Radio, Store, Tent, Trash2, UtensilsCrossed } from "lucide-react";
+import { BadgeDollarSign, Brain, Building2, ClipboardList, FileChartColumn, FlaskConical, Landmark, Layers, Megaphone, Mic, Presentation, Radio, Store, Tent, Trash2, UtensilsCrossed } from "lucide-react";
 import { DashShell } from "./Dash";
 
 const TABS = [
@@ -27,11 +28,12 @@ const TABS = [
   ["seminar", Presentation, "Seminar"],
   ["aula", Landmark, "Aula"],
   ["food", UtensilsCrossed, "Food Court"],
+  ["reports", FileChartColumn, "Laporan event"],
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: OrgTab[] }[] = [
   { label: "Pantau", ids: ["live", "registrations", "early"] },
-  { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food"] },
+  { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food", "reports"] },
   { label: "Bisnis", ids: ["ads", "prices"] },
 ];
 
@@ -121,6 +123,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
       {tab === "seminar" && <OrgSeminars onToast={setToast} />}
       {tab === "aula" && <OrgAula onToast={setToast} />}
       {tab === "food" && <OrgFoodCourt onToast={setToast} />}
+      {tab === "reports" && <OrgReports onToast={setToast} />}
       </DashShell>
       {toast && <div className="cp-toast">{toast}</div>}
     </main>
