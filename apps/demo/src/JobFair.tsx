@@ -205,6 +205,21 @@ export function JobFair() {
   const anomaly = useAnomaly();
   const catching = useRef(false);
   useEffect(() => startAnomalies(), []);
+  // How much of the screen the bottom tab bar really covers (taller with big system fonts or a
+  // home-indicator inset): the action button sits above it and the camera keeps the floor's last row clear.
+  const navRef = useRef<HTMLDivElement>(null);
+  const [navSpace, setNavSpace] = useState(0);
+  useEffect(() => {
+    const nav = navRef.current;
+    const game = nav?.parentElement;
+    if (!nav || !game) return setNavSpace(0);
+    const measure = () => setNavSpace(Math.ceil(game.getBoundingClientRect().bottom - nav.getBoundingClientRect().top));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    ro.observe(game);
+    return () => ro.disconnect();
+  }, [session]);
   const [inviteId, setInviteId] = useState<string | null>(null);
   /** The guide is open, and the place whose introduction is showing (once, the first time in). */
   const [guide, setGuide] = useState(false);
@@ -1511,10 +1526,10 @@ export function JobFair() {
   const totalJobs = fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0);
 
   return (
-    <div className="game game-fair">
+    <div className="game game-fair" style={navSpace ? { ["--fair-nav" as string]: `${navSpace}px` } : undefined}>
       <CafeScene
         className="game-scene"
-        hudBottom={session ? 72 : 0}
+        hudBottom={session ? Math.max(72, navSpace) + 52 : 0}
         floor={floor}
         floorName={shortName}
         hallTitle={room ? undefined : fair.hallBanner(fairFloorIndex(floor.id)).title}
@@ -1709,7 +1724,7 @@ export function JobFair() {
         )}
 
         {session && (
-          <div className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
+          <div ref={navRef} className="hud hud-bl" onPointerDown={(e) => e.stopPropagation()}>
             <div className="rpg-box actions tabbar">
               <button type="button" className="menu-btn" onClick={() => setPanel("profile")} title="Profil, lamaran, dan stempel stand">
                 <span className="tab-ico">🎒</span>

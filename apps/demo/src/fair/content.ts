@@ -42,6 +42,12 @@ export interface SeminarSession {
   speaker: string;
   role: string;
   slides: { title: string; points: string[]; say: string }[];
+  /** When it starts (epoch ms, set in WIB by the organiser); without it: "Jadwal belum ditentukan". */
+  startAt?: number;
+  /** How long it runs, in minutes (60 when unset). */
+  minutes?: number;
+  /** Seats; unset means no limit. */
+  capacity?: number;
 }
 
 export const SEMINARS: SeminarSession[] = [

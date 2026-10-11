@@ -23,8 +23,14 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      must verify its email before applying.
    - `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`): protects the daily
      reminder job (`/api/cron/reminders`, 06.00 WIB), which sends each seeker an email and phone
-     notification for today's interviews, office visits and the Aula items they asked to be
-     reminded of. Vercel Cron sends it automatically; without it the job refuses to run.
+     notification for today's interviews, office visits, the Aula items they asked to be
+     reminded of and the seminars they registered for (plus tomorrow's seminars, H-1). Vercel
+     Cron sends it automatically; without it the job refuses to run.
+     The "15 menit lagi" and "seminar dimulai" pushes go out when visitors load the game and when
+     the speaker goes live. To have them on time even when nobody is online, point a free
+     scheduler (e.g. cron-job.org) at `GET /api/cron/seminars` every 5 minutes with the header
+     `Authorization: Bearer <CRON_SECRET>`; Vercel Hobby cron only runs once a day. Each push is
+     sent once however often it runs.
    - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
    - `TURNSTILE_SECRET_KEY` and `VITE_TURNSTILE_SITE_KEY` (Cloudflare Turnstile, free): human
      check on sign-up. Off while unset; sign-up also has a hidden honeypot field.

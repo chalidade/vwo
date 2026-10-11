@@ -1,18 +1,21 @@
 // The live game's shared event setup, one JSON document per key ("org", "company:<booth id>").
-// Keys under "billing:" (the organiser's seller and bank details, buyers' invoice details) are
-// private: the setup read below never returns them, only their own key reads do.
+// Keys under "billing:" (the organiser's seller and bank details, buyers' invoice details) and
+// "semreg:" (who registered for a seminar, see seminar-registrations.ts) are private: the setup read
+// below never returns them, only their own key reads do.
 import { and, eq, notLike, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairState } from "./jobfair-schema";
 
 export const PRIVATE_STATE_PREFIX = "billing:";
+/** One document per seminar session listing who registered: the organiser's export reads it, nobody else. */
+export const SEMINAR_REG_PREFIX = "semreg:";
 
-/** The event setup. Seekers' offers ("offers:<user id>", see fair-pool.ts) are personal and left out, and so are billing details. */
+/** The event setup. Seekers' offers ("offers:<user id>", see fair-pool.ts) are personal and left out, and so are billing details and seminar registrations. */
 export function readFairState(db: Db) {
   return db
     .select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt })
     .from(fairState)
-    .where(and(sql`${fairState.key} not like 'offers:%'`, notLike(fairState.key, `${PRIVATE_STATE_PREFIX}%`)));
+    .where(and(sql`${fairState.key} not like 'offers:%'`, notLike(fairState.key, `${PRIVATE_STATE_PREFIX}%`), notLike(fairState.key, `${SEMINAR_REG_PREFIX}%`)));
 }
 
 export async function readFairStateKey(db: Db, key: string) {
@@ -66,5 +69,23 @@ export async function putFairStateLocked<T extends { key: string; data: unknown 
       .values({ key: doc.key, data: doc.data, updatedBy: userId })
       .onConflictDoUpdate({ target: fairState.key, set: { data: doc.data, updatedBy: userId, updatedAt: sql`now()` } });
     return doc;
+  });
+}
+
+/**
+ * Change one document under a lock: `change` gets what is stored (null when nothing is) and returns
+ * the new document, or null to leave it as it is. Two organisers changing it at once take turns.
+ */
+export async function updateFairStateLocked<T>(db: Db, key: string, userId: string, change: (data: unknown) => T | null) {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fair:" + key}))`);
+    const [row] = await tx.select({ data: fairState.data }).from(fairState).where(eq(fairState.key, key));
+    const next = change(row ? row.data : null);
+    if (next === null) return null;
+    await tx
+      .insert(fairState)
+      .values({ key, data: next, updatedBy: userId })
+      .onConflictDoUpdate({ target: fairState.key, set: { data: next, updatedBy: userId, updatedAt: sql`now()` } });
+    return next;
   });
 }

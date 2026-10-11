@@ -1,7 +1,14 @@
 // In-browser job fair for the static demo: company booths with recruiters, the organisers'
 // info desk, bot job seekers walking from booth to booth, and the applications they send.
 import {
+  type AnnounceBoard,
   type AvatarState,
+  currentAnnouncement,
+  hideAnnouncement,
+  legacyBoard,
+  postAnnouncement,
+  removeAnnouncement,
+  repostAnnouncement,
   COIN_STAND_SPOTS,
   type CompanyBooth,
   type JobPosting,
@@ -24,6 +31,8 @@ import {
   safeImage,
   safeUrl,
   makeStall,
+  editStall,
+  type StallEdit,
   freeStallSlotsOf,
   type StallInput,
   buildFairRoom,
@@ -68,6 +77,9 @@ import {
   remindDayFor,
   toggleRemind,
   wibDay,
+  registerBlock,
+  seminarReminders,
+  seminarSlots,
   type BoothTier,
   FEATURED_PRODUCT_ID,
   canOpenAnotherJob,
@@ -234,6 +246,14 @@ export interface CallLog {
   seconds: number;
 }
 
+/** A room's own words, as the organiser set them. Unset fields keep the published ones. */
+export interface RoomInfo {
+  name?: string;
+  tagline?: string;
+  host?: string;
+  hostRole?: string;
+}
+
 /** What the organiser changed: booths added or taken out, ads, announcements, rooms. */
 export interface OrgState {
   /** Event booths the organiser took out. */
@@ -244,8 +264,13 @@ export interface OrgState {
   promoters?: Promoter[];
   /** Sponsors, when the organiser edited them. */
   sponsors?: SponsorView[];
+  /** The announcement on every visitor's screen (from `announcements` on the live site). */
   announcement?: { text: string; at: number };
+  /** What the organiser sent, newest first, and which one is on screen. Live: the server's, read only. */
+  announcements?: AnnounceBoard;
   psych?: PsychConfig;
+  /** What visitors read about a room (the food court), when the organiser changed it. */
+  roomInfo?: Record<string, RoomInfo>;
   seminars?: SeminarSession[];
   /** How many of the organiser's walking promoters are out at once. Unset: all of them. */
   walkers?: number;
@@ -562,6 +587,8 @@ export interface PlayerState {
   notifRead?: BoothRead;
   /** Aula rundown items the player asked to be reminded of, per WIB day (the server emails them that morning). */
   remind?: RemindList;
+  /** Demo: seminar sessions the player registered for. The live site keeps these on the server. */
+  semreg?: string[];
 }
 
 export interface DailyState {
@@ -974,7 +1001,7 @@ export class DemoJobFair {
       else if (key.startsWith("room:") && !hidden.has(key.slice(5))) order.push(key);
     }
     const levelOf = (key: string) => order.indexOf(key);
-    const sig = () => [...this.levelsByKey()].map(([k, l]) => `${k}=${l}`).join() + this.fair.floors.map((f) => f.theme).join();
+    const sig = () => [...this.levelsByKey()].map(([k, l]) => `${k}=${l}`).join() + this.fair.floors.map((f) => f.theme).join() + this.fair.rooms.map((r) => r.name).join();
     const before = sig();
     this.fair.hallBase = levelOf("hall:0");
     this.fair.floors.splice(0, this.fair.floors.length, ...halls.map((h, i) => ({ name: `Lantai ${this.fair.hallBase! + i + 1}`, theme: h.theme })));
@@ -986,6 +1013,10 @@ export class DemoJobFair {
         const room = mine.get(r.id) ?? structuredClone(r);
         room.level = levelOf(`room:${r.id}`);
         room.price = this.org.prices?.[fairRoomFloorId(this.fair, r.id)] ?? r.price;
+        const info = this.org.roomInfo?.[r.id];
+        room.name = info?.name || r.name;
+        room.tagline = info?.tagline || r.tagline;
+        room.staff = { name: info?.host || r.staff.name, role: info?.hostRole || r.staff.role };
         return room;
       });
     this.fair.rooms.splice(0, this.fair.rooms.length, ...rooms);
@@ -1136,6 +1167,29 @@ export class DemoJobFair {
     if (this.rentedStalls.has(stallId) && !this.org.removedStalls?.includes(stallId)) this.org.removedStalls = [...(this.org.removedStalls ?? []), stallId];
     this.setStalls(room.id, room.stalls.filter((st) => st.id !== stallId));
     return true;
+  }
+
+  /** Change a stall already in the food court: its words, look and vouchers. Its place stays. */
+  updateStall(stallId: string, input: StallEdit) {
+    const room = this.fair.rooms.find((r) => r.stalls?.some((st) => st.id === stallId));
+    if (!room?.stalls) return null;
+    const next = room.stalls.map((st) => (st.id === stallId ? editStall(st, input) : st));
+    this.setStalls(room.id, next);
+    return next.find((st) => st.id === stallId) ?? null;
+  }
+
+  /** What visitors read about a room; empty fields go back to the published words. */
+  setRoomInfo(roomId: string, info: RoomInfo) {
+    const t = (v: string | undefined, n: number) => v?.trim().slice(0, n) || undefined;
+    const clean: RoomInfo = { name: t(info.name, 40), tagline: t(info.tagline, 120), host: t(info.host, 40), hostRole: t(info.hostRole, 40) };
+    const { [roomId]: _, ...rest } = this.org.roomInfo ?? {};
+    this.org.roomInfo = Object.values(clean).some(Boolean) ? { ...rest, [roomId]: clean } : rest;
+    this.saveOrg();
+  }
+
+  /** The published words of a room, to show what an empty field falls back to. */
+  publishedRoom(roomId: string) {
+    return this.originalRooms.find((r) => r.id === roomId);
   }
 
   /** Put the food court back as published. */
@@ -1344,12 +1398,33 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
-  /** A message from the organiser to everyone in the hall. */
+  /** The organiser's announcements: the one on screen and the ones sent before. */
+  announcementBoard(): AnnounceBoard {
+    return this.org.announcements ?? legacyBoard(this.org);
+  }
+
+  /** Take a board (the server's, on the live site) and show its current announcement. */
+  setAnnounceBoard(board: AnnounceBoard) {
+    const now = currentAnnouncement(board);
+    this.org.announcements = board;
+    this.org.announcement = now ? { text: now.text, at: now.at } : undefined;
+    this.saveOrg();
+  }
+
+  /** A message from the organiser to everyone in the hall. Empty text takes the current one down. */
   announce(text: string) {
     const t = text.trim().slice(0, 200);
-    this.org.announcement = t ? { text: t, at: this.now() } : undefined;
+    const board = this.announcementBoard();
+    this.setAnnounceBoard(t ? postAnnouncement(board, t, this.now(), this.id(`ann${this.now().toString(36)}`)) : hideAnnouncement(board));
     if (t) this.notices.push(`📢 Panitia: ${t}`);
-    this.saveOrg();
+  }
+
+  /** Show a past announcement again, or delete one from the history (and the screen). */
+  repostAnnouncement(id: string) {
+    this.setAnnounceBoard(repostAnnouncement(this.announcementBoard(), id, this.now(), this.id(`ann${this.now().toString(36)}`)));
+  }
+  removeAnnouncement(id: string) {
+    this.setAnnounceBoard(removeAnnouncement(this.announcementBoard(), id));
   }
 
   psychConfig(): PsychConfig {
@@ -1434,10 +1509,64 @@ export class DemoJobFair {
     return this.player.remind[day]?.includes(id) ? day : null;
   }
 
-  /** The player's interviews, office visits and reminded Aula items on `day` (WIB, today by default). */
+  /** The player's interviews, office visits, reminded Aula items and registered seminars on `day` (WIB, today by default). */
   myReminders(day = wibDay(this.now())): Reminder[] {
     const mine = this.applications.filter((a) => a.visitorId === PLAYER_ID);
-    return dueReminders({ day, applications: mine, remind: this.player.remind, rundown: this.rundown() });
+    const extra = seminarReminders(seminarSlots({ seminars: this.seminars() }), this.seminarRegs(), day);
+    return dueReminders({ day, applications: mine, remind: this.player.remind, rundown: this.rundown(), extra });
+  }
+
+  // ---- Seminar registration ("Daftar" / "Batal") ----------------------------------------
+
+  /** Live: the server's word on who registered; null until it is known (the demo keeps them in `player.semreg`). */
+  private liveSemRegs: string[] | null = null;
+  /** How many registered for each session (live: from the server). */
+  readonly seminarRegCounts = new Map<string, number>();
+
+  /** The sessions the player registered for. */
+  seminarRegs(): string[] {
+    return this.liveSemRegs ?? this.player.semreg ?? [];
+  }
+
+  /** How many registered for a session (the demo only knows about this player). */
+  seminarRegCount(id: string) {
+    return this.seminarRegCounts.get(id) ?? (this.seminarRegs().includes(id) ? 1 : 0);
+  }
+
+  /** Live: the server's counts and this account's registrations replace this browser's. */
+  setSeminarRegs(mine: string[], counts: Record<string, number>) {
+    this.liveSemRegs = mine;
+    this.seminarRegCounts.clear();
+    for (const [id, n] of Object.entries(counts)) this.seminarRegCounts.set(id, n);
+    this.emit();
+  }
+
+  /** Live: one registration the server confirmed. */
+  seminarRegChanged(id: string, registered: boolean, count: number) {
+    const was = this.seminarRegs().filter((x) => x !== id);
+    this.liveSemRegs = registered ? [...was, id] : was;
+    this.seminarRegCounts.set(id, count);
+    this.emit();
+  }
+
+  /** Demo: register or cancel in this browser, with the same rules the server applies. */
+  toggleSeminarRegLocal(id: string): { ok: true; registered: boolean } | { ok: false; error: string } {
+    const slot = seminarSlots({ seminars: this.seminars() }).find((s) => s.id === id);
+    if (!slot) return { ok: false, error: "not_found" };
+    const mine = this.player.semreg ?? [];
+    const count = this.seminarRegCount(id);
+    if (mine.includes(id)) {
+      this.player.semreg = mine.filter((x) => x !== id);
+      this.seminarRegCounts.set(id, Math.max(0, count - 1));
+    } else {
+      const block = registerBlock(slot, count, this.now());
+      if (block) return { ok: false, error: block };
+      this.player.semreg = [...mine, id].slice(-50);
+      this.seminarRegCounts.set(id, count + 1);
+    }
+    this.persist();
+    this.emit();
+    return { ok: true, registered: this.player.semreg.includes(id) };
   }
 
   // ---- Booth decorations visitors can use ------------------------------------------------
@@ -1638,6 +1767,8 @@ export class DemoJobFair {
   private serverReviews: ServerReviews | null = null;
   /** Live: a booth's notifications are worked out from its applications, the same on every device. */
   serverInbox = false;
+  /** Live: the event setup is the server's; other tabs' saved copies of it are not taken. */
+  serverOrg = false;
   /** Live: which booth notifications the company has read, per booth. */
   private boothRead = new Map<string, BoothRead>();
   /** Notes being saved: the server's older copy must not overwrite them meanwhile. */
@@ -1821,7 +1952,9 @@ export class DemoJobFair {
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
     if (!saved) return;
-    this.loadOrg(saved.org);
+    // Live: the event setup comes from the server. Another tab's saved copy may be older than what
+    // this tab just changed (a deleted announcement, an edited stall) and must not undo it.
+    if (!this.serverOrg) this.loadOrg(saved.org);
     this.loadCompany(saved.company);
     for (const a of saved.applications ?? []) {
       if (!this.booth(a.boothId)) continue;

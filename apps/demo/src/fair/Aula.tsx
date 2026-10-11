@@ -4,8 +4,9 @@ import type { AulaEvent } from "../jobfair-engine";
 import { fair } from "../useFair";
 import { calendarHref } from "./calendar";
 import { Modal } from "./Modal";
+import { SeminarSchedule } from "./SeminarSchedule";
 
-export type AulaTab = "jadwal" | "info" | "meet";
+export type AulaTab = "jadwal" | "seminar" | "info" | "meet";
 
 const KIND: Record<AulaEvent["kind"], string> = { sambutan: "🎙️ Sambutan", talkshow: "💬 Talkshow", hiburan: "🎸 Hiburan", doorprize: "🎁 Door prize", info: "ℹ️ Info" };
 
@@ -58,6 +59,7 @@ export function AulaBoard({ tab: start, stops, onClose, onGo }: { tab: AulaTab; 
         {(
           [
             ["jadwal", "🗓️ Jadwal"],
+            ["seminar", "🎤 Seminar"],
             ["info", "ℹ️ Info & denah"],
             ["meet", "📍 Meeting point"],
           ] as const
@@ -100,6 +102,12 @@ export function AulaBoard({ tab: start, stops, onClose, onGo }: { tab: AulaTab; 
               </li>
             ))}
           </ol>
+        </>
+      )}
+      {tab === "seminar" && (
+        <>
+          <p className="au-now">Seminar di Ruang Seminar. Daftar sesi yang ingin kamu ikuti, nanti diingatkan H-1 dan 15 menit sebelum mulai.</p>
+          <SeminarSchedule />
         </>
       )}
       {tab === "info" && (

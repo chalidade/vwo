@@ -12,6 +12,7 @@ import { startReviewSync } from "./review-sync";
 import { startStatsSync } from "./stats-sync";
 import { startSharedSync } from "./shared-state";
 import { claimStoredRef } from "./fair/viral";
+import { pullSeminarRegs } from "./fair/seminar-reg";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -37,6 +38,8 @@ function useLiveAccount() {
       if (a) startPaymentSync();
       startReviewSync();
       startStatsSync(!!a);
+      // Registered seminars feed the game's reminders ("15 menit lagi").
+      void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
     };
     window.addEventListener(ACCOUNT_EVENT, on);
@@ -47,6 +50,8 @@ function useLiveAccount() {
       if (a) startPaymentSync();
       startReviewSync();
       startStatsSync(!!a);
+      // Registered seminars feed the game's reminders ("15 menit lagi").
+      void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);

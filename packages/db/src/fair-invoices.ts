@@ -1,7 +1,7 @@
 // Numbered invoices for coin purchases. A gateway payment gets a paid invoice once it is confirmed;
 // a bank transfer or termin starts as an issued invoice that the organiser marks paid instalment by
 // instalment. The last confirmation hands over the coins, under an idempotency key, exactly once.
-import { and, desc, eq, inArray, notExists, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notExists, sql } from "drizzle-orm";
 import { type BuyerInfo, type Instalment, type InvoiceLine, type InvoiceMethod, invoiceNumber, nextInstalment, type SellerInfo, taxSplit } from "@vwo/shared";
 import type { Db } from "./client";
 import { coinLedger, fairInvoices, fairPayments } from "./jobfair-schema";
@@ -165,12 +165,16 @@ export async function invoiceFile(db: Db, id: string, name: string) {
   return rows[0]?.f ?? null;
 }
 
-/** An account's invoices, and those of the booths it runs. */
-export function invoicesOf(db: Db, userId: string, booths: string[] = []) {
+/**
+ * The invoices one page lists. A company portal (`{ booth }`) lists that booth's invoices whoever in
+ * the booth bought them, and nothing else; the personal page lists the account's own invoices that
+ * were not bought for a booth. The caller checks booth membership before asking for a booth.
+ */
+export function invoicesOf(db: Db, userId: string, scope: { booth: string } | "personal" = "personal") {
   return db
     .select(lean)
     .from(fairInvoices)
-    .where(booths.length ? or(eq(fairInvoices.userId, userId), inArray(fairInvoices.boothKey, booths)) : eq(fairInvoices.userId, userId))
+    .where(scope === "personal" ? and(eq(fairInvoices.userId, userId), isNull(fairInvoices.boothKey)) : eq(fairInvoices.boothKey, scope.booth))
     .orderBy(desc(fairInvoices.createdAt))
     .limit(100);
 }
