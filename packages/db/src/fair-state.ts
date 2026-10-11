@@ -3,8 +3,12 @@ import { eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { fairState } from "./jobfair-schema";
 
+/** The event setup. Seekers' offers ("offers:<user id>", see fair-pool.ts) are personal and left out. */
 export function readFairState(db: Db) {
-  return db.select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt }).from(fairState);
+  return db
+    .select({ key: fairState.key, data: fairState.data, updatedAt: fairState.updatedAt })
+    .from(fairState)
+    .where(sql`${fairState.key} not like 'offers:%'`);
 }
 
 export async function readFairStateKey(db: Db, key: string) {

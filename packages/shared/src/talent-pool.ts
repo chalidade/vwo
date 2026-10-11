@@ -1,0 +1,229 @@
+// A company's talent pool: everyone who ever applied to its booth(s), kept after the event ends so
+// the company can reach them again for a newer vacancy, plus the seekers who said any company may
+// contact them. Worked out from the applications and the seekers' saved profiles, with no table of
+// its own. The same functions run on the server (live site) and in the browser (demo).
+import { z } from "zod";
+import type { CompanyBooth, JobPosting } from "./jobfair";
+import { educationLevel, scoreJob } from "./recommend";
+
+/** One application as the pool reads it: who sent it where, and the form they filled in. */
+export interface PoolApplication {
+  id: string;
+  seeker: string;
+  boothId: string;
+  jobId: string;
+  jobTitle: string;
+  status: string;
+  at: number;
+  data: Record<string, unknown>;
+}
+
+/** What the pool reads from a seeker's saved profile. Any shape is accepted: it comes from a JSON document. */
+export type PoolProfile = Record<string, unknown> | null | undefined;
+
+export interface PoolMember {
+  /** The account id of an applicant; for an opted-in stranger, a handle that only works for offers from this booth. */
+  seeker: string;
+  name: string;
+  headline: string;
+  skills: string;
+  city: string;
+  education: string;
+  /** Contact details, only for seekers who applied to this company. */
+  email?: string;
+  phone?: string;
+  cvUrl?: string;
+  /** Applied to one of the company's booths (the pool proper); otherwise an opted-in seeker found by matching. */
+  applicant: boolean;
+  /** Agreed to hear about other vacancies. Applicants count as agreeing unless they switched it off. */
+  contactable: boolean;
+  /** Their applications to the company, newest first. */
+  applications: { id: string; boothId: string; jobId: string; jobTitle: string; status: string; at: number }[];
+  /** When they last applied or updated their profile. */
+  lastAt: number;
+}
+
+/** Profile fields are read as text; a list (a skills picker) is read as the comma separated text it stands for. */
+export const textOf = (v: unknown, max = 300): string =>
+  (typeof v === "string" ? v : Array.isArray(v) ? v.filter((x) => typeof x === "string").join(", ") : typeof v === "number" ? String(v) : "").trim().slice(0, max);
+
+/** Whether a seeker's profile lets companies they never applied to reach them: only when they turned it on. */
+export const optedIn = (p: PoolProfile) => p?.contactable === true;
+
+/** "Sari Wulandari" as "Sari W.": an opted-in seeker stays anonymous until they apply. */
+export function shortName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Pencari kerja";
+  return parts.length === 1 ? parts[0]! : `${parts[0]} ${parts[parts.length - 1]![0]!.toUpperCase()}.`;
+}
+
+/**
+ * Group the company's applications by seeker. The newest application gives the contact details the
+ * seeker sent the company; the saved profile, when there is one, gives fresher skills and city.
+ */
+export function poolMembers(apps: PoolApplication[], profiles: Map<string, PoolProfile> = new Map()): PoolMember[] {
+  const by = new Map<string, PoolMember>();
+  for (const a of [...apps].sort((x, y) => y.at - x.at)) {
+    const app = { id: a.id, boothId: a.boothId, jobId: a.jobId, jobTitle: a.jobTitle, status: a.status, at: a.at };
+    const have = by.get(a.seeker);
+    if (have) {
+      have.applications.push(app);
+      continue;
+    }
+    const p = profiles.get(a.seeker);
+    const d = a.data;
+    const pick = (k: string, max?: number) => textOf(p?.[k], max) || textOf(d[k], max);
+    by.set(a.seeker, {
+      seeker: a.seeker,
+      name: textOf(d.name, 80) || textOf(p?.name, 80) || "Pelamar",
+      headline: pick("headline", 200),
+      skills: pick("skills"),
+      city: pick("city", 80),
+      education: pick("education", 200),
+      email: textOf(d.email, 120) || undefined,
+      phone: textOf(d.phone, 30) || undefined,
+      cvUrl: textOf(d.cvUrl, 300) || undefined,
+      applicant: true,
+      contactable: p?.contactable !== false,
+      applications: [app],
+      lastAt: a.at,
+    });
+  }
+  return [...by.values()];
+}
+
+/** An opted-in seeker who never applied to the company: what they do and where, without who they are or how to reach them. */
+export function outsiderMember(seeker: string, p: PoolProfile, at: number): PoolMember {
+  return {
+    seeker,
+    name: shortName(textOf(p?.name, 80)),
+    headline: textOf(p?.headline, 200),
+    skills: textOf(p?.skills),
+    city: textOf(p?.city, 80),
+    education: textOf(p?.education, 200),
+    applicant: false,
+    contactable: true,
+    applications: [],
+    lastAt: at,
+  };
+}
+
+export const poolFilterSchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  skill: z.string().trim().max(80).optional(),
+  city: z.string().trim().max(80).optional(),
+  education: z.string().trim().max(80).optional(),
+  status: z.string().trim().max(40).optional(),
+});
+export type PoolFilter = z.infer<typeof poolFilterSchema>;
+
+const has = (text: string, term?: string) => !term || text.toLowerCase().includes(term.toLowerCase());
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** The skills in a profile's comma separated text, each once, in the spelling first used. */
+export function skillsOf(text: string): string[] {
+  const out: string[] = [];
+  for (const s of text
+    .split(/[,;\n/]+/)
+    .map((x) => x.trim())
+    .filter(Boolean))
+    if (!out.some((o) => same(o, s))) out.push(s.slice(0, 60));
+  return out;
+}
+
+const LEVEL_NAMES: Record<number, string> = { 2: "SMA/SMK", 3: "D3", 4: "S1/D4", 5: "S2", 6: "S3" };
+/** The schooling level for the education filter ("S1/D4"), or "" when the text names none. */
+export const educationOf = (text: string) => LEVEL_NAMES[educationLevel(text)] ?? "";
+export const EDUCATION_FILTERS = Object.values(LEVEL_NAMES);
+
+/** The members matching every filter given, newest first. Status matches any of their applications. */
+export function filterPool(members: PoolMember[], f: PoolFilter): PoolMember[] {
+  return members
+    .filter(
+      (m) =>
+        (!f.skill || skillsOf(m.skills).some((s) => same(s, f.skill!))) &&
+        (!f.city || same(m.city, f.city)) &&
+        (!f.education || educationOf(m.education) === f.education) &&
+        (!f.status || m.applications.some((a) => a.status === f.status)) &&
+        (!f.q || [m.name, m.headline, m.skills, m.email ?? ""].some((s) => has(s, f.q))),
+    )
+    .sort((a, b) => b.lastAt - a.lastAt);
+}
+
+export interface PoolFacets {
+  skills: { value: string; n: number }[];
+  cities: { value: string; n: number }[];
+}
+
+/** The skills and cities in the pool, most common first, for the filter dropdowns. */
+export function poolFacets(members: PoolMember[], max = 80): PoolFacets {
+  const count = (values: string[][]) => {
+    const by = new Map<string, { value: string; n: number }>();
+    for (const vs of values)
+      for (const v of vs) {
+        const k = v.toLowerCase();
+        const have = by.get(k);
+        if (have) have.n++;
+        else by.set(k, { value: v, n: 1 });
+      }
+    return [...by.values()].sort((a, b) => b.n - a.n || a.value.localeCompare(b.value)).slice(0, max);
+  };
+  return { skills: count(members.map((m) => skillsOf(m.skills))), cities: count(members.map((m) => (m.city ? [m.city] : []))) };
+}
+
+export const POOL_PAGE = 30;
+
+/** One page of a list, and how many there are in all. */
+export function pageOf<T>(list: T[], page: number, size = POOL_PAGE) {
+  const p = Math.max(0, Math.floor(page) || 0);
+  return { items: list.slice(p * size, (p + 1) * size), total: list.length, page: p, pageSize: size };
+}
+
+export interface Candidate {
+  member: PoolMember;
+  score: number;
+  /** Short reasons, e.g. "React", "Jakarta", "cocok untuk mahasiswa". */
+  why: string[];
+}
+
+/**
+ * The people who suit one vacancy best: the seeker matcher (scoreJob) run the other way round, for
+ * each member against this job. People who already applied to it are left out: they are in the
+ * applicants list. Past applicants come before opted-in strangers on an equal score.
+ */
+export function rankCandidates(members: PoolMember[], booth: CompanyBooth, job: JobPosting, limit = 10): Candidate[] {
+  return members
+    .filter((m) => !m.applications.some((a) => a.jobId === job.id && a.boothId === booth.id))
+    .map((m) => {
+      const r = scoreJob(m, booth, job);
+      return { member: m, score: r.score, why: r.why };
+    })
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score || Number(b.member.applicant) - Number(a.member.applicant) || b.member.lastAt - a.member.lastAt)
+    .slice(0, limit);
+}
+
+/** A company's invitation to apply to one of its vacancies, kept with the seeker until they apply or dismiss it. */
+export interface TalentOffer {
+  id: string;
+  boothId: string;
+  jobId: string;
+  company: string;
+  jobTitle: string;
+  note?: string;
+  at: number;
+}
+
+export const talentOfferSchema = z.object({
+  /** A past applicant's account id, or the handle an opted-in stranger got in "Kandidat cocok". */
+  seeker: z.string().regex(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|h_[0-9a-f]{32})$/i),
+  jobId: z.string().regex(/^[\w-]{1,80}$/),
+  note: z.string().trim().max(300).optional(),
+});
+
+/** How many offers a seeker keeps; the oldest drop off. */
+export const OFFER_LIMIT = 30;
+
+/** The chat message a past applicant gets with an offer, in the conversation they already had with the company. */
+export const offerMessage = (o: { jobTitle: string; note?: string }) =>
+  `Kami membuka lowongan ${o.jobTitle} dan menurut kami cocok untukmu. ${o.note ? `${o.note} ` : ""}Lamar lewat Tas > Cocok > Tawaran perusahaan.`.slice(0, 600);

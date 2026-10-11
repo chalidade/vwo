@@ -11,3 +11,5 @@ export * from "./pricing";
 export * from "./coin-rules";
 export * from "./aula";
 export * from "./reminders";
+export * from "./recommend";
+export * from "./talent-pool";
