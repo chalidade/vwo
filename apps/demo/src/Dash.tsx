@@ -78,7 +78,9 @@ export function DashShell<T extends string>({
                   <span className="dash-ic">
                     <Icon i={i.icon} />
                   </span>
-                  <span className="dash-label">{i.label}</span>
+                  <span className="dash-label" title={i.label}>
+                    {i.label}
+                  </span>
                   {!!i.count && <span className="dash-count">{i.count}</span>}
                 </button>
               ))}
@@ -91,11 +93,13 @@ export function DashShell<T extends string>({
         <header className="dash-top">
           <div className="dash-mbrand">{brand}</div>
           <div className="dash-top-text">
-            <span className="dash-crumb">
+            <span className="dash-crumb" title={typeof title === "string" ? title : undefined}>
               {title}
               {group && <span className="dash-crumb-group"> / {group.label}</span>}
             </span>
-            <h1 className="dash-title">{current?.label}</h1>
+            <h1 className="dash-title" title={current?.label}>
+              {current?.label}
+            </h1>
             {subtitle && <span className="dash-sub">{subtitle}</span>}
           </div>
           {quick && <div className="dash-quick">{quick}</div>}
