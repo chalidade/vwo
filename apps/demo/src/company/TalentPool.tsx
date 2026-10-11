@@ -61,6 +61,44 @@ async function sendOffer(booth: CompanyBooth, m: PoolMember, job: JobPosting, no
 /** Vacancies a member can still be offered: open, and not ones they applied to. */
 const offerable = (booth: CompanyBooth, m: PoolMember) => openJobs(booth).filter((j) => !m.applications.some((a) => a.boothId === booth.id && a.jobId === j.id));
 
+type PlaceSkill = { skill?: string; province?: string; city?: string };
+
+/**
+ * Keahlian, provinsi and domisili dropdowns built from the pick-list values the people in the list
+ * have (old free-text skills read with parseSkills). Picking a province narrows the domisili list.
+ */
+export function PlaceSkillFilters({ facets, value, onChange }: { facets: PoolFacets; value: PlaceSkill; onChange: (v: PlaceSkill) => void }) {
+  const cities = facets.cities.filter((c) => !value.province || c.province === value.province);
+  return (
+    <>
+      <select value={value.skill ?? ""} onChange={(e) => onChange({ skill: e.target.value || undefined })} aria-label="Keahlian">
+        <option value="">Semua keahlian</option>
+        {facets.skills.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.value} ({s.n})
+          </option>
+        ))}
+      </select>
+      <select value={value.province ?? ""} onChange={(e) => onChange({ province: e.target.value || undefined, city: undefined })} aria-label="Provinsi">
+        <option value="">Semua provinsi</option>
+        {facets.provinces.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.value} ({s.n})
+          </option>
+        ))}
+      </select>
+      <select value={value.city ?? ""} onChange={(e) => onChange({ city: e.target.value || undefined })} aria-label="Domisili">
+        <option value="">Semua domisili</option>
+        {cities.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.value} ({s.n})
+          </option>
+        ))}
+      </select>
+    </>
+  );
+}
+
 export function TalentPool({ booth, onChat }: { booth: CompanyBooth; onChat: (applicationId: string) => void }) {
   const [filter, setFilter] = useState<PoolFilter>({});
   const [page, setPage] = useState(0);
@@ -90,7 +128,7 @@ export function TalentPool({ booth, onChat }: { booth: CompanyBooth; onChat: (ap
 
   const demoAll = useMemo(() => (LIVE ? [] : localPool(booth.id)), [booth.id, fair.applications.length]);
   const view = LIVE
-    ? (live ?? { members: [], total: 0, pageSize: 30, facets: { skills: [], cities: [] } })
+    ? (live ?? { members: [], total: 0, pageSize: 30, facets: { skills: [], provinces: [], cities: [] } })
     : (() => {
         const p = pageOf(filterPool(demoAll, filter), page);
         return { members: p.items, total: p.total, pageSize: p.pageSize, facets: poolFacets(demoAll) };
@@ -110,22 +148,14 @@ export function TalentPool({ booth, onChat }: { booth: CompanyBooth; onChat: (ap
         </p>
         <div className="cp-filters">
           <input type="search" placeholder="Cari nama, keahlian..." value={filter.q ?? ""} onChange={set("q")} aria-label="Cari di talent pool" maxLength={80} />
-          <select value={filter.skill ?? ""} onChange={set("skill")} aria-label="Keahlian">
-            <option value="">Semua keahlian</option>
-            {view.facets.skills.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.value} ({s.n})
-              </option>
-            ))}
-          </select>
-          <select value={filter.city ?? ""} onChange={set("city")} aria-label="Domisili">
-            <option value="">Semua domisili</option>
-            {view.facets.cities.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.value} ({s.n})
-              </option>
-            ))}
-          </select>
+          <PlaceSkillFilters
+            facets={view.facets}
+            value={filter}
+            onChange={(v) => {
+              setFilter((f) => ({ ...f, ...v }));
+              setPage(0);
+            }}
+          />
           <select value={filter.education ?? ""} onChange={set("education")} aria-label="Pendidikan">
             <option value="">Semua pendidikan</option>
             {EDUCATION_FILTERS.map((s) => (

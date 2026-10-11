@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { CompanyBooth, JobPosting } from "./jobfair";
 import { educationLevel, scoreJob } from "./recommend";
+import { canonicalSkill, parseSkills, provinceOf } from "./taxonomy";
 
 /** One application as the pool reads it: who sent it where, and the form they filled in. */
 export interface PoolApplication {
@@ -111,6 +112,7 @@ export function outsiderMember(seeker: string, p: PoolProfile, at: number): Pool
 export const poolFilterSchema = z.object({
   q: z.string().trim().max(80).optional(),
   skill: z.string().trim().max(80).optional(),
+  province: z.string().trim().max(80).optional(),
   city: z.string().trim().max(80).optional(),
   education: z.string().trim().max(80).optional(),
   status: z.string().trim().max(40).optional(),
@@ -120,16 +122,14 @@ export type PoolFilter = z.infer<typeof poolFilterSchema>;
 const has = (text: string, term?: string) => !term || text.toLowerCase().includes(term.toLowerCase());
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/** The skills in a profile's comma separated text, each once, in the spelling first used. */
-export function skillsOf(text: string): string[] {
-  const out: string[] = [];
-  for (const s of text
-    .split(/[,;\n/]+/)
-    .map((x) => x.trim())
-    .filter(Boolean))
-    if (!out.some((o) => same(o, s))) out.push(s.slice(0, 60));
-  return out;
-}
+/** Whether someone listed this skill: a whole skill as the pick list spells it (old free text is read with parseSkills too), so "Java" is not "JavaScript". */
+export const hasSkill = (text: string, skill: string) => {
+  const want = canonicalSkill(skill) ?? skill;
+  return parseSkills(text).some((s) => same(s, want));
+};
+
+/** Whether a domisili ("Kota Surabaya") is in this province and/or is this kab/kota. */
+export const inPlace = (city: string, f: { province?: string; city?: string }) => (!f.city || same(city, f.city)) && (!f.province || same(provinceOf(city) ?? "", f.province));
 
 const LEVEL_NAMES: Record<number, string> = { 2: "SMA/SMK", 3: "D3", 4: "S1/D4", 5: "S2", 6: "S3" };
 /** The schooling level for the education filter ("S1/D4"), or "" when the text names none. */
@@ -141,8 +141,8 @@ export function filterPool(members: PoolMember[], f: PoolFilter): PoolMember[] {
   return members
     .filter(
       (m) =>
-        (!f.skill || skillsOf(m.skills).some((s) => same(s, f.skill!))) &&
-        (!f.city || same(m.city, f.city)) &&
+        (!f.skill || hasSkill(m.skills, f.skill)) &&
+        inPlace(m.city, f) &&
         (!f.education || educationOf(m.education) === f.education) &&
         (!f.status || m.applications.some((a) => a.status === f.status)) &&
         (!f.q || [m.name, m.headline, m.skills, m.email ?? ""].some((s) => has(s, f.q))),
@@ -150,15 +150,24 @@ export function filterPool(members: PoolMember[], f: PoolFilter): PoolMember[] {
     .sort((a, b) => b.lastAt - a.lastAt);
 }
 
+export interface Facet {
+  value: string;
+  n: number;
+}
 export interface PoolFacets {
-  skills: { value: string; n: number }[];
-  cities: { value: string; n: number }[];
+  skills: Facet[];
+  provinces: Facet[];
+  /** Each kab/kota with its province, so the domisili list can follow the chosen province. */
+  cities: (Facet & { province: string })[];
 }
 
-/** The skills and cities in the pool, most common first, for the filter dropdowns. */
-export function poolFacets(members: PoolMember[], max = 80): PoolFacets {
+/**
+ * The skills, provinces and kab/kota among these people, most common first, for the filter
+ * dropdowns. Works for pool members and for a booth's applicants alike.
+ */
+export function placeSkillFacets(people: { skills?: string; city?: string }[], max = 80): PoolFacets {
   const count = (values: string[][]) => {
-    const by = new Map<string, { value: string; n: number }>();
+    const by = new Map<string, Facet>();
     for (const vs of values)
       for (const v of vs) {
         const k = v.toLowerCase();
@@ -168,8 +177,15 @@ export function poolFacets(members: PoolMember[], max = 80): PoolFacets {
       }
     return [...by.values()].sort((a, b) => b.n - a.n || a.value.localeCompare(b.value)).slice(0, max);
   };
-  return { skills: count(members.map((m) => skillsOf(m.skills))), cities: count(members.map((m) => (m.city ? [m.city] : []))) };
+  const cities = (p: { city?: string }) => (p.city?.trim() ? [p.city.trim()] : []);
+  return {
+    skills: count(people.map((p) => parseSkills(p.skills ?? ""))),
+    provinces: count(people.map((p) => cities(p).flatMap((c) => provinceOf(c) ?? []))),
+    cities: count(people.map(cities)).map((c) => ({ ...c, province: provinceOf(c.value) ?? "" })),
+  };
 }
+
+export const poolFacets = (members: PoolMember[]) => placeSkillFacets(members);
 
 export const POOL_PAGE = 30;
 

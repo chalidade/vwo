@@ -11,7 +11,8 @@ import {
   poolMembers,
   rankCandidates,
   shortName,
-  skillsOf,
+  hasSkill,
+  inPlace,
   textOf,
 } from "../src";
 
@@ -76,19 +77,26 @@ describe("talent pool", () => {
     expect(shortName("")).toBe("Pencari kerja");
   });
 
-  it("filters by skill, city, education level and status, newest first", () => {
+  it("filters by skill, province, domisili, education level and status, newest first", () => {
     const pool = poolMembers([
-      app({ seeker: "a", at: 1, data: { name: "A", skills: "React, Excel", city: "Jakarta", education: "S1 Informatika" } }),
-      app({ seeker: "b", at: 2, status: "Shortlist", data: { name: "B", skills: "JavaScript", city: "Bandung", education: "SMK TKJ" } }),
+      // Old free text: read with the pick list's spellings.
+      app({ seeker: "a", at: 1, data: { name: "A", skills: "reactjs, excel", city: "Kota Jakarta Selatan", education: "S1 Informatika" } }),
+      app({ seeker: "b", at: 2, status: "Shortlist", data: { name: "B", skills: "JavaScript", city: "Kota Bandung", education: "SMK TKJ" } }),
     ]);
-    expect(filterPool(pool, { skill: "react" }).map((m) => m.seeker)).toEqual(["a"]);
+    expect(filterPool(pool, { skill: "React" }).map((m) => m.seeker)).toEqual(["a"]);
+    expect(filterPool(pool, { skill: "Microsoft Excel" }).map((m) => m.seeker)).toEqual(["a"]);
     // A dropdown value matches a whole skill, not part of one.
     expect(filterPool(pool, { skill: "Java" })).toEqual([]);
-    expect(filterPool(pool, { city: "bandung" }).map((m) => m.seeker)).toEqual(["b"]);
+    expect(filterPool(pool, { city: "Kota Bandung" }).map((m) => m.seeker)).toEqual(["b"]);
+    expect(filterPool(pool, { province: "DKI Jakarta" }).map((m) => m.seeker)).toEqual(["a"]);
+    expect(filterPool(pool, { province: "DKI Jakarta", city: "Kota Bandung" })).toEqual([]);
     expect(filterPool(pool, { education: "S1/D4" }).map((m) => m.seeker)).toEqual(["a"]);
     expect(filterPool(pool, { status: "Shortlist" }).map((m) => m.seeker)).toEqual(["b"]);
     expect(filterPool(pool, {}).map((m) => m.seeker)).toEqual(["b", "a"]);
-    expect(poolFacets(pool).skills.map((s) => s.value)).toEqual(["Excel", "JavaScript", "React"]);
+    const facets = poolFacets(pool);
+    expect(facets.skills.map((s) => s.value)).toEqual(["JavaScript", "Microsoft Excel", "React"]);
+    expect(facets.provinces.map((s) => s.value).sort()).toEqual(["DKI Jakarta", "Jawa Barat"]);
+    expect(facets.cities.find((c) => c.value === "Kota Bandung")?.province).toBe("Jawa Barat");
     expect(educationOf("D3 Akuntansi")).toBe("D3");
   });
 
@@ -114,6 +122,8 @@ describe("talent pool", () => {
   it("reads list or text fields as text", () => {
     expect(textOf(["React", 3, "Go"])).toBe("React, Go");
     expect(textOf({ x: 1 })).toBe("");
-    expect(skillsOf("React; react, Go\nSQL")).toEqual(["React", "Go", "SQL"]);
+    expect(hasSkill("React; react, Go\nSQL", "go")).toBe(true);
+    expect(inPlace("Kota Surabaya", { province: "Jawa Timur" })).toBe(true);
+    expect(inPlace("Surabaya", { province: "Jawa Timur" })).toBe(false);
   });
 });
