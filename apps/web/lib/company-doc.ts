@@ -1,6 +1,6 @@
 import "server-only";
 import { type Payment, paidInvoicesOf, readFairState, readPrices, writeFairState } from "@vwo/db";
-import { ACCESSORY_DEFAULTS, FEATURED_PRODUCT_ID, type JobPosting, limitOpenJobs, priceFrom, productAllowed } from "@vwo/shared";
+import { ACCESSORY_DEFAULTS, FEATURED_PRODUCT_ID, cleanEmployees, cleanIndustry, cleanJobs, limitOpenJobs, priceFrom, productAllowed } from "@vwo/shared";
 import { boothNow } from "./booths";
 import { db } from "./db";
 
@@ -49,7 +49,8 @@ export async function settleInvoice(p: Payment, userId: string) {
  * A company account saves its booth. The browser may not mark bills paid, own products, switch
  * on decorations or raise its tier by itself: only payments the gateway confirmed count. A mini
  * (UMKM) booth keeps at most one open vacancy and has no stand to decorate, and only a booth that
- * paid for the featured add-on may feature a vacancy.
+ * paid for the featured add-on may feature a vacancy. Vacancies, industry and headcount are
+ * cleaned and bounded the way the portal's pickers save them (job-lists.ts).
  */
 export async function guardCompanyDoc(boothId: string, incoming: Doc): Promise<Doc> {
   const [stored, paid, prices, booth] = await Promise.all([companyDoc(boothId), paidInvoicesOf(db, boothId), readPrices(db), boothNow(boothId)]);
@@ -75,11 +76,9 @@ export async function guardCompanyDoc(boothId: string, incoming: Doc): Promise<D
   doc.owned = doc.owned.filter((id) => productAllowed(pkg, id));
   const vip = doc.owned.includes("vip") || doc.edits!.tier === "premium";
   const owned = new Set(doc.owned);
-  if (Array.isArray(doc.edits!.jobs))
-    doc.edits!.jobs = limitOpenJobs(
-      pkg,
-      (doc.edits!.jobs as unknown[]).filter((j): j is JobPosting => !!j && typeof j === "object"),
-    );
+  if (doc.edits!.jobs !== undefined) doc.edits!.jobs = limitOpenJobs(pkg, cleanJobs(doc.edits!.jobs));
+  if (doc.edits!.industry !== undefined) doc.edits!.industry = cleanIndustry(doc.edits!.industry) ?? "";
+  if (doc.edits!.employees !== undefined) doc.edits!.employees = cleanEmployees(doc.edits!.employees);
   const featured = doc.edits!.featuredJob;
   if (featured !== undefined && !(owned.has(FEATURED_PRODUCT_ID) && typeof featured === "string" && featured.length <= 120)) delete doc.edits!.featuredJob;
   if (Array.isArray(doc.edits!.accessories)) {

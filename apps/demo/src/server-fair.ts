@@ -1,6 +1,18 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
-import type { ApplicationShared, BoothReport, Candidate, CompanyBooth, FairApplicationInput, FairApplicationOut, PoolFacets, PoolFilter, PoolMember, TalentOffer } from "@vwo/shared";
+import type {
+  ApplicationShared,
+  BoothReport,
+  Candidate,
+  CompanyBooth,
+  FairApplicationInput,
+  FairApplicationOut,
+  PoolFacets,
+  PoolFilter,
+  PoolMember,
+  StandPlacements,
+  TalentOffer,
+} from "@vwo/shared";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -140,6 +152,10 @@ export const boothMembers = (boothId: string) =>
   call<{ members: { id: string; email: string; name: string | null; since: number }[] }>(`booths/${encodeURIComponent(boothId)}/members`);
 export const removeBoothMember = (boothId: string, userId: string) =>
   call<{ ok: true }>(`booths/${encodeURIComponent(boothId)}/members?user=${encodeURIComponent(userId)}`, { method: "DELETE", body: {} });
+
+/** The organiser moves a stand to slot `slot` of booth floor `floor`, or swaps it with the stand there. */
+export const moveStandOnServer = (boothId: string, floor: number, slot: number) =>
+  call<{ ok: true; placements: StandPlacements; swapped: string | null }>(`booths/${encodeURIComponent(boothId)}/place`, { method: "POST", body: { floor, slot } });
 
 /** What to tell a company when joining its booth failed. */
 export function claimErrorText(error: string) {
