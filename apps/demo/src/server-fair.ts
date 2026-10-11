@@ -1,6 +1,6 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
-import type { ApplicationShared, CompanyBooth, FairApplicationInput, FairApplicationOut } from "@vwo/shared";
+import type { ApplicationShared, Candidate, CompanyBooth, FairApplicationInput, FairApplicationOut, PoolFacets, PoolFilter, PoolMember, TalentOffer } from "@vwo/shared";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -19,8 +19,7 @@ async function call<T>(path: string, init?: { method: string; body: unknown }): 
   }
 }
 
-export const sendApplication = (input: FairApplicationInput) =>
-  call<{ application: FairApplicationOut }>("applications", { method: "POST", body: input });
+export const sendApplication = (input: FairApplicationInput) => call<{ application: FairApplicationOut }>("applications", { method: "POST", body: input });
 
 export const myApplications = () => call<{ applications: FairApplicationOut[] }>("applications");
 
@@ -63,11 +62,51 @@ export const markBoothInboxRead = (boothId: string, read: { all: number; ids: st
 export const sendShared = (id: string, as: "company" | "seeker", shared: ApplicationShared) =>
   call<{ ok: true }>(`applications/${encodeURIComponent(id)}/shared`, { method: "PUT", body: { as, shared } });
 
+/** The booth's talent pool: everyone who applied to the company, filtered, a page at a time. */
+export const boothPool = (boothId: string, filter: PoolFilter, page: number) => {
+  const q = new URLSearchParams({ page: String(page) });
+  for (const [k, v] of Object.entries(filter)) if (v) q.set(k, v);
+  return call<{ members: PoolMember[]; total: number; page: number; pageSize: number; facets: PoolFacets }>(`booths/${encodeURIComponent(boothId)}/pool?${q}`);
+};
+
+/** "Kandidat cocok" for one of the booth's vacancies. */
+export const jobCandidates = (boothId: string, jobId: string) =>
+  call<{ candidates: Candidate[] }>(`booths/${encodeURIComponent(boothId)}/matches?job=${encodeURIComponent(jobId)}`);
+
+/** Invite someone from the pool to apply to a vacancy. */
+export const offerJob = (boothId: string, seeker: string, jobId: string, note?: string) =>
+  call<{ ok: true; chat: boolean }>(`booths/${encodeURIComponent(boothId)}/offers`, { method: "POST", body: { seeker, jobId, note: note?.trim().slice(0, 300) || undefined } });
+
+/** What to tell a company when an offer did not go out. */
+export function offerErrorText(error: string) {
+  switch (error) {
+    case "already_offered":
+      return "Lowongan ini sudah pernah ditawarkan ke orang ini.";
+    case "already_applied":
+      return "Orang ini sudah melamar lowongan ini.";
+    case "not_contactable":
+      return "Pelamar ini memilih tidak dihubungi untuk lowongan lain.";
+    case "job_not_found":
+      return "Lowongan sudah ditutup atau belum tersimpan di server.";
+    case "too_many_requests":
+      return "Terlalu banyak tawaran dalam satu jam. Coba lagi nanti.";
+    case "offline":
+      return "Tidak tersambung ke server. Coba lagi.";
+    default:
+      return "Tawaran gagal terkirim. Coba lagi sebentar lagi.";
+  }
+}
+
+/** The seeker's invitations to apply, and dismissing one. */
+export const myOffers = () => call<{ offers: TalentOffer[] }>("offers");
+export const dropOffer = (id: string) => call<{ ok: true }>(`offers?id=${encodeURIComponent(id)}`, { method: "DELETE", body: {} });
+
 /** A company account joins its booth with the code and PIN from the organiser. */
 export const claimBooth = (boothId: string, pin: string) => call<{ ok: true; boothId: string }>("company/claim", { method: "POST", body: { boothId, pin } });
 
 /** Event admins: the accounts that run a booth, and taking one out. */
-export const boothMembers = (boothId: string) => call<{ members: { id: string; email: string; name: string | null; since: number }[] }>(`booths/${encodeURIComponent(boothId)}/members`);
+export const boothMembers = (boothId: string) =>
+  call<{ members: { id: string; email: string; name: string | null; since: number }[] }>(`booths/${encodeURIComponent(boothId)}/members`);
 export const removeBoothMember = (boothId: string, userId: string) =>
   call<{ ok: true }>(`booths/${encodeURIComponent(boothId)}/members?user=${encodeURIComponent(userId)}`, { method: "DELETE", body: {} });
 

@@ -2078,3 +2078,45 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
   .inv-doc { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; border-radius: 0; padding: 0; }
   .no-print { display: none !important; }
 }
+/* Skill and place pickers: chips and suggestions from fixed lists (pickers.tsx). */
+.sp-field > .pk { grid-column: 1 / -1; }
+.pk { --pk-bg: #fff; --pk-ink: #111; --pk-line: #d4d4d4; display: grid; gap: 6px; min-width: 0; }
+.pk-label { font-weight: 600; }
+.pk-box { position: relative; }
+.pk-box input { width: 100%; box-sizing: border-box; }
+.pk-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--pk-bg); color: var(--pk-ink); border: 1px solid var(--pk-line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); max-height: 280px; overflow: auto; }
+.pk-list li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.pk-list li[aria-selected="true"], .pk-list li:hover { background: color-mix(in srgb, var(--pk-ink) 8%, transparent); }
+.pk-list small, .pk-picked small { opacity: 0.65; font-weight: 400; }
+.pk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pk-chips li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--pk-ink); color: var(--pk-bg); font-size: 13px; font-weight: 600; }
+.pk-chips li[data-own] { background: transparent; color: inherit; border: 1px dashed currentColor; }
+.pk-chips button { all: unset; cursor: pointer; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; font-size: 15px; line-height: 1; }
+.pk-chips button:focus-visible { outline: 2px solid currentColor; }
+.pk-browse { all: unset; justify-self: start; cursor: pointer; font-size: 13px; text-decoration: underline; opacity: 0.8; }
+.pk-browse:focus-visible { outline: 2px solid currentColor; }
+.pk-groups { display: grid; gap: 4px; max-height: 320px; overflow: auto; padding-right: 2px; }
+.pk-groups summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 4px 0; }
+.pk-opts { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 8px; }
+.pk-opts button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--pk-line); font-size: 13px; }
+.pk-opts button[aria-pressed="true"] { background: var(--pk-ink); color: var(--pk-bg); border-color: var(--pk-ink); }
+.pk-opts button:disabled { opacity: 0.4; cursor: default; }
+.pk-opts button:focus-visible { outline: 2px solid currentColor; }
+.pk-picked { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--pk-line); border-radius: 10px; }
+.pk-picked > span { display: grid; }
+.pk-picked button { all: unset; cursor: pointer; font-size: 13px; text-decoration: underline; }
+.pk-hint { opacity: 0.7; font-size: 13px; }
+.lite .pk-chips button, .lite .pk-opts button { min-height: 32px; }
+@media (prefers-color-scheme: dark) {
+  .lite .pk { --pk-bg: #1a1a1a; --pk-ink: #f5f5f5; --pk-line: #404040; }
+}
+/* Talent pool (company portal) and the seeker's contact consent. */
+.sp-consent { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.sp-consent input { margin-top: 3px; flex: none; }
+.sp-consent > span { display: grid; gap: 2px; }
+.cp-app-row.tp-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+.tp-pages { justify-content: space-between; align-items: center; margin-top: 10px; }
+.tp-cands { flex: 1 1 100%; list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.tp-cands li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.tp-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.tp-why { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--text); }
