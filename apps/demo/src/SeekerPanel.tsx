@@ -7,8 +7,9 @@ import { LevelBar, Stars } from "./fair/Modal";
 import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
 import { readImageFile } from "./imageFile";
+import { canRecommend, recommendBooths, recommendJobs } from "./fair/recommend";
 
-export type SeekerTab = "profile" | "applications" | "stamps";
+export type SeekerTab = "profile" | "match" | "applications" | "stamps";
 
 const FIELDS: { key: keyof SeekerProfile; label: string; placeholder?: string; type?: string }[] = [
   { key: "name", label: "Nama lengkap" },
@@ -108,6 +109,7 @@ export function SeekerPanel({
           {(
             [
               ["profile", "👤 Profil"],
+              ["match", "✨ Cocok"],
               ["applications", `📋 Lamaran (${applications.length})`],
               ["stamps", `🏅 Stempel (${visited.size}/${booths.length})`],
             ] as const
@@ -338,6 +340,72 @@ export function SeekerPanel({
               </>
             ))}
 
+          {tab === "match" && (
+            <div className="sp-match">
+              {!canRecommend(profile) ? (
+                <p className="sp-empty">
+                  Isi <b>Status</b>, <b>Pendidikan</b> dan <b>Keahlian</b> di tab Profil, nanti di sini muncul lowongan dan stand yang paling cocok untukmu.{" "}
+                  <button type="button" className="small-btn" onClick={() => setTab("profile")}>
+                    Isi profil
+                  </button>
+                </p>
+              ) : (
+                (() => {
+                  const applied = new Set(applications.map((a) => a.jobId));
+                  const jobs = recommendJobs(profile, booths, applied, 8);
+                  const stands = recommendBooths(profile, booths, applied, 4);
+                  if (!jobs.length) return <p className="sp-empty">Belum ada lowongan yang cocok. Tambah keahlianmu di tab Profil supaya rekomendasinya lebih pas.</p>;
+                  return (
+                    <>
+                      <p className="sp-summary">Dipilih dari keahlian, pendidikan dan domisili di profilmu.</p>
+                      <h3 className="sp-h3">Lowongan</h3>
+                      <ul className="sp-list">
+                        {jobs.map((m) => (
+                          <li key={m.job.id} style={{ ["--c" as string]: m.booth.color }}>
+                            <span className="sp-logo">{m.booth.logo}</span>
+                            <span className="sp-main">
+                              <b>{m.job.title}</b>
+                              <span className="sp-muted">
+                                {m.booth.company} · {floors[m.booth.floor]?.name ?? ""} · {m.job.type} · {m.job.location}
+                              </span>
+                              <span className="sp-why">Cocok: {m.why.join(", ")}</span>
+                            </span>
+                            <span className="sp-links">
+                              <button type="button" onClick={() => onOpenJob(m.booth.id, m.job.id)}>
+                                Lihat & lamar
+                              </button>
+                              <button type="button" onClick={() => onGoTo(m.booth.id)}>
+                                Antar ke stand
+                              </button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <h3 className="sp-h3">Stand yang layak dikunjungi</h3>
+                      <ul className="sp-list">
+                        {stands.map((b) => (
+                          <li key={b.booth.id} style={{ ["--c" as string]: b.booth.color }}>
+                            <span className="sp-logo">{b.booth.logo}</span>
+                            <span className="sp-main">
+                              <b>{b.booth.company}</b>
+                              <span className="sp-muted">
+                                {b.booth.industry} · {floors[b.booth.floor]?.name ?? ""} · {b.jobs.length} lowongan cocok
+                              </span>
+                            </span>
+                            <span className="sp-links">
+                              <button type="button" onClick={() => onGoTo(b.booth.id)}>
+                                Antar ke stand
+                              </button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  );
+                })()
+              )}
+            </div>
+          )}
           {tab === "stamps" && (
             <>
               <p className="sp-summary">

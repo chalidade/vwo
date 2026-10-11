@@ -2485,6 +2485,22 @@ export class DemoJobFair {
     this.emit();
   }
 
+  /** Apply from the light list mode, without walking into the fair: the player is only present for
+   *  the moment it takes, and nobody sees them arrive or leave. */
+  applyFromList(name: string, input: Parameters<DemoJobFair["apply"]>[1]) {
+    const had = this.visitors.get(PLAYER_ID);
+    if (!had) {
+      const { x, y } = this.fair.spawn;
+      const floorId = this.stops[0]?.floorId ?? this.floors[0]!.id;
+      this.visitors.set(PLAYER_ID, { memberId: PLAYER_ID, visitId: PLAYER_ID, displayName: name, memberType: "host", floorId, x, y, facing: "back", isBot: false, arrivedAt: this.now(), verified: !!this.player.verified });
+    }
+    try {
+      return this.apply(PLAYER_ID, input);
+    } finally {
+      if (!had) this.visitors.delete(PLAYER_ID);
+    }
+  }
+
   apply(
     visitorId: string,
     input: { id?: string; boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string; photo?: string },
