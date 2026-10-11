@@ -3,10 +3,10 @@ import { type BoothTheme, type CompanyBooth, type GateStyle, hasStand, MINI_MAX_
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
-import { FileSpreadsheet } from "lucide-react";
+import { ArrowLeftRight, FileSpreadsheet, MoveRight } from "lucide-react";
 import { ACCESSORY_PRODUCTS, LAPOR_LABEL, coinText, rupiah } from "../fair/company";
 import { LIVE } from "../mode";
-import { boothMembers, removeBoothMember } from "../server-fair";
+import { boothMembers, moveStandOnServer, removeBoothMember } from "../server-fair";
 import { fair } from "../useFair";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#334155"];
@@ -21,7 +21,9 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
   const [adding, setAdding] = useState<Slot | null>(null);
   const [config, setConfig] = useState<string | null>(null);
   const [people, setPeople] = useState<string | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
   const configuring = config ? fair.booth(config) : undefined;
+  const movingBooth = moving ? fair.booth(moving) : undefined;
   const floors = fair.fair.floors;
   const removed = fair.removedBooths();
   const free = fair.freeSlots();
@@ -82,6 +84,9 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                     <span className="org-slot-tools">
                       <button type="button" className="small-btn" onClick={() => setConfig(b.id)}>
                         Atur
+                      </button>
+                      <button type="button" className="small-btn ghost" onClick={() => setMoving(b.id)}>
+                        Pindah
                       </button>
                       <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`} onClick={() => !LIVE && sessionLogin(b.id)}>
                         Portal
@@ -229,6 +234,16 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
           }}
         />
       )}
+      {movingBooth && (
+        <MoveStand
+          booth={movingBooth}
+          onClose={() => setMoving(null)}
+          onDone={(text) => {
+            setMoving(null);
+            onToast(text);
+          }}
+        />
+      )}
       {adding && (
         <AddBooth
           slot={adding}
@@ -310,6 +325,131 @@ function AddBooth({ slot, onClose, onDone }: { slot: Slot; onClose: () => void; 
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/** What to tell the organiser when a move failed. */
+function moveErrorText(error: string) {
+  switch (error) {
+    case "not_allowed":
+    case "not_signed_in":
+      return "Hanya panitia yang bisa memindahkan stand. Masuk lagi dengan akun panitia.";
+    case "invalid_slot":
+      return "Tempat itu tidak ada lagi. Muat ulang halaman lalu pilih tempat lain.";
+    case "same_slot":
+      return "Stand sudah ada di tempat itu.";
+    case "not_found":
+      return "Stand ini sudah tidak ada di acara.";
+    case "too_many_requests":
+      return "Terlalu banyak perpindahan dalam waktu singkat. Coba lagi sebentar lagi.";
+    case "offline":
+      return "Tidak tersambung ke server. Periksa internet lalu coba lagi.";
+    default:
+      return "Stand gagal dipindah. Coba lagi.";
+  }
+}
+
+/**
+ * Move a stand to another slot, on its floor or another booth floor: a small map of every floor's
+ * six slots. A free slot moves the stand there; a taken one swaps the two stands. The booth's
+ * applicants, promoter, media and VIP SPG go with it, and visitors pay the new floor's entry price.
+ */
+function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: () => void; onDone: (text: string) => void }) {
+  const [to, setTo] = useState<{ floor: number; slot: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const here = { floor: booth.floor, slot: BOOTH_SLOTS.findIndex((s) => s.x === booth.x && s.y === booth.y) };
+  const other = to ? fair.standAt(to.floor, to.slot) : undefined;
+  const floorName = (i: number) => `${fair.fair.floors[i]?.name ?? ""} · ${fair.fair.floors[i]?.theme ?? ""}`;
+  const priceOf = (i: number) => fair.floorPrice(fair.floorIdOf({ floor: i }));
+  const move = async () => {
+    if (!to) return;
+    setBusy(true);
+    setError("");
+    const r = LIVE ? await moveStandOnServer(booth.id, to.floor, to.slot) : fair.moveStand(booth.id, to.floor, to.slot);
+    setBusy(false);
+    if ("ok" in r && !r.ok) return setError(moveErrorText(r.error));
+    if ("error" in r) return setError(moveErrorText(r.error));
+    // Live: the server's answer is the truth; every visitor's game takes it on its next pull.
+    if ("data" in r) fair.setPlacements(r.data.placements);
+    const place = `${fair.fair.floors[to.floor]?.name}, ${SLOT_NAMES[to.slot]?.toLowerCase()}`;
+    onDone(other ? `Stand ${booth.company} dan ${other.company} bertukar tempat` : `Stand ${booth.company} dipindah ke ${place}`);
+  };
+  return (
+    <div className="cp-modal org-move-wrap" onClick={onClose}>
+      <div className="card org-move" role="dialog" aria-label={`Pindahkan stand ${booth.company}`} onClick={(e) => e.stopPropagation()}>
+        <h2 className="cp-h2">Pindahkan stand {booth.company}</h2>
+        <p className="muted small org-move-help">
+          Sekarang di {fair.fair.floors[booth.floor]?.name}, {SLOT_NAMES[here.slot]?.toLowerCase()}. Pilih tempat kosong untuk memindah, atau stand lain untuk bertukar tempat.
+          Pelamar, promotor, video, dan dekorasi ikut pindah.
+        </p>
+        <div className="org-move-floors">
+          {fair.fair.floors.map((_, floor) => {
+            const price = priceOf(floor);
+            return (
+              <section key={floor} className="org-move-floor">
+                <div className="org-move-head">
+                  <b className="small">{floorName(floor)}</b>
+                  <span className="org-move-price muted small">{price ? `Masuk ${price} koin` : "Gratis"}</span>
+                </div>
+                <div className="org-move-grid" role="radiogroup" aria-label={floorName(floor)}>
+                  {BOOTH_SLOTS.map((_, slot) => {
+                    const b = fair.standAt(floor, slot);
+                    const current = floor === here.floor && slot === here.slot;
+                    const picked = to?.floor === floor && to.slot === slot;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        role="radio"
+                        aria-checked={picked}
+                        className="org-move-cell"
+                        data-state={current ? "here" : b ? "taken" : "free"}
+                        data-picked={picked ? "" : undefined}
+                        disabled={current || busy}
+                        title={SLOT_NAMES[slot]}
+                        aria-label={`${SLOT_NAMES[slot]}: ${current ? "posisi sekarang" : b ? b.company : "kosong"}`}
+                        style={b ? { ["--c" as string]: b.color } : undefined}
+                        onClick={() => setTo({ floor, slot })}
+                      >
+                        <span className="org-move-name">{current ? "Di sini" : b ? b.company : "Kosong"}</span>
+                        <span className="org-move-slot">{SLOT_NAMES[slot]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+        {to && (
+          <p className="small org-move-plan">
+            {other ? (
+              <>
+                <ArrowLeftRight size={14} aria-hidden /> {booth.company} dan {other.company} bertukar tempat: {other.company} pindah ke {fair.fair.floors[here.floor]?.name},{" "}
+                {SLOT_NAMES[here.slot]?.toLowerCase()}.
+              </>
+            ) : (
+              <>
+                <MoveRight size={14} aria-hidden /> {booth.company} pindah ke {fair.fair.floors[to.floor]?.name}, {SLOT_NAMES[to.slot]?.toLowerCase()}.
+              </>
+            )}
+            {to.floor !== here.floor && priceOf(to.floor) !== priceOf(here.floor)
+              ? ` Pengunjung membayar harga masuk ${fair.fair.floors[to.floor]?.name}: ${priceOf(to.floor) ? `${priceOf(to.floor)} koin` : "gratis"}.`
+              : ""}
+          </p>
+        )}
+        {error && <p className="bk-err small">{error}</p>}
+        <div className="row">
+          <button type="button" disabled={!to || busy} onClick={() => void move()}>
+            {busy ? "Memindah…" : other ? "Tukar tempat" : "Pindahkan"}
+          </button>
+          <button type="button" className="ghost" onClick={onClose}>
+            Batal
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
