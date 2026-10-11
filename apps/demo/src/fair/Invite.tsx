@@ -1,34 +1,16 @@
 import type { FairApplication } from "../jobfair-engine";
 import { BoothLogo } from "@vwo/ui";
 import { fair } from "../useFair";
+import { calendarHref } from "./calendar";
 import { Modal } from "./Modal";
 
-const ics = (t: number) => new Date(t).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-
 /** A calendar file for the interview, so the applicant can keep it in their own calendar. */
-function calendarHref(a: FairApplication) {
+function interviewHref(a: FairApplication) {
   const iv = a.interview!;
   return calendarFile(a, iv.at, `Interview ${a.jobTitle} · ${a.company}`, iv.place || iv.mode, iv.note || `Interview via ${iv.mode}`);
 }
 
-function calendarFile(a: FairApplication, at: number, summary: string, location: string, description: string) {
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//jobfair//ID",
-    "BEGIN:VEVENT",
-    `UID:${a.id}@vwo.example`,
-    `DTSTAMP:${ics(Date.now())}`,
-    `DTSTART:${ics(at)}`,
-    `DTEND:${ics(at + 45 * 60_000)}`,
-    `SUMMARY:${summary.replace(/[,;\n]/g, " ")}`,
-    `LOCATION:${location.replace(/[,;\n]/g, " ")}`,
-    `DESCRIPTION:${description.replace(/[,;\n]/g, " ")}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ];
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
-}
+const calendarFile = (a: FairApplication, at: number, summary: string, location: string, description: string) => calendarHref({ uid: a.id, at, minutes: 45, summary, location, description });
 
 /** The invitation the applicant sees when a company schedules (or moves) an interview. */
 export function InviteCard({ application: a, onOpen, onClose }: { application: FairApplication; onOpen: () => void; onClose: () => void }) {
@@ -82,7 +64,7 @@ export function InviteCard({ application: a, onOpen, onClose }: { application: F
         )}
       </div>
       <div className="iv-actions">
-        <a className="small-btn ghost" href={calendarHref(a)} download={`interview-${a.company}.ics`}>
+        <a className="small-btn ghost" href={interviewHref(a)} download={`interview-${a.company}.ics`}>
           🗓️ Simpan ke kalender
         </a>
         <button type="button" className="mb-order jb-apply" onClick={onOpen}>

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import type { FairStop } from "@vwo/shared";
+import { type FairStop, remindDayFor, wibDay, wibTime } from "@vwo/shared";
 import type { AulaEvent } from "../jobfair-engine";
 import { fair } from "../useFair";
+import { calendarHref } from "./calendar";
 import { Modal } from "./Modal";
 
 export type AulaTab = "jadwal" | "info" | "meet";
@@ -14,6 +15,37 @@ const FAQ = [
   { q: "Kapan HR menghubungi saya?", a: "HR bisa membalas chat, menelepon, atau mengirim undangan interview. Semuanya muncul di lonceng notifikasi 🔔." },
   { q: "Di mana mendapat e-sertifikat seminar?", a: "Tonton seminar di Ruang Seminar sampai selesai, sertifikatnya masuk ke profilmu." },
 ];
+
+/** "Ingatkan saya" and "Simpan ke kalender" for one rundown item: today's while it is still to come, else tomorrow's. */
+function RemindButtons({ e }: { e: AulaEvent }) {
+  const now = Date.now();
+  const on = fair.remindedOn(e.id);
+  const day = on ?? remindDayFor(e, now);
+  const at = wibTime(day, e.start);
+  const end = wibTime(day, e.end);
+  if (at === null) return null;
+  const when = day === wibDay(now) ? "hari ini" : "besok";
+  const toggle = () => {
+    const d = fair.toggleAulaReminder(e.id);
+    fair.notices.push(d ? `🔔 Kamu akan diingatkan: ${e.title}, ${when} jam ${e.start} WIB` : `🔕 Pengingat ${e.title} dimatikan`);
+  };
+  return (
+    <span className="au-remind">
+      <button type="button" className="small-btn ghost" data-on={on ? "" : undefined} aria-pressed={!!on} onClick={toggle} title={on ? `Diingatkan ${when}. Ketuk untuk batal.` : `Ingatkan saya ${when}, 1 jam dan 10 menit sebelumnya`}>
+        {on ? "🔔 Diingatkan" : "🔕 Ingatkan saya"}
+      </button>
+      <a
+        className="small-btn ghost"
+        href={calendarHref({ uid: `aula-${e.id}-${day}`, at, minutes: end !== null && end > at ? (end - at) / 60_000 : 60, summary: e.title, location: e.place || "Panggung Aula · Lantai 1 · jobfair.co.id", description: `${KIND[e.kind]} bersama ${e.host} di job fair` })}
+        download={`acara-${e.id}.ics`}
+        title={`Simpan ke kalender (${when})`}
+        aria-label={`Simpan ${e.title} ke kalender`}
+      >
+        🗓️
+      </a>
+    </span>
+  );
+}
 
 /** The Aula's boards: today's rundown, the building and FAQ, and the meeting point. */
 export function AulaBoard({ tab: start, stops, onClose, onGo }: { tab: AulaTab; stops: FairStop[]; onClose: () => void; onGo?: (s: FairStop) => void }) {
@@ -64,6 +96,7 @@ export function AulaBoard({ tab: start, stops, onClose, onGo }: { tab: AulaTab; 
                     {e.place ? ` · ${e.place}` : " · Panggung Aula"}
                   </span>
                 </span>
+                <RemindButtons e={e} />
               </li>
             ))}
           </ol>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   type AvatarState,
   COIN_STAND_SPOTS,
@@ -97,6 +97,7 @@ import { BookStand } from "./fair/BookStand";
 import { RentStall } from "./fair/RentStall";
 import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
 import { AulaBoard, type AulaTab } from "./fair/Aula";
+import { useReminderAlerts } from "./fair/reminders";
 import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
@@ -386,6 +387,14 @@ export function JobFair() {
   useEffect(() => {
     if (!inviteId && fair.interviewAlerts.length) setInviteId(fair.interviewAlerts.shift()!);
   });
+
+  // An hour and ten minutes before an interview, office visit or reminded Aula item: queued with the other toasts.
+  const [, kick] = useReducer((n: number) => n + 1, 0);
+  const remindToast = useCallback((text: string) => {
+    fair.notices.push(text);
+    kick();
+  }, []);
+  useReminderAlerts(!!session, remindToast);
 
   // Level-ups and company ratings arrive from the engine; show them one at a time.
   useEffect(() => {

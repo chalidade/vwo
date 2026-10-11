@@ -4,7 +4,7 @@ import { usePush } from "./push";
 export function PushCard({ who }: { who: "seeker" | "company" }) {
   const { state, enable, disable } = usePush();
   if (state === "unsupported" || state === "off" || state === "busy") return null;
-  const what = who === "company" ? "lamaran baru dan balasan pelamar" : "balasan HR, undangan interview, dan ajakan berteman";
+  const what = who === "company" ? "lamaran baru dan balasan pelamar" : "balasan HR, undangan dan pengingat interview, dan ajakan berteman";
   return (
     <div className="push-card" data-on={state === "on" ? "" : undefined}>
       {state === "on" ? (

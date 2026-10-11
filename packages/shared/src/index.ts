@@ -9,3 +9,5 @@ export * from "./auth";
 export * from "./fair-api";
 export * from "./pricing";
 export * from "./coin-rules";
+export * from "./aula";
+export * from "./reminders";
