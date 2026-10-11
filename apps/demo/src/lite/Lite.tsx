@@ -11,6 +11,7 @@ import { fair, useFair } from "../useFair";
 import { WalletPanel } from "../fair/Wallet";
 import { type ReferralInfo, inviteLink, inviteText, loadReferral } from "../fair/viral";
 import { type JobMatch, canRecommend, recommendBooths, recommendJobs } from "../fair/recommend";
+import { RegionPicker, SkillPicker } from "../pickers";
 
 const TYPES = ["Semua", "Full-time", "Kontrak", "Magang", "Part-time"] as const;
 
@@ -430,8 +431,8 @@ function ProfileForm({ profile, onSave }: { profile: SeekerProfile; onSave: (p: 
     >
       {field("headline", "Status", "Fresh graduate Akuntansi")}
       {field("education", "Pendidikan", "S1 Akuntansi, 2025")}
-      {field("skills", "Keahlian", "Excel, pajak, laporan keuangan", "Pisahkan dengan koma.")}
-      {field("city", "Domisili", "Surabaya")}
+      <SkillPicker value={p.skills} onChange={(skills) => setP((was) => ({ ...was, skills }))} />
+      <RegionPicker value={p.city} onChange={(city) => setP((was) => ({ ...was, city }))} />
       {field("campus", "Kampus / sekolah", "Universitas Airlangga")}
       <button type="submit" className="lite-btn">
         Simpan
