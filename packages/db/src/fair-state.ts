@@ -45,3 +45,21 @@ export async function addFairStateLocked(db: Db, lock: string, userId: string, d
     return doc;
   });
 }
+
+/**
+ * Change one document under a lock: `change` gets what is stored (null when nothing is) and returns
+ * the new document, or null to leave it as it is. Two organisers changing it at once take turns.
+ */
+export async function updateFairStateLocked<T>(db: Db, key: string, userId: string, change: (data: unknown) => T | null) {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fair:" + key}))`);
+    const [row] = await tx.select({ data: fairState.data }).from(fairState).where(eq(fairState.key, key));
+    const next = change(row ? row.data : null);
+    if (next === null) return null;
+    await tx
+      .insert(fairState)
+      .values({ key, data: next, updatedBy: userId })
+      .onConflictDoUpdate({ target: fairState.key, set: { data: next, updatedBy: userId, updatedAt: sql`now()` } });
+    return next;
+  });
+}

@@ -1,4 +1,5 @@
-import { boothsOf, readFairState, writeFairState } from "@vwo/db";
+import { boothsOf, readFairState, readFairStateKey, writeFairState } from "@vwo/db";
+import { ANNOUNCE_KEY, cleanBoard, currentAnnouncement } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { guardCompanyDoc } from "@/lib/company-doc";
 import { db } from "@/lib/db";
@@ -30,6 +31,7 @@ export async function GET() {
   const companies: Record<string, Doc> = {};
   const bookings: Doc[] = [];
   const stalls: unknown[] = [];
+  let board: ReturnType<typeof cleanBoard> | null = null;
   let version = 0;
   for (const r of rows) {
     // A booth's inbox read marks are that company's alone (see booths/[booth]/inbox).
@@ -38,7 +40,9 @@ export async function GET() {
     if (r.key.startsWith("billing:")) continue;
     version = Math.max(version, r.updatedAt.getTime());
     const data = r.data as Doc;
-    if (r.key === "org") {
+    if (r.key === ANNOUNCE_KEY) {
+      board = cleanBoard(r.data);
+    } else if (r.key === "org") {
       const { pins, bookings: _b, ...rest } = data;
       org = admin ? data : rest;
     } else if (r.key.startsWith("booking:")) {
@@ -52,6 +56,12 @@ export async function GET() {
       const { invoices, ...rest } = data;
       companies[id] = admin || mine.has(id) ? data : { ...rest, invoices: [] };
     }
+  }
+  // Announcements live in their own document; the copy in the old setup only counts until the first change.
+  if (board) {
+    const { announcement: _a, ...rest } = org ?? { removed: [], added: [] };
+    const now = currentAnnouncement(board);
+    org = { ...rest, ...(now ? { announcement: { text: now.text, at: now.at } } : {}), ...(admin ? { announcements: board } : {}) };
   }
   return NextResponse.json({ org, companies, bookings, stalls, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -75,7 +85,14 @@ export async function PUT(req: Request) {
   const booth = body.key.startsWith("company:") ? body.key.slice("company:".length) : null;
   if (!admin && !(booth && (await canManageBooth(user, booth)))) return fail(403, "not_allowed");
   // A company's own save can't mark bills paid or unlock products; only confirmed payments do.
-  const data = admin || !booth ? body.data : await guardCompanyDoc(booth, body.data as Parameters<typeof guardCompanyDoc>[1]);
+  let data = admin || !booth ? body.data : await guardCompanyDoc(booth, body.data as Parameters<typeof guardCompanyDoc>[1]);
+  if (body.key === "org") {
+    // Announcements are changed only through their own API: an older copy of the setup pushed from
+    // some browser must not bring one back. The setup keeps whatever it had stored before.
+    const { announcement: _a, announcements: _b, ...rest } = data as Doc;
+    const stored = (await readFairStateKey(db, "org"))?.data as Doc | undefined;
+    data = stored?.announcement ? { ...rest, announcement: stored.announcement } : rest;
+  }
   await writeFairState(db, { key: body.key, data, userId: user.id });
   return NextResponse.json({ ok: true });
 }

@@ -52,7 +52,9 @@ export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
 
   const local = () => {
     const s = fair.sharedState();
-    const m = new Map<string, string>([["org", JSON.stringify(s.org)]]);
+    // Announcements have their own API; the server ignores them in the setup, so they never count as a change to push.
+    const { announcement: _a, announcements: _b, ...org } = s.org;
+    const m = new Map<string, string>([["org", JSON.stringify(org)]]);
     for (const [id, c] of Object.entries(s.companies)) m.set(`company:${id}`, JSON.stringify(c));
     return m;
   };

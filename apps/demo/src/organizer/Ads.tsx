@@ -1,8 +1,10 @@
-import { Trash2 } from "lucide-react";
+import { Eye, EyeOff, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { Promoter, SponsorView } from "@vwo/shared";
+import { currentAnnouncement, type Promoter, type SponsorView } from "@vwo/shared";
 import { ACCESSORY_PRODUCTS, FEATURED_PRODUCT, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
 import { STAND_PRICES } from "../jobfair-engine";
+import { LIVE } from "../mode";
+import { announceOp, type AnnounceOp } from "../server-fair";
 import { fair } from "../useFair";
 
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
@@ -16,10 +18,8 @@ const lines = (s: string) =>
 export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const [editing, setEditing] = useState<Promoter | null>(null);
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
-  const [note, setNote] = useState("");
   const promoters = fair.allPromoters();
   const companyPromoters = fair.fair.promoters.filter((p) => p.boothId);
-  const ann = fair.org.announcement;
   const floorName = (level: number) => fair.stops.find((s) => s.level === level)?.name ?? `Lantai ${level + 1}`;
   const stalls = fair.fair.rooms.flatMap((r) => r.stalls ?? []);
   const decor = [...fair.ads.entries()].filter(([k]) => k.startsWith("acc:"));
@@ -34,7 +34,12 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const owners = (id: string) => [...fair.company.values()].filter((c) => c.owned.includes(id)).length;
   const rates = [
     { name: "Paket mini UMKM", price: STAND_PRICES.mini, sold: fair.fair.booths.filter((b) => b.tier === "mini").length, note: "Tanpa stand, 1 lowongan" },
-    { name: "Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium" && b.tier !== "mini").length, note: `${fair.freeSlots().length} stand kosong` },
+    {
+      name: "Stand reguler",
+      price: STAND_PRICES.regular,
+      sold: fair.fair.booths.filter((b) => b.tier !== "premium" && b.tier !== "mini").length,
+      note: `${fair.freeSlots().length} stand kosong`,
+    },
     { name: "Stand VIP", price: STAND_PRICES.premium, sold: fair.fair.booths.filter((b) => b.tier === "premium").length + owners(VIP_PRODUCT.id) },
     { name: `${PROMOTER_PRODUCT.emoji} ${PROMOTER_PRODUCT.name}`, price: PROMOTER_PRODUCT.price, sold: owners(PROMOTER_PRODUCT.id) },
     { name: `${FEATURED_PRODUCT.emoji} ${FEATURED_PRODUCT.name}`, price: FEATURED_PRODUCT.price, sold: owners(FEATURED_PRODUCT.id) },
@@ -92,38 +97,16 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
           </b>
         </div>
         <p className="muted small" style={{ marginBottom: 0 }}>
-          Yang keliling: {promoters.filter((p) => p.walks && p.active !== false).slice(0, limit).map((p) => p.brand).join(", ") || "tidak ada"}
+          Yang keliling:{" "}
+          {promoters
+            .filter((p) => p.walks && p.active !== false)
+            .slice(0, limit)
+            .map((p) => p.brand)
+            .join(", ") || "tidak ada"}
           {companyPromoters.length > 0 && ` · plus ${companyPromoters.length} promotor perusahaan`}. Urutan mengikuti daftar promotor di bawah.
         </p>
       </div>
-      <div className="card" id="ad-announce">
-        <h2 className="cp-h2">Pengumuman ke semua pengunjung</h2>
-        {ann && (
-          <p className="org-ann">
-            <b>Sedang tampil:</b> {ann.text} <span className="muted small">· {new Date(ann.at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
-          </p>
-        )}
-        <form
-          className="org-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!note.trim()) return;
-            fair.announce(note);
-            setNote("");
-            onToast("Pengumuman dikirim");
-          }}
-        >
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Contoh: Walk-in interview PT Contoh dibuka jam 13.00 di Lantai 2" />
-          <button type="submit" disabled={!note.trim()}>
-            Kirim
-          </button>
-          {ann && (
-            <button type="button" className="ghost" onClick={() => fair.announce("")}>
-              Hapus
-            </button>
-          )}
-        </form>
-      </div>
+      <AnnounceCard onToast={onToast} />
 
       <HallBannerCard onToast={onToast} />
 
@@ -136,7 +119,9 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
             ＋ Tambah promotor
           </button>
         </div>
-        <p className="muted small">Promotor berdiri di satu titik dan menyapa yang lewat. Promotor keliling berjalan di lantainya dan mendatangi pengunjung untuk menawarkan promo.</p>
+        <p className="muted small">
+          Promotor berdiri di satu titik dan menyapa yang lewat. Promotor keliling berjalan di lantainya dan mendatangi pengunjung untuk menawarkan promo.
+        </p>
         <ul className="org-cards">
           {promoters.map((p) => {
             const a = fair.ads.get(`promo:${p.id}`);
@@ -161,7 +146,12 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
                   <button type="button" className="small-btn ghost" onClick={() => setEditing(p)}>
                     Ubah
                   </button>
-                  <button type="button" className="small-btn ghost" onClick={() => confirm(`Hapus promotor ${p.brand}?`) && fair.removePromoter(p.id)} aria-label={`Hapus ${p.brand}`}>
+                  <button
+                    type="button"
+                    className="small-btn ghost"
+                    onClick={() => confirm(`Hapus promotor ${p.brand}?`) && fair.removePromoter(p.id)}
+                    aria-label={`Hapus ${p.brand}`}
+                  >
                     <Trash2 size={16} aria-hidden />
                   </button>
                 </span>
@@ -518,13 +508,134 @@ function HallBannerCard({ onToast }: { onToast: (t: string) => void }) {
         {floors.map((f, i) => (
           <label key={i}>
             Baris kedua · {f.name.split("·")[0]!.trim()}
-            <input value={subs[i] ?? ""} onChange={(e) => setSubs(subs.map((x, j) => (j === i ? e.target.value : x)))} maxLength={70} placeholder={fair.floors[i]?.name ?? f.name} />
+            <input
+              value={subs[i] ?? ""}
+              onChange={(e) => setSubs(subs.map((x, j) => (j === i ? e.target.value : x)))}
+              maxLength={70}
+              placeholder={fair.floors[i]?.name ?? f.name}
+            />
           </label>
         ))}
         <div className="row cp-span">
           <button type="submit">Simpan banner</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+const timeText = (at: number) => new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+/**
+ * The organiser's announcement to everyone in the hall, and the ones sent before. On the live site
+ * every step goes to the server at once, so taking one down reaches every visitor on their next sync.
+ */
+function AnnounceCard({ onToast }: { onToast: (t: string) => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const board = fair.announcementBoard();
+  const now = currentAnnouncement(board);
+  const run = async (op: AnnounceOp, done: string) => {
+    setError("");
+    if (!LIVE) {
+      if (op.op === "post") fair.announce(op.text);
+      else if (op.op === "hide") fair.announce("");
+      else if (op.op === "repost") fair.repostAnnouncement(op.id);
+      else fair.removeAnnouncement(op.id);
+      onToast(done);
+      return true;
+    }
+    setBusy(true);
+    const r = await announceOp(op);
+    setBusy(false);
+    if (!r.ok) {
+      setError(
+        r.error === "not_allowed"
+          ? "Hanya panitia yang bisa mengubah pengumuman."
+          : r.error === "offline"
+            ? "Tidak tersambung ke server. Coba lagi."
+            : "Gagal menyimpan. Coba lagi.",
+      );
+      return false;
+    }
+    fair.setAnnounceBoard(r.data.board);
+    onToast(done);
+    return true;
+  };
+  return (
+    <div className="card" id="ad-announce">
+      <h2 className="cp-h2">Pengumuman ke semua pengunjung</h2>
+      {now ? (
+        <div className="org-ann ann-now">
+          <span>
+            <b>Sedang tampil:</b> {now.text} <span className="muted small">· {timeText(now.at)}</span>
+          </span>
+          <button type="button" className="small-btn ghost" disabled={busy} onClick={() => void run({ op: "hide" }, "Pengumuman diturunkan dari layar pengunjung")}>
+            <EyeOff size={14} aria-hidden /> Hapus dari layar
+          </button>
+        </div>
+      ) : (
+        <p className="muted small" style={{ marginTop: 0 }}>
+          Tidak ada pengumuman yang tampil.
+        </p>
+      )}
+      <form
+        className="org-row"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!note.trim()) return;
+          if (await run({ op: "post", text: note.trim() }, "Pengumuman dikirim")) setNote("");
+        }}
+      >
+        <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Contoh: Walk-in interview PT Contoh dibuka jam 13.00 di Lantai 2" />
+        <button type="submit" disabled={!note.trim() || busy}>
+          Kirim
+        </button>
+      </form>
+      {error && <p className="bk-err">{error}</p>}
+      {board.history.length > 0 && (
+        <>
+          <h3 className="cp-h3 ann-h">Riwayat pengumuman</h3>
+          <ul className="ann-list">
+            {board.history.map((a) => (
+              <li key={a.id} className="ann-item" data-on={a.id === board.current ? "" : undefined}>
+                <span className="ann-text">
+                  {a.text}
+                  <span className="muted small">
+                    {" "}
+                    · {timeText(a.at)}
+                    {a.id === board.current && " · sedang tampil"}
+                  </span>
+                </span>
+                <span className="ann-tools">
+                  {a.id !== board.current && (
+                    <button type="button" className="small-btn ghost" disabled={busy} onClick={() => void run({ op: "repost", id: a.id }, "Pengumuman ditampilkan lagi")}>
+                      <RotateCcw size={14} aria-hidden /> Tampilkan lagi
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="small-btn ghost"
+                    disabled={busy}
+                    aria-label={`Hapus pengumuman: ${a.text}`}
+                    onClick={() => {
+                      if (!confirm(a.id === board.current ? "Hapus pengumuman ini? Pengumuman juga hilang dari layar pengunjung." : "Hapus pengumuman ini dari riwayat?")) return;
+                      void run({ op: "remove", id: a.id }, "Pengumuman dihapus");
+                    }}
+                  >
+                    <Trash2 size={14} aria-hidden /> Hapus
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            <Eye size={12} aria-hidden /> Yang tampil muncul sebagai pesan di layar setiap pengunjung sampai mereka menutupnya. Dihapus atau diturunkan, pesannya hilang dari semua
+            pengunjung dalam setengah menit.
+          </p>
+        </>
+      )}
     </div>
   );
 }
