@@ -2402,3 +2402,54 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
   border-top: 1px dashed var(--line);
   overflow-wrap: anywhere;
 }
+/* ======================================================================
+   mobile-polish: phone fixes. List rows stack (text full width, actions
+   below), titles wrap, the KPI strip keeps its gutter, popups sit above the
+   dashboard tab bar, and the game's floating buttons clear its bottom menu.
+   ====================================================================== */
+/* Rows of a list: buttons keep their label on one line and wrap as a group. */
+.cp-job-tools, .org-card-tools { flex-wrap: wrap; align-items: center; }
+.cp-job-tools > :is(button, a), .org-card-tools > :is(button, a) { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .cp-jobs li > :first-child { flex: 1 1 100%; }
+  .cp-job-tools { flex: 1 1 100%; gap: 4px; }
+  .app-dash .cp-job-tools > :is(button, a) { padding: 6px 8px; font-size: 13px; }
+  .org-card-tools { justify-content: flex-start; }
+}
+/* Tables: tighter cells, a readable first column, and figures that never break mid-number (wide ones scroll in .org-scroll). */
+@media (max-width: 640px) {
+  .app-dash table.list :is(th, td) { padding: 8px 6px; }
+  .app-dash table.cp-table td:first-child { min-width: 9em; }
+  .app-dash table.cp-table td:not(:first-child) { white-space: nowrap; }
+}
+/* Koin & belanja: the product text next to its icon, the price and checkbox on a row below it. */
+@media (max-width: 560px) {
+  .bl-line { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px 12px; align-items: start; }
+  .bl-line > :not(.bl-emoji, .bl-line-main) { grid-column: 2; justify-self: start; }
+  .bl-line > .bl-pick, .bl-row-end > .bl-pick { justify-self: stretch; justify-content: space-between; }
+  .bl-row-end > * { flex: 1; }
+  .bl-wallet-head > div:first-child { flex-basis: 100%; min-width: 0; }
+  .bl-history li { grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; }
+  .bl-history li > :first-child { grid-column: 1 / -1; font-size: 12px; }
+}
+@media (max-width: 900px) {
+  /* The full section name wraps instead of ending in "…". */
+  .dash-title { white-space: normal; overflow: visible; text-overflow: clip; font-size: clamp(24px, 7.6vw, 32px); overflow-wrap: break-word; text-wrap: balance; }
+  .dash-crumb { white-space: normal; }
+  /* Snap the first KPI tile to the gutter, not to the screen edge. */
+  .app-dash .cp-kpis { scroll-padding-inline: 16px; }
+  /* Toasts above the tab bar. */
+  .app-dash .cp-toast { bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 75; }
+}
+/* Dashboard popups cover the tab bar and scroll inside the screen, so their last button is reachable. */
+:where(.app-dash) .cp-modal { z-index: 70; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+:where(.app-dash .cp-modal) > .card { max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow: auto; overscroll-behavior: contain; }
+
+/* Game: the bottom menu above the home indicator; the action button ("Ngobrol dengan recruiter",
+   "Lihat lowongan", "Naik lift"...) and toasts above the menu's measured height (--fair-nav). */
+.game-fair .hud-bl { bottom: calc(12px + env(safe-area-inset-bottom)); }
+.game-fair .hud-bottom { bottom: calc(var(--fair-nav, 76px) + 8px); }
+.game-fair .toast { bottom: calc(var(--fair-nav, 76px) + 60px); }
+@media (max-width: 640px) { .game-fair .hud-bl { bottom: calc(8px + env(safe-area-inset-bottom)); } }
+/* Game popups: above the menu (z-index), clear of the home indicator. */
+.game .mb-backdrop { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
