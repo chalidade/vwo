@@ -25,3 +25,4 @@ export * from "./fair-booth-hooks";
 export * from "./fair-invoices";
 export * from "./fair-pool";
 export * from "./booth-reports";
+export * from "./anomaly";

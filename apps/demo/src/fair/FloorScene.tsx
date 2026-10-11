@@ -1,8 +1,10 @@
 import { fairFloorIndex, hasStand, infoDeskOn } from "@vwo/shared";
-import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
+import { CafeScene, anomalyExtras, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import { staffLook } from "./staff-look";
 import { levelOf } from "./content";
 import { fair } from "../useFair";
+import { startAnomalies, useAnomaly } from "../anomaly-sync";
+import { useEffect } from "react";
 
 /** One floor of the job fair as everyone on it sees it, without a player: the organiser's live view
  *  and the home page preview. The caller re-renders it (useFair) so people keep walking. */
@@ -11,6 +13,8 @@ export function FloorScene({ floorId, className }: { floorId: string; className?
   const floor = fair.floor(stop.floorId);
   const room = fair.roomOf(floor.id);
   const hall = fairFloorIndex(floor.id);
+  const anomaly = useAnomaly();
+  useEffect(() => startAnomalies(), []);
   return (
     <CafeScene
       className={className}
@@ -25,6 +29,7 @@ export function FloorScene({ floorId, className }: { floorId: string; className?
       npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || fair.fair.promoters.find((p) => s.id.endsWith(p.id))?.color || "#1e3a8a") }))}
       bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
       extras={[
+        ...(anomaly?.floorId === floor.id ? anomalyExtras({ ...anomaly, claimed: anomaly.claimed?.coins }) : []),
         ...liftExtras(stop.name, fair.stops),
         ...infoDeskExtras(infoDeskOn(fair.fair, floor.id)),
         ...fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks).flatMap((p) => promoterExtras(p)),

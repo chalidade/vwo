@@ -31,6 +31,7 @@ import {
   loungeSpot,
   safeImage,
   vipSeatBooth,
+  anomalyRewardText,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -58,6 +59,7 @@ import {
   type StageScreen,
   lookFor,
   sponsorExtras,
+  anomalyExtras,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
 import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
@@ -107,6 +109,7 @@ import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
 import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
 import { fair, useFair } from "./useFair";
+import { claimAnomaly, startAnomalies, useAnomaly } from "./anomaly-sync";
 
 interface Session {
   visitorId: string;
@@ -198,6 +201,10 @@ export function JobFair() {
   const character = account ? loadCharacter() : null;
   const [editLook, setEditLook] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** A cat, fireflies or another surprise somewhere in the building (the server says which and where). */
+  const anomaly = useAnomaly();
+  const catching = useRef(false);
+  useEffect(() => startAnomalies(), []);
   const [inviteId, setInviteId] = useState<string | null>(null);
   /** The guide is open, and the place whose introduction is showing (once, the first time in). */
   const [guide, setGuide] = useState(false);
@@ -602,7 +609,8 @@ export function JobFair() {
       if (KEY_DIRS[e.code] || e.code.startsWith("Shift")) {
         keys.current.add(e.code);
         e.preventDefault();
-      } else if ((e.code === "KeyE" || e.key === "Enter" || e.code === "Space") && !e.repeat) {
+      } else if ((e.code === "KeyE" || ((e.key === "Enter" || e.code === "Space") && tag !== "BUTTON")) && !e.repeat) {
+        // Enter and Space on a focused button press that button (keyboard users reach the HUD this way).
         e.preventDefault();
         interact();
       }
@@ -1420,8 +1428,24 @@ export function JobFair() {
     };
   }
 
+  /** Walk to the anomaly on this floor and catch it; the server decides what it gives. */
+  const catchAnomaly = () => {
+    const a = anomaly;
+    if (!a || a.claimed || !session || catching.current) return;
+    // Stand beside it, where it strolls, so the player doesn't cover it.
+    goTo(a.floorId, a.x - 0.8, a.y, async () => {
+      if (catching.current) return;
+      catching.current = true;
+      const r = await claimAnomaly();
+      catching.current = false;
+      setToast(r.ok ? `🎉 ${r.name} tertangkap! ${anomalyRewardText(r.reward)}` : r.text);
+    });
+  };
+  const anomalyHere = anomaly && anomaly.floorId === floor.id ? anomaly : null;
+
   // --- Scene.
   const extras = [
+    ...(anomalyHere ? anomalyExtras({ ...anomalyHere, claimed: anomalyHere.claimed?.coins }, session ? catchAnomaly : undefined) : []),
     ...(room ? [] : fair.freeSlots().filter((sl) => sl.floor === hall)).flatMap((sl) => emptyBoothExtras(sl, () => setBooking(sl))),
     ...booths.flatMap((b) =>
       boothExtras(b, {
@@ -1651,6 +1675,10 @@ export function JobFair() {
           ) : reach && reachHint(reach.kind) ? (
             <button type="button" className="rpg-box seated-btn reach-hint" onPointerDown={(e) => e.stopPropagation()} onClick={interact}>
               {reachHint(reach.kind)} <span className="rpg-kbd">E</span>
+            </button>
+          ) : session && anomalyHere && !anomalyHere.claimed ? (
+            <button type="button" className="rpg-box seated-btn anom-hint" onPointerDown={(e) => e.stopPropagation()} onClick={catchAnomaly}>
+              ✨ {anomalyHere.name} muncul di lantai ini! Tangkap
             </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
