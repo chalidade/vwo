@@ -2166,3 +2166,11 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
   .rp-demo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rp-track, .rp-track > span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+
+/* Organiser: the mini (UMKM) booths listed under each floor's stand map. */
+.org-umkm { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line, #e5e5e5); }
+
+/* Light mode: paid featured vacancies. */
+.lite-featured { border: 2px solid var(--l-ink); }
+.sp-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde68a; color: #713f12; vertical-align: middle; }

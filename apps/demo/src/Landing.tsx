@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
-import { openJobs, type JobPosting } from "@vwo/shared";
+import { featuredFirst, openJobs, type JobPosting } from "@vwo/shared";
 import { BoothLogo } from "@vwo/ui";
 import { FloorScene } from "./fair/FloorScene";
 import { InstallButton } from "./install";
@@ -263,7 +263,8 @@ export function Landing() {
   }, [auto]);
   const stop = stops[pick % Math.max(1, stops.length)] ?? fair.stops[0]!;
   const booths = fair.fair.booths;
-  const allJobs = booths.flatMap((b) => openJobs(b).map((j) => ({ b, j })));
+  // Paid featured vacancies first.
+  const allJobs = featuredFirst(booths.flatMap((b) => openJobs(b).map((j) => ({ booth: b, job: j })))).map(({ booth, job }) => ({ b: booth, j: job }));
   const types = TYPES.filter((t) => t === "Semua" || allJobs.some(({ j }) => j.type === t));
   const shown = allJobs.filter(({ j }) => type === "Semua" || j.type === type).slice(0, 6);
 

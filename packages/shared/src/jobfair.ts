@@ -1,6 +1,7 @@
 // A job fair as another kind of room: company booths instead of tables. Visitors walk between
 // booths, ask the recruiter questions, read the hiring banners, and apply.
 // Coordinates are tiles, like the cafe floors.
+import { type BoothTier, hasStand } from "./booth-packages";
 import { seatPositionsAround } from "./layout";
 import type { FloorView, MapObjectView, SeatView, TableView } from "./venue-view";
 
@@ -22,8 +23,12 @@ export interface JobPosting {
   quota?: number;
 }
 
-/** Vacancies still taking applications. */
-export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.closed);
+/** Vacancies still taking applications, the booth's featured one (see featuredJob) first. */
+export const openJobs = (b: { jobs: JobPosting[]; featuredJob?: string }) => {
+  const open = b.jobs.filter((j) => !j.closed);
+  const top = b.featuredJob ? open.findIndex((j) => j.id === b.featuredJob) : -1;
+  return top > 0 ? [open[top]!, ...open.slice(0, top), ...open.slice(top + 1)] : open;
+};
 
 /** Looks a company can pick for its booth in the company portal. */
 export type BoothTheme = "classic" | "modern" | "wood" | "pastel" | "neon";
@@ -50,8 +55,9 @@ export interface CompanyBooth {
   color: string;
   /** Index into JobFairView.floors. */
   floor: number;
-  /** Premium booths pay for a bigger presence: gold trim, spotlights, and a crown on the sign. */
-  tier?: "premium" | "regular";
+  /** Premium booths pay for a bigger presence: gold trim, spotlights, and a crown on the sign.
+   *  Mini booths (the UMKM package) have no stand: they are listed in the Pojok UMKM, x and y unused. */
+  tier?: BoothTier;
   /** Top-left corner of the booth, in tiles. Every booth is BOOTH_W × BOOTH_H. */
   x: number;
   y: number;
@@ -86,6 +92,8 @@ export interface CompanyBooth {
   media?: BoothMedia;
   /** The company's walking promoter, once it bought one. */
   promoter?: BoothPromoter;
+  /** The vacancy shown at the top of the lists, once the company bought the featured add-on. */
+  featuredJob?: string;
 }
 
 /** Content behind a booth's decorations, set in the company portal. */
@@ -163,7 +171,7 @@ export const BOOTH_SPOTS = {
 /** How far a VIP booth's side wings reach past a regular booth on each side, in tiles. */
 export const VIP_WING = 2.5;
 
-type BoothShape = { x: number; y: number; tier?: "premium" | "regular"; accessories?: string[] };
+type BoothShape = { x: number; y: number; tier?: BoothTier; accessories?: string[] };
 
 /** VIP booths come with an entrance gate; others can add one. */
 export const boothHasGate = (b: BoothShape) => b.tier === "premium" || !!b.accessories?.includes("gapura");
@@ -678,7 +686,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   const objects: MapObjectView[] = [];
   const add = (o: Omit<MapObjectView, "id" | "targetFloorId" | "targetX" | "targetY">, target?: { floor: number; x: number; y: number }) =>
     objects.push({ ...o, id: `${id}-obj-${objects.length}`, targetFloorId: target ? fairFloorId(fair, target.floor) : null, targetX: target?.x ?? null, targetY: target?.y ?? null });
-  for (const b of fair.booths) if (b.floor === floor) for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
+  for (const b of fair.booths) if (b.floor === floor && hasStand(b)) for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
   for (const sp of fair.sponsors) if (sp.floor === floor) add({ type: "blocked", x: sp.x, y: sp.y, width: SPONSOR_W, height: SPONSOR_H, spriteKey: "invisible", isWalkable: false });
   if (fair.coinStand.floor === floor) {
     const c = fair.coinStand;

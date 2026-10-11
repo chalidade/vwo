@@ -1,8 +1,8 @@
-import { Crown, Megaphone } from "lucide-react";
+import { Crown, Megaphone, Star, Store } from "lucide-react";
 import { useState } from "react";
-import { type CompanyBooth, coinPrice, koinText, rp } from "@vwo/shared";
+import { type CompanyBooth, coinPrice, hasStand, koinText, MINI_MAX_OPEN_JOBS, rp, UMKM_CORNER } from "@vwo/shared";
 import type { CompanyInvoice } from "../jobfair-engine";
-import { ACCESSORY_PRODUCTS, type CompanyProduct, PROMOTER_PRODUCT, VIP_PRODUCT } from "../fair/company";
+import { ACCESSORY_PRODUCTS, type CompanyProduct, FEATURED_PRODUCT, PROMOTER_PRODUCT, VIP_PRODUCT } from "../fair/company";
 import { InvoicesPanel } from "../fair/Invoices";
 import { CoinBalance, TopUp } from "../fair/TopUp";
 import { fair } from "../useFair";
@@ -48,6 +48,8 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const invoices = fair.company.get(booth.id)?.invoices ?? [];
   const vip = booth.tier === "premium";
+  /** Mini (UMKM) booths have no stand: no VIP upgrade or decorations, only the promoter and the featured vacancy. */
+  const stand = hasStand(booth);
   const pending = new Set(invoices.filter((i) => i.status === "Belum dibayar").flatMap((i) => i.items.map((x) => x.id)));
   const toggle = (id: string) => {
     const next = new Set(cart);
@@ -55,7 +57,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
     else next.add(id);
     setCart(next);
   };
-  const items = [VIP_PRODUCT, PROMOTER_PRODUCT, ...ACCESSORY_PRODUCTS].filter((p) => cart.has(p.id));
+  const items = [VIP_PRODUCT, PROMOTER_PRODUCT, FEATURED_PRODUCT, ...ACCESSORY_PRODUCTS].filter((p) => cart.has(p.id));
   const total = items.reduce((n, p) => n + p.price, 0);
   const need = coinPrice(total);
   const open = invoices.filter((i) => i.status === "Belum dibayar");
@@ -134,25 +136,57 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
 
       <div className="bl-grid">
         <div className="bl-main">
-          <section className="card bl-vip" data-vip={vip ? "" : undefined}>
-            <div className="bl-vip-top">
-              <span className="bl-vip-crown">
-                <Crown size={22} aria-hidden />
-              </span>
-              <div>
-                <h2 className="cp-h2">Stand VIP</h2>
-                <p className="small muted">{VIP_PRODUCT.about}</p>
+          {!stand && (
+            <section className="card">
+              <div className="bl-line">
+                <span className="bl-emoji">
+                  <Store size={20} aria-hidden />
+                </span>
+                <span className="bl-line-main">
+                  <b>Paket mini UMKM</b>
+                  <span className="small muted">
+                    Perusahaanmu tampil di {UMKM_CORNER}, daftar lowongan, mode ringan dan rekomendasi pencari kerja, dengan {MINI_MAX_OPEN_JOBS} lowongan aktif. Paket ini tanpa stand di lantai pameran, jadi
+                    upgrade VIP dan aksesoris stand tidak tersedia. Hubungi panitia untuk pindah ke stand reguler.
+                  </span>
+                </span>
               </div>
+            </section>
+          )}
+
+          <section className="card">
+            <div className="bl-line">
+              <span className="bl-emoji">
+                <Star size={20} aria-hidden />
+              </span>
+              <span className="bl-line-main">
+                <b>{FEATURED_PRODUCT.name}</b>
+                <span className="small muted">{FEATURED_PRODUCT.about}</span>
+              </span>
+              {product(FEATURED_PRODUCT, fair.owns(booth.id, FEATURED_PRODUCT.id), "✓ Aktif · pilih lowongannya di tab Lowongan")}
             </div>
-            <ul className="bl-feats">
-              <li>Stand lebih lebar, umbul-umbul brand kiri dan kanan</li>
-              <li>Gapura di pintu masuk, model dan tulisannya bisa diatur</li>
-              <li>Layar video besar untuk video perusahaan</li>
-              <li>Lampu sorot, karpet emas, LED berjalan, label VIP</li>
-              <li>Prioritas di layar informasi panitia</li>
-            </ul>
-            <div className="bl-row-end">{product(VIP_PRODUCT, vip, "✓ Stand kamu sudah VIP")}</div>
           </section>
+
+          {stand && (
+            <section className="card bl-vip" data-vip={vip ? "" : undefined}>
+              <div className="bl-vip-top">
+                <span className="bl-vip-crown">
+                  <Crown size={22} aria-hidden />
+                </span>
+                <div>
+                  <h2 className="cp-h2">Stand VIP</h2>
+                  <p className="small muted">{VIP_PRODUCT.about}</p>
+                </div>
+              </div>
+              <ul className="bl-feats">
+                <li>Stand lebih lebar, umbul-umbul brand kiri dan kanan</li>
+                <li>Gapura di pintu masuk, model dan tulisannya bisa diatur</li>
+                <li>Layar video besar untuk video perusahaan</li>
+                <li>Lampu sorot, karpet emas, LED berjalan, label VIP</li>
+                <li>Prioritas di layar informasi panitia</li>
+              </ul>
+              <div className="bl-row-end">{product(VIP_PRODUCT, vip, "✓ Stand kamu sudah VIP")}</div>
+            </section>
+          )}
 
           <section className="card">
             <div className="bl-line">
@@ -167,28 +201,30 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
             </div>
           </section>
 
-          <section className="card">
-            <h2 className="cp-h2">Aksesoris stand</h2>
-            <ul className="bl-acc">
-              {ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => (
-                <li key={p.id} className="bl-line">
-                  <span className="bl-emoji">{p.emoji}</span>
-                  <span className="bl-line-main">
-                    <b>{p.name}</b>
-                    <span className="small muted">{p.about}</span>
-                  </span>
-                  {product(p, fair.owns(booth.id, p.id), vip && p.id === "gapura" ? "Termasuk VIP" : undefined)}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {stand && (
+            <section className="card">
+              <h2 className="cp-h2">Aksesoris stand</h2>
+              <ul className="bl-acc">
+                {ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => (
+                  <li key={p.id} className="bl-line">
+                    <span className="bl-emoji">{p.emoji}</span>
+                    <span className="bl-line-main">
+                      <b>{p.name}</b>
+                      <span className="small muted">{p.about}</span>
+                    </span>
+                    {product(p, fair.owns(booth.id, p.id), vip && p.id === "gapura" ? "Termasuk VIP" : undefined)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <aside className="bl-side">
           <section className="card bl-cart">
             <h2 className="cp-h2">Keranjang</h2>
             {items.length === 0 ? (
-              <p className="muted small">Centang VIP, promotor, atau aksesoris untuk dibeli dengan koin.</p>
+              <p className="muted small">{stand ? "Centang VIP, promotor, lowongan unggulan, atau aksesoris untuk dibeli dengan koin." : "Centang promotor atau lowongan unggulan untuk dibeli dengan koin."}</p>
             ) : (
               <>
                 <ul className="bl-lines">

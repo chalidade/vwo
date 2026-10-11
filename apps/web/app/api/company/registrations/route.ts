@@ -20,7 +20,7 @@ const schema = z.object({
   contactRole: text(2, 60),
   email: z.string().trim().email().max(120),
   phone: z.string().trim().regex(/^\+?[0-9 -]{8,20}$/),
-  tier: z.enum(["regular", "premium"]),
+  tier: z.enum(["mini", "regular", "premium"]),
   /** Hidden field: people leave it empty, bots fill it in. */
   website2: z.string().max(0).optional(),
 });

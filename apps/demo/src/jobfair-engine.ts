@@ -66,6 +66,13 @@ import {
   remindDayFor,
   toggleRemind,
   wibDay,
+  type BoothTier,
+  FEATURED_PRODUCT_ID,
+  canOpenAnotherJob,
+  hasStand,
+  limitOpenJobs,
+  productAllowed,
+  UMKM_CORNER,
 } from "@vwo/shared";
 import {
   CAREER_ARTICLES,
@@ -327,7 +334,7 @@ export interface StandBooking {
   company: string;
   contact: string;
   email: string;
-  tier: "premium" | "regular";
+  tier: BoothTier;
   price: number;
   method: string;
   at: number;
@@ -356,6 +363,9 @@ export const stallPrice = () => price("stall");
 
 /** Stand prices for a booking, from the organiser's price list. */
 export const STAND_PRICES = {
+  get mini() {
+    return price("stand.mini");
+  },
   get regular() {
     return price("stand.regular");
   },
@@ -408,7 +418,7 @@ export interface CompanyInvoice {
 }
 
 /** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
-const EDITABLE = ["company", "tagline", "industry", "logo", "logoImg", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "vipStyle", "vipHeadline", "callouts", "media", "promoter"] as const;
+const EDITABLE = ["company", "tagline", "industry", "logo", "logoImg", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "vipStyle", "vipHeadline", "callouts", "media", "promoter", "featuredJob"] as const;
 export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
@@ -803,7 +813,7 @@ export class DemoJobFair {
     const old = new Map(this.staff.map((x) => [x.id, x]));
     const promoFloor = (p: Promoter) => this.stops.find((st) => st.level === p.level)?.floorId ?? this.floors[0]!.id;
     const next: FairStaff[] = [
-      ...fair.booths.map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
+      ...fair.booths.filter(hasStand).map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
       // An info desk on every floor; the entrance one keeps its old id.
       ...this.stops.map((st): FairStaff => {
         const d = infoDeskOn(fair, st.floorId);
@@ -1116,13 +1126,16 @@ export class DemoJobFair {
 
   /** Empty booth places on the hall floors. */
   freeSlots() {
-    return this.fair.floors.flatMap((_, floor) => BOOTH_SLOTS.filter((sl) => !this.fair.booths.some((b) => b.floor === floor && b.x === sl.x && b.y === sl.y)).map((sl) => ({ floor, ...sl })));
+    return this.fair.floors.flatMap((_, floor) => BOOTH_SLOTS.filter((sl) => !this.fair.booths.some((b) => hasStand(b) && b.floor === floor && b.x === sl.x && b.y === sl.y)).map((sl) => ({ floor, ...sl })));
   }
 
-  /** Put a new company in a free slot. */
-  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; email?: string; floor: number; x: number; y: number; tier?: "premium" | "regular" }) {
+  /** Put a new company in a free slot. A mini (UMKM) booth takes no slot: it is listed in its floor's Pojok UMKM. */
+  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; email?: string; floor: number; x: number; y: number; tier?: BoothTier }) {
     const name = input.company.trim();
-    if (!name || !this.freeSlots().some((sl) => sl.floor === input.floor && sl.x === input.x && sl.y === input.y)) return null;
+    const stand = hasStand(input);
+    if (!name) return null;
+    if (stand && !this.freeSlots().some((sl) => sl.floor === input.floor && sl.x === input.x && sl.y === input.y)) return null;
+    if (!stand && !this.fair.floors[input.floor]) return null;
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
     let id = slug;
     for (let n = 2; this.original.has(id) || this.org.added.some((b) => b.id === id); n++) id = `${slug}-${n}`;
@@ -1135,12 +1148,12 @@ export class DemoJobFair {
       color: input.color,
       floor: input.floor,
       tier: input.tier ?? "regular",
-      x: input.x,
-      y: input.y,
+      x: stand ? input.x : 0,
+      y: stand ? input.y : 0,
       recruiter: input.recruiter?.trim() || "Recruiter",
       ...(input.email?.trim() ? { email: input.email.trim() } : {}),
       about: `${name} membuka lowongan di job fair ini. Profil lengkap diisi perusahaan lewat portal perusahaan.`,
-      faq: [{ q: "Bagaimana cara melamar?", a: "Pilih lowongan di banner stand lalu kirim lamaran." }],
+      faq: [{ q: "Bagaimana cara melamar?", a: stand ? "Pilih lowongan di banner stand lalu kirim lamaran." : "Buka daftar lowongan di Pojok UMKM lalu kirim lamaran." }],
       jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],
     };
     this.org.added.push(booth);
@@ -1165,7 +1178,7 @@ export class DemoJobFair {
   restoreBooth(id: string) {
     const b = this.original.get(id);
     if (!b || !this.org.removed.includes(id)) return false;
-    if (this.fair.booths.some((x) => x.floor === b.floor && x.x === b.x && x.y === b.y)) return false;
+    if (hasStand(b) && this.fair.booths.some((x) => hasStand(x) && x.floor === b.floor && x.x === b.x && x.y === b.y)) return false;
     this.org.removed = this.org.removed.filter((x) => x !== id);
     this.saveOrg();
     return true;
@@ -1231,7 +1244,7 @@ export class DemoJobFair {
   }
 
   /** A company books an empty stand, pays (demo), and its booth appears on the map with a portal PIN. */
-  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: "premium" | "regular"; method: string; floor: number; x: number; y: number }) {
+  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: BoothTier; method: string; floor: number; x: number; y: number }) {
     const booth = this.addBooth({ company: input.company, industry: input.industry, color: input.color, recruiter: input.contact, email: input.email, floor: input.floor, x: input.x, y: input.y, tier: input.tier });
     if (!booth) return null;
     const pin = String(1000 + Math.floor(this.rand() * 9000));
@@ -1445,7 +1458,10 @@ export class DemoJobFair {
       if (st) {
         this.company.set(b.id, st);
         Object.assign(b, st.edits);
-        if (st.owned.includes("vip")) b.tier = "premium";
+        if (st.owned.includes("vip") && hasStand(b)) b.tier = "premium";
+        // What the booth's package allows, whatever was saved: one open vacancy for a mini booth, and a featured one only when paid for.
+        b.jobs = limitOpenJobs(b.tier, b.jobs);
+        if (b.featuredJob && !st.owned.includes(FEATURED_PRODUCT_ID)) delete b.featuredJob;
       }
       const rec = this.staff.find((x) => x.id === recruiterId(b.id));
       if (rec) rec.name = b.recruiter;
@@ -1469,14 +1485,18 @@ export class DemoJobFair {
    * The organiser sets a booth up directly: VIP or regular, theme, add-ons (given for free) and
    * their content such as the video link and the gate. Stored with the company's own changes.
    */
-  configureBooth(boothId: string, cfg: { tier?: "premium" | "regular"; theme?: BoothTheme; accessories?: string[]; media?: Partial<BoothMedia> }) {
+  configureBooth(boothId: string, cfg: { tier?: BoothTier; theme?: BoothTheme; accessories?: string[]; media?: Partial<BoothMedia> }) {
     const b = this.booth(boothId);
     if (!b) return;
     const st = this.companyOf(boothId);
     if (cfg.tier) {
       st.edits.tier = cfg.tier;
       b.tier = cfg.tier;
-      if (cfg.tier === "regular") st.owned = st.owned.filter((x) => x !== "vip");
+      if (cfg.tier !== "premium") st.owned = st.owned.filter((x) => x !== "vip");
+      if (cfg.tier === "mini") {
+        b.jobs = limitOpenJobs("mini", b.jobs);
+        st.edits.jobs = structuredClone(b.jobs);
+      }
     }
     if (cfg.theme) {
       st.edits.theme = cfg.theme;
@@ -1518,11 +1538,11 @@ export class DemoJobFair {
         x: 24,
         y: 13,
         headline: c.headline?.trim() || `${b.company} buka ${jobs.length} lowongan`,
-        offer: c.offer?.trim() || `Kami sedang mencari ${jobs.slice(0, 2).map((j) => j.title).join(" dan ") || "talenta baru"}. Mampir ke stand kami di ${hallName(this.fair, b.floor)} ya!`,
+        offer: c.offer?.trim() || `Kami sedang mencari ${jobs.slice(0, 2).map((j) => j.title).join(" dan ") || "talenta baru"}. ${hasStand(b) ? `Mampir ke stand kami di ${hallName(this.fair, b.floor)} ya!` : `Lihat lowongan kami di ${UMKM_CORNER} ya!`}`,
         cta: "Lihat lowongan",
         url: b.website ?? "",
         code: c.code?.trim() || undefined,
-        callouts: c.callouts?.length ? c.callouts : [`${b.company} lagi buka lowongan! 💼`, "Mampir ke stand kami yuk!"],
+        callouts: c.callouts?.length ? c.callouts : [`${b.company} lagi buka lowongan! 💼`, hasStand(b) ? "Mampir ke stand kami yuk!" : `Cek lowongan kami di ${UMKM_CORNER} yuk!`],
         walks: true,
       });
     }
@@ -2614,6 +2634,8 @@ export class DemoJobFair {
     for (const k of EDITABLE) if (k in patch) (clean as Record<string, unknown>)[k] = structuredClone(patch[k]);
     if (clean.company !== undefined && !clean.company.trim()) delete clean.company;
     if (clean.logo !== undefined) clean.logo = clean.logo.trim().slice(0, 3) || b.logo;
+    if (clean.jobs) clean.jobs = limitOpenJobs(b.tier, clean.jobs);
+    if ("featuredJob" in clean && clean.featuredJob && !this.owns(boothId, FEATURED_PRODUCT_ID)) delete clean.featuredJob;
     if ("logoImg" in clean) clean.logoImg = safeImage(clean.logoImg);
     Object.assign(b, clean);
     Object.assign(this.companyOf(boothId).edits, clean);
@@ -2625,12 +2647,23 @@ export class DemoJobFair {
     this.emit();
   }
 
-  /** Add a vacancy or replace the one with the same id. */
+  /** Add a vacancy or replace the one with the same id. False when the booth's package has no room for another open one. */
   saveJob(boothId: string, job: JobPosting) {
     const b = this.booth(boothId);
-    if (!b || !job.title.trim()) return;
+    if (!b || !job.title.trim()) return false;
+    if (!job.closed && !canOpenAnotherJob(b, job.id)) return false;
     const jobs = b.jobs.some((j) => j.id === job.id) ? b.jobs.map((j) => (j.id === job.id ? job : j)) : [...b.jobs, job];
     this.editBooth(boothId, { jobs });
+    return true;
+  }
+
+  /** The company picks which open vacancy the featured add-on shows at the top of the lists; null takes it off. */
+  setFeaturedJob(boothId: string, jobId: string | null) {
+    const b = this.booth(boothId);
+    if (!b || !this.owns(boothId, FEATURED_PRODUCT_ID)) return false;
+    if (jobId && !b.jobs.some((j) => j.id === jobId && !j.closed)) return false;
+    this.editBooth(boothId, { featuredJob: jobId ?? undefined });
+    return true;
   }
 
   /** Remove a vacancy. One that already has applicants is closed instead, so they keep their history. */
@@ -2653,7 +2686,7 @@ export class DemoJobFair {
   /** Free products, and those the company paid for. */
   owns(boothId: string, productId: string) {
     const p = productOf(productId);
-    if (!p) return false;
+    if (!p || !productAllowed(this.booth(boothId)?.tier, productId)) return false;
     if (productId === "vip") return this.booth(boothId)?.tier === "premium";
     if (VIP_INCLUDED.includes(productId) && this.booth(boothId)?.tier === "premium") return true;
     return p.price === 0 || !!this.company.get(boothId)?.owned.includes(productId);
@@ -2679,7 +2712,7 @@ export class DemoJobFair {
   createInvoice(boothId: string, productIds: string[]) {
     const items = [...new Set(productIds)]
       .map((id) => productOf(id))
-      .filter((p): p is NonNullable<typeof p> => !!p && p.price > 0 && !this.owns(boothId, p.id))
+      .filter((p): p is NonNullable<typeof p> => !!p && p.price > 0 && productAllowed(this.booth(boothId)?.tier, p.id) && !this.owns(boothId, p.id))
       .map((p) => ({ id: p.id, name: p.name, price: p.price }));
     if (!items.length || !this.booth(boothId)) return null;
     const st = this.companyOf(boothId);
@@ -2708,8 +2741,8 @@ export class DemoJobFair {
     inv.method = method;
     inv.paidAt = this.now();
     for (const it of inv.items) if (!st.owned.includes(it.id)) st.owned.push(it.id);
-    if (inv.items.some((i) => i.id === "vip")) b.tier = "premium";
-    for (const it of inv.items) if (it.id !== "vip" && it.id !== "promoter" && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
+    if (inv.items.some((i) => i.id === "vip") && hasStand(b)) b.tier = "premium";
+    for (const it of inv.items) if (it.id !== "vip" && it.id !== "promoter" && it.id !== FEATURED_PRODUCT_ID && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
     this.syncCompanyPromoters();
     this.refreshFloors();
     this.persist();
@@ -3078,7 +3111,7 @@ export class DemoJobFair {
 
     if (now >= this.nextCalloutAt) {
       this.nextCalloutAt = now + 7000 + this.rand() * 9000;
-      const quiet = this.fair.booths.filter((b) => this.peopleAt(b.id) === 0 && !this.bubbles.has(recruiterId(b.id)));
+      const quiet = this.fair.booths.filter((b) => hasStand(b) && this.peopleAt(b.id) === 0 && !this.bubbles.has(recruiterId(b.id)));
       if (quiet.length) {
         const b = this.pick(quiet);
         const open = openJobs(b);
@@ -3240,7 +3273,8 @@ export class DemoJobFair {
   private spawnBot() {
     const v = this.join(this.pick(BOT_NAMES), true);
     // Shuffle, keep a few, then visit them floor by floor going up.
-    const booths = [...this.fair.booths]
+    const booths = this.fair.booths
+      .filter(hasStand)
       .sort(() => this.rand() - 0.5)
       .slice(0, 2 + Math.floor(this.rand() * 3))
       .sort((a, b) => a.floor - b.floor);
@@ -3462,7 +3496,7 @@ export function spgName(boothId: string) {
   return SPG_NAMES[h % SPG_NAMES.length]!;
 }
 /** Where a VIP booth's SPG waits: just outside the rope of the left wing, by the gate. */
-export function spgHome(b: { x: number; y: number; tier?: "premium" | "regular" }) {
+export function spgHome(b: { x: number; y: number; tier?: BoothTier }) {
   return { x: boothFrame(b).x + 1.2, y: b.y + BOOTH_H + 0.35 };
 }
 

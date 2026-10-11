@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { Promoter, SponsorView } from "@vwo/shared";
-import { ACCESSORY_PRODUCTS, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
+import { ACCESSORY_PRODUCTS, FEATURED_PRODUCT, PROMOTER_PRODUCT, VIP_PRODUCT, rupiah } from "../fair/company";
 import { STAND_PRICES } from "../jobfair-engine";
 import { fair } from "../useFair";
 
@@ -33,9 +33,11 @@ export function OrgAds({ onToast }: { onToast: (t: string) => void }) {
   const limit = fair.walkerLimit();
   const owners = (id: string) => [...fair.company.values()].filter((c) => c.owned.includes(id)).length;
   const rates = [
-    { name: "Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium").length, note: `${fair.freeSlots().length} stand kosong` },
+    { name: "Paket mini UMKM", price: STAND_PRICES.mini, sold: fair.fair.booths.filter((b) => b.tier === "mini").length, note: "Tanpa stand, 1 lowongan" },
+    { name: "Stand reguler", price: STAND_PRICES.regular, sold: fair.fair.booths.filter((b) => b.tier !== "premium" && b.tier !== "mini").length, note: `${fair.freeSlots().length} stand kosong` },
     { name: "Stand VIP", price: STAND_PRICES.premium, sold: fair.fair.booths.filter((b) => b.tier === "premium").length + owners(VIP_PRODUCT.id) },
     { name: `${PROMOTER_PRODUCT.emoji} ${PROMOTER_PRODUCT.name}`, price: PROMOTER_PRODUCT.price, sold: owners(PROMOTER_PRODUCT.id) },
+    { name: `${FEATURED_PRODUCT.emoji} ${FEATURED_PRODUCT.name}`, price: FEATURED_PRODUCT.price, sold: owners(FEATURED_PRODUCT.id) },
     ...ACCESSORY_PRODUCTS.filter((p) => p.price > 0).map((p) => ({ name: `${p.emoji} ${p.name}`, price: p.price, sold: owners(p.id) })),
   ];
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });

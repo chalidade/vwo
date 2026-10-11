@@ -1,6 +1,6 @@
-import { Palette, Sparkles, Trash2 } from "lucide-react";
+import { Palette, Sparkles, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
+import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, canOpenAnotherJob, FEATURED_PRODUCT_ID, fairFloorId, hasStand, isFeatured, MINI_MAX_OPEN_JOBS, UMKM_CORNER } from "@vwo/shared";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
 import { readImageFile } from "../imageFile";
 import { staffLook } from "../fair/staff-look";
@@ -46,7 +46,7 @@ export function BoothPreview({ booth }: { booth: CompanyBooth }) {
       avatars={[...fair.visitors.values()].filter((v) => v.floorId === floorId)}
       lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
       bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-      extras={fair.fair.booths.filter((b) => b.floor === booth.floor).flatMap((b) => boothExtras(b))}
+      extras={fair.fair.booths.filter((b) => b.floor === booth.floor && hasStand(b)).flatMap((b) => boothExtras(b))}
     />
   );
 }
@@ -337,6 +337,9 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
     setToast(t);
     setTimeout(() => setToast(null), 2500);
   };
+  /** The mini (UMKM) package keeps one open vacancy: another opens only after one is closed. */
+  const full = !canOpenAnotherJob(booth);
+  const canFeature = fair.owns(booth.id, FEATURED_PRODUCT_ID);
   if (edit) return <JobForm job={edit} booth={booth} onDone={(msg) => (setEdit(null), msg && flash(msg))} />;
   return (
     <div className="card">
@@ -344,15 +347,23 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
         <h2 className="cp-h2" style={{ margin: 0 }}>
           Lowongan ({booth.jobs.filter((j) => !j.closed).length} aktif)
         </h2>
-        <button type="button" onClick={() => setEdit(emptyJob(fair.newJobId(booth.id)))}>
+        <button type="button" disabled={full} title={full ? "Tutup lowongan aktif dulu" : undefined} onClick={() => setEdit(emptyJob(fair.newJobId(booth.id)))}>
           + Lowongan baru
         </button>
       </div>
+      {!hasStand(booth) && (
+        <p className="muted small">
+          Paket mini UMKM: {MINI_MAX_OPEN_JOBS} lowongan aktif, tampil di {UMKM_CORNER}. Untuk membuka lowongan lain, tutup lowongan yang aktif dulu.
+        </p>
+      )}
+      <p className="muted small">
+        {canFeature ? "Lowongan unggulan aktif: tandai satu lowongan dengan bintang supaya tampil paling atas di daftar lowongan." : "Beli Lowongan unggulan di tab Koin & belanja supaya satu lowongan tampil paling atas di daftar lowongan."}
+      </p>
       <ul className="cp-jobs">
         {booth.jobs.map((j) => (
           <li key={j.id} data-closed={j.closed ? "" : undefined}>
             <div className="cp-job-main">
-              <b>{j.title}</b> {j.closed && <span className="status">Ditutup</span>}
+              <b>{j.title}</b> {j.closed && <span className="status">Ditutup</span>} {isFeatured(booth, j.id) && <span className="status">Unggulan</span>}
               <span className="muted small">
                 {j.type} · {j.location || "-"} {j.salary ? `· ${j.salary}` : ""} {j.deadline ? `· s.d. ${j.deadline}` : ""} · {count(j.id)} pelamar
               </span>
@@ -363,10 +374,27 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
                   <Sparkles size={16} aria-hidden /> Kandidat cocok
                 </button>
               )}
+              {canFeature && !j.closed && (
+                <button
+                  type="button"
+                  className="small-btn ghost"
+                  aria-pressed={isFeatured(booth, j.id)}
+                  title={isFeatured(booth, j.id) ? "Lepas dari unggulan" : "Jadikan lowongan unggulan"}
+                  onClick={() => fair.setFeaturedJob(booth.id, isFeatured(booth, j.id) ? null : j.id)}
+                >
+                  <Star size={16} aria-hidden fill={isFeatured(booth, j.id) ? "currentColor" : "none"} />
+                </button>
+              )}
               <button type="button" className="small-btn ghost" onClick={() => setEdit({ ...j, requirements: [...j.requirements] })}>
                 Ubah
               </button>
-              <button type="button" className="small-btn ghost" onClick={() => fair.saveJob(booth.id, { ...j, closed: !j.closed })}>
+              <button
+                type="button"
+                className="small-btn ghost"
+                disabled={j.closed && full}
+                title={j.closed && full ? `Paket mini UMKM: ${MINI_MAX_OPEN_JOBS} lowongan aktif` : undefined}
+                onClick={() => fair.saveJob(booth.id, { ...j, closed: !j.closed })}
+              >
                 {j.closed ? "Buka lagi" : "Tutup"}
               </button>
               <button
@@ -398,7 +426,7 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
       className="card cp-form"
       onSubmit={(e) => {
         e.preventDefault();
-        fair.saveJob(booth.id, {
+        const ok = fair.saveJob(booth.id, {
           id: job.id,
           title: f.title.trim(),
           type: f.type,
@@ -413,7 +441,8 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
             .map((r) => r.trim())
             .filter(Boolean),
         });
-        onDone(isNew ? "Lowongan baru tayang di stand" : "Lowongan diperbarui");
+        if (!ok) return onDone(`Paket mini UMKM hanya ${MINI_MAX_OPEN_JOBS} lowongan aktif. Tutup lowongan yang aktif dulu.`);
+        onDone(isNew ? (hasStand(booth) ? "Lowongan baru tayang di stand" : `Lowongan baru tayang di ${UMKM_CORNER}`) : "Lowongan diperbarui");
       }}
     >
       <h2 className="cp-h2 cp-span">{isNew ? "Lowongan baru" : `Ubah ${job.title}`}</h2>

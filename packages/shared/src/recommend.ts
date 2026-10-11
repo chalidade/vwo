@@ -4,6 +4,7 @@
 // so it also works offline and in the light mode. The server runs the same scoring the other way
 // round, to suggest candidates for a company's vacancy (see talent-pool.ts).
 import { type CompanyBooth, type JobPosting, openJobs } from "./jobfair";
+import { featuredFirst } from "./booth-packages";
 import { parseSkills, placeName } from "./taxonomy";
 
 export interface ProfileHints {
@@ -136,14 +137,14 @@ export function scoreJob(p: ProfileHints, booth: CompanyBooth, job: JobPosting):
   return { booth, job, score: Math.max(0, score), why };
 }
 
-/** The vacancies that suit the profile best, best first; applied and closed ones left out. */
+/** The vacancies that suit the profile best, best first; applied and closed ones left out. A
+ *  featured vacancy (a paid add-on) that matches at all goes to the top. */
 export function recommendJobs(p: ProfileHints, booths: CompanyBooth[], applied: Set<string> = new Set(), limit = 6): JobMatch[] {
   const out: JobMatch[] = [];
   for (const b of booths) for (const j of openJobs(b)) if (!applied.has(j.id)) out.push(scoreJob(p, b, j));
-  return out
-    .filter((m) => m.score > 0)
-    .sort((a, b) => b.score - a.score || (b.booth.tier === "premium" ? 1 : 0) - (a.booth.tier === "premium" ? 1 : 0) || a.job.title.localeCompare(b.job.title))
-    .slice(0, limit);
+  return featuredFirst(
+    out.filter((m) => m.score > 0).sort((a, b) => b.score - a.score || (b.booth.tier === "premium" ? 1 : 0) - (a.booth.tier === "premium" ? 1 : 0) || a.job.title.localeCompare(b.job.title)),
+  ).slice(0, limit);
 }
 
 /** The booths worth visiting: their best matching vacancy, plus a little for each other match. */

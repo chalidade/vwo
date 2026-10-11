@@ -1,6 +1,6 @@
 // The company portal's catalogue: what a company can buy for its booth, and how applicants are scored.
 import { BOOTH_ACCESSORIES } from "@vwo/ui";
-import { type CompanyBooth, coinPrice, type JobPosting, koinText, price } from "@vwo/shared";
+import { type CompanyBooth, coinPrice, FEATURED_PRODUCT_ID, type JobPosting, koinText, price } from "@vwo/shared";
 
 /** One thing a company can pay for. Prices are kept in rupiah and paid in coins (see coinText). */
 export interface CompanyProduct {
@@ -31,6 +31,16 @@ export const PROMOTER_PRODUCT: CompanyProduct = {
   about: "Seorang promotor berbaju warna brand-mu berjalan di lantai stand, mendatangi pelamar, dan mengajak mereka melihat lowonganmu.",
 };
 
+export const FEATURED_PRODUCT: CompanyProduct = {
+  id: FEATURED_PRODUCT_ID,
+  name: "Lowongan unggulan",
+  emoji: "⭐",
+  get price() {
+    return price("product.featured");
+  },
+  about: "Satu lowongan pilihanmu tampil paling atas di daftar lowongan, mode ringan dan rekomendasi pencari kerja, dengan tanda Unggulan. Bisa diganti kapan saja.",
+};
+
 export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_ACCESSORIES.map((a) => ({
   id: a.id,
   name: a.name,
@@ -46,7 +56,8 @@ export const ACCESSORY_PRODUCTS: (CompanyProduct & { slot: string })[] = BOOTH_A
 /** VIP booths get these add-ons without buying them (they also have a big video wall built in). */
 export const VIP_INCLUDED = ["gapura"];
 
-export const productOf = (id: string) => (id === VIP_PRODUCT.id ? VIP_PRODUCT : id === PROMOTER_PRODUCT.id ? PROMOTER_PRODUCT : ACCESSORY_PRODUCTS.find((p) => p.id === id));
+export const productOf = (id: string) =>
+  id === VIP_PRODUCT.id ? VIP_PRODUCT : id === PROMOTER_PRODUCT.id ? PROMOTER_PRODUCT : id === FEATURED_PRODUCT.id ? FEATURED_PRODUCT : ACCESSORY_PRODUCTS.find((p) => p.id === id);
 
 export const PAY_METHODS = ["QRIS", "Virtual Account BCA", "Virtual Account Mandiri", "Kartu kredit", "Transfer bank"] as const;
 

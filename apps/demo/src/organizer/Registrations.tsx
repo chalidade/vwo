@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { type BoothTier, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
 import { coinText, rupiah } from "../fair/company";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { LIVE } from "../mode";
@@ -88,14 +89,17 @@ export function OrgRegistrations({ onToast }: { onToast: (t: string) => void }) 
 }
 
 function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
-  const free = fair.freeSlots();
+  // A mini (UMKM) package takes no stand slot: the organiser only picks the floor whose Pojok UMKM lists it.
+  const mini = r.tier === "mini";
+  const free = mini ? fair.fair.floors.map((_, floor) => ({ floor, x: 0, y: 0 })) : fair.freeSlots();
+  const place = (s: { floor: number; x: number; y: number }) => `${fair.fair.floors[s.floor]?.name} · ${mini ? UMKM_CORNER : slotName(s.x, s.y)}`;
   const [slot, setSlot] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const pick = free[slot];
   return (
     <li style={{ display: "block" }}>
-      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {coinText(r.price)} (≈ {rupiah(r.price)})
+      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {TIER_LABEL[r.tier as BoothTier] ?? TIER_LABEL.regular} · {coinText(r.price)} (≈ {rupiah(r.price)})
       {r.method && <span className="muted small"> · dibayar via {r.method}</span>}
       <div className="muted small">
         {r.industry} · {r.city} · {r.website ? (
@@ -123,7 +127,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
                 <select value={slot} onChange={(e) => setSlot(Number(e.target.value))} aria-label="Tempat stand">
                   {free.map((s, i) => (
                     <option key={`${s.floor}-${s.x}-${s.y}`} value={i}>
-                      {fair.fair.floors[s.floor]?.name} · {slotName(s.x, s.y)}
+                      {place(s)}
                     </option>
                   ))}
                 </select>
@@ -132,7 +136,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
                   className="small-btn"
                   disabled={busy}
                   onClick={async () => {
-                    if (!pick || !confirm(`Verifikasi ${r.company} dan buka stand di ${fair.fair.floors[pick.floor]?.name} · ${slotName(pick.x, pick.y)}?`)) return;
+                    if (!pick || !confirm(`Verifikasi ${r.company} dan ${mini ? "tampilkan di" : "buka stand di"} ${place(pick)}?`)) return;
                     setBusy(true);
                     const res = await call<{ boothId: string; pin: string }>(`/api/jobfair/registrations/${r.id}/verify`, pick);
                     setBusy(false);
@@ -140,7 +144,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
                     onDone(`${r.company} terverifikasi · kode ${res.data.boothId} · PIN ${res.data.pin}`);
                   }}
                 >
-                  ✓ Verifikasi & buka stand
+                  {mini ? "✓ Verifikasi & tampilkan" : "✓ Verifikasi & buka stand"}
                 </button>
               </>
             ) : (

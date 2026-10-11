@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
-import { type CompanyBooth, type JobPosting, openJobs, price } from "@vwo/shared";
+import { type CompanyBooth, type JobPosting, featuredJobs, hasStand, isFeatured, openJobs, price, UMKM_CORNER } from "@vwo/shared";
 import { AccountGate } from "../AccountGate";
 import { type Account, ACCOUNT_EVENT, currentAccount } from "../account";
 import { PLAYER_ID } from "../jobfair-engine";
@@ -77,6 +77,8 @@ export function LiteMode() {
     }))
     .filter((x) => x.jobs.length);
   const total = list.reduce((n, x) => n + x.jobs.length, 0);
+  // Paid featured vacancies that pass the search, shown above the companies.
+  const featured = featuredJobs(list.map((x) => x.booth)).filter((f) => list.some((x) => x.booth === f.booth && x.jobs.includes(f.job)));
 
   const startApply = (booth: CompanyBooth, job: JobPosting) => {
     setNotice("");
@@ -194,6 +196,17 @@ export function LiteMode() {
           </p>
         </section>
 
+        {featured.length > 0 && (
+          <section className="lite-card lite-featured" aria-labelledby="lite-featured">
+            <h2 id="lite-featured">Lowongan unggulan</h2>
+            <ul className="lite-list">
+              {featured.map((f) => (
+                <JobRow key={f.job.id} booth={f.booth} job={f.job} showCompany applied={applied.has(f.job.id)} onApply={() => startApply(f.booth, f.job)} />
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section id="lite-list" aria-label="Perusahaan dan lowongan" className="lite-companies">
           {list.map(({ booth: b, jobs }) => (
             <details key={b.id} id={`lite-${b.id}`} className="lite-card lite-co" open={!!needle || list.length <= 3}>
@@ -201,9 +214,11 @@ export function LiteMode() {
                 <span className="lite-co-name">
                   <b>{b.company}</b>
                   {b.tier === "premium" && <span className="lite-tag">VIP</span>}
+                  {!hasStand(b) && <span className="lite-tag">UMKM</span>}
                 </span>
                 <span className="lite-muted">
-                  {b.industry} · {fair.fair.floors[b.floor]?.name ?? ""} · {jobs.length} lowongan
+                  {b.industry} · {hasStand(b) ? "" : `${UMKM_CORNER} `}
+                  {fair.fair.floors[b.floor]?.name ?? ""} · {jobs.length} lowongan
                 </span>
               </summary>
               {b.tagline && <p className="lite-muted">{b.tagline}</p>}
@@ -344,13 +359,29 @@ export function LiteMode() {
   );
 }
 
-function JobRow({ booth, job, match, applied, onApply }: { booth: CompanyBooth; job: JobPosting; match?: JobMatch; applied: boolean; onApply: () => void }) {
+function JobRow({
+  booth,
+  job,
+  match,
+  showCompany,
+  applied,
+  onApply,
+}: {
+  booth: CompanyBooth;
+  job: JobPosting;
+  match?: JobMatch;
+  showCompany?: boolean;
+  applied: boolean;
+  onApply: () => void;
+}) {
   return (
-    <li className="lite-job">
+    <li className="lite-job" data-featured={isFeatured(booth, job.id) ? "" : undefined}>
       <span>
-        <b>{job.title}</b>
+        <b>
+          {job.title} {isFeatured(booth, job.id) && <span className="lite-tag">Unggulan</span>}
+        </b>
         <span className="lite-muted">
-          {match ? `${booth.company} · ` : ""}
+          {match || showCompany ? `${booth.company} · ` : ""}
           {job.type} · {job.location}
           {job.salary ? ` · Rp${job.salary}` : ""}
         </span>

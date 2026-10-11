@@ -133,3 +133,11 @@
 .rg-pack small { color: var(--cs-mute); font-size: 12px; }
 .rg-pack span { margin-top: 6px; font-weight: 800; color: var(--cs-yellow); }
 .rg-pack-tag { position: absolute; top: -9px; right: 10px; margin: 0 !important; padding: 2px 8px; border-radius: 99px; background: var(--cs-yellow); color: #111 !important; font-size: 11px; }
+
+/* Registration: the mini (UMKM) package and the featured vacancy add-on. */
+.rg-tiers-3 { grid-template-columns: repeat(3, 1fr); }
+.rg-tier { position: relative; }
+.rg-tier[data-mini] { border-color: rgb(134 239 172 / 0.45); }
+.rg-tier-tag { display: inline-block; margin-bottom: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgb(34 197 94 / 0.18); color: #86efac; }
+.rg-addon { font-size: 13px; margin: 0 0 20px; }
+@media (max-width: 760px) { .rg-tiers-3 { grid-template-columns: 1fr; } }

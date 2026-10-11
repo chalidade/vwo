@@ -16,6 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const q = await searchParams;
   const user = await currentUser();
   const prices = await readPrices(db);
+  const mini = priceFrom(prices, "stand.mini");
   const regular = priceFrom(prices, "stand.regular");
   const premium = priceFrom(prices, "stand.premium");
   // Back from the checkout page: ask Xendit straight away instead of waiting for its webhook.
@@ -54,7 +55,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           Buka booth di <span className="cs-shine">jobfair</span>
         </h1>
         <p className="cs-sub" style={{ margin: "12px 0 0" }}>
-          Isi data perusahaan dan pilih paket stand, lalu bayar dengan koin (isi koin lewat QRIS, virtual account, e-wallet atau kartu). Setelah pembayaran, panitia memverifikasi bahwa perusahaanmu nyata. Kode perusahaan dan PIN untuk masuk ke portal dikirim setelah terverifikasi.
+          Isi data perusahaan dan pilih paket stand (ada paket mini untuk UMKM), lalu bayar dengan koin (isi koin lewat QRIS, virtual account, e-wallet atau kartu). Setelah pembayaran, panitia memverifikasi bahwa perusahaanmu nyata. Kode perusahaan dan PIN untuk masuk ke portal dikirim setelah terverifikasi.
         </p>
         <ol className="rg-steps">
           <li>Masuk dengan Google</li>
@@ -67,8 +68,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           <RegisterCompany
             email={user.email}
             name={user.name}
-            prices={{ regular, premium }}
-            coins={{ regular: coinsFor(prices, regular), premium: coinsFor(prices, premium) }}
+            prices={{ mini, regular, premium }}
+            coins={{ mini: coinsFor(prices, mini), regular: coinsFor(prices, regular), premium: coinsFor(prices, premium) }}
+            featured={{ price: priceFrom(prices, "product.featured"), coins: coinsFor(prices, priceFrom(prices, "product.featured")) }}
             balance={balance}
             packs={packs}
             initial={mine}

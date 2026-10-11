@@ -19,6 +19,13 @@ export interface RegistrationView {
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
 const koin = (n: number) => `${n.toLocaleString("id-ID")} koin`;
+type Tier = "mini" | "regular" | "premium";
+const TIERS: { id: Tier; name: string; about: string; tag?: string }[] = [
+  { id: "mini", name: "Paket mini UMKM", tag: "Untuk UMKM", about: "1 lowongan aktif, tampil di Pojok UMKM, daftar lowongan, mode ringan dan rekomendasi. Tanpa stand di lantai pameran." },
+  { id: "regular", name: "Stand reguler", about: "Panel, meja recruiter, roll-up banner, lowongan tanpa batas" },
+  { id: "premium", name: "👑 Stand VIP", about: "Stand lebih lebar, layar video, lampu sorot, LED berjalan, posisi teratas" },
+];
+const TIER_NAME: Record<string, string> = { mini: "Paket mini UMKM", regular: "Stand reguler", premium: "Stand VIP" };
 const STATUS: Record<string, string> = { unpaid: "Menunggu pembayaran", paid: "Menunggu verifikasi panitia", verified: "Terverifikasi", rejected: "Ditolak" };
 
 const ERRORS: Record<string, string> = {
@@ -59,6 +66,7 @@ export function RegisterCompany({
   name,
   prices,
   coins,
+  featured,
   balance: startBalance,
   packs,
   initial,
@@ -67,8 +75,10 @@ export function RegisterCompany({
 }: {
   email: string;
   name: string;
-  prices: { regular: number; premium: number };
-  coins: { regular: number; premium: number };
+  prices: Record<Tier, number>;
+  coins: Record<Tier, number>;
+  /** The featured vacancy add-on, bought later in the company portal. */
+  featured: { price: number; coins: number };
   balance: number;
   packs: Pack[];
   initial: RegistrationView[];
@@ -81,7 +91,7 @@ export function RegisterCompany({
   const open = list.find((r) => r.status === "unpaid" || r.status === "paid");
   const [showForm, setShowForm] = useState(!list.length);
   const [f, setF] = useState({ company: "", industry: "", website: "", city: "", contactName: name, contactRole: "HR", email, phone: "", website2: "" });
-  const [tier, setTier] = useState<"regular" | "premium">("regular");
+  const [tier, setTier] = useState<Tier>("regular");
   const [color, setColor] = useState(COLORS[0]!);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -139,7 +149,7 @@ export function RegisterCompany({
             {r.company} <span className="rg-status" data-s={r.status}>{STATUS[r.status] ?? r.status}</span>
           </h2>
           <p className="cs-sub" style={{ margin: "4px 0 0", fontSize: 14 }}>
-            {r.tier === "premium" ? "Stand VIP" : "Stand reguler"} · {koin(r.coins)} (≈ {rupiah(r.price)}) · didaftarkan {new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+            {TIER_NAME[r.tier] ?? TIER_NAME.regular} · {koin(r.coins)} (≈ {rupiah(r.price)}) · didaftarkan {new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
           </p>
           {r.status === "unpaid" && (
             <div style={{ marginTop: 14 }}>
@@ -205,21 +215,25 @@ export function RegisterCompany({
             setBusy(false);
             if (!res.ok) return setError(res.error);
             const r = res.data.registration!;
-            setList([{ ...r, coins: coins[r.tier === "premium" ? "premium" : "regular"], createdAt: new Date(r.createdAt).getTime() }, ...list]);
+            setList([{ ...r, coins: coins[(r.tier in coins ? r.tier : "regular") as Tier], createdAt: new Date(r.createdAt).getTime() }, ...list]);
             setShowForm(false);
           }}
         >
           <h2>Pilih paket</h2>
-          <div className="rg-tiers" style={{ margin: "12px 0 20px" }}>
-            {(["regular", "premium"] as const).map((t) => (
-              <button key={t} type="button" className="rg-tier" data-on={tier === t ? "" : undefined} onClick={() => setTier(t)}>
-                <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
-                <strong>{koin(coins[t])}</strong>
-                <small style={{ display: "block", marginBottom: 6 }}>≈ {rupiah(prices[t])}</small>
-                <small>{t === "premium" ? "Stand lebih lebar, layar video, lampu sorot, LED berjalan, posisi teratas" : "Panel, meja recruiter, roll-up banner, lowongan tanpa batas"}</small>
+          <div className="rg-tiers rg-tiers-3" style={{ margin: "12px 0 12px" }}>
+            {TIERS.map((t) => (
+              <button key={t.id} type="button" className="rg-tier" data-on={tier === t.id ? "" : undefined} data-mini={t.id === "mini" ? "" : undefined} onClick={() => setTier(t.id)}>
+                {t.tag && <span className="rg-tier-tag">{t.tag}</span>}
+                <b>{t.name}</b>
+                <strong>{koin(coins[t.id])}</strong>
+                <small style={{ display: "block", marginBottom: 6 }}>≈ {rupiah(prices[t.id])}</small>
+                <small>{t.about}</small>
               </button>
             ))}
           </div>
+          <p className="cs-sub rg-addon">
+            <b>Tambahan: Lowongan unggulan</b> · {koin(featured.coins)} (≈ {rupiah(featured.price)}). Satu lowongan tampil paling atas di daftar lowongan, mode ringan dan rekomendasi. Bisa dibeli untuk paket apa pun lewat portal perusahaan setelah booth aktif.
+          </p>
           <h2>Data perusahaan</h2>
           <div className="rg-grid" style={{ marginTop: 12 }}>
             <label className="full">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BoothLogo } from "@vwo/ui";
-import type { CompanyBooth } from "@vwo/shared";
+import { type CompanyBooth, FEATURED_PRODUCT_ID, hasStand, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { PushCard } from "../fair/PushCard";
@@ -294,7 +294,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
             <BoothLogo booth={booth} className="cp-logo" />
             <span className="dash-brand-text">
               <b>{booth.company}</b>
-              <span>{booth.tier === "premium" ? "Stand VIP" : "Stand reguler"}</span>
+              <span>{TIER_LABEL[booth.tier ?? "regular"]}</span>
             </span>
           </>
         }
@@ -304,10 +304,11 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
           </>
         }
         primary={["overview", "applicants", "jobs", "billing"]}
-        subtitle={`${booth.industry} · Stand di ${fair.fair.floors[booth.floor]?.name ?? "aula"} · Recruiter ${booth.recruiter}`}
+        subtitle={`${booth.industry} · ${hasStand(booth) ? "Stand di" : UMKM_CORNER} ${fair.fair.floors[booth.floor]?.name ?? "aula"} · Recruiter ${booth.recruiter}`}
         groups={GROUPS.map((g) => ({
           label: g.label,
-          items: g.ids.map((id) => {
+          // A mini (UMKM) booth has no stand to dress up.
+          items: g.ids.filter((id) => id !== "booth" || hasStand(booth)).map((id) => {
             const t = TABS.find(([x]) => x === id)!;
             return { id, icon: t[1], label: t[2], count: id === "applicants" ? fresh : undefined };
           }),
@@ -357,7 +358,8 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
         />
       )}
       {tab === "jobs" && <JobsEditor booth={booth} />}
-      {tab === "booth" && <BoothEditor booth={booth} onTab={setTab} />}
+      {tab === "booth" && hasStand(booth) && <BoothEditor booth={booth} onTab={setTab} />}
+      {tab === "booth" && !hasStand(booth) && <Overview booth={booth} onTab={setTab} />}
       {tab === "profile" && <ProfileEditor booth={booth} />}
       {tab === "faq" && <FaqEditor booth={booth} />}
       {tab === "billing" && <Billing booth={booth} />}
@@ -390,11 +392,12 @@ function Overview({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab)
     ["Diterima", by("Diterima")],
   ] as const;
   const todo = [
-    !booth.theme && { text: "Pilih tema booth supaya stand tampil beda", tab: "booth" as const },
+    hasStand(booth) && !booth.theme && { text: "Pilih tema booth supaya stand tampil beda", tab: "booth" as const },
     booth.faq.length < 3 && { text: "Tambah FAQ supaya recruiter bisa menjawab pengunjung", tab: "faq" as const },
     !booth.phone && { text: "Isi nomor HP/WhatsApp HR di profil", tab: "profile" as const },
     booth.jobs.some((j) => !j.description) && { text: "Lengkapi deskripsi lowongan", tab: "jobs" as const },
-    booth.tier !== "premium" && { text: "Upgrade ke stand VIP untuk lampu sorot dan LED berjalan", tab: "billing" as const },
+    hasStand(booth) && booth.tier !== "premium" && { text: "Upgrade ke stand VIP untuk lampu sorot dan LED berjalan", tab: "billing" as const },
+    !fair.owns(booth.id, FEATURED_PRODUCT_ID) && { text: "Pasang Lowongan unggulan supaya lowonganmu tampil paling atas", tab: "billing" as const },
   ].filter(Boolean) as { text: string; tab: PortalTab }[];
 
   return (
