@@ -1,10 +1,11 @@
 // Live site: the event setup (organiser's changes, every company's booth) is kept on the server,
 // so the panitia, the companies and the job seekers all see the same event on every device.
 // Everyone pulls it; event admins push what they change here, and company accounts their own booth.
+import type { StandPlacements } from "@vwo/shared";
 import type { BookedBooth, CompanyState, OrgState, RentedStall } from "./jobfair-engine";
 import { fair } from "./useFair";
 
-type Shared = { org: OrgState | null; companies: Record<string, CompanyState>; bookings?: BookedBooth[]; stalls?: RentedStall[]; version: number };
+type Shared = { org: OrgState | null; companies: Record<string, CompanyState>; bookings?: BookedBooth[]; stalls?: RentedStall[]; placements?: StandPlacements; version: number };
 
 let started = false;
 let admin = false;
@@ -69,7 +70,7 @@ export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
       // After the first pull, an admin's unsent edits win; they go up on the next push.
       if (d.version === version || unsent()) return;
       version = d.version;
-      fair.applyShared(d.org, d.companies, d.bookings ?? [], d.stalls ?? []);
+      fair.applyShared(d.org, d.companies, d.bookings ?? [], d.stalls ?? [], d.placements ?? {});
       const now = local();
       if (d.org) synced.set("org", now.get("org")!);
       for (const id of Object.keys(d.companies)) {

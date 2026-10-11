@@ -1,5 +1,6 @@
 import { boothsOf, readFairState, writeFairState } from "@vwo/db";
 import { NextResponse } from "next/server";
+import { PLACEMENT_KEY } from "@/lib/booths";
 import { guardCompanyDoc } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth, isFairAdmin } from "@/lib/fair";
@@ -30,6 +31,7 @@ export async function GET() {
   const companies: Record<string, Doc> = {};
   const bookings: Doc[] = [];
   const stalls: unknown[] = [];
+  let placements: Doc = {};
   let version = 0;
   for (const r of rows) {
     // A booth's inbox read marks are that company's alone (see booths/[booth]/inbox).
@@ -44,6 +46,9 @@ export async function GET() {
     } else if (r.key.startsWith("booking:")) {
       // A stand a company booked itself: everyone sees the booth, admins also the booking and PIN.
       bookings.push(admin ? { booth: data.booth, booking: data.booking, pin: data.pin } : { booth: data.booth });
+    } else if (r.key === PLACEMENT_KEY) {
+      // Where the organiser moved stands to: everyone's game puts them there.
+      placements = (data.placements ?? {}) as Doc;
     } else if (r.key.startsWith("stall:")) {
       // A food court stand a business paid for: everyone sees it, admins also who paid.
       stalls.push(rentedOut(data, admin));
@@ -53,7 +58,7 @@ export async function GET() {
       companies[id] = admin || mine.has(id) ? data : { ...rest, invoices: [] };
     }
   }
-  return NextResponse.json({ org, companies, bookings, stalls, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ org, companies, bookings, stalls, placements, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** Save the organiser's setup (event admins) or one company's booth (its accounts, or admins). */
