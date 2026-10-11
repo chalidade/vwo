@@ -45,3 +45,26 @@ export async function addFairStateLocked(db: Db, lock: string, userId: string, d
     return doc;
   });
 }
+
+/**
+ * Read the documents and write one (new or replacing), under a lock: the organiser moving stands
+ * and a booking taking a slot decide from the same documents one after the other.
+ */
+export async function putFairStateLocked<T extends { key: string; data: unknown }>(
+  db: Db,
+  lock: string,
+  userId: string,
+  decide: (rows: { key: string; data: unknown }[]) => T | { error: string },
+) {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fair:" + lock}))`);
+    const rows = await tx.select({ key: fairState.key, data: fairState.data }).from(fairState);
+    const doc = decide(rows);
+    if ("error" in doc) return doc;
+    await tx
+      .insert(fairState)
+      .values({ key: doc.key, data: doc.data, updatedBy: userId })
+      .onConflictDoUpdate({ target: fairState.key, set: { data: doc.data, updatedBy: userId, updatedAt: sql`now()` } });
+    return doc;
+  });
+}

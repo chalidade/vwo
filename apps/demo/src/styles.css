@@ -2196,3 +2196,23 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .cp-form .pk-opts button { min-height: 30px; box-sizing: border-box; display: inline-flex; align-items: center; }
 .cp-form .pk-chips li { max-width: 100%; overflow-wrap: anywhere; }
 .cp-form label > small { font-weight: 400; }
+/* stand-placement: the organiser moves a stand to another floor or slot, or swaps two stands. */
+.cp-modal.org-move-wrap { z-index: 70; padding: 12px; }
+.org-move { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow: auto; display: grid; gap: 10px; }
+.org-move .cp-h2 { margin: 0; }
+.org-move-help { margin: 0; }
+.org-move-floors { display: grid; gap: 10px; }
+.org-move-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.org-move-price { white-space: nowrap; }
+.org-move-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, auto); grid-auto-flow: column; gap: 6px; }
+.org-move-cell { all: unset; box-sizing: border-box; display: grid; gap: 2px; align-content: center; min-height: 52px; min-width: 0; padding: 6px 8px; border-radius: 10px; border: 1.5px dashed #d4d4d4; background: transparent; color: var(--text); cursor: pointer; font-size: 12px; line-height: 1.25; }
+.org-move-cell[data-state="taken"] { border: 1.5px solid var(--line, #e5e5e5); border-left: 5px solid var(--c, #111); background: #fff; }
+.org-move-cell[data-state="here"] { border: 1.5px solid #111; background: #f4f4f5; cursor: default; }
+.org-move-cell[data-picked] { outline: 2.5px solid #111; outline-offset: 1px; }
+.org-move-cell:focus-visible { outline: 2.5px solid #111; outline-offset: 1px; }
+.org-move-cell:disabled:not([data-state="here"]) { opacity: 0.5; cursor: default; }
+.org-move-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-move-slot { color: var(--muted, #6b7280); font-size: 11px; }
+.org-move-plan { margin: 0; display: block; }
+.org-move-plan svg { vertical-align: -2px; }
+.org-move .row { position: sticky; bottom: -14px; padding: 8px 0 2px; background: inherit; }
