@@ -1,6 +1,6 @@
 import { fairFloorIndex, infoDeskOn } from "@vwo/shared";
 import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
-import { staffLook } from "../JobFair";
+import { staffLook } from "./staff-look";
 import { levelOf } from "./content";
 import { fair } from "../useFair";
 

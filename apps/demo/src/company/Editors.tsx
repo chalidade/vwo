@@ -3,7 +3,7 @@ import { useState } from "react";
 import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
 import { readImageFile } from "../imageFile";
-import { staffLook } from "../JobFair";
+import { staffLook } from "../fair/staff-look";
 import { ACCESSORY_PRODUCTS, coinText } from "../fair/company";
 import { fair } from "../useFair";
 import { GateEditor, MediaEditor } from "./MediaEditor";

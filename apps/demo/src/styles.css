@@ -1908,3 +1908,88 @@ body:has(.app-dash) { background: #f7f7f7; }
 .app-dash .cp-server-note { border: 0; border-radius: 16px; background: var(--soft); color: var(--text); }
 .app-dash .bl-wait, .app-dash .pr-koin { background: var(--soft); color: var(--text); }
 .app-dash .pr-row[data-changed] { background: #fafafa; box-shadow: inset 3px 0 0 var(--ink); }
+
+/* ======================================================================
+   Light mode (#/ringan): the fair as plain lists for cheap phones, slow
+   connections and assistive technology. System font, big text and tap
+   targets, strong contrast, no motion, no images.
+   ====================================================================== */
+.app-loading { margin: 40vh auto 0; color: #737373; font: 15px system-ui, sans-serif; }
+.app-lite { --l-ink: #111; --l-muted: #525252; --l-line: #e5e5e5; --l-soft: #f2f2f2; background: #f7f7f7; color: var(--l-ink); font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body:has(.app-lite) { background: #f7f7f7; background-image: none; }
+.lite { max-width: 760px; width: 100%; margin: 0 auto; padding: 0 16px 48px; }
+.lite * { animation: none !important; transition: none !important; }
+.lite a { color: var(--l-ink); text-decoration: underline; text-underline-offset: 3px; }
+.lite :focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.lite-skip { position: absolute; left: -9999px; }
+.lite-skip:focus { left: 16px; top: 8px; z-index: 50; padding: 10px 14px; background: #fff; border-radius: 10px; }
+.lite-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(12px + env(safe-area-inset-top)) 0 12px; background: #f7f7f7; border-bottom: 1px solid var(--l-line); }
+.lite-brand { display: block; font-size: 18px; }
+.lite-mode { font-size: 13px; color: var(--l-muted); }
+.lite-nav { display: flex; gap: 8px; }
+.lite-main { display: grid; gap: 14px; padding-top: 14px; }
+.lite-intro { margin: 0; color: var(--l-muted); }
+.lite-notice { margin: 0; padding: 12px 14px; border-radius: 14px; background: #ecfdf5; color: #065f46; font-weight: 600; }
+.lite-card { margin: 0; padding: 16px; border-radius: 18px; background: #fff; border: 1px solid var(--l-line); }
+.lite-card h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.25; }
+.lite-muted { display: block; color: var(--l-muted); font-size: 15px; margin: 0; }
+.lite-why { display: block; font-size: 14px; font-weight: 600; }
+.lite-list { list-style: none; margin: 0; padding: 0; }
+.lite-job { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--l-line); }
+.lite-list > .lite-job:first-child { border-top: 0; }
+.lite-job > span:first-child { min-width: 0; display: grid; gap: 2px; }
+.lite-more { font-size: 15px; }
+.lite-more summary { cursor: pointer; color: var(--l-muted); min-height: 32px; display: inline-flex; align-items: center; }
+.lite-more ul { margin: 4px 0; padding-left: 20px; }
+.lite-more p { margin: 4px 0; }
+.lite-status { flex: none; padding: 6px 10px; border-radius: 999px; background: var(--l-soft); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.lite-booths { margin-top: 10px; }
+.lite-companies { display: grid; gap: 10px; }
+.lite-co > summary { list-style: none; cursor: pointer; display: grid; gap: 2px; min-height: 44px; }
+.lite-co > summary::-webkit-details-marker { display: none; }
+.lite-co > summary::after { content: "Lihat lowongan"; font-size: 14px; text-decoration: underline; color: var(--l-muted); }
+.lite-co[open] > summary::after { content: "Tutup"; }
+.lite-co[open] > summary { margin-bottom: 8px; }
+.lite-co-name { display: flex; gap: 8px; align-items: center; font-size: 18px; }
+.lite-tag { padding: 1px 7px; border-radius: 999px; background: var(--l-soft); font-size: 12px; font-weight: 700; }
+.lite-filters { display: grid; gap: 10px; grid-template-columns: 1fr; margin-bottom: 8px; }
+@media (min-width: 640px) { .lite-filters { grid-template-columns: 2fr 1fr 1fr; } }
+.lite-filters label, .lite-field { display: grid; gap: 4px; font-size: 15px; font-weight: 600; }
+.lite input, .lite select, .lite textarea { width: 100%; min-height: 46px; padding: 10px 12px; font: inherit; font-size: 17px; color: var(--l-ink); background: #fff; border: 1.5px solid #a3a3a3; border-radius: 12px; box-shadow: none; }
+.lite textarea { min-height: 90px; }
+.lite button { box-shadow: none; transform: none; font: inherit; cursor: pointer; }
+.lite-btn { flex: none; min-height: 44px; padding: 10px 18px; border: 0; border-radius: 999px; background: var(--l-ink); color: #fff; font-weight: 700; }
+.lite-btn:disabled { opacity: 0.6; }
+.lite-chip { min-height: 40px; padding: 8px 14px; border: 1.5px solid var(--l-line); border-radius: 999px; background: #fff; color: var(--l-ink); font-weight: 600; font-size: 15px; }
+.lite-link { padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; font-weight: inherit; }
+.lite-form { display: grid; gap: 12px; }
+.lite-error { margin: 0; color: #b91c1c; font-weight: 600; }
+.lite-sheet-wrap { position: fixed; inset: 0; z-index: 60; display: grid; align-items: end; justify-items: center; background: rgb(0 0 0 / 0.45); }
+.lite-sheet { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 18px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #fff; color: var(--l-ink); }
+@media (min-width: 640px) { .lite-sheet-wrap { align-items: center; } .lite-sheet { border-radius: 22px; } }
+.lite-sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.lite-sheet-head h2 { margin: 0; font-size: 20px; }
+@media (prefers-color-scheme: dark) {
+  .app-lite { --l-ink: #f5f5f5; --l-muted: #c4c4c4; --l-line: #333; --l-soft: #262626; background: #111; }
+  body:has(.app-lite) { background: #111; }
+  .lite-top { background: #111; }
+  .lite-card, .lite-sheet, .lite-chip, .lite input, .lite select, .lite textarea { background: #1a1a1a; color: var(--l-ink); }
+  .lite-btn { background: #f5f5f5; color: #111; }
+  .lite-notice { background: #052e1f; color: #a7f3d0; }
+  .lite-skip:focus { background: #1a1a1a; }
+  .lite-error { color: #fca5a5; }
+}
+.lp-lite { margin: 16px 0 0; font-size: 14px; color: var(--lp-muted); }
+.lp-lite a { color: inherit; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.lp-lite[data-slow] { padding: 10px 14px; border-radius: 12px; background: rgb(255 255 255 / 0.08); color: #fff; }
+/* The sign-in box inside the light mode drops the game frame. */
+.lite-sheet .rpg-box.ag { width: 100%; padding: 0; border: 0; box-shadow: none; background: transparent; color: var(--l-ink); font: inherit; image-rendering: auto; }
+.lite-sheet .ag-logo { display: none; }
+.lite-sheet .ag-tabs button, .lite-sheet .ag button { min-height: 44px; border: 1.5px solid var(--l-line); border-radius: 999px; box-shadow: none; background: transparent; color: var(--l-ink); }
+.lite-sheet .ag-tabs button[aria-selected="true"], .lite-sheet .ag .cc-go { background: var(--l-ink); border-color: var(--l-ink); color: #fff; }
+.lite-sheet .ag a, .lite-sheet .ag .ag-link { color: var(--l-ink); }
+.lite-sheet .cc-note { color: var(--l-muted); }
+@media (prefers-color-scheme: dark) { .lite-sheet .ag-tabs button[aria-selected="true"], .lite-sheet .ag .cc-go { color: #111; } }
+.lite-sheet .ag button.ag-link { min-height: 0; padding: 0; border: 0; background: none; text-decoration: underline; }
+.sp-why { font-size: 12px; font-weight: 700; color: #15803d; }
+.sp-h3 { margin: 12px 0 6px; font-size: 13px; }

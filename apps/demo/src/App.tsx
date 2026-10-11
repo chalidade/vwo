@@ -1,9 +1,6 @@
-import { useEffect, useState } from "react";
-import { JobFair } from "./JobFair";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Landing } from "./Landing";
-import { JobFairAdmin } from "./JobFairAdmin";
-import { CompanyPortal } from "./company/Portal";
-import { SpeakerStage } from "./organizer/Speaker";
+import { LiteMode } from "./lite/Lite";
 import { LIVE } from "./mode";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
 import { startCoinSync } from "./coin-sync";
@@ -53,6 +50,13 @@ function useLiveAccount() {
   return account;
 }
 
+// The game and the dashboards load only when opened, so the home page and the light mode stay small
+// on cheap phones and slow connections.
+const JobFair = lazy(() => import("./JobFair").then((m) => ({ default: m.JobFair })));
+const JobFairAdmin = lazy(() => import("./JobFairAdmin").then((m) => ({ default: m.JobFairAdmin })));
+const CompanyPortal = lazy(() => import("./company/Portal").then((m) => ({ default: m.CompanyPortal })));
+const SpeakerStage = lazy(() => import("./organizer/Speaker").then((m) => ({ default: m.SpeakerStage })));
+
 export function App() {
   const hash = useHash();
   const account = useLiveAccount();
@@ -62,28 +66,33 @@ export function App() {
   const route = hash.replace(/^#\/?/, "");
   // In a room the game takes the whole screen; the way back home is on the title screen.
   const game = route === "jobfair";
-  const home = !route.startsWith("jobfair");
+  const lite = route === "ringan";
+  const home = !route.startsWith("jobfair") && !lite;
   // The organiser pages and the company portal use the light dashboard look.
   const dash = route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route === "jobfair/speaker";
   return (
-    <div className={game ? "app app-game" : home ? "app app-home" : dash ? "app app-dash" : "app"}>
-      {route === "jobfair" ? (
-        <JobFair />
-      ) : (route.startsWith("jobfair/admin") || route === "jobfair/speaker") && !organizer ? (
-        <main className="cp">
-          <p className="card cp-server-note">
-            Halaman ini khusus panitia. Masuk dengan akun panitia di halaman Job Fair, lalu buka lagi. <a href="#/jobfair">Ke Job Fair</a>
-          </p>
-        </main>
-      ) : route.startsWith("jobfair/admin") ? (
-        <JobFairAdmin tab={route.split("/")[2]} />
-      ) : route === "jobfair/speaker" ? (
-        <SpeakerStage />
-      ) : route.startsWith("jobfair/company") ? (
-        <CompanyPortal boothId={route.split("/")[2]} />
-      ) : (
-        <Landing />
-      )}
+    <div className={game ? "app app-game" : home ? "app app-home" : dash ? "app app-dash" : lite ? "app app-lite" : "app"}>
+      <Suspense fallback={<p className="app-loading">Memuat…</p>}>
+        {lite ? (
+          <LiteMode />
+        ) : route === "jobfair" ? (
+          <JobFair />
+        ) : (route.startsWith("jobfair/admin") || route === "jobfair/speaker") && !organizer ? (
+          <main className="cp">
+            <p className="card cp-server-note">
+              Halaman ini khusus panitia. Masuk dengan akun panitia di halaman Job Fair, lalu buka lagi. <a href="#/jobfair">Ke Job Fair</a>
+            </p>
+          </main>
+        ) : route.startsWith("jobfair/admin") ? (
+          <JobFairAdmin tab={route.split("/")[2]} />
+        ) : route === "jobfair/speaker" ? (
+          <SpeakerStage />
+        ) : route.startsWith("jobfair/company") ? (
+          <CompanyPortal boothId={route.split("/")[2]} />
+        ) : (
+          <Landing />
+        )}
+      </Suspense>
     </div>
   );
 }
