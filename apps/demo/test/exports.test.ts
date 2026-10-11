@@ -206,6 +206,37 @@ describe("lapor lowongan", () => {
     expect(rows[1]!.slice(5, 10)).toEqual(["", "Bandung", "nego", null, "Paruh waktu"]);
   });
 
+  it("lists every picked place and its provinces, comma separated", () => {
+    const [row] = laporRows([
+      {
+        company: "PT Multi",
+        jobs: [
+          {
+            id: "m1",
+            title: "Kasir / Pramuniaga",
+            type: "Kontrak",
+            location: "Bandung, Surabaya",
+            requirements: ["Teliti", "Memiliki SIM C"],
+            education: "SMA/SMK, D3",
+            major: "SMK Akuntansi, Manajemen",
+            experience: "Fresh graduate, < 1 tahun",
+            city: "Kota Bandung, Kab. Bandung, Kota Surabaya",
+          },
+        ],
+      },
+    ]);
+    expect(row!.slice(0, 7)).toEqual([
+      "Kasir / Pramuniaga",
+      null,
+      "SMA/SMK, D3",
+      "SMK Akuntansi, Manajemen",
+      "Fresh graduate, < 1 tahun",
+      "Jawa Barat, Jawa Timur",
+      "Kota Bandung, Kab. Bandung, Kota Surabaya",
+    ]);
+    expect(row![12]).toBe("Teliti; Memiliki SIM C");
+  });
+
   it("writes a CSV Excel opens without running formulas", () => {
     const csv = laporCsv(booths);
     expect(csv.startsWith('﻿"Jabatan",')).toBe(true);

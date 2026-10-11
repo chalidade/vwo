@@ -778,6 +778,9 @@ export function JobFair() {
     if (!hasStand(b)) return setBoard({ boothId: b.id });
     const me = session && fair.visitors.get(session.visitorId);
     if (!me) return;
+    // A stand on a paid floor (the organiser may have moved it there) asks for that floor's ticket first.
+    const into = fair.passFor(fair.floorIdOf(b));
+    if (into && me.floorId !== fair.floorIdOf(b) && !fair.hasTicket(into.id)) return askTicket(into, () => goToBooth(b));
     goal.current = { floorId: fair.floorIdOf(b), ...boothSpot(b, "talk"), then: () => talkToRecruiter(b) };
     planRoute();
   };

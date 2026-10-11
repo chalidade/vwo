@@ -73,6 +73,11 @@ import {
   limitOpenJobs,
   productAllowed,
   UMKM_CORNER,
+  STAND_SLOTS,
+  type StandPlacements,
+  type StandSpot,
+  placeStands,
+  planStandMove,
 } from "@vwo/shared";
 import {
   CAREER_ARTICLES,
@@ -260,6 +265,9 @@ export interface OrgState {
   hiddenRooms?: string[];
   /** Entry price in coins per floor id, when the organiser changed it. 0 is free. */
   prices?: Record<string, number>;
+  /** Where the organiser moved stands to, by booth id (see placeStands). Live: the server's
+   *  placement document, which only the move route writes, replaces this on every pull. */
+  placements?: StandPlacements;
   /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. 3 once
    *  promoters' levels follow the floor order with the Aula on Lantai 1. */
   layout?: number;
@@ -392,7 +400,7 @@ export interface PsychConfig {
 }
 
 /** Where a booth can stand on a hall floor: three columns, two rows. */
-export const BOOTH_SLOTS = [3, 20, 37].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
+export const BOOTH_SLOTS = STAND_SLOTS;
 
 /** Paid booth decorations visitors can use, and what happened. */
 export type AccessoryResult = { ok: true; text: string; voucher?: Voucher; coins?: number } | { ok: false; text: string };
@@ -729,6 +737,10 @@ export class DemoJobFair {
   org: OrgState = { removed: [], added: [] };
   /** Live: booths that came from a server booking. */
   private booked = new Set<string>();
+  /** Where each stand stands now, by booth id (see loadOrg). */
+  private spots = new Map<string, StandSpot>();
+  /** Where each VIP booth stood when its SPG was placed, so a moved booth's SPG goes with it. */
+  private spgAt = new Map<string, string>();
   /** Live: food court stalls that came from a paid rental. */
   private rentedStalls = new Set<string>();
   /** Walking promoters: where they are heading and who they last talked to. */
@@ -851,7 +863,11 @@ export class DemoJobFair {
           const id = spgId(b.id);
           const was = old.get(id);
           const floorId = fairFloorId(fair, b.floor);
-          if (was && was.floorId === floorId) return { ...was, name: spgName(b.id), boothId: b.id };
+          const at = `${b.floor}:${b.x}:${b.y}`;
+          // The SPG stays where it is unless the organiser moved the booth: then it goes to the new gate.
+          const moved = this.spgAt.get(b.id) !== at;
+          this.spgAt.set(b.id, at);
+          if (was && was.floorId === floorId && !moved) return { ...was, name: spgName(b.id), boothId: b.id };
           return { id, name: spgName(b.id), boothId: b.id, floorId, ...spgHome(b), facing: "front" };
         }),
       ...fair.promoters.map((p) => {
@@ -872,13 +888,15 @@ export class DemoJobFair {
     this.applyBuilding();
     const before = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
     const base = [...[...this.original.values()].filter((b) => !this.org.removed.includes(b.id)), ...this.org.added];
+    // Where each stand stands: where it was published, added or booked, or where the organiser moved it.
+    this.spots = placeStands(base, this.org.placements, this.fair.floors.length);
     const byId = new Map(this.fair.booths.map((b) => [b.id, b]));
     // Keep the same objects for booths that stay, so open dialogs keep pointing at them.
     const booths = base.map((b) => {
       const mine = byId.get(b.id);
-      if (!mine) return structuredClone(b);
+      if (!mine) return Object.assign(structuredClone(b), this.spots.get(b.id));
       for (const k of Object.keys(mine)) delete (mine as unknown as Record<string, unknown>)[k];
-      return Object.assign(mine, structuredClone(b));
+      return Object.assign(mine, structuredClone(b), this.spots.get(b.id));
     });
     this.fair.booths.splice(0, this.fair.booths.length, ...booths);
     // Published promoters stand on the published levels: move them with their floor, drop them with it.
@@ -1138,7 +1156,8 @@ export class DemoJobFair {
     if (!stand && !this.fair.floors[input.floor]) return null;
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
     let id = slug;
-    for (let n = 2; this.original.has(id) || this.org.added.some((b) => b.id === id); n++) id = `${slug}-${n}`;
+    // Ids still named by a stand move are not given out again, so a new booth doesn't inherit an old one's spot.
+    for (let n = 2; this.original.has(id) || this.org.added.some((b) => b.id === id) || this.org.placements?.[id]; n++) id = `${slug}-${n}`;
     const booth: CompanyBooth = {
       id,
       company: name,
@@ -1187,6 +1206,30 @@ export class DemoJobFair {
   /** Booths taken out that could come back. */
   removedBooths() {
     return this.org.removed.map((id) => this.original.get(id)!).filter(Boolean);
+  }
+
+  /** The stand at slot `slot` of booth floor `floor`, if one stands there. */
+  standAt(floor: number, slot: number) {
+    const sl = BOOTH_SLOTS[slot];
+    return sl ? this.fair.booths.find((b) => hasStand(b) && b.floor === floor && b.x === sl.x && b.y === sl.y) : undefined;
+  }
+
+  /**
+   * Demo: the organiser moves a stand to slot `slot` of booth floor `floor`, or swaps it with the
+   * stand there. Its applicants, promoter, media and the floor's entry price go with it, since they
+   * follow the booth's id and floor. The live app asks the server instead (see setPlacements).
+   */
+  moveStand(boothId: string, floor: number, slot: number) {
+    const r = planStandMove(this.fair.booths, this.org.placements, boothId, { floor, slot }, this.fair.floors.length);
+    if ("error" in r) return r;
+    this.setPlacements(r.placements);
+    return r;
+  }
+
+  /** Put the stands where the organiser moved them (live: the server's answer to a move). */
+  setPlacements(placements: StandPlacements) {
+    this.org.placements = structuredClone(placements);
+    this.saveOrg();
   }
 
   /** Add or change a promoter NPC (standing or walking). */
@@ -1463,6 +1506,8 @@ export class DemoJobFair {
         b.jobs = limitOpenJobs(b.tier, b.jobs);
         if (b.featuredJob && !st.owned.includes(FEATURED_PRODUCT_ID)) delete b.featuredJob;
       }
+      // The organiser decides where a stand stands, whatever a company's saved edits say.
+      Object.assign(b, this.spots.get(b.id));
       const rec = this.staff.find((x) => x.id === recruiterId(b.id));
       if (rec) rec.name = b.recruiter;
     }
@@ -1479,6 +1524,13 @@ export class DemoJobFair {
     if (sig === this.floorSig) return;
     this.floorSig = sig;
     this.fair.floors.forEach((_, i) => (this.floors[i] = buildJobFairFloor(this.fair, i)));
+    // A stand moved onto someone (the organiser moved or swapped it): they step out beside it.
+    for (const v of this.visitors.values()) {
+      const f = this.floors.find((x) => x.id === v.floorId);
+      if (!f || v.seatId || !isBlocked(f, v.x, v.y)) continue;
+      const p = freeSpotNear(f, v.x, v.y);
+      Object.assign(v, isBlocked(f, p.x, p.y) ? LIFT_FRONT : p);
+    }
   }
 
   /**
@@ -1722,12 +1774,14 @@ export class DemoJobFair {
   }
 
   /** Live: take the setup from the server. Missing parts keep what this browser has. */
-  applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = [], stalls: RentedStall[] = []) {
-    const base = org ?? (bookings.length || stalls.length ? this.org : null);
+  applyShared(org: OrgState | null, companies: Record<string, CompanyState>, bookings: BookedBooth[] = [], stalls: RentedStall[] = [], placements: StandPlacements = {}) {
+    const base = org ?? (bookings.length || stalls.length || Object.keys(placements).length ? this.org : null);
     if (base) {
       const next = structuredClone(base);
       next.added ??= [];
       next.removed ??= [];
+      // Stand moves come only from the server's placement document.
+      next.placements = structuredClone(placements);
       for (const b of bookings) {
         this.booked.add(b.booth.id);
         if (next.removed.includes(b.booth.id)) continue;
