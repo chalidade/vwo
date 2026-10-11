@@ -3,7 +3,8 @@ import { type BoothTheme, type CompanyBooth, type GateStyle, hasStand, MINI_MAX_
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
-import { ACCESSORY_PRODUCTS, coinText, rupiah } from "../fair/company";
+import { FileSpreadsheet } from "lucide-react";
+import { ACCESSORY_PRODUCTS, LAPOR_LABEL, coinText, rupiah } from "../fair/company";
 import { LIVE } from "../mode";
 import { boothMembers, removeBoothMember } from "../server-fair";
 import { fair } from "../useFair";
@@ -32,6 +33,25 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
         <p className="muted small" style={{ marginTop: 0 }}>
           Tiap lantai aula punya {BOOTH_SLOTS.length} tempat stand. Lepas stand untuk mengosongkan tempat: di peta muncul stand kosong yang bisa dibooking perusahaan sendiri, atau isi langsung di sini. {free.length} tempat kosong.
         </p>
+        <div className="row org-export">
+          <span className="muted small cp-grow">
+            Semua lowongan aktif di acara ini ({fair.fair.booths.reduce((n, b) => n + b.jobs.filter((j) => !j.closed).length, 0)}), {LAPOR_LABEL}:
+          </span>
+          <button
+            type="button"
+            className="small-btn ghost"
+            onClick={() => void import("../fair/exports").then((m) => m.saveLapor(fair.fair.booths, "lapor-lowongan-acara", "xlsx"))}
+          >
+            <FileSpreadsheet size={14} aria-hidden /> Excel
+          </button>
+          <button
+            type="button"
+            className="small-btn ghost"
+            onClick={() => void import("../fair/exports").then((m) => m.saveLapor(fair.fair.booths, "lapor-lowongan-acara", "csv"))}
+          >
+            CSV
+          </button>
+        </div>
         {floors.map((fl, floor) => (
           <section key={floor} className="org-floor">
             <h3 className="cp-h3">{fl.name}</h3>

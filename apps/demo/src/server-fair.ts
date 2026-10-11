@@ -49,6 +49,37 @@ export function applyErrorText(error: string) {
   }
 }
 
+/** A booth's ATS webhook as the portal sees it; the secret only ever comes back once, when made. */
+export interface BoothHook {
+  url: string;
+  enabled: boolean;
+  lastStatus: number | null;
+  lastAt: number | null;
+  updatedAt: number;
+}
+const hookPath = (boothId: string) => `booths/${encodeURIComponent(boothId)}/hook`;
+export const boothHook = (boothId: string) => call<{ hook: BoothHook | null }>(hookPath(boothId));
+export const saveBoothHook = (boothId: string, url: string, enabled: boolean) =>
+  call<{ hook: BoothHook; secret?: string }>(hookPath(boothId), { method: "PUT", body: { url, enabled } });
+export const rotateBoothHook = (boothId: string) => call<{ secret: string }>(hookPath(boothId), { method: "POST", body: { action: "rotate" } });
+export const testBoothHook = (boothId: string) => call<{ status: number; error?: string; hook: BoothHook | null }>(hookPath(boothId), { method: "POST", body: { action: "test" } });
+export const deleteBoothHook = (boothId: string) => call<{ ok: true }>(hookPath(boothId), { method: "DELETE", body: {} });
+
+/** What to tell the company when saving or testing its webhook failed. */
+export function hookErrorText(error: string) {
+  const text: Record<string, string> = {
+    https_only: "Alamat harus diawali https://",
+    invalid_url: "Alamat URL tidak valid.",
+    url_not_allowed: "Alamat ini tidak diizinkan (localhost, jaringan privat, atau tidak bisa ditemukan). Pakai alamat publik ATS kamu.",
+    too_many_requests: "Terlalu sering. Coba lagi beberapa menit lagi.",
+    not_allowed: "Akun ini bukan pengelola stand ini.",
+    not_signed_in: "Masuk dulu dengan akun perusahaan.",
+    not_found: "Webhook belum diatur.",
+    offline: "Tidak tersambung ke server.",
+  };
+  return text[error] ?? "Gagal. Coba lagi.";
+}
+
 /** The company's private notes on one applicant. */
 export const saveNotes = (boothId: string, id: string, notes: string) =>
   call<{ ok: true }>(`booths/${encodeURIComponent(boothId)}/applications`, { method: "PATCH", body: { id, notes: notes.slice(0, 1000) } });
