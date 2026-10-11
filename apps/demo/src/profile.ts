@@ -11,6 +11,8 @@ export interface SeekerProfile {
   education: string;
   skills: string;
   cvUrl: string;
+  /** Campus or school, for the campus leaderboard. */
+  campus?: string;
   /** Profile photo as a small JPEG data URL, shown to HR with applications. */
   photo?: string;
 }

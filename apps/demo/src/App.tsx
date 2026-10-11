@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Landing } from "./Landing";
 import { LiteMode } from "./lite/Lite";
 import { LIVE } from "./mode";
+import { fair } from "./useFair";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
 import { startCoinSync } from "./coin-sync";
 import { startPaymentSync } from "./payments";
@@ -10,6 +11,7 @@ import { startPriceSync } from "./prices-sync";
 import { startReviewSync } from "./review-sync";
 import { startStatsSync } from "./stats-sync";
 import { startSharedSync } from "./shared-state";
+import { claimStoredRef } from "./fair/viral";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -35,6 +37,7 @@ function useLiveAccount() {
       if (a) startPaymentSync();
       startReviewSync();
       startStatsSync(!!a);
+      void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
@@ -44,6 +47,7 @@ function useLiveAccount() {
       if (a) startPaymentSync();
       startReviewSync();
       startStatsSync(!!a);
+      void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);
   }, []);
