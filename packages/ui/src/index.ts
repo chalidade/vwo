@@ -6,3 +6,4 @@ export * from "./rpg/JobFair";
 export * from "./rpg/FairRooms";
 export * from "./rpg/BoothDecor";
 export * from "./rpg/Mascot";
+export * from "./rpg/Anomaly";

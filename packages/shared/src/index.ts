@@ -21,3 +21,4 @@ export * from "./talent-pool";
 export * from "./booth-report";
 export * from "./seminars";
 export * from "./stand-placement";
+export * from "./anomaly";

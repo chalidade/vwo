@@ -3,6 +3,7 @@ import { ALL_COIN_PACKAGES, coinsFor, PRICE_CATALOG, PRICE_GROUPS, type Prices, 
 import { rupiah } from "../fair/company";
 import { savePrices } from "../prices-sync";
 import { useFair } from "../useFair";
+import { OrgAnomalies } from "./Anomalies";
 
 const show = (unit: string, n: number) => (unit === "koin" ? `${n} koin` : rupiah(n));
 
@@ -97,6 +98,7 @@ export function OrgPrices({ onToast }: { onToast: (t: string) => void }) {
           </button>
         </div>
       </div>
+      <OrgAnomalies onToast={onToast} />
     </div>
   );
 }

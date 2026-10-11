@@ -26,3 +26,4 @@ export * from "./fair-invoices";
 export * from "./fair-pool";
 export * from "./booth-reports";
 export * from "./seminar-registrations";
+export * from "./anomaly";

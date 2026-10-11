@@ -67,6 +67,8 @@ import {
   boothFrame,
   vipSeats,
   type AulaEvent,
+  type AnomalySettings,
+  anomalySettings,
   DEFAULT_RUNDOWN,
   type Reminder,
   type RemindList,
@@ -296,6 +298,8 @@ export interface OrgState {
   /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. 3 once
    *  promoters' levels follow the floor order with the Aula on Lantai 1. */
   layout?: number;
+  /** Random anomalies (a cat, fireflies...) on the floors: on or off, and claims per seeker per day. The server reads this too. */
+  anomalies?: AnomalySettings;
 }
 
 /** How many notifications the demo keeps for each person or company. */
@@ -1312,6 +1316,16 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
+  /** Random anomalies on the floors, as the organiser set them. */
+  anomalySettings() {
+    return anomalySettings(this.org);
+  }
+
+  setAnomalySettings(next: Partial<AnomalySettings>) {
+    this.org.anomalies = anomalySettings({ anomalies: { ...this.anomalySettings(), ...next } });
+    this.saveOrg();
+  }
+
   // ---- Company sign-in and stand bookings ---------------------------------------------------
 
   companyPin(boothId: string) {
@@ -2139,6 +2153,12 @@ export class DemoJobFair {
     this.player.txns.length = Math.min(this.player.txns.length, 50);
     if (op) this.onCoins?.(op);
     this.persist();
+  }
+
+  /** The offline demo pays for a tapped anomaly here; on the live site the server booked it and sent the ledger. */
+  anomalyFound(coins: number, reason: string) {
+    this.earn(coins, reason);
+    this.emit();
   }
 
   /** Live: the balance, history and blue check as the server's ledger has them. */
