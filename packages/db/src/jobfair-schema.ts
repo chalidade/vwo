@@ -1,7 +1,7 @@
 // Job fair tables. Accounts reuse `users`; everything else here belongs to a fair.
 // Coins are an append-only ledger: a balance is the sum of a user's rows, never a column anyone edits.
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgEnum, pgSequence, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./schema";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -509,3 +509,76 @@ export const fairPayments = pgTable(
     check("fair_payments_amount_ck", sql`${t.amount} > 0`),
   ],
 );
+
+/** Invoice numbers count up without gaps being reused, across all buyers: INV/2026/10/000123. */
+export const fairInvoiceSeq = pgSequence("fair_invoice_seq", { startWith: 1 });
+
+/**
+ * Official bills for companies and agencies: a numbered invoice for coins or booth items, paid
+ * through the gateway, by bank transfer, or in instalments (termin). Totals are worked out on the
+ * server; once the organiser is PKP the tax line and the faktur pajak number are filled in.
+ */
+export const fairInvoices = pgTable(
+  "fair_invoices",
+  {
+    id: id(),
+    number: text("number").notNull(),
+    userId: userRef("user_id"),
+    boothKey: text("booth_key"),
+    /** The gateway payment that settles it, when paid that way. */
+    paymentId: uuid("payment_id").references(() => fairPayments.id, { onDelete: "set null" }),
+    /** Who is billed: company or agency name, NPWP, address, email, contact. */
+    buyer: jsonb("buyer").notNull(),
+    /** Lines: { name, qty, unit, amount }. */
+    items: jsonb("items").notNull(),
+    subtotal: integer("subtotal").notNull(),
+    tax: integer("tax").notNull().default(0),
+    total: integer("total").notNull(),
+    /** gateway · transfer · termin */
+    method: text("method").notNull(),
+    /** issued → paid, or void. */
+    status: text("status").notNull().default("issued"),
+    dueAt: ts("due_at"),
+    paidAt: ts("paid_at"),
+    /** The faktur pajak number, once the organiser has made it (PKP only). */
+    taxInvoiceNo: text("tax_invoice_no"),
+    /** Instalments, transfer proofs and anything else about how it gets paid. */
+    meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("fair_invoices_number_uq").on(t.number),
+    index("fair_invoices_user_idx").on(t.userId),
+    index("fair_invoices_booth_idx").on(t.boothKey),
+    check("fair_invoices_method_ck", sql`${t.method} in ('gateway','transfer','termin')`),
+    check("fair_invoices_status_ck", sql`${t.status} in ('issued','paid','void')`),
+    check("fair_invoices_total_ck", sql`${t.total} >= 0 and ${t.subtotal} >= 0 and ${t.tax} >= 0`),
+  ],
+);
+
+/** A booth's post-event report frozen when an event ends, so the next event can be compared with it. */
+export const fairBoothReports = pgTable(
+  "fair_booth_reports",
+  {
+    id: id(),
+    boothKey: text("booth_key").notNull(),
+    /** The event it covers, e.g. "Job Fair Oktober 2026". */
+    eventName: text("event_name").notNull(),
+    data: jsonb("data").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("fair_booth_reports_booth_idx").on(t.boothKey, t.createdAt)],
+);
+
+/** Where a booth's new applicants are sent (its ATS), signed with a secret only the company sees. */
+export const fairBoothHooks = pgTable("fair_booth_hooks", {
+  boothKey: text("booth_key").primaryKey(),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  lastStatus: integer("last_status"),
+  lastAt: ts("last_at"),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
