@@ -69,4 +69,7 @@ END $$;
 CREATE INDEX IF NOT EXISTS "fair_booth_reports_booth_idx" ON "fair_booth_reports" USING btree ("booth_key","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "fair_invoices_number_uq" ON "fair_invoices" USING btree ("number");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "fair_invoices_user_idx" ON "fair_invoices" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "fair_invoices_booth_idx" ON "fair_invoices" USING btree ("booth_key");
+CREATE INDEX IF NOT EXISTS "fair_invoices_booth_idx" ON "fair_invoices" USING btree ("booth_key");--> statement-breakpoint
+ALTER TABLE "fair_invoices" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "fair_booth_reports" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "fair_booth_hooks" ENABLE ROW LEVEL SECURITY;
