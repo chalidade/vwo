@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
-import { MAX_CUSTOM_SKILLS, MAX_SKILLS, SKILL_GROUPS, canonicalSkill, isRegion, joinSkills, parseSkills, provinceOf, searchRegions, searchSkills } from "@vwo/shared";
+import { useEffect, useId, useRef, useState } from "react";
+import { type PickList, SKILL_LIST, customEntries, isRegion, joinSkills, parseList, parseSkills, provinceOf, searchRegions } from "@vwo/shared";
 
-// Profile fields picked from fixed lists instead of typed freely, so every seeker spells a skill or
-// a city the same way and companies can filter on them.
+// Fields picked from fixed lists instead of typed freely, so every seeker spells a skill or a city
+// the same way and companies can filter on them, and every company its vacancies and profile.
 
 /** Arrow keys, Enter and Escape over a list of suggestions under a text box. */
 function useSuggest(count: number, pick: (i: number) => void, close: () => void) {
@@ -23,38 +23,87 @@ function useSuggest(count: number, pick: (i: number) => void, close: () => void)
   return { active, setActive, onKeyDown };
 }
 
-/** Skills as chips: search the list, or add up to a few of the seeker's own words. Stored comma separated. */
-export function SkillPicker({ value, onChange, label = "Keahlian" }: { value: string; onChange: (v: string) => void; label?: string }) {
-  const chosen = parseSkills(value);
+/**
+ * Entries of one list as chips: search the list, open it whole by group, or add a few of one's own
+ * words when the list allows them. A short list with one group (schooling, experience, industry)
+ * shows every entry as a toggle instead of a search box. Entries saved before the list existed stay
+ * as dashed chips until they are removed.
+ */
+export function ListPicker({
+  list,
+  value,
+  onChange,
+  label,
+  noun,
+  placeholder,
+  hint,
+}: {
+  list: PickList;
+  value: readonly string[];
+  onChange: (v: string[]) => void;
+  label: string;
+  /** What one entry is called in messages, e.g. "keahlian", "jurusan". */
+  noun: string;
+  placeholder?: string;
+  /** A line under the label, e.g. "maks. 3". */
+  hint?: string;
+}) {
+  const chosen = [...value];
   const [q, setQ] = useState("");
   const [browse, setBrowse] = useState(false);
+  /** Suggestions show only while the box has focus, so they never cover the buttons after it. */
+  const [focused, setFocused] = useState(false);
   const listId = useId();
-  const custom = chosen.filter((s) => !canonicalSkill(s));
-  const full = chosen.length >= MAX_SKILLS;
-  const hits = q.trim() ? searchSkills(q, chosen) : [];
-  const typed = q.trim().replace(/\s+/g, " ").slice(0, 40);
-  const canAddOwn = !!typed && !canonicalSkill(typed) && !hits.some((h) => h.toLowerCase() === typed.toLowerCase()) && custom.length < MAX_CUSTOM_SKILLS;
+  const custom = customEntries(list, chosen);
+  const full = chosen.length >= list.max;
+  const flat = list.groups.length === 1 && list.groups[0]![1].length <= 45;
+  const hits = q.trim() && focused ? list.search(q, chosen) : [];
+  const typed = q.trim().replace(/\s+/g, " ").slice(0, list.itemLen);
+  const canAddOwn =
+    focused && list.maxCustom > 0 && !!typed && !list.canonical(typed) && !hits.some((h) => h.toLowerCase() === typed.toLowerCase()) && custom.length < list.maxCustom;
   const options = [...hits, ...(canAddOwn ? [typed] : [])];
+  // Suggestions open below the box: bring them into view, clear of the phone's bottom nav (scroll-margin in CSS).
+  const listRef = useRef<HTMLUListElement>(null);
+  const open = options.length > 0;
+  useEffect(() => {
+    if (open) listRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [open]);
 
   const add = (s: string) => {
     if (full) return;
-    onChange(joinSkills(parseSkills(joinSkills([...chosen, s]))));
+    onChange(parseList(list, [...chosen, s]));
     setQ("");
   };
-  const remove = (s: string) => onChange(joinSkills(chosen.filter((x) => x !== s)));
+  const remove = (s: string) => onChange(chosen.filter((x) => x !== s));
   const nav = useSuggest(
     options.length,
     (i) => add(options[i]!),
     () => setQ(""),
   );
+  const toggles = (entries: readonly string[]) => (
+    <div className="pk-opts">
+      {entries.map((s) => {
+        const on = chosen.includes(s);
+        return (
+          <button key={s} type="button" aria-pressed={on} disabled={!on && full} onClick={() => (on ? remove(s) : add(s))}>
+            {s}
+          </button>
+        );
+      })}
+    </div>
+  );
+  // In a flat list the toggles show what is chosen; only entries from before the list need a chip.
+  const chips = flat ? custom : chosen;
 
   return (
     <div className="pk">
-      <span className="pk-label">{label}</span>
-      {chosen.length > 0 && (
-        <ul className="pk-chips" aria-label="Keahlian dipilih">
-          {chosen.map((s) => (
-            <li key={s} data-own={canonicalSkill(s) ? undefined : ""}>
+      <span className="pk-label">
+        {label} {hint && <small className="pk-hint">{hint}</small>}
+      </span>
+      {chips.length > 0 && (
+        <ul className="pk-chips" aria-label={`${label} dipilih`}>
+          {chips.map((s) => (
+            <li key={s} data-own={list.canonical(s) ? undefined : ""}>
               {s}
               <button type="button" onClick={() => remove(s)} aria-label={`Hapus ${s}`}>
                 ×
@@ -63,72 +112,91 @@ export function SkillPicker({ value, onChange, label = "Keahlian" }: { value: st
           ))}
         </ul>
       )}
-      <div className="pk-box">
-        <input
-          type="search"
-          role="combobox"
-          aria-expanded={options.length > 0}
-          aria-controls={listId}
-          aria-label={`Cari ${label.toLowerCase()}`}
-          placeholder={full ? `Maksimal ${MAX_SKILLS} keahlian` : "Ketik, mis. Excel, React, desain"}
-          disabled={full}
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            nav.setActive(0);
-          }}
-          onKeyDown={nav.onKeyDown}
-        />
-        {options.length > 0 && (
-          <ul className="pk-list" id={listId} role="listbox">
-            {options.map((s, i) => (
-              <li
-                key={s}
-                role="option"
-                aria-selected={i === nav.active}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  add(s);
-                }}
-              >
-                {canAddOwn && s === typed ? (
-                  <>
-                    Tambah “{s}” <small>(tidak ada di daftar)</small>
-                  </>
-                ) : (
-                  s
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {q.trim() && !options.length && custom.length >= MAX_CUSTOM_SKILLS && (
-        <small className="pk-hint">Tidak ada di daftar. Keahlian di luar daftar maksimal {MAX_CUSTOM_SKILLS}.</small>
-      )}
-      <button type="button" className="pk-browse" onClick={() => setBrowse((b) => !b)} aria-expanded={browse}>
-        {browse ? "Tutup daftar" : "Lihat semua keahlian"}
-      </button>
-      {browse && (
-        <div className="pk-groups">
-          {SKILL_GROUPS.map(([group, list]) => (
-            <details key={group}>
-              <summary>{group}</summary>
-              <div className="pk-opts">
-                {list.map((s) => {
-                  const on = chosen.includes(s);
-                  return (
-                    <button key={s} type="button" aria-pressed={on} disabled={!on && full} onClick={() => (on ? remove(s) : add(s))}>
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-            </details>
-          ))}
-        </div>
+      {flat && custom.length > 0 && <small className="pk-hint">Garis putus-putus: isian lama, belum dari daftar. Hapus lalu pilih dari daftar.</small>}
+      {flat ? (
+        toggles(list.groups[0]![1])
+      ) : (
+        <>
+          <div className="pk-box">
+            <input
+              type="search"
+              role="combobox"
+              aria-expanded={options.length > 0}
+              aria-controls={listId}
+              aria-label={`Cari ${noun}`}
+              placeholder={full ? `Maksimal ${list.max} ${noun}` : placeholder}
+              disabled={full}
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                nav.setActive(0);
+              }}
+              onKeyDown={nav.onKeyDown}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+            />
+            {options.length > 0 && (
+              <ul className="pk-list" id={listId} role="listbox" ref={listRef}>
+                {options.map((s, i) => (
+                  <li
+                    key={s}
+                    role="option"
+                    aria-selected={i === nav.active}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      add(s);
+                    }}
+                  >
+                    {canAddOwn && s === typed ? (
+                      <>
+                        Tambah “{s}” <small>(tidak ada di daftar)</small>
+                      </>
+                    ) : (
+                      <>
+                        {s}
+                        {list.note?.(s) && <small>{list.note(s)}</small>}
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {q.trim() && focused && !options.length && (
+            <small className="pk-hint">
+              {list.maxCustom && custom.length >= list.maxCustom ? `Tidak ada di daftar. Isian di luar daftar maksimal ${list.maxCustom}.` : "Tidak ada di daftar. Coba kata lain."}
+            </small>
+          )}
+          <button type="button" className="pk-browse" onClick={() => setBrowse((b) => !b)} aria-expanded={browse}>
+            {browse ? "Tutup daftar" : `Lihat semua ${noun}`}
+          </button>
+          {browse && (
+            <div className="pk-groups">
+              {list.groups.map(([group, entries]) => (
+                <details key={group}>
+                  <summary>{group}</summary>
+                  {toggles(entries)}
+                </details>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+/** Skills as chips: search the list, or add up to a few of the seeker's own words. Stored comma separated. */
+export function SkillPicker({ value, onChange, label = "Keahlian" }: { value: string; onChange: (v: string) => void; label?: string }) {
+  return (
+    <ListPicker
+      list={SKILL_LIST}
+      value={parseSkills(value)}
+      onChange={(v) => onChange(joinSkills(v))}
+      label={label}
+      noun="keahlian"
+      placeholder="Ketik, mis. Excel, React, desain"
+    />
   );
 }
 

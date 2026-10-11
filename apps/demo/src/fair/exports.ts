@@ -1,7 +1,7 @@
 // Spreadsheet exports for the company portal and the organiser: applicants as a tidy Excel workbook,
 // and vacancies in the fields Kemnaker asks for when a vacancy is reported (wajib lapor lowongan).
 // Imported with import() so the xlsx writer only loads when someone exports.
-import { type CompanyBooth, type JobPosting, provinceOf } from "@vwo/shared";
+import { type CompanyBooth, type JobPosting, LOCATION_LIST, QUALIFICATION_LIST, parseList, provincesOf } from "@vwo/shared";
 import type { FairApplication } from "../jobfair-engine";
 import { type Column, type Sheet, XLSX_TYPE, xlsx } from "../xlsx";
 import { LAPOR_LABEL, PIPELINE } from "./company";
@@ -147,27 +147,29 @@ const localDate = (ymd: string | undefined) => {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
 };
 
-/** One row per open vacancy, ready for the reporting form. Salary text that can't be read stays as text. */
+/** One row per open vacancy, ready for the reporting form. Salary text that can't be read stays as text.
+ *  Fields picked from lists hold several entries, comma separated, the way the portal stores them. */
 export function laporRows(booths: Pick<CompanyBooth, "company" | "jobs">[]) {
   return booths.flatMap((b) =>
     b.jobs
       .filter((j) => !j.closed)
       .map((j) => {
         const pay = parseSalary(j.salary);
+        const places = parseList(LOCATION_LIST, j.city);
         return [
           j.title,
           j.quota ?? null,
           j.education ?? "",
           j.major ?? "",
           j.experience ?? "",
-          (j.city && provinceOf(j.city)) || "",
-          j.city || j.location || "",
+          provincesOf(places).join(", "),
+          places.join(", ") || j.location || "",
           pay.min ?? (j.salary || null),
           pay.max ?? null,
           JOB_TYPE[j.type] ?? j.type,
           localDate(j.deadline),
           j.description ?? "",
-          j.requirements.join("; "),
+          parseList(QUALIFICATION_LIST, j.requirements).join("; "),
           b.company,
         ] as (string | number | Date | null)[];
       }),
