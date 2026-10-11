@@ -1,9 +1,25 @@
 import "server-only";
-import { attachCheckout, createPayment, grantCoins, markClosed, markPaid, markRefunded, NotEnoughCoinsError, openPayment, type Payment, type PaymentKind, payRegistration, paymentById, readPrices, spendCoins } from "@vwo/db";
+import {
+  attachCheckout,
+  createPayment,
+  grantCoins,
+  markClosed,
+  markPaid,
+  markRefunded,
+  NotEnoughCoinsError,
+  openPayment,
+  type Payment,
+  type PaymentKind,
+  payRegistration,
+  paymentById,
+  readPrices,
+  spendCoins,
+} from "@vwo/db";
 import { coinsFor } from "@vwo/shared";
 import { liveCoins } from "./coins";
 import { db } from "./db";
 import { settleInvoice } from "./company-doc";
+import { invoiceForPayment } from "./invoices";
 import { placeRentedStall } from "./stalls";
 import { createXenditInvoice, getXenditInvoice, methodName, xenditEnabled } from "./xendit";
 
@@ -64,7 +80,15 @@ export class CoinsShortError extends Error {
 export async function payWithCoins(user: { id: string }, p: Purchase): Promise<Payment> {
   const coins = coinsFor(await readPrices(db), p.amount);
   await liveCoins(user.id);
-  const row = await createPayment(db, { userId: user.id, kind: p.kind, ref: p.ref, description: `${p.description} · ${coins.toLocaleString("id-ID")} koin`.slice(0, 200), amount: coins, meta: { ...p.meta, rupiah: p.amount, coins }, provider: "koin" });
+  const row = await createPayment(db, {
+    userId: user.id,
+    kind: p.kind,
+    ref: p.ref,
+    description: `${p.description} · ${coins.toLocaleString("id-ID")} koin`.slice(0, 200),
+    amount: coins,
+    meta: { ...p.meta, rupiah: p.amount, coins },
+    provider: "koin",
+  });
   // A bill can be charged once ever; a registration or a stand once per attempt (a second attempt
   // on a registration that is already paid gets its coins back below).
   const key = p.kind === "invoice" ? `buy:invoice:${p.ref}` : `buy:${p.kind}:${row.id}`;
@@ -106,6 +130,8 @@ async function fulfil(p: Payment) {
   if (p.kind === "registration") await payRegistration(db, p.ref, p.userId, p.method ?? "Xendit");
   if (p.kind === "invoice") await settleInvoice(p, p.userId);
   if (p.kind === "stall") await placeRentedStall(p);
+  // Money paid gets its numbered invoice; a failure here is retried when the buyer opens their invoices.
+  await invoiceForPayment(p).catch((e) => console.error("invoice not issued", p.id, e));
 }
 
 /**

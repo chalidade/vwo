@@ -4,6 +4,7 @@ import { OrgAds } from "./organizer/Ads";
 import { OrgAula } from "./organizer/Aula";
 import { OrgBooths } from "./organizer/Booths";
 import { OrgFloors } from "./organizer/Floors";
+import { OrgInvoices } from "./organizer/Invoices";
 import { OrgLive } from "./organizer/Live";
 import { OrgPrices } from "./organizer/Prices";
 import { OrgPsych } from "./organizer/Psych";
@@ -13,7 +14,25 @@ import { OrgReports } from "./organizer/Reports";
 import { OrgSeminars } from "./organizer/Seminars";
 import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
-import { BadgeDollarSign, Brain, Building2, ClipboardList, FileChartColumn, FlaskConical, Landmark, Layers, Megaphone, Mic, Presentation, Radio, Store, Tent, Trash2, UtensilsCrossed } from "lucide-react";
+import {
+  BadgeDollarSign,
+  FileText,
+  Brain,
+  Building2,
+  ClipboardList,
+  FileChartColumn,
+  FlaskConical,
+  Landmark,
+  Layers,
+  Megaphone,
+  Mic,
+  Presentation,
+  Radio,
+  Store,
+  Tent,
+  Trash2,
+  UtensilsCrossed,
+} from "lucide-react";
 import { DashShell } from "./Dash";
 
 const TABS = [
@@ -24,6 +43,7 @@ const TABS = [
   ["early", FlaskConical, "Early access"],
   ["ads", Megaphone, "Iklan & pendapatan"],
   ["prices", BadgeDollarSign, "Harga & koin"],
+  ["invoices", FileText, "Invoice & pajak"],
   ["psych", Brain, "Psikotes"],
   ["seminar", Presentation, "Seminar"],
   ["aula", Landmark, "Aula"],
@@ -34,7 +54,7 @@ type OrgTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: OrgTab[] }[] = [
   { label: "Pantau", ids: ["live", "registrations", "early"] },
   { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food", "reports"] },
-  { label: "Bisnis", ids: ["ads", "prices"] },
+  { label: "Bisnis", ids: ["ads", "prices", "invoices"] },
 ];
 
 const TAB_KEY = "vwo:org-tab";
@@ -74,7 +94,9 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         accent="#f97316"
         brand={
           <>
-            <span className="cp-logo"><Tent size={18} aria-hidden /></span>
+            <span className="cp-logo">
+              <Tent size={18} aria-hidden />
+            </span>
             <span className="dash-brand-text">
               <b>Panitia</b>
               <span>{fair.fair.name}</span>
@@ -112,18 +134,19 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
           </>
         }
       >
-      {tab === "live" && <OrgLive />}
-      {tab === "floors" && <OrgFloors onToast={setToast} />}
-      {tab === "booths" && <OrgBooths onToast={setToast} />}
-      {tab === "registrations" && <OrgRegistrations onToast={setToast} />}
-      {tab === "early" && <OrgEarlyAccess onToast={setToast} />}
-      {tab === "ads" && <OrgAds onToast={setToast} />}
-      {tab === "prices" && <OrgPrices onToast={setToast} />}
-      {tab === "psych" && <OrgPsych onToast={setToast} />}
-      {tab === "seminar" && <OrgSeminars onToast={setToast} />}
-      {tab === "aula" && <OrgAula onToast={setToast} />}
-      {tab === "food" && <OrgFoodCourt onToast={setToast} />}
-      {tab === "reports" && <OrgReports onToast={setToast} />}
+        {tab === "live" && <OrgLive />}
+        {tab === "floors" && <OrgFloors onToast={setToast} />}
+        {tab === "booths" && <OrgBooths onToast={setToast} />}
+        {tab === "registrations" && <OrgRegistrations onToast={setToast} />}
+        {tab === "early" && <OrgEarlyAccess onToast={setToast} />}
+        {tab === "ads" && <OrgAds onToast={setToast} />}
+        {tab === "prices" && <OrgPrices onToast={setToast} />}
+        {tab === "invoices" && <OrgInvoices onToast={setToast} />}
+        {tab === "psych" && <OrgPsych onToast={setToast} />}
+        {tab === "seminar" && <OrgSeminars onToast={setToast} />}
+        {tab === "aula" && <OrgAula onToast={setToast} />}
+        {tab === "food" && <OrgFoodCourt onToast={setToast} />}
+        {tab === "reports" && <OrgReports onToast={setToast} />}
       </DashShell>
       {toast && <div className="cp-toast">{toast}</div>}
     </main>
