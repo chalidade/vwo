@@ -17,6 +17,9 @@ import {
   LIFT_FRONT,
   findPath,
   openJobs,
+  hasStand,
+  isFeatured,
+  UMKM_CORNER,
   slide,
   isBlocked,
   price,
@@ -315,7 +318,8 @@ export function JobFair() {
   /** The first hall has the entrance hall's info desk and its own lift signs. */
   const firstHall = hall === 0;
   const stop = fair.stopOf(floor.id);
-  const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === hall);
+  /** Booths standing on this hall; mini (UMKM) booths have no stand and are listed in the Pojok UMKM instead. */
+  const booths = room ? [] : fair.fair.booths.filter((b) => b.floor === hall && hasStand(b));
   const sponsors = room ? [] : fair.fair.sponsors.filter((sp) => sp.floor === hall);
   const coinHere = !room && fair.fair.coinStand.floor === hall;
   const promotersHere = fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks);
@@ -755,6 +759,8 @@ export function JobFair() {
   /** Walk to a booth's desk, on whatever floor, and talk to the recruiter there. Called from menus
    *  that are still closing, so no busy check. */
   const goToBooth = (b: CompanyBooth) => {
+    // A mini (UMKM) booth has no stand to walk to: its vacancies open straight away.
+    if (!hasStand(b)) return setBoard({ boothId: b.id });
     const me = session && fair.visitors.get(session.visitorId);
     if (!me) return;
     goal.current = { floorId: fair.floorIdOf(b), ...boothSpot(b, "talk"), then: () => talkToRecruiter(b) };
@@ -972,7 +978,7 @@ export function JobFair() {
       pages: [`${fair.fair.floors[i]!.name} isinya ${fair.fair.floors[i]!.theme}. Mau ke stand mana?`],
       choices: [
         ...fair.fair.booths
-          .filter((b) => b.floor === i)
+          .filter((b) => b.floor === i && hasStand(b))
           .map((b) => ({
             label: `${b.tier === "premium" ? "👑 " : ""}${b.company}`,
             hint: `${openJobs(b).length} lowongan`,
@@ -985,6 +991,26 @@ export function JobFair() {
         { label: "← Kembali", onPick: () => setTalk(main) },
       ],
     });
+    // Mini (UMKM) booths have no stand: the desk lists them and opens their vacancies.
+    const umkm = fair.fair.booths.filter((b) => !hasStand(b));
+    const umkmChoice: Talk = {
+      speaker: `${staff} · Panitia`,
+      pages: [`${UMKM_CORNER}: usaha kecil dan menengah yang ikut job fair. Lowongannya bisa langsung dilihat dari sini.`],
+      choices: [
+        ...umkm.map((b) => {
+          const top = openJobs(b)[0];
+          return {
+            label: b.company,
+            hint: [b.industry, top ? `${top.title}${isFeatured(b, top.id) ? " · unggulan" : ""}` : "belum ada lowongan"].join(" · "),
+            onPick: () => {
+              setTalk(null);
+              setBoard({ boothId: b.id });
+            },
+          };
+        }),
+        { label: "← Kembali", onPick: () => setTalk(main) },
+      ],
+    };
     const main: Talk = {
       speaker: `${staff} · Panitia`,
       pages: ["Ada yang bisa dibantu? Pilih tujuanmu, nanti aku antar."],
@@ -994,7 +1020,7 @@ export function JobFair() {
           const price = fair.floorPrice(st.floorId);
           const r = st.roomId ? fair.room(st.roomId) : undefined;
           const i = fairFloorIndex(st.floorId);
-          const count = r ? "" : `${fair.fair.booths.filter((b) => b.floor === i).length} stand`;
+          const count = r ? "" : `${fair.fair.booths.filter((b) => b.floor === i && hasStand(b)).length} stand`;
           return {
             label: `${st.emoji} ${st.label}`,
             hint: [`Lt ${st.level + 1}`, count, price ? `${price} koin` : ""].filter(Boolean).join(" · "),
@@ -1006,6 +1032,7 @@ export function JobFair() {
             },
           };
         }),
+        ...(umkm.length ? [{ label: `🏪 ${UMKM_CORNER}`, hint: `${umkm.length} usaha kecil · lowongan tanpa stand`, onPick: () => setTalk(umkmChoice) }] : []),
         { label: "🪙 Beli koin di sini", hint: "tanpa ke Stand Koin", onPick: () => { setTalk(null); setWallet("desk"); } },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
@@ -1705,7 +1732,7 @@ export function JobFair() {
               setPanel(null);
               if (b) {
                 goToBooth(b);
-                setToast(`Menuju stand ${b.company}`);
+                if (hasStand(b)) setToast(`Menuju stand ${b.company}`);
               }
             }}
             onReset={() => {

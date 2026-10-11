@@ -1,7 +1,8 @@
 import { myPayments, type PaymentKind, readFairState, readPrices, registrationById } from "@vwo/db";
-import { ALL_COIN_PACKAGES, freeStallSlotsOf, priceFrom, STALL_SLOTS } from "@vwo/shared";
+import { ALL_COIN_PACKAGES, type BoothTier, freeStallSlotsOf, priceFrom, productAllowed, STALL_SLOTS, TIER_LABEL } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { boothNow } from "@/lib/booths";
 import { companyDoc, PRODUCT_IDS } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth } from "@/lib/fair";
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
       kind: "registration",
       ref: reg.id,
       amount: reg.price,
-      description: `Pendaftaran stand ${reg.tier === "premium" ? "VIP" : "reguler"} · ${reg.company}`.slice(0, 200),
+      description: `Pendaftaran ${TIER_LABEL[reg.tier as BoothTier] ?? TIER_LABEL.regular} · ${reg.company}`.slice(0, 200),
       back: "/daftar-perusahaan",
     };
   } else if (b.kind === "stall") {
@@ -114,8 +115,9 @@ export async function POST(req: Request) {
     const inv = (await companyDoc(b.booth))?.invoices?.find((i) => i.id === b.invoice);
     if (!inv) return fail(404, "not_found");
     if (inv.status !== "Belum dibayar") return fail(409, "not_payable");
-    // Only real products, each once, at the organiser's current price; the bill's own prices are ignored.
-    const ids = [...new Set((inv.items ?? []).map((i) => i.id))].filter((id) => PRODUCT_IDS.has(id));
+    // Only real products the booth's package may have, each once, at the organiser's current price; the bill's own prices are ignored.
+    const tier = (await boothNow(b.booth))?.tier;
+    const ids = [...new Set((inv.items ?? []).map((i) => i.id))].filter((id) => PRODUCT_IDS.has(id) && productAllowed(tier, id));
     const items = ids
       .map((id) => ({ id, name: String(inv.items?.find((i) => i.id === id)?.name ?? id).slice(0, 60), price: priceFrom(prices, `product.${id}`) }))
       .filter((i) => i.price > 0);

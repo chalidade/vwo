@@ -1,4 +1,4 @@
-import { fairFloorIndex, infoDeskOn } from "@vwo/shared";
+import { fairFloorIndex, hasStand, infoDeskOn } from "@vwo/shared";
 import { CafeScene, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import { staffLook } from "./staff-look";
 import { levelOf } from "./content";
@@ -35,7 +35,7 @@ export function FloorScene({ floorId, className }: { floorId: string; className?
               ? psikotesExtras(room)
               : seminarStageExtras(room, null)
           : [
-              ...fair.fair.booths.filter((b) => b.floor === hall).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
+              ...fair.fair.booths.filter((b) => b.floor === hall && hasStand(b)).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
               ...fair.fair.sponsors.filter((sp) => sp.floor === hall).map((sp) => sponsorExtras(sp)),
               ...(fair.fair.coinStand.floor === hall ? coinStandExtras(fair.fair.coinStand) : []),
             ]),

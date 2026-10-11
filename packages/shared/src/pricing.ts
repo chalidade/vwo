@@ -78,11 +78,13 @@ export const PRICE_CATALOG: PriceItem[] = [
   koin("Telepon & video call", "consult.2", "Konsultasi dengan konsultan 2 menit", 5),
   koin("Telepon & video call", "consult.5", "Konsultasi dengan konsultan 5 menit", 10),
   koin("Telepon & video call", "consult.10", "Konsultasi dengan konsultan 10 menit", 20),
+  rupiah("Sewa stand", "stand.mini", "Daftar booth: paket mini UMKM (tanpa stand, 1 lowongan, tampil di Pojok UMKM)", 1_000_000),
   rupiah("Sewa stand", "stand.regular", "Daftar booth: stand reguler", 7_500_000),
   rupiah("Sewa stand", "stand.premium", "Daftar booth: stand VIP", 15_000_000),
   rupiah("Sewa stand", "stall", "Sewa stan food court", 750_000),
   rupiah("Upgrade & paket VIP", "product.vip", "Upgrade stand reguler ke VIP", 2_500_000),
   rupiah("Upgrade & paket VIP", "product.promoter", "NPC promotor keliling", 1_000_000),
+  rupiah("Upgrade & paket VIP", "product.featured", "Lowongan unggulan (1 lowongan di urutan teratas daftar)", 500_000),
   ...ACCESSORY_DEFAULTS.map((a) => rupiah("Printilan booth", `product.${a.id}`, a.name, a.price)),
 ];
 

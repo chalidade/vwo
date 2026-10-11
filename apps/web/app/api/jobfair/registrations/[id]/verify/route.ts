@@ -10,7 +10,7 @@ import { currentUser } from "@/lib/session";
 
 const schema = z.object({ floor: z.number().int().min(0).max(20), x: z.number(), y: z.number() });
 
-/** The organiser checked the company is real: its booth goes up on the chosen slot with a portal PIN. */
+/** The organiser checked the company is real: its booth goes up on the chosen slot (a mini booth only on the chosen floor) with a portal PIN. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!reg) return fail(404, "not_found");
   if (reg.status !== "paid") return fail(409, "not_paid");
   const placed = await placeBooth(
-    { company: reg.company, industry: reg.industry, color: reg.color, contact: reg.contactName, email: reg.email, tier: reg.tier === "premium" ? "premium" : "regular", price: reg.price, method: reg.method ?? "-", ...body.data },
+    { company: reg.company, industry: reg.industry, color: reg.color, contact: reg.contactName, email: reg.email, tier: reg.tier === "premium" || reg.tier === "mini" ? reg.tier : "regular", price: reg.price, method: reg.method ?? "-", ...body.data },
     user!.id,
   );
   if ("error" in placed) return fail(409, placed.error);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
+import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, openJobs, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
 import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
 import { AULA, makeStall, fairFloorId, infoDeskOn, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
 import { BOOTH_SLOTS, CONVOS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
@@ -899,5 +899,49 @@ describe("organiser price list", () => {
     expect(before - fair.player.coins).toBe(9);
     setPriceTable({});
     expect(price("coin.apply")).toBe(5);
+  });
+
+  it("lists a mini (UMKM) booth without a stand, with one open vacancy and no VIP", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const free = fair.freeSlots().length;
+    const floorBefore = JSON.stringify(fair.floors[1]!.objects);
+    const b = fair.addBooth({ company: "Kopi Ibu Sari", industry: "Kuliner", color: "#ea580c", floor: 1, x: 3, y: 0.4, tier: "mini" })!;
+    expect(b.tier).toBe("mini");
+    expect([b.x, b.y]).toEqual([0, 0]);
+    // No slot taken, no walls, no recruiter on the floor.
+    expect(fair.freeSlots()).toHaveLength(free);
+    expect(JSON.stringify(fair.floors[1]!.objects)).toBe(floorBefore);
+    expect(fair.staff.some((s) => s.id === recruiterId(b.id))).toBe(false);
+    // One open vacancy: a second one is refused until the first is closed.
+    const first = b.jobs[0]!;
+    const kasir = { id: "kopi-2", title: "Kasir", type: "Part-time" as const, location: "Bandung", requirements: [] };
+    expect(fair.saveJob(b.id, { ...first, title: "Barista" })).toBe(true);
+    expect(fair.saveJob(b.id, kasir)).toBe(false);
+    expect(fair.saveJob(b.id, { ...kasir, closed: true })).toBe(true);
+    expect(fair.saveJob(b.id, kasir)).toBe(false);
+    fair.saveJob(b.id, { ...fair.booth(b.id)!.jobs[0]!, closed: true });
+    expect(fair.saveJob(b.id, kasir)).toBe(true);
+    // Even a raw edit can't open more than one.
+    fair.editBooth(b.id, { jobs: fair.booth(b.id)!.jobs.map((j) => ({ ...j, closed: false })) });
+    expect(fair.booth(b.id)!.jobs.filter((j) => !j.closed)).toHaveLength(1);
+    // No stand to upgrade or decorate; the featured vacancy is for sale.
+    expect(fair.createInvoice(b.id, ["vip", "tv"])).toBeNull();
+    expect(fair.createInvoice(b.id, ["vip", "featured"])!.items.map((i) => i.id)).toEqual(["featured"]);
+  });
+
+  it("puts a vacancy at the top once the company paid for the featured add-on", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const b = fair.fair.booths.find((x) => x.jobs.length > 1)!;
+    const last = b.jobs.at(-1)!;
+    expect(fair.setFeaturedJob(b.id, last.id)).toBe(false);
+    fair.editBooth(b.id, { featuredJob: last.id });
+    expect(fair.booth(b.id)!.featuredJob).toBeUndefined();
+    const inv = fair.createInvoice(b.id, ["featured"])!;
+    expect(fair.payInvoice(b.id, inv.id, "Koin")).toBe(true);
+    expect(fair.setFeaturedJob(b.id, last.id)).toBe(true);
+    expect(openJobs(fair.booth(b.id)!)[0]!.id).toBe(last.id);
+    expect(fair.setFeaturedJob(b.id, "nope")).toBe(false);
+    expect(fair.setFeaturedJob(b.id, null)).toBe(true);
+    expect(openJobs(fair.booth(b.id)!)[0]!.id).toBe(b.jobs[0]!.id);
   });
 });

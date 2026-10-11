@@ -1,6 +1,6 @@
 import "server-only";
 import { readFairState, writeFairState } from "@vwo/db";
-import { type CompanyBooth, DEMO_JOB_FAIR } from "@vwo/shared";
+import { type BoothTier, type CompanyBooth, DEMO_JOB_FAIR, hasStand } from "@vwo/shared";
 import { randomInt } from "node:crypto";
 import { db } from "./db";
 
@@ -15,7 +15,7 @@ export interface NewBooth {
   color: string;
   contact: string;
   email: string;
-  tier: "regular" | "premium";
+  tier: BoothTier;
   price: number;
   method: string;
   floor: number;
@@ -24,11 +24,14 @@ export interface NewBooth {
 }
 
 /**
- * Put a company's booth on a free slot of a hall floor, with a random portal PIN. The booth is kept
- * as its own `booking:<id>` document so an organiser saving the event setup can't overwrite it.
+ * Put a company's booth on a free slot of a hall floor, with a random portal PIN. A mini (UMKM)
+ * booth takes no slot: it is listed in its floor's Pojok UMKM. The booth is kept as its own
+ * `booking:<id>` document so an organiser saving the event setup can't overwrite it.
  */
 export async function placeBooth(input: NewBooth, userId: string): Promise<{ booth: CompanyBooth; pin: string } | { error: "invalid_slot" | "slot_taken" }> {
-  if (!SLOTS.some((s) => s.x === input.x && s.y === input.y)) return { error: "invalid_slot" };
+  const stand = hasStand(input);
+  if (!stand) input = { ...input, x: 0, y: 0 };
+  else if (!SLOTS.some((s) => s.x === input.x && s.y === input.y)) return { error: "invalid_slot" };
   const rows = await readFairState(db);
   const org = (rows.find((r) => r.key === "org")?.data ?? {}) as Org;
   const removed = new Set(org.removed ?? []);
@@ -36,7 +39,7 @@ export async function placeBooth(input: NewBooth, userId: string): Promise<{ boo
   if (input.floor < 0 || input.floor >= halls) return { error: "invalid_slot" };
   const booked = rows.filter((r) => r.key.startsWith("booking:")).map((r) => (r.data as { booth: CompanyBooth }).booth);
   const standing = [...DEMO_JOB_FAIR.booths.filter((b) => !removed.has(b.id)), ...(org.added ?? []), ...booked.filter((b) => !removed.has(b.id))];
-  if (standing.some((b) => b.floor === input.floor && b.x === input.x && b.y === input.y)) return { error: "slot_taken" };
+  if (stand && standing.some((b) => hasStand(b) && b.floor === input.floor && b.x === input.x && b.y === input.y)) return { error: "slot_taken" };
 
   const taken = new Set([...DEMO_JOB_FAIR.booths, ...(org.added ?? []), ...booked].map((b) => b.id));
   const slug = input.company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
@@ -57,7 +60,7 @@ export async function placeBooth(input: NewBooth, userId: string): Promise<{ boo
     recruiter: input.contact,
     email: input.email,
     about: `${name} membuka lowongan di job fair ini. Profil lengkap diisi perusahaan lewat portal perusahaan.`,
-    faq: [{ q: "Bagaimana cara melamar?", a: "Pilih lowongan di banner stand lalu kirim lamaran." }],
+    faq: [{ q: "Bagaimana cara melamar?", a: stand ? "Pilih lowongan di banner stand lalu kirim lamaran." : "Buka daftar lowongan di Pojok UMKM lalu kirim lamaran." }],
     jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],
   };
   const pin = String(randomInt(100000, 1000000));

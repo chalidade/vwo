@@ -1,10 +1,11 @@
 import "server-only";
 import { type Payment, paidInvoicesOf, readFairState, readPrices, writeFairState } from "@vwo/db";
-import { ACCESSORY_DEFAULTS, priceFrom } from "@vwo/shared";
+import { ACCESSORY_DEFAULTS, FEATURED_PRODUCT_ID, type JobPosting, limitOpenJobs, priceFrom, productAllowed } from "@vwo/shared";
+import { boothNow } from "./booths";
 import { db } from "./db";
 
 /** What a company can buy for its booth, by the id the game uses. */
-export const PRODUCT_IDS = new Set(["vip", "promoter", ...ACCESSORY_DEFAULTS.map((a) => a.id)]);
+export const PRODUCT_IDS = new Set(["vip", "promoter", FEATURED_PRODUCT_ID, ...ACCESSORY_DEFAULTS.map((a) => a.id)]);
 /** VIP booths get these without buying them. */
 const VIP_INCLUDED = ["gapura"];
 
@@ -29,7 +30,7 @@ function applyPaid(doc: Doc, p: Payment) {
   for (const id of itemsOf(p)) {
     if (!owned.has(id)) {
       owned.add(id);
-      if (id !== "vip" && id !== "promoter") on.add(id);
+      if (id !== "vip" && id !== "promoter" && id !== FEATURED_PRODUCT_ID) on.add(id);
     }
   }
   doc.owned = [...owned];
@@ -46,10 +47,12 @@ export async function settleInvoice(p: Payment, userId: string) {
 
 /**
  * A company account saves its booth. The browser may not mark bills paid, own products, switch
- * on decorations or raise its tier by itself: only payments the gateway confirmed count.
+ * on decorations or raise its tier by itself: only payments the gateway confirmed count. A mini
+ * (UMKM) booth keeps at most one open vacancy and has no stand to decorate, and only a booth that
+ * paid for the featured add-on may feature a vacancy.
  */
 export async function guardCompanyDoc(boothId: string, incoming: Doc): Promise<Doc> {
-  const [stored, paid, prices] = await Promise.all([companyDoc(boothId), paidInvoicesOf(db, boothId), readPrices(db)]);
+  const [stored, paid, prices, booth] = await Promise.all([companyDoc(boothId), paidInvoicesOf(db, boothId), readPrices(db), boothNow(boothId)]);
   const before = new Map((stored?.invoices ?? []).map((i) => [i.id, i]));
   const doc: Doc = { ...incoming, edits: { ...(incoming.edits ?? {}) } };
 
@@ -68,11 +71,20 @@ export async function guardCompanyDoc(boothId: string, incoming: Doc): Promise<D
 
   for (const p of paid) applyPaid(doc, p);
 
+  const pkg = (doc.edits!.tier as string | undefined) ?? booth?.tier;
+  doc.owned = doc.owned.filter((id) => productAllowed(pkg, id));
   const vip = doc.owned.includes("vip") || doc.edits!.tier === "premium";
   const owned = new Set(doc.owned);
+  if (Array.isArray(doc.edits!.jobs))
+    doc.edits!.jobs = limitOpenJobs(
+      pkg,
+      (doc.edits!.jobs as unknown[]).filter((j): j is JobPosting => !!j && typeof j === "object"),
+    );
+  const featured = doc.edits!.featuredJob;
+  if (featured !== undefined && !(owned.has(FEATURED_PRODUCT_ID) && typeof featured === "string" && featured.length <= 120)) delete doc.edits!.featuredJob;
   if (Array.isArray(doc.edits!.accessories)) {
     doc.edits!.accessories = (doc.edits!.accessories as unknown[]).filter(
-      (id): id is string => typeof id === "string" && (owned.has(id) || priceFrom(prices, `product.${id}`) === 0 || (vip && VIP_INCLUDED.includes(id))),
+      (id): id is string => typeof id === "string" && productAllowed(pkg, id) && (owned.has(id) || priceFrom(prices, `product.${id}`) === 0 || (vip && VIP_INCLUDED.includes(id))),
     );
   }
   return doc;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type CompanyBooth, type FairFloorInfo, type TalentOffer, messageTime, safeImage } from "@vwo/shared";
+import { type CompanyBooth, type FairFloorInfo, type TalentOffer, hasStand, isFeatured, messageTime, safeImage, UMKM_CORNER } from "@vwo/shared";
 import { LIVE } from "./mode";
 import { dropOffer, myOffers } from "./server-fair";
 import { BoothLogo, type Look, Person } from "@vwo/ui";
@@ -100,6 +100,8 @@ export function SeekerPanel({
   const invited = applications.filter((a) => a.status === "Diundang interview").length;
   const visits = applications.filter((a) => a.status === "Kunjungan kantor").length;
   const boothOf = (id: string) => booths.find((b) => b.id === id);
+  /** Booths with a stand to visit: the stamp card leaves out the Pojok UMKM, which has no stands. */
+  const stands = booths.filter(hasStand);
   const lv = levelOf(player.xp);
   const best = player.psych.reduce<number | null>((m, r) => Math.max(m ?? 0, Math.round((r.score / r.total) * 100)), null);
   const rated = applications.filter((a) => a.rating);
@@ -121,7 +123,7 @@ export function SeekerPanel({
               ["match", "✨ Cocok"],
               ["invite", "🎉 Ajak & lencana"],
               ["applications", `📋 Lamaran (${applications.length})`],
-              ["stamps", `🏅 Stempel (${visited.size}/${booths.length})`],
+              ["stamps", `🏅 Stempel (${visited.size}/${stands.length})`],
             ] as const
           ).map(([id, label]) => (
             <button key={id} type="button" data-active={tab === id ? "" : undefined} onClick={() => setTab(id)}>
@@ -409,9 +411,12 @@ export function SeekerPanel({
                           <li key={m.job.id} style={{ ["--c" as string]: m.booth.color }}>
                             <span className="sp-logo">{m.booth.logo}</span>
                             <span className="sp-main">
-                              <b>{m.job.title}</b>
+                              <b>
+                                {m.job.title} {isFeatured(m.booth, m.job.id) && <span className="sp-tag">Unggulan</span>}
+                              </b>
                               <span className="sp-muted">
-                                {m.booth.company} · {floors[m.booth.floor]?.name ?? ""} · {m.job.type} · {m.job.location}
+                                {m.booth.company} · {hasStand(m.booth) ? "" : `${UMKM_CORNER} `}
+                                {floors[m.booth.floor]?.name ?? ""} · {m.job.type} · {m.job.location}
                               </span>
                               <span className="sp-why">Cocok: {m.why.join(", ")}</span>
                             </span>
@@ -419,9 +424,11 @@ export function SeekerPanel({
                               <button type="button" onClick={() => onOpenJob(m.booth.id, m.job.id)}>
                                 Lihat & lamar
                               </button>
-                              <button type="button" onClick={() => onGoTo(m.booth.id)}>
-                                Antar ke stand
-                              </button>
+                              {hasStand(m.booth) && (
+                                <button type="button" onClick={() => onGoTo(m.booth.id)}>
+                                  Antar ke stand
+                                </button>
+                              )}
                             </span>
                           </li>
                         ))}
@@ -439,7 +446,7 @@ export function SeekerPanel({
                             </span>
                             <span className="sp-links">
                               <button type="button" onClick={() => onGoTo(b.booth.id)}>
-                                Antar ke stand
+                                {hasStand(b.booth) ? "Antar ke stand" : "Lihat lowongan"}
                               </button>
                             </span>
                           </li>
@@ -460,7 +467,7 @@ export function SeekerPanel({
               player={player}
               applications={applications}
               stamps={visited.size}
-              booths={booths.length}
+              booths={stands.length}
               psychPass={fair.psychConfig().pass}
               onEditProfile={() => setTab("profile")}
             />
@@ -468,10 +475,10 @@ export function SeekerPanel({
           {tab === "stamps" && (
             <>
               <p className="sp-summary">
-                {visited.size === booths.length ? "Semua stand sudah kamu kunjungi! 🏆" : `Kunjungi semua stand untuk melengkapi kartu stempel (${visited.size}/${booths.length}).`}
+                {visited.size >= stands.length ? "Semua stand sudah kamu kunjungi! 🏆" : `Kunjungi semua stand untuk melengkapi kartu stempel (${visited.size}/${stands.length}).`}
               </p>
               {floors.map((f, i) => {
-                const here = booths.filter((b) => b.floor === i);
+                const here = stands.filter((b) => b.floor === i);
                 const got = here.filter((b) => visited.has(b.id)).length;
                 return (
                   <section key={f.name} className="sp-floor">

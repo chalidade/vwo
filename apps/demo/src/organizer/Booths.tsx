@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type BoothTheme, type CompanyBooth, type GateStyle } from "@vwo/shared";
+import { type BoothTheme, type CompanyBooth, type GateStyle, hasStand, MINI_MAX_OPEN_JOBS, openJobs, UMKM_CORNER } from "@vwo/shared";
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
@@ -13,7 +13,8 @@ const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#eab308", "#f97316"
 const SLOT_NAMES = ["Kiri atas", "Kiri bawah", "Tengah atas", "Tengah bawah", "Kanan atas", "Kanan bawah"];
 const slotName = (x: number, y: number) => SLOT_NAMES[BOOTH_SLOTS.findIndex((s) => s.x === x && s.y === y)] ?? "";
 
-type Slot = { floor: number; x: number; y: number };
+/** Where a new booth goes; `mini` adds a mini (UMKM) booth to the floor's Pojok UMKM instead of a slot. */
+type Slot = { floor: number; x: number; y: number; mini?: boolean };
 
 /** The organiser adds companies to free booth places, takes them out, or brings them back. */
 export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
@@ -56,7 +57,7 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
             <h3 className="cp-h3">{fl.name}</h3>
             <div className="org-slots">
               {BOOTH_SLOTS.map((sl) => {
-                const b = fair.fair.booths.find((x) => x.floor === floor && x.x === sl.x && x.y === sl.y);
+                const b = fair.fair.booths.find((x) => hasStand(x) && x.floor === floor && x.x === sl.x && x.y === sl.y);
                 if (!b)
                   return (
                     <button key={`${sl.x}-${sl.y}`} type="button" className="org-slot org-slot-free" onClick={() => setAdding({ floor, ...sl })}>
@@ -120,6 +121,58 @@ export function OrgBooths({ onToast }: { onToast: (t: string) => void }) {
                   </div>
                 );
               })}
+            </div>
+            <div className="org-umkm">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="small">
+                  <b>{UMKM_CORNER}</b> <span className="muted">· paket mini tanpa stand, {MINI_MAX_OPEN_JOBS} lowongan aktif</span>
+                </span>
+                <button type="button" className="small-btn ghost" onClick={() => setAdding({ floor, x: 0, y: 0, mini: true })}>
+                  + Tambah UMKM
+                </button>
+              </div>
+              <ul className="cp-jobs">
+                {fair.fair.booths
+                  .filter((b) => b.floor === floor && !hasStand(b))
+                  .map((b) => (
+                    <li key={b.id}>
+                      <span className="cp-job-main">
+                        <b>{b.company}</b>
+                        <span className="muted small">
+                          {openJobs(b)[0]?.title ?? "Belum ada lowongan aktif"} · {fair.applications.filter((a) => a.boothId === b.id).length} pelamar · <code>{b.id}</code> · PIN{" "}
+                          {LIVE && !fair.hasCompanyPin(b.id) ? "belum diatur" : <code>{fair.companyPin(b.id)}</code>}
+                        </span>
+                      </span>
+                      <span className="cp-job-tools">
+                        <a className="small-btn ghost" href={`#/jobfair/company/${b.id}`} onClick={() => !LIVE && sessionLogin(b.id)}>
+                          Portal
+                        </a>
+                        <button
+                          type="button"
+                          className="small-btn ghost"
+                          onClick={() => {
+                            const pin = prompt(`PIN baru untuk ${b.company} (4–6 angka).`, LIVE && !fair.hasCompanyPin(b.id) ? String(100000 + Math.floor(Math.random() * 900000)) : fair.companyPin(b.id));
+                            if (pin == null) return;
+                            onToast(fair.setCompanyPin(b.id, pin.trim()) ? `PIN ${b.company} diganti` : "PIN harus 4–6 angka");
+                          }}
+                        >
+                          PIN
+                        </button>
+                        <button
+                          type="button"
+                          className="small-btn ghost"
+                          onClick={() => {
+                            if (!confirm(`Keluarkan ${b.company} dari ${UMKM_CORNER}? Lamaran ke perusahaan ini ikut terhapus.`)) return;
+                            fair.removeBooth(b.id);
+                            onToast(`${b.company} dikeluarkan`);
+                          }}
+                        >
+                          Lepas
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+              </ul>
             </div>
           </section>
         ))}
@@ -205,12 +258,12 @@ function AddBooth({ slot, onClose, onDone }: { slot: Slot; onClose: () => void; 
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          const b = fair.addBooth({ company, industry, tagline, recruiter, logo, color, tier: vip ? "premium" : "regular", ...slot });
+          const b = fair.addBooth({ company, industry, tagline, recruiter, logo, color, tier: slot.mini ? "mini" : vip ? "premium" : "regular", floor: slot.floor, x: slot.x, y: slot.y });
           if (b) onDone(b.company);
         }}
       >
         <h2 className="cp-h2 cp-span">
-          Stand baru · {fair.fair.floors[slot.floor]?.name}, {slotName(slot.x, slot.y)}
+          {slot.mini ? "UMKM baru" : "Stand baru"} · {fair.fair.floors[slot.floor]?.name}, {slot.mini ? UMKM_CORNER : slotName(slot.x, slot.y)}
         </h2>
         <label>
           Nama perusahaan
@@ -240,15 +293,17 @@ function AddBooth({ slot, onClose, onDone }: { slot: Slot; onClose: () => void; 
             ))}
           </div>
         </div>
-        <label className="cp-check cp-span">
-          <input type="checkbox" checked={vip} onChange={(e) => setVip(e.target.checked)} /> Stand VIP (sudah dibayar ke panitia)
-        </label>
+        {!slot.mini && (
+          <label className="cp-check cp-span">
+            <input type="checkbox" checked={vip} onChange={(e) => setVip(e.target.checked)} /> Stand VIP (sudah dibayar ke panitia)
+          </label>
+        )}
         <p className="muted small cp-span" style={{ margin: 0 }}>
           Perusahaan melengkapi profil, lowongan, dan dekorasi sendiri lewat portal perusahaan.
         </p>
         <div className="row cp-span">
           <button type="submit" disabled={!company.trim()}>
-            Tambah stand
+            {slot.mini ? "Tambah UMKM" : "Tambah stand"}
           </button>
           <button type="button" className="ghost" onClick={onClose}>
             Batal
