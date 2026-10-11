@@ -993,6 +993,10 @@ a.cp-link.ghost { background: var(--surface); color: var(--text); }
 .au-main { display: grid; min-width: 0; flex: 1; }
 .au-main b { font-size: 14px; }
 .au-main span { font-size: 12px; color: #57534e; }
+.au-remind { display: flex; gap: 4px; flex: none; }
+.au-remind .small-btn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+.au-remind .small-btn[data-on] { background: #fff1f2; border-color: #9f1239; color: #9f1239; }
+@media (max-width: 480px) { .au-list li { flex-wrap: wrap; } .au-remind { width: 100%; justify-content: flex-end; } }
 .au-h { margin: 12px 0 6px; font-size: 14px; }
 .au-floors { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
 .au-lv { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #1e3a8a; color: #fff; font-weight: 900; }

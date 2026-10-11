@@ -19,3 +19,4 @@ export * from "./fair-coins";
 export * from "./fair-social";
 export * from "./cleanup";
 export * from "./push";
+export * from "./reminders";

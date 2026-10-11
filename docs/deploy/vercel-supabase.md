@@ -21,6 +21,10 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      straight away and gets a PIN for colleagues. Panitia → Stand → Akun lists and removes them.
    - `RESEND_API_KEY`, `MAIL_FROM`: verification and password reset emails. Once set, an account
      must verify its email before applying.
+   - `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`): protects the daily
+     reminder job (`/api/cron/reminders`, 06.00 WIB), which sends each seeker an email and phone
+     notification for today's interviews, office visits and the Aula items they asked to be
+     reminded of. Vercel Cron sends it automatically; without it the job refuses to run.
    - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
    - `TURNSTILE_SECRET_KEY` and `VITE_TURNSTILE_SITE_KEY` (Cloudflare Turnstile, free): human
      check on sign-up. Off while unset; sign-up also has a hidden honeypot field.

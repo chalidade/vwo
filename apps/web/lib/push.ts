@@ -40,19 +40,24 @@ export interface PushMessage {
 export function pushTo(userIds: string[], msg: PushMessage) {
   const ids = [...new Set(userIds)].filter(Boolean);
   if (!ids.length || !configured()) return;
-  after(async () => {
-    try {
-      const subs = await pushSubscriptionsOf(db, ids);
-      const payload = JSON.stringify({ title: msg.title.slice(0, 80), body: msg.body.slice(0, 180), url: msg.url ?? "/", tag: msg.tag });
-      await Promise.all(
-        subs.map((s) =>
-          webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "normal", timeout: 8000 }).catch(async (e: { statusCode?: number }) => {
-            if (e.statusCode === 404 || e.statusCode === 410) await dropPushEndpoint(db, s.endpoint);
-          }),
-        ),
-      );
-    } catch (e) {
-      console.warn("push failed", (e as Error).message);
-    }
-  });
+  after(() => sendPush(ids, msg));
+}
+
+/** Send now and wait for it (a cron job has no response to send first). Never throws. */
+export async function sendPush(userIds: string[], msg: PushMessage) {
+  const ids = [...new Set(userIds)].filter(Boolean);
+  if (!ids.length || !configured()) return;
+  try {
+    const subs = await pushSubscriptionsOf(db, ids);
+    const payload = JSON.stringify({ title: msg.title.slice(0, 80), body: msg.body.slice(0, 180), url: msg.url ?? "/", tag: msg.tag });
+    await Promise.all(
+      subs.map((s) =>
+        webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "normal", timeout: 8000 }).catch(async (e: { statusCode?: number }) => {
+          if (e.statusCode === 404 || e.statusCode === 410) await dropPushEndpoint(db, s.endpoint);
+        }),
+      ),
+    );
+  } catch (e) {
+    console.warn("push failed", (e as Error).message);
+  }
 }
