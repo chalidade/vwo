@@ -2190,6 +2190,12 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .lite-featured { border: 2px solid var(--l-ink); }
 .sp-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde68a; color: #713f12; vertical-align: middle; }
 
+/* ---- company-selects: list pickers in the vacancy editor and company profile ---- */
+.cp-form .pk-label small { font-weight: 400; }
+.cp-form .pk-list { scroll-margin-bottom: 96px; }
+.cp-form .pk-opts button { min-height: 30px; box-sizing: border-box; display: inline-flex; align-items: center; }
+.cp-form .pk-chips li { max-width: 100%; overflow-wrap: anywhere; }
+.cp-form label > small { font-weight: 400; }
 /* stand-placement: the organiser moves a stand to another floor or slot, or swaps two stands. */
 .cp-modal.org-move-wrap { z-index: 70; padding: 12px; }
 .org-move { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow: auto; display: grid; gap: 10px; }

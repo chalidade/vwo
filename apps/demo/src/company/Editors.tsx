@@ -1,7 +1,35 @@
 import { Palette, Sparkles, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { type BoothTheme, type CompanyBooth, EDUCATION_LEVELS, type JobPosting, type VipStyle, canOpenAnotherJob, FEATURED_PRODUCT_ID, fairFloorId, hasStand, isFeatured, MINI_MAX_OPEN_JOBS, UMKM_CORNER } from "@vwo/shared";
-import { RegionPicker } from "../pickers";
+import {
+  type BoothTheme,
+  type CompanyBooth,
+  EDUCATION_LIST,
+  EMPLOYEE_BANDS,
+  EXPERIENCE_LIST,
+  INDUSTRY_LIST,
+  type JobPosting,
+  LOCATION_LIST,
+  MAJOR_LIST,
+  POSITION_LIST,
+  QUALIFICATION_LIST,
+  type VipStyle,
+  WORK_MODES,
+  type WorkMode,
+  canOpenAnotherJob,
+  employeeBand,
+  FEATURED_PRODUCT_ID,
+  fairFloorId,
+  hasStand,
+  isEmployeeBand,
+  isFeatured,
+  joinList,
+  locationText,
+  MINI_MAX_OPEN_JOBS,
+  parseList,
+  UMKM_CORNER,
+  workModeOf,
+} from "@vwo/shared";
+import { ListPicker } from "../pickers";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
 import { readImageFile } from "../imageFile";
 import { staffLook } from "../fair/staff-look";
@@ -78,7 +106,12 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
               className="cp-theme"
               data-active={(booth.theme ?? "classic") === t ? "" : undefined}
               onClick={() => fair.editBooth(booth.id, { theme: t })}
-              style={{ ["--wall" as string]: BOOTH_THEMES[t].wall, ["--base" as string]: BOOTH_THEMES[t].base, ["--post" as string]: BOOTH_THEMES[t].post, ["--c" as string]: booth.color }}
+              style={{
+                ["--wall" as string]: BOOTH_THEMES[t].wall,
+                ["--base" as string]: BOOTH_THEMES[t].base,
+                ["--post" as string]: BOOTH_THEMES[t].post,
+                ["--c" as string]: booth.color,
+              }}
             >
               <span className="cp-theme-swatch" />
               {BOOTH_THEMES[t].name}
@@ -88,7 +121,15 @@ export function BoothEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: 
         <h2 className="cp-h2">Warna brand</h2>
         <div className="cp-colors">
           {COLORS.map((c) => (
-            <button key={c} type="button" className="cp-color" style={{ background: c }} data-active={booth.color === c ? "" : undefined} onClick={() => fair.editBooth(booth.id, { color: c })} aria-label={`Warna ${c}`} />
+            <button
+              key={c}
+              type="button"
+              className="cp-color"
+              style={{ background: c }}
+              data-active={booth.color === c ? "" : undefined}
+              onClick={() => fair.editBooth(booth.id, { color: c })}
+              aria-label={`Warna ${c}`}
+            />
           ))}
           <label className="cp-color cp-color-pick" title="Warna lain">
             <Palette size={18} aria-hidden />
@@ -185,7 +226,6 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
     company: booth.company,
     logo: booth.logo,
     tagline: booth.tagline,
-    industry: booth.industry,
     recruiter: booth.recruiter,
     about: booth.about,
     website: booth.website ?? "",
@@ -197,8 +237,12 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
     benefits: (booth.benefits ?? []).join("\n"),
     socials: (booth.socials ?? []).map((s) => `${s.label} ${s.url}`).join("\n"),
   });
+  /** Up to three industries from the list; an old free-typed one stays until it is removed. */
+  const [industry, setIndustry] = useState(() => parseList(INDUSTRY_LIST, booth.industry, 40));
   const [saved, flash] = useSaved();
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const oldEmployees = booth.employees && !isEmployeeBand(booth.employees) ? booth.employees : "";
+  const suggestBand = employeeBand(oldEmployees);
   const field = (k: keyof typeof f, label: string, props: Record<string, unknown> = {}) => (
     <label>
       {label}
@@ -219,7 +263,7 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
           company: f.company.trim(),
           logo: f.logo,
           tagline: f.tagline.trim(),
-          industry: f.industry.trim(),
+          industry: joinList(INDUSTRY_LIST, industry),
           recruiter: f.recruiter.trim() || booth.recruiter,
           about: f.about.trim(),
           website: f.website.trim() || undefined,
@@ -229,10 +273,12 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
           founded: Number(f.founded) || undefined,
           employees: f.employees.trim() || undefined,
           benefits: lines(f.benefits),
-          socials: lines(f.socials).map((l) => {
-            const url = l.match(/https?:\/\/\S+/)?.[0] ?? "";
-            return { label: l.replace(url, "").trim() || url, url };
-          }).filter((s) => s.url),
+          socials: lines(f.socials)
+            .map((l) => {
+              const url = l.match(/https?:\/\/\S+/)?.[0] ?? "";
+              return { label: l.replace(url, "").trim() || url, url };
+            })
+            .filter((s) => s.url),
         });
         flash();
       }}
@@ -242,9 +288,21 @@ export function ProfileEditor({ booth }: { booth: CompanyBooth }) {
       {field("company", "Nama perusahaan", { required: true, maxLength: 40 })}
       {field("logo", "Logo teks (1–3 huruf/emoji, dipakai jika belum ada gambar)", { required: true, maxLength: 3 })}
       {field("tagline", "Tagline", { maxLength: 80 })}
-      {field("industry", "Industri", { maxLength: 40 })}
       {field("recruiter", "Nama recruiter di stand", { maxLength: 30 })}
-      {field("employees", "Jumlah karyawan", { placeholder: "200–500" })}
+      <label>
+        Jumlah karyawan
+        <select value={f.employees} onChange={set("employees")}>
+          <option value="">Pilih jumlah karyawan</option>
+          {oldEmployees && <option value={oldEmployees}>{oldEmployees} (isian lama)</option>}
+          {EMPLOYEE_BANDS.map((b) => (
+            <option key={b}>{b}</option>
+          ))}
+        </select>
+        {f.employees === oldEmployees && suggestBand && <small className="muted">Pilih rentang, mis. {suggestBand}</small>}
+      </label>
+      <div className="cp-span">
+        <ListPicker list={INDUSTRY_LIST} value={industry} onChange={setIndustry} label="Industri" noun="industri" hint={`maks. ${INDUSTRY_LIST.max}`} />
+      </div>
       {field("founded", "Tahun berdiri", { type: "number", min: 1900, max: 2100 })}
       {field("website", "Website", { type: "url", placeholder: "https://" })}
       {field("email", "Email HR", { type: "email" })}
@@ -299,8 +357,21 @@ export function FaqEditor({ booth }: { booth: CompanyBooth }) {
         <div key={i} className="cp-faq cp-span">
           <span className="cp-faq-no">{i + 1}</span>
           <div className="cp-faq-fields">
-            <input value={x.q} onChange={(e) => setItems(items.map((y, j) => (j === i ? { ...y, q: e.target.value } : y)))} placeholder="Pertanyaan" maxLength={120} aria-label={`Pertanyaan ${i + 1}`} />
-            <textarea rows={2} value={x.a} onChange={(e) => setItems(items.map((y, j) => (j === i ? { ...y, a: e.target.value } : y)))} placeholder="Jawaban" maxLength={400} aria-label={`Jawaban ${i + 1}`} />
+            <input
+              value={x.q}
+              onChange={(e) => setItems(items.map((y, j) => (j === i ? { ...y, q: e.target.value } : y)))}
+              placeholder="Pertanyaan"
+              maxLength={120}
+              aria-label={`Pertanyaan ${i + 1}`}
+            />
+            <textarea
+              rows={2}
+              value={x.a}
+              onChange={(e) => setItems(items.map((y, j) => (j === i ? { ...y, a: e.target.value } : y)))}
+              placeholder="Jawaban"
+              maxLength={400}
+              aria-label={`Jawaban ${i + 1}`}
+            />
           </div>
           <div className="cp-faq-tools">
             <button type="button" className="small-btn ghost" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Naik">
@@ -358,7 +429,9 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
         </p>
       )}
       <p className="muted small">
-        {canFeature ? "Lowongan unggulan aktif: tandai satu lowongan dengan bintang supaya tampil paling atas di daftar lowongan." : "Beli Lowongan unggulan di tab Koin & belanja supaya satu lowongan tampil paling atas di daftar lowongan."}
+        {canFeature
+          ? "Lowongan unggulan aktif: tandai satu lowongan dengan bintang supaya tampil paling atas di daftar lowongan."
+          : "Beli Lowongan unggulan di tab Koin & belanja supaya satu lowongan tampil paling atas di daftar lowongan."}
       </p>
       <ul className="cp-jobs">
         {booth.jobs.map((j) => (
@@ -421,51 +494,67 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
 function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth; onDone: (msg?: string) => void }) {
   const isNew = !booth.jobs.some((j) => j.id === job.id);
   const [f, setF] = useState({
-    ...job,
+    type: job.type,
     salary: job.salary ?? "",
     description: job.description ?? "",
     deadline: job.deadline ?? "",
     quota: job.quota ? String(job.quota) : "",
-    req: job.requirements.join("\n"),
-    education: job.education ?? "",
-    major: job.major ?? "",
-    experience: job.experience ?? "",
-    city: job.city ?? "",
+    mode: workModeOf(job.location) as WorkMode,
   });
+  // The list fields, as chips. Text saved before the lists stays as the company's own entries.
+  const [lists, setLists] = useState(() => ({
+    title: parseList(POSITION_LIST, job.title, 60),
+    places: parseList(LOCATION_LIST, job.city),
+    education: parseList(EDUCATION_LIST, job.education),
+    major: parseList(MAJOR_LIST, job.major),
+    experience: parseList(EXPERIENCE_LIST, job.experience),
+    requirements: parseList(QUALIFICATION_LIST, job.requirements),
+  }));
+  const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  const pick = (k: keyof typeof lists) => (v: string[]) => setLists((was) => ({ ...was, [k]: v }));
+  /** A location typed before the regions list, kept until places are picked. */
+  const oldLocation = !job.city && job.location ? job.location : "";
+  const location = lists.places.length || f.mode === "Remote" ? locationText(lists.places, f.mode) : oldLocation;
   return (
     <form
-      className="card cp-form"
+      className="card cp-form cp-job-form"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!lists.title.length) return setError("Pilih posisi dulu.");
+        if (!location) return setError("Pilih kabupaten/kota tempat kerja, atau sistem kerja Remote.");
         const ok = fair.saveJob(booth.id, {
           id: job.id,
-          title: f.title.trim(),
+          title: joinList(POSITION_LIST, lists.title),
           type: f.type,
-          location: f.location.trim(),
+          location,
           salary: f.salary.trim() || undefined,
           description: f.description.trim() || undefined,
           deadline: f.deadline || undefined,
           quota: Number(f.quota) || undefined,
-          education: f.education || undefined,
-          major: f.major.trim() || undefined,
-          experience: f.experience.trim() || undefined,
-          city: f.city.trim() || undefined,
+          education: joinList(EDUCATION_LIST, lists.education) || undefined,
+          major: joinList(MAJOR_LIST, lists.major) || undefined,
+          experience: joinList(EXPERIENCE_LIST, lists.experience) || undefined,
+          city: joinList(LOCATION_LIST, lists.places) || undefined,
           closed: job.closed,
-          requirements: f.req
-            .split("\n")
-            .map((r) => r.trim())
-            .filter(Boolean),
+          requirements: lists.requirements,
         });
         if (!ok) return onDone(`Paket mini UMKM hanya ${MINI_MAX_OPEN_JOBS} lowongan aktif. Tutup lowongan yang aktif dulu.`);
         onDone(isNew ? (hasStand(booth) ? "Lowongan baru tayang di stand" : `Lowongan baru tayang di ${UMKM_CORNER}`) : "Lowongan diperbarui");
       }}
     >
       <h2 className="cp-h2 cp-span">{isNew ? "Lowongan baru" : `Ubah ${job.title}`}</h2>
-      <label>
-        Posisi
-        <input required value={f.title} onChange={set("title")} maxLength={60} placeholder="Frontend Developer" />
-      </label>
+      <div className="cp-span">
+        <ListPicker
+          list={POSITION_LIST}
+          value={lists.title}
+          onChange={pick("title")}
+          label="Posisi"
+          noun="posisi"
+          placeholder="Ketik, mis. Admin, Kasir, Developer"
+          hint={`maks. ${POSITION_LIST.max}`}
+        />
+      </div>
       <label>
         Tipe
         <select value={f.type} onChange={set("type")}>
@@ -475,9 +564,25 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
         </select>
       </label>
       <label>
-        Lokasi
-        <input required value={f.location} onChange={set("location")} placeholder="Jakarta / Hybrid" />
+        Sistem kerja
+        <select value={f.mode} onChange={set("mode")}>
+          {WORK_MODES.map((m) => (
+            <option key={m}>{m}</option>
+          ))}
+        </select>
       </label>
+      <div className="cp-span">
+        <ListPicker
+          list={LOCATION_LIST}
+          value={lists.places}
+          onChange={pick("places")}
+          label="Lokasi (kabupaten/kota)"
+          noun="kabupaten/kota"
+          placeholder="Ketik kota atau kabupaten"
+          hint={`maks. ${LOCATION_LIST.max}`}
+        />
+        {oldLocation && !lists.places.length && <small className="pk-hint">Lokasi lama: {oldLocation}. Pilih dari daftar supaya mudah dicari dan dilaporkan.</small>}
+      </div>
       <label>
         Gaji per bulan
         <input value={f.salary} onChange={set("salary")} placeholder="8–12 jt" />
@@ -493,34 +598,39 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
       <p className="cp-span muted small" style={{ margin: "4px 0 0" }}>
         Untuk lapor lowongan ke SIAPkerja/Karirhub (opsional, tidak tampil di stand):
       </p>
-      <label>
-        Pendidikan minimal
-        <select value={f.education} onChange={set("education")}>
-          <option value="">-</option>
-          {EDUCATION_LEVELS.map((e) => (
-            <option key={e}>{e}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Jurusan
-        <input value={f.major} onChange={set("major")} maxLength={120} placeholder="Teknik Informatika, Sistem Informasi" />
-      </label>
-      <label>
-        Pengalaman
-        <input value={f.experience} onChange={set("experience")} maxLength={60} placeholder="Min. 1 tahun / fresh graduate" />
-      </label>
       <div className="cp-span">
-        <RegionPicker label="Kabupaten/Kota tempat kerja (provinsi ikut otomatis)" value={f.city} onChange={(city) => setF({ ...f, city })} />
+        <ListPicker list={EDUCATION_LIST} value={lists.education} onChange={pick("education")} label="Pendidikan" noun="pendidikan" hint="boleh lebih dari satu" />
+      </div>
+      <div className="cp-span">
+        <ListPicker list={EXPERIENCE_LIST} value={lists.experience} onChange={pick("experience")} label="Pengalaman" noun="pengalaman" hint={`maks. ${EXPERIENCE_LIST.max}`} />
+      </div>
+      <div className="cp-span">
+        <ListPicker
+          list={MAJOR_LIST}
+          value={lists.major}
+          onChange={pick("major")}
+          label="Jurusan"
+          noun="jurusan"
+          placeholder="Ketik, mis. Akuntansi, SMK, Informatika"
+          hint={`maks. ${MAJOR_LIST.max}`}
+        />
       </div>
       <label className="cp-span">
         Deskripsi pekerjaan
         <textarea rows={4} value={f.description} onChange={set("description")} maxLength={1200} placeholder="Apa yang akan dikerjakan sehari-hari" />
       </label>
-      <label className="cp-span">
-        Kualifikasi (satu per baris, dipakai untuk menghitung kecocokan pelamar)
-        <textarea rows={5} value={f.req} onChange={set("req")} placeholder={"S1 Informatika\nReact, TypeScript\nPengalaman 1 tahun"} />
-      </label>
+      <div className="cp-span">
+        <ListPicker
+          list={QUALIFICATION_LIST}
+          value={lists.requirements}
+          onChange={pick("requirements")}
+          label="Kualifikasi"
+          noun="kualifikasi"
+          placeholder="Ketik, mis. Excel, komunikatif, SIM C"
+          hint="dipakai untuk menghitung kecocokan pelamar"
+        />
+      </div>
+      {error && <p className="cp-warn cp-span">{error}</p>}
       <div className="row cp-span">
         <button type="submit">{isNew ? "Tayangkan" : "Simpan"}</button>
         <button type="button" className="ghost" onClick={() => onDone()}>
@@ -585,7 +695,9 @@ function VipEditor({ booth, onTab }: { booth: CompanyBooth; onTab: (t: PortalTab
     <div className="card cp-vip-card" data-locked={vip ? undefined : ""}>
       <h2 className="cp-h2">Tampilan VIP {!vip && <span className="cp-lock">Khusus VIP</span>}</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
-        {vip ? "Pilih gaya stand supaya beda dari stand VIP lain. Langsung tampil di job fair." : "Stand VIP bisa memilih salah satu gaya ini, lengkap dengan layar video, lounge, dan gapura."}
+        {vip
+          ? "Pilih gaya stand supaya beda dari stand VIP lain. Langsung tampil di job fair."
+          : "Stand VIP bisa memilih salah satu gaya ini, lengkap dengan layar video, lounge, dan gapura."}
       </p>
       <div className="cp-vip-styles">
         {(Object.keys(VIP_STYLES) as VipStyle[]).map((k) => {

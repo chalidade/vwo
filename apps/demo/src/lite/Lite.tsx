@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
-import { type CompanyBooth, type JobPosting, featuredJobs, hasStand, isFeatured, openJobs, price, UMKM_CORNER } from "@vwo/shared";
+import { type CompanyBooth, type JobPosting, featuredJobs, hasStand, INDUSTRY_LIST, isFeatured, openJobs, parseList, price, UMKM_CORNER } from "@vwo/shared";
 import { AccountGate } from "../AccountGate";
 import { type Account, ACCOUNT_EVENT, currentAccount } from "../account";
 import { PLAYER_ID } from "../jobfair-engine";
@@ -63,12 +63,13 @@ export function LiteMode() {
   const booths = fair.fair.booths;
   const mine = fair.applications.filter((a) => a.visitorId === PLAYER_ID);
   const applied = new Set(mine.map((a) => a.jobId));
-  const industries = useMemo(() => [...new Set(booths.map((b) => b.industry))].sort(), [booths]);
+  // A company may pick up to three industries; each one is its own filter choice.
+  const industries = useMemo(() => [...new Set(booths.flatMap((b) => parseList(INDUSTRY_LIST, b.industry)))].sort(), [booths]);
   const recs = canRecommend(profile) ? recommendJobs(profile, booths, applied, 5) : [];
   const recBooths = canRecommend(profile) ? recommendBooths(profile, booths, applied, 3) : [];
   const needle = q.trim().toLowerCase();
   const list = booths
-    .filter((b) => !industry || b.industry === industry)
+    .filter((b) => !industry || parseList(INDUSTRY_LIST, b.industry).includes(industry))
     .map((b) => ({
       booth: b,
       jobs: openJobs(b).filter(
