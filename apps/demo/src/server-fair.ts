@@ -1,6 +1,6 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
-import type { ApplicationShared, Candidate, CompanyBooth, FairApplicationInput, FairApplicationOut, PoolFacets, PoolFilter, PoolMember, TalentOffer } from "@vwo/shared";
+import type { ApplicationShared, BoothReport, Candidate, CompanyBooth, FairApplicationInput, FairApplicationOut, PoolFacets, PoolFilter, PoolMember, TalentOffer } from "@vwo/shared";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -129,3 +129,9 @@ export function claimErrorText(error: string) {
       return "Gagal masuk ke stand. Coba lagi sebentar lagi.";
   }
 }
+
+/** The booth's post-event report: this event so far, its saved reports, and the latest to compare with. */
+export type SavedReport = { id: string; eventName: string; at: number; report: BoothReport };
+export const boothReport = (boothId: string) =>
+  call<{ report: BoothReport; history: { id: string; eventName: string; at: number }[]; previous: SavedReport | null }>(`booths/${encodeURIComponent(boothId)}/report`);
+export const boothSavedReport = (boothId: string, id: string) => call<{ saved: SavedReport }>(`booths/${encodeURIComponent(boothId)}/report?id=${encodeURIComponent(id)}`);

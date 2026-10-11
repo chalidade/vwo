@@ -15,3 +15,4 @@ export * from "./invoice";
 export * from "./taxonomy";
 export * from "./recommend";
 export * from "./talent-pool";
+export * from "./booth-report";
