@@ -1335,7 +1335,8 @@ export function JobFair() {
       id = res.data.application.id;
     }
     const a = fair.apply(session.visitorId, { id, boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
-    updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl });
+    // Applying turns on "Boleh dihubungi perusahaan untuk lowongan lain" unless they already chose.
+    updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl, contactable: profile.contactable ?? true });
     setApplying(null);
     if (a) setToast(`Lamaran ${a.jobTitle} terkirim ke ${a.company}${fair.player.txns[0]?.reason.startsWith("Lamar") ? ` (−${price("coin.apply")} 🪙)` : " (voucher)"}`);
   };

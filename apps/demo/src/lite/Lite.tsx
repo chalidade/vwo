@@ -300,6 +300,8 @@ export function LiteMode() {
             account={account}
             onTopUp={() => setWallet(true)}
             onDone={(text, p) => {
+              // Applying turns on "Boleh dihubungi perusahaan untuk lowongan lain" unless they already chose.
+              p = { ...p, contactable: p.contactable ?? true };
               setProfile(p);
               saveProfile(p);
               setApplying(null);

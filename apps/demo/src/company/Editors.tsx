@@ -1,4 +1,4 @@
-import { Palette, Trash2 } from "lucide-react";
+import { Palette, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
@@ -8,6 +8,7 @@ import { ACCESSORY_PRODUCTS, coinText } from "../fair/company";
 import { fair } from "../useFair";
 import { GateEditor, MediaEditor } from "./MediaEditor";
 import { PromoterEditor } from "./PromoterEditor";
+import { JobCandidates } from "./TalentPool";
 import type { PortalTab } from "./Portal";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#84cc16", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#4f46e5", "#334155"];
@@ -329,6 +330,8 @@ const emptyJob = (id: string): JobPosting => ({ id, title: "", type: "Full-time"
 export function JobsEditor({ booth }: { booth: CompanyBooth }) {
   const [edit, setEdit] = useState<JobPosting | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** The vacancy whose "Kandidat cocok" is open. */
+  const [cands, setCands] = useState<string | null>(null);
   const count = (id: string) => fair.applications.filter((a) => a.boothId === booth.id && a.jobId === id).length;
   const flash = (t: string) => {
     setToast(t);
@@ -355,6 +358,11 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
               </span>
             </div>
             <div className="cp-job-tools">
+              {!j.closed && (
+                <button type="button" className="small-btn ghost" aria-expanded={cands === j.id} onClick={() => setCands(cands === j.id ? null : j.id)}>
+                  <Sparkles size={16} aria-hidden /> Kandidat cocok
+                </button>
+              )}
               <button type="button" className="small-btn ghost" onClick={() => setEdit({ ...j, requirements: [...j.requirements] })}>
                 Ubah
               </button>
@@ -372,6 +380,7 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
                 <Trash2 size={16} aria-hidden />
               </button>
             </div>
+            {cands === j.id && !j.closed && <JobCandidates booth={booth} job={j} />}
           </li>
         ))}
       </ul>

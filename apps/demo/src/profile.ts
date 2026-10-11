@@ -15,6 +15,13 @@ export interface SeekerProfile {
   campus?: string;
   /** Profile photo as a small JPEG data URL, shown to HR with applications. */
   photo?: string;
+  /**
+   * "Boleh dihubungi perusahaan untuk lowongan lain". Unset until they choose; sending the first
+   * application turns it on (they can switch it off). On: companies they applied to may offer other
+   * vacancies, and any company may find them in "Kandidat cocok" (without contact details until they
+   * apply). Off: only the companies they applied to see them, for those applications.
+   */
+  contactable?: boolean;
 }
 
 const KEY = "vwo:jobseeker";

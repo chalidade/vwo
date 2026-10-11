@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { type CompanyBooth, type FairFloorInfo, messageTime, safeImage } from "@vwo/shared";
+import { useEffect, useState } from "react";
+import { type CompanyBooth, type FairFloorInfo, type TalentOffer, messageTime, safeImage } from "@vwo/shared";
+import { LIVE } from "./mode";
+import { dropOffer, myOffers } from "./server-fair";
 import { BoothLogo, type Look, Person } from "@vwo/ui";
 import { SEEKER_TITLES, levelOf } from "./fair/content";
 import { fair } from "./useFair";
@@ -13,7 +15,7 @@ import { RegionPicker, SkillPicker } from "./pickers";
 
 export type SeekerTab = "profile" | "match" | "invite" | "applications" | "stamps";
 
-const FIELDS: { key: keyof SeekerProfile; label: string; placeholder?: string; type?: string }[] = [
+const FIELDS: { key: Exclude<keyof SeekerProfile, "contactable">; label: string; placeholder?: string; type?: string }[] = [
   { key: "name", label: "Nama lengkap" },
   { key: "headline", label: "Status", placeholder: "Fresh graduate Teknik Informatika" },
   { key: "email", label: "Email", type: "email", placeholder: "nama@email.com" },
@@ -240,6 +242,23 @@ export function SeekerPanel({
                     </label>
                   ),
                 )}
+                <label className="sp-consent">
+                  <input
+                    type="checkbox"
+                    checked={profile.contactable ?? applications.length > 0}
+                    onChange={(e) => {
+                      // Saved right away: it decides who may reach them, not just how the form is filled.
+                      onSaveProfile({ ...profile, contactable: e.target.checked });
+                      setForm((f) => ({ ...f, contactable: e.target.checked }));
+                    }}
+                  />
+                  <span>
+                    <b>Boleh dihubungi perusahaan untuk lowongan lain</b>
+                    <span className="sp-muted small">
+                      Perusahaan yang pernah kamu lamar bisa menawarkan lowongan baru, dan perusahaan lain bisa melihat keahlian, pendidikan dan domisilimu (tanpa nama lengkap, foto dan kontak) lalu mengajakmu melamar.
+                    </span>
+                  </span>
+                </label>
                 <div className="sp-actions">
                   <button type="submit" className="mb-order jb-apply">
                     Simpan profil
@@ -367,6 +386,7 @@ export function SeekerPanel({
 
           {tab === "match" && (
             <div className="sp-match">
+              {LIVE && <Offers applications={applications} booths={booths} onOpenJob={onOpenJob} />}
               {!canRecommend(profile) ? (
                 <p className="sp-empty">
                   Isi <b>Status</b>, <b>Pendidikan</b> dan <b>Keahlian</b> di tab Profil, nanti di sini muncul lowongan dan stand yang paling cocok untukmu.{" "}
@@ -495,6 +515,65 @@ export function SeekerPanel({
 }
 
 /** Messages from the company about one application, with a reply box. */
+/** Live: companies inviting the seeker to apply to a vacancy ("Tawarkan lowongan" in their talent pool). */
+function Offers({ applications, booths, onOpenJob }: { applications: FairApplication[]; booths: CompanyBooth[]; onOpenJob: (boothId: string, jobId: string) => void }) {
+  const [offers, setOffers] = useState<TalentOffer[]>([]);
+  useEffect(() => {
+    let gone = false;
+    void myOffers().then((r) => !gone && r.ok && setOffers(r.data.offers));
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const applied = new Set(applications.map((a) => `${a.boothId}:${a.jobId}`));
+  // An offer they already applied to is done: clear it on the server too.
+  useEffect(() => {
+    const done = offers.filter((o) => applied.has(`${o.boothId}:${o.jobId}`));
+    if (!done.length) return;
+    for (const o of done) void dropOffer(o.id);
+    setOffers((all) => all.filter((o) => !done.includes(o)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offers, applications.length]);
+  const open = offers.filter((o) => !applied.has(`${o.boothId}:${o.jobId}`) && booths.some((b) => b.id === o.boothId && b.jobs.some((j) => j.id === o.jobId && !j.closed)));
+  if (!open.length) return null;
+  return (
+    <>
+      <h3 className="sp-h3">Tawaran perusahaan</h3>
+      <ul className="sp-list">
+        {open.map((o) => {
+          const b = booths.find((x) => x.id === o.boothId);
+          return (
+            <li key={o.id} style={{ ["--c" as string]: b?.color ?? "#64748b" }}>
+              <span className="sp-logo">{b?.logo}</span>
+              <span className="sp-main">
+                <b>{o.jobTitle}</b>
+                <span className="sp-muted">
+                  {o.company} mengajakmu melamar · {when(o.at)}
+                </span>
+                {o.note && <span className="sp-muted">"{o.note}"</span>}
+              </span>
+              <span className="sp-links">
+                <button type="button" onClick={() => onOpenJob(o.boothId, o.jobId)}>
+                  Lihat & lamar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOffers((all) => all.filter((x) => x.id !== o.id));
+                    void dropOffer(o.id);
+                  }}
+                >
+                  Tolak
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 function Chat({ app, onReply }: { app: FairApplication; onReply: (applicationId: string, text: string) => void }) {
   const [text, setText] = useState("");
   return (
