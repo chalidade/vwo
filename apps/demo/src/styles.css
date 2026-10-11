@@ -1997,3 +1997,31 @@ body:has(.app-lite) { background: #f7f7f7; background-image: none; }
 .lite-sheet .ag button.ag-link { min-height: 0; padding: 0; border: 0; background: none; text-decoration: underline; }
 .sp-why { font-size: 12px; font-weight: 700; color: #15803d; }
 .sp-h3 { margin: 12px 0 6px; font-size: 13px; }
+
+/* "Ajak & lencana" in the seeker's bag: avatar card, invite link, badges, campus leaderboard. */
+.vr { display: grid; gap: 12px; }
+.vr-card { display: grid; justify-items: center; gap: 4px; padding: 18px 14px 14px; border-radius: 14px; background: radial-gradient(circle at 50% 38%, #fff000 0 34%, transparent 34.5%), #0a0a0a; color: #fff; text-align: center; }
+.vr-sprite { display: grid; place-items: center; height: 160px; }
+.vr-name { margin-top: 6px; font-size: 20px; }
+.vr-sub { font-size: 13px; color: #d4d4d4; }
+.vr-level { font-size: 13px; font-weight: 700; color: #fff000; }
+.vr-badges { display: flex; gap: 6px; font-size: 22px; margin: 2px 0 6px; }
+.vr-box { padding: 10px 12px; border-radius: 12px; background: #fff; border: 2px solid #ead2bd; }
+.vr-box .sp-h3 { margin-top: 0; }
+.vr-link { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.vr-link input { flex: 1 1 200px; min-width: 0; font-size: 13px; padding: 6px 8px; border-width: 2px; }
+a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; border: 2px solid #3b2a20; border-radius: 10px; padding: 3px 10px; font-weight: 700; font-size: 13px; }
+.vr-badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.vr-badge-list li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: #f5f5f4; filter: grayscale(1); opacity: 0.6; }
+.vr-badge-list li[data-got] { background: #fef9c3; filter: none; opacity: 1; }
+.vr-badge-list li > span:last-child { display: grid; font-size: 13px; }
+.vr-badge-ic { font-size: 22px; }
+.vr-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.vr-board li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; font-size: 14px; }
+.vr-board li[data-me] { background: #fef9c3; }
+.vr-rank { font-weight: 800; text-align: center; }
+.vr-campus { display: grid; min-width: 0; }
+.lite-invite { display: grid; gap: 8px; justify-items: start; margin: 10px 0 0; }
+.lite-invite a.lite-btn { display: inline-flex; align-items: center; text-decoration: none; color: #fff; }
+.lite-invite .lite-muted { overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) { .lite-invite a.lite-btn { color: #111; } }

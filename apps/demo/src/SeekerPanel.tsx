@@ -8,8 +8,9 @@ import type { FairApplication, PlayerState } from "./jobfair-engine";
 import type { SeekerProfile } from "./profile";
 import { readImageFile } from "./imageFile";
 import { canRecommend, recommendBooths, recommendJobs } from "./fair/recommend";
+import { ViralTab } from "./fair/Viral";
 
-export type SeekerTab = "profile" | "match" | "applications" | "stamps";
+export type SeekerTab = "profile" | "match" | "invite" | "applications" | "stamps";
 
 const FIELDS: { key: keyof SeekerProfile; label: string; placeholder?: string; type?: string }[] = [
   { key: "name", label: "Nama lengkap" },
@@ -18,6 +19,7 @@ const FIELDS: { key: keyof SeekerProfile; label: string; placeholder?: string; t
   { key: "phone", label: "No. HP", type: "tel", placeholder: "08xx" },
   { key: "city", label: "Domisili", placeholder: "Jakarta" },
   { key: "education", label: "Pendidikan", placeholder: "S1 Informatika, 2025" },
+  { key: "campus", label: "Kampus / sekolah", placeholder: "Universitas Indonesia" },
   { key: "skills", label: "Keahlian", placeholder: "React, Excel, desain" },
   { key: "cvUrl", label: "Link CV", type: "url", placeholder: "https://" },
 ];
@@ -110,6 +112,7 @@ export function SeekerPanel({
             [
               ["profile", "👤 Profil"],
               ["match", "✨ Cocok"],
+              ["invite", "🎉 Ajak & lencana"],
               ["applications", `📋 Lamaran (${applications.length})`],
               ["stamps", `🏅 Stempel (${visited.size}/${booths.length})`],
             ] as const
@@ -212,7 +215,7 @@ export function SeekerPanel({
                     <span>{f.label}</span>
                     <input
                       type={f.type ?? "text"}
-                      value={form[f.key]}
+                      value={form[f.key] ?? ""}
                       placeholder={f.placeholder}
                       maxLength={f.key === "cvUrl" ? 300 : 80}
                       onChange={(e) => {
@@ -405,6 +408,20 @@ export function SeekerPanel({
                 })()
               )}
             </div>
+          )}
+          {tab === "invite" && (
+            <ViralTab
+              look={look}
+              name={profile.name}
+              headline={profile.headline}
+              campus={profile.campus ?? ""}
+              player={player}
+              applications={applications}
+              stamps={visited.size}
+              booths={booths.length}
+              psychPass={fair.psychConfig().pass}
+              onEditProfile={() => setTab("profile")}
+            />
           )}
           {tab === "stamps" && (
             <>

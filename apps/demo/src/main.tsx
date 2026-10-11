@@ -3,10 +3,12 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { CrashGuard, watchErrors } from "./crash";
 import { setupInstall } from "./install";
+import { captureRef } from "./fair/viral";
 import "@vwo/ui/src/rpg/rpg.css";
 import "./styles.css";
 
 setupInstall();
+captureRef();
 watchErrors();
 
 createRoot(document.getElementById("root")!).render(

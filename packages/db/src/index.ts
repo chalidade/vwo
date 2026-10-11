@@ -20,3 +20,4 @@ export * from "./fair-social";
 export * from "./cleanup";
 export * from "./push";
 export * from "./reminders";
+export * from "./fair-referrals";

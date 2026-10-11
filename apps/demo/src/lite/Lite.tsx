@@ -9,6 +9,7 @@ import { type SeekerProfile, loadProfile, saveProfile } from "../profile";
 import { applyErrorText, myApplications, sendApplication } from "../server-fair";
 import { fair, useFair } from "../useFair";
 import { WalletPanel } from "../fair/Wallet";
+import { type ReferralInfo, inviteLink, inviteText, loadReferral } from "../fair/viral";
 import { type JobMatch, canRecommend, recommendBooths, recommendJobs } from "../fair/recommend";
 
 const TYPES = ["Semua", "Full-time", "Kontrak", "Magang", "Part-time"] as const;
@@ -46,6 +47,10 @@ export function LiteMode() {
   const [wallet, setWallet] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
   const [notice, setNotice] = useState("");
+  const [ref, setRef] = useState<ReferralInfo | null>(null);
+  useEffect(() => {
+    void loadReferral(account).then(setRef);
+  }, [account?.id]);
 
   // Live site: this account's applications and the companies' answers.
   useEffect(() => {
@@ -240,6 +245,25 @@ export function LiteMode() {
             </ul>
           </section>
         )}
+        {ref && (
+          <section className="lite-card" aria-labelledby="lite-invite">
+            <h2 id="lite-invite">Ajak teman</h2>
+            <p className="lite-muted">
+              Teman yang daftar lewat linkmu dapat {ref.reward} koin, kamu juga. Sudah {ref.friends} teman bergabung.
+            </p>
+            <p className="lite-invite">
+              <a
+                className="lite-btn"
+                href={`https://wa.me/?text=${encodeURIComponent(inviteText(profile.name || account?.name || "", ref.code, ref.reward))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Kirim lewat WhatsApp
+              </a>
+              <span className="lite-muted">{inviteLink(ref.code)}</span>
+            </p>
+          </section>
+        )}
       </main>
 
       {gate && !account && (
@@ -408,6 +432,7 @@ function ProfileForm({ profile, onSave }: { profile: SeekerProfile; onSave: (p: 
       {field("education", "Pendidikan", "S1 Akuntansi, 2025")}
       {field("skills", "Keahlian", "Excel, pajak, laporan keuangan", "Pisahkan dengan koma.")}
       {field("city", "Domisili", "Surabaya")}
+      {field("campus", "Kampus / sekolah", "Universitas Airlangga")}
       <button type="submit" className="lite-btn">
         Simpan
       </button>

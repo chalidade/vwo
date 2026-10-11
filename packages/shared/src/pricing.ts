@@ -63,6 +63,7 @@ export const PRICE_CATALOG: PriceItem[] = [
   koin("Koin pencari kerja", "coin.verify", "Centang biru (akun terverifikasi)", 60),
   koin("Koin pencari kerja", "coin.start", "Koin sambutan akun baru", 50, "Diberikan, bukan dibayar"),
   koin("Koin pencari kerja", "coin.daily", "Koin gratis harian", 20, "Diberikan, bukan dibayar"),
+  koin("Koin pencari kerja", "coin.referral", "Bonus ajak teman (untuk yang mengajak dan yang diajak)", 10, "Diberikan, bukan dibayar"),
   rupiah("Paket koin", "pack.koin-50", "50 koin", 10_000),
   rupiah("Paket koin", "pack.koin-120", "100 koin + 20 bonus", 20_000),
   rupiah("Paket koin", "pack.koin-300", "250 koin + 50 bonus", 45_000),
