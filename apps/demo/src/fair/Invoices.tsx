@@ -290,6 +290,9 @@ export function InvoicesPanel({ booth }: { booth?: string }) {
       </section>
       <section className="inv-sec">
         <h3 className="cp-h3">Invoice</h3>
+        <p className="muted small">
+          {booth ? "Semua invoice perusahaan ini, siapa pun anggota tim yang membeli." : "Invoice pembelian pribadi. Invoice perusahaan ada di portal perusahaan."}
+        </p>
         {data.invoices.length === 0 ? (
           <p className="muted small">Belum ada invoice. Setiap pembelian koin yang dibayar mendapat invoice bernomor.</p>
         ) : (

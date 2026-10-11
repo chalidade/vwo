@@ -1,6 +1,7 @@
 // The live app's applications on the server: what the seeker sent, and what each booth received.
 // The GitHub Pages demo never calls these; everything there stays in the browser.
 import type {
+  AnnounceBoard,
   ApplicationShared,
   BoothReport,
   Candidate,
@@ -182,3 +183,7 @@ export type SavedReport = { id: string; eventName: string; at: number; report: B
 export const boothReport = (boothId: string) =>
   call<{ report: BoothReport; history: { id: string; eventName: string; at: number }[]; previous: SavedReport | null }>(`booths/${encodeURIComponent(boothId)}/report`);
 export const boothSavedReport = (boothId: string, id: string) => call<{ saved: SavedReport }>(`booths/${encodeURIComponent(boothId)}/report?id=${encodeURIComponent(id)}`);
+
+/** Event admins: send, take down, show again or delete an announcement. The server's board comes back. */
+export type AnnounceOp = { op: "post"; text: string } | { op: "hide" } | { op: "repost"; id: string } | { op: "remove"; id: string };
+export const announceOp = (body: AnnounceOp) => call<{ board: AnnounceBoard }>("announcements", { method: "POST", body });

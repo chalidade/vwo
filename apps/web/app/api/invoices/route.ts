@@ -21,14 +21,15 @@ async function sellerForBuyers() {
   return { name: s.name, address: s.address, npwp: s.npwp, email: s.email, phone: s.phone, pkp: s.pkp, ppnRate: s.ppnRate, bank: s.bank, takesTransfer: sellerTakesTransfer(s) };
 }
 
-/** This account's invoices (and, with ?booth=, that booth's), its saved buyer details and the seller. */
+/** This account's own invoices (or, with ?booth=, only that booth's), its saved buyer details and the seller. */
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
   const booth = new URL(req.url).searchParams.get("booth");
-  const booths = booth && BOOTH.test(booth) && (await canManageBooth(user, booth)) ? [booth] : [];
+  // A company portal lists only its own booth's invoices, and only to that booth's members.
+  if (booth !== null && (!BOOTH.test(booth) || !(await canManageBooth(user, booth)))) return fail(403, "not_allowed");
   if (await allow(`invoice-backfill:${user.id}`, 30, 600_000)) await backfillInvoices(user);
-  const rows = await invoicesOf(db, user.id, booths);
+  const rows = await invoicesOf(db, user.id, booth ? { booth } : "personal");
   return NextResponse.json({ invoices: rows.map(invoiceOut), buyer: await readBuyer(user.id), seller: await sellerForBuyers() }, { headers: { "Cache-Control": "no-store" } });
 }
 

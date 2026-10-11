@@ -2,8 +2,9 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EMPTY_SELLER, instalmentPlan, INVOICE_NO, type SellerInfo } from "@vwo/shared";
+import { ANNOUNCE_KEY, cleanBoard, EMPTY_SELLER, instalmentPlan, INVOICE_NO, postAnnouncement, removeAnnouncement, type SellerInfo } from "@vwo/shared";
 import {
+  addBoothMember,
   addTransferProof,
   buyerKey,
   coinBalance,
@@ -14,6 +15,7 @@ import {
   invoiceById,
   invoiceFile,
   invoicesOf,
+  isBoothMember,
   issuePaymentInvoice,
   markPaid,
   paymentsWithoutInvoice,
@@ -21,6 +23,7 @@ import {
   register,
   SELLER_KEY,
   setTaxInvoice,
+  updateFairStateLocked,
   voidInvoice,
   writeFairState,
 } from "../src";
@@ -155,6 +158,37 @@ describe("paying an invoice", () => {
   });
 });
 
+describe("who lists which invoices", () => {
+  it("keeps each booth's invoices to that booth, and personal ones to the account", async () => {
+    const alice = (await register(db, { email: "alice@a.example", password: "rahasia123", name: "Alice" })).userId;
+    const andi = (await register(db, { email: "andi@a.example", password: "rahasia123", name: "Andi" })).userId;
+    const bobi = (await register(db, { email: "bobi@b.example", password: "rahasia123", name: "Bobi" })).userId;
+    await addBoothMember(db, "booth-a", alice);
+    await addBoothMember(db, "booth-a", andi);
+    await addBoothMember(db, "booth-b", bobi);
+    const issue = (userId: string, boothKey: string | null) =>
+      createInvoice(db, { userId, boothKey, buyer, seller, items: pack(1_000), method: "transfer", instalments: instalmentPlan(1_000, 1, new Date()) });
+    const a1 = await issue(alice, "booth-a");
+    const a2 = await issue(andi, "booth-a");
+    const b1 = await issue(bobi, "booth-b");
+    // Alice also bought for booth B once (say, before she moved companies) and once for herself.
+    const aliceForB = await issue(alice, "booth-b");
+    const alicePersonal = await issue(alice, null);
+
+    const ids = (rows: { id: string }[]) => rows.map((r) => r.id).sort();
+    // Any member of booth A sees every booth A invoice, and nothing of booth B or anyone's personal ones.
+    expect(ids(await invoicesOf(db, alice, { booth: "booth-a" }))).toEqual([a1.id, a2.id].sort());
+    expect(ids(await invoicesOf(db, andi, { booth: "booth-a" }))).toEqual([a1.id, a2.id].sort());
+    expect(ids(await invoicesOf(db, bobi, { booth: "booth-b" }))).toEqual([b1.id, aliceForB.id].sort());
+    // The personal page holds only what the account bought for no booth.
+    expect(ids(await invoicesOf(db, alice))).toEqual([alicePersonal.id]);
+    expect(await invoicesOf(db, bobi)).toEqual([]);
+    // The route asks for a booth's list only after this check, so booth B stays shut to booth A.
+    expect(await isBoothMember(db, alice, "booth-b")).toBe(false);
+    expect(await isBoothMember(db, bobi, "booth-a")).toBe(false);
+  });
+});
+
 describe("billing state", () => {
   it("stays out of the public setup read", async () => {
     await writeFairState(db, { key: SELLER_KEY, data: { ...seller, npwp: "012345678901000" }, userId: adminId });
@@ -163,5 +197,21 @@ describe("billing state", () => {
     const keys = (await readFairState(db)).map((r) => r.key);
     expect(keys).toContain("org");
     expect(keys.some((k) => k.startsWith("billing:"))).toBe(false);
+  });
+});
+
+describe("announcements", () => {
+  it("take turns under the lock, so no organiser's change is lost", async () => {
+    await Promise.all(
+      Array.from({ length: 8 }, (_, i) => updateFairStateLocked(db, ANNOUNCE_KEY, adminId, (stored) => postAnnouncement(cleanBoard(stored), `pesan ${i}`, i, `a${i}`))),
+    );
+    const board = cleanBoard((await readFairState(db)).find((r) => r.key === ANNOUNCE_KEY)?.data);
+    expect(board.history).toHaveLength(8);
+    // Deleting the one on screen takes it off for everyone: the stored board no longer has it.
+    await updateFairStateLocked(db, ANNOUNCE_KEY, adminId, (stored) => removeAnnouncement(cleanBoard(stored), cleanBoard(stored).current!));
+    const after = cleanBoard((await readFairState(db)).find((r) => r.key === ANNOUNCE_KEY)?.data);
+    expect(after.current).toBeNull();
+    expect(after.history).toHaveLength(7);
+    expect(await updateFairStateLocked(db, ANNOUNCE_KEY, adminId, () => null)).toBeNull();
   });
 });

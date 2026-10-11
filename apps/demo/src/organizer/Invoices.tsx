@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DEFAULT_PPN, type InvoiceStatus, rp, type SellerInfo } from "@vwo/shared";
+import { DEFAULT_PPN, type InvoiceStatus, npwpText, rp, type SellerInfo, taxSplit } from "@vwo/shared";
 import {
   cancelInvoice,
   confirmPaid,
@@ -16,6 +16,68 @@ import {
 } from "../invoices";
 import { LIVE } from "../mode";
 
+/** What each field of the seller details is for, in a line the organiser can act on. */
+const SELLER_HINTS = {
+  name: "Nama resmi badan usaha penyelenggara, sama persis dengan yang terdaftar di NPWP. Dicetak paling atas sebagai penerbit invoice.",
+  npwp: "NPWP penyelenggara. Perusahaan pembeli butuh ini untuk pembukuan dan pajaknya.",
+  address: "Alamat kantor sesuai NPWP. Dicetak di bawah nama penjual.",
+  email: "Ke mana pembeli bertanya soal tagihan.",
+  phone: "Nomor yang bisa dihubungi bagian keuangan pembeli.",
+  bankName: "Bank tujuan transfer, misalnya BCA atau Mandiri.",
+  account: "Nomor rekening yang dicetak di invoice transfer dan termin. Periksa lagi: pembeli mentransfer ke nomor ini.",
+  holder: "Nama pemilik rekening, sebaiknya sama dengan nama penjual supaya pembeli yakin.",
+} as const;
+
+/** A miniature of the top of an invoice, so the organiser sees where each field ends up. */
+function SellerPreview({ f }: { f: SellerInfo }) {
+  const bank = f.bank.name && f.bank.account;
+  const t = taxSplit(1_110_000, f);
+  return (
+    <figure className="sel-preview" aria-label="Contoh tampilan di invoice">
+      <figcaption className="muted small">Contoh tampilan di invoice pembeli</figcaption>
+      <div className="sel-preview-doc">
+        <div className="sel-preview-head">
+          <div>
+            <b>{f.name || "Nama penjual"}</b>
+            <span>{f.address || "Alamat penjual"}</span>
+            <span>NPWP {f.npwp ? npwpText(f.npwp) : "belum diisi"}</span>
+            <span>{[f.email, f.phone].filter(Boolean).join(" · ") || "Email · telepon"}</span>
+          </div>
+          <div className="sel-preview-title">
+            <b>INVOICE</b>
+            <span>INV/2026/10/000123</span>
+          </div>
+        </div>
+        {t.rate > 0 && (
+          <>
+            <div className="sel-preview-row muted">
+              <span>DPP</span>
+              <span>{rp(t.subtotal)}</span>
+            </div>
+            <div className="sel-preview-row muted">
+              <span>PPN {String(t.rate).replace(".", ",")}%</span>
+              <span>{rp(t.tax)}</span>
+            </div>
+          </>
+        )}
+        <div className="sel-preview-row">
+          <b>Total paket koin</b>
+          <b>{rp(t.total)}</b>
+        </div>
+        <p className="sel-preview-pay">
+          {bank ? (
+            <>
+              Transfer ke <b>{f.bank.name}</b> no. rekening <b>{f.bank.account}</b> a.n. <b>{f.bank.holder || "…"}</b>
+            </>
+          ) : (
+            "Rekening belum diisi: pembeli belum bisa memilih transfer bank atau termin."
+          )}
+        </p>
+      </div>
+    </figure>
+  );
+}
+
 /** The organiser as seller on every invoice: name, NPWP, PKP and PPN, and the bank account buyers transfer to. */
 function SellerSettings({ onToast }: { onToast: (t: string) => void }) {
   const [f, setF] = useState<SellerInfo | null>(null);
@@ -28,12 +90,14 @@ function SellerSettings({ onToast }: { onToast: (t: string) => void }) {
     <label className={k === "address" ? "cp-span" : undefined}>
       {label}
       <input value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} {...props} />
+      <span className="sel-hint">{SELLER_HINTS[k]}</span>
     </label>
   );
   const bank = (k: keyof SellerInfo["bank"], label: string, props: Record<string, unknown> = {}) => (
     <label>
       {label}
       <input value={f.bank[k]} onChange={(e) => setF({ ...f, bank: { ...f.bank, [k]: e.target.value } })} {...props} />
+      <span className="sel-hint">{SELLER_HINTS[k === "name" ? "bankName" : k]}</span>
     </label>
   );
   return (
@@ -50,22 +114,40 @@ function SellerSettings({ onToast }: { onToast: (t: string) => void }) {
         onToast("Data penjual disimpan");
       }}
     >
-      {text("name", "Nama penjual (badan usaha)", { maxLength: 120 })}
+      <div className="cp-span sel-intro">
+        <p>
+          <b>Untuk apa data ini?</b> Setiap kali perusahaan membeli koin, sistem membuat invoice resmi. Di invoice itu panitia adalah <b>penjual</b> (penerbit tagihan), dan
+          perusahaan adalah pembeli. Data di bawah dicetak sebagai identitas penjual di setiap invoice dan menjadi dasar faktur pajak.
+        </p>
+        <ul className="small">
+          <li>Nama, alamat dan NPWP: identitas penerbit invoice, dibutuhkan bagian keuangan dan pajak pembeli.</li>
+          <li>Status PKP dan tarif PPN: menentukan apakah invoice memisahkan DPP dan PPN.</li>
+          <li>Rekening bank: tujuan transfer pembeli. Tanpa rekening, pilihan transfer bank dan termin tidak muncul.</li>
+        </ul>
+      </div>
+      <h3 className="cp-span cp-h3 sel-group">Identitas penjual</h3>
+      {text("name", "Nama penjual (badan usaha)", { maxLength: 120, placeholder: "PT Contoh Acara Indonesia" })}
       {text("npwp", "NPWP", { maxLength: 24, inputMode: "numeric", placeholder: "15 atau 16 digit" })}
       {text("address", "Alamat", { maxLength: 300 })}
       {text("email", "Email", { type: "email", maxLength: 160 })}
       {text("phone", "Telepon", { maxLength: 40 })}
+      <h3 className="cp-span cp-h3 sel-group">Pajak</h3>
       <label className="cp-check cp-span">
         <input type="checkbox" checked={f.pkp} onChange={(e) => setF({ ...f, pkp: e.target.checked })} /> Sudah PKP (invoice menampilkan DPP dan PPN, faktur pajak bisa dicatat)
       </label>
       <label>
         Tarif PPN (%)
         <input type="number" min={0} max={50} step={0.01} value={f.ppnRate} disabled={!f.pkp} onChange={(e) => setF({ ...f, ppnRate: Number(e.target.value) || DEFAULT_PPN })} />
+        <span className="sel-hint">Hanya dipakai kalau sudah PKP. Umumnya 11%.</span>
       </label>
       <span />
+      <h3 className="cp-span cp-h3 sel-group">Rekening untuk transfer</h3>
       {bank("name", "Bank", { maxLength: 60, placeholder: "BCA" })}
       {bank("account", "No. rekening", { maxLength: 40, inputMode: "numeric" })}
       {bank("holder", "Atas nama", { maxLength: 120 })}
+      <div className="cp-span">
+        <SellerPreview f={f} />
+      </div>
       <div className="cp-span row inv-actions">
         <button type="submit" className="small-btn" disabled={busy}>
           {busy ? "Menyimpan…" : "Simpan"}
@@ -74,7 +156,7 @@ function SellerSettings({ onToast }: { onToast: (t: string) => void }) {
       </div>
       <p className="cp-span muted small">
         Harga paket koin dianggap sudah termasuk PPN: saat PKP, invoice memisahkan DPP dan PPN dari harga itu. Data ini hanya terlihat di invoice pembeli, tidak di data acara
-        publik. Invoice yang sudah terbit tidak berubah.
+        publik. Invoice yang sudah terbit tidak berubah; perubahan berlaku untuk invoice berikutnya.
       </p>
     </form>
   );

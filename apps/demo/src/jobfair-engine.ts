@@ -1,7 +1,14 @@
 // In-browser job fair for the static demo: company booths with recruiters, the organisers'
 // info desk, bot job seekers walking from booth to booth, and the applications they send.
 import {
+  type AnnounceBoard,
   type AvatarState,
+  currentAnnouncement,
+  hideAnnouncement,
+  legacyBoard,
+  postAnnouncement,
+  removeAnnouncement,
+  repostAnnouncement,
   COIN_STAND_SPOTS,
   type CompanyBooth,
   type JobPosting,
@@ -24,6 +31,8 @@ import {
   safeImage,
   safeUrl,
   makeStall,
+  editStall,
+  type StallEdit,
   freeStallSlotsOf,
   type StallInput,
   buildFairRoom,
@@ -235,6 +244,14 @@ export interface CallLog {
   seconds: number;
 }
 
+/** A room's own words, as the organiser set them. Unset fields keep the published ones. */
+export interface RoomInfo {
+  name?: string;
+  tagline?: string;
+  host?: string;
+  hostRole?: string;
+}
+
 /** What the organiser changed: booths added or taken out, ads, announcements, rooms. */
 export interface OrgState {
   /** Event booths the organiser took out. */
@@ -245,8 +262,13 @@ export interface OrgState {
   promoters?: Promoter[];
   /** Sponsors, when the organiser edited them. */
   sponsors?: SponsorView[];
+  /** The announcement on every visitor's screen (from `announcements` on the live site). */
   announcement?: { text: string; at: number };
+  /** What the organiser sent, newest first, and which one is on screen. Live: the server's, read only. */
+  announcements?: AnnounceBoard;
   psych?: PsychConfig;
+  /** What visitors read about a room (the food court), when the organiser changed it. */
+  roomInfo?: Record<string, RoomInfo>;
   seminars?: SeminarSession[];
   /** How many of the organiser's walking promoters are out at once. Unset: all of them. */
   walkers?: number;
@@ -975,7 +997,7 @@ export class DemoJobFair {
       else if (key.startsWith("room:") && !hidden.has(key.slice(5))) order.push(key);
     }
     const levelOf = (key: string) => order.indexOf(key);
-    const sig = () => [...this.levelsByKey()].map(([k, l]) => `${k}=${l}`).join() + this.fair.floors.map((f) => f.theme).join();
+    const sig = () => [...this.levelsByKey()].map(([k, l]) => `${k}=${l}`).join() + this.fair.floors.map((f) => f.theme).join() + this.fair.rooms.map((r) => r.name).join();
     const before = sig();
     this.fair.hallBase = levelOf("hall:0");
     this.fair.floors.splice(0, this.fair.floors.length, ...halls.map((h, i) => ({ name: `Lantai ${this.fair.hallBase! + i + 1}`, theme: h.theme })));
@@ -987,6 +1009,10 @@ export class DemoJobFair {
         const room = mine.get(r.id) ?? structuredClone(r);
         room.level = levelOf(`room:${r.id}`);
         room.price = this.org.prices?.[fairRoomFloorId(this.fair, r.id)] ?? r.price;
+        const info = this.org.roomInfo?.[r.id];
+        room.name = info?.name || r.name;
+        room.tagline = info?.tagline || r.tagline;
+        room.staff = { name: info?.host || r.staff.name, role: info?.hostRole || r.staff.role };
         return room;
       });
     this.fair.rooms.splice(0, this.fair.rooms.length, ...rooms);
@@ -1137,6 +1163,29 @@ export class DemoJobFair {
     if (this.rentedStalls.has(stallId) && !this.org.removedStalls?.includes(stallId)) this.org.removedStalls = [...(this.org.removedStalls ?? []), stallId];
     this.setStalls(room.id, room.stalls.filter((st) => st.id !== stallId));
     return true;
+  }
+
+  /** Change a stall already in the food court: its words, look and vouchers. Its place stays. */
+  updateStall(stallId: string, input: StallEdit) {
+    const room = this.fair.rooms.find((r) => r.stalls?.some((st) => st.id === stallId));
+    if (!room?.stalls) return null;
+    const next = room.stalls.map((st) => (st.id === stallId ? editStall(st, input) : st));
+    this.setStalls(room.id, next);
+    return next.find((st) => st.id === stallId) ?? null;
+  }
+
+  /** What visitors read about a room; empty fields go back to the published words. */
+  setRoomInfo(roomId: string, info: RoomInfo) {
+    const t = (v: string | undefined, n: number) => v?.trim().slice(0, n) || undefined;
+    const clean: RoomInfo = { name: t(info.name, 40), tagline: t(info.tagline, 120), host: t(info.host, 40), hostRole: t(info.hostRole, 40) };
+    const { [roomId]: _, ...rest } = this.org.roomInfo ?? {};
+    this.org.roomInfo = Object.values(clean).some(Boolean) ? { ...rest, [roomId]: clean } : rest;
+    this.saveOrg();
+  }
+
+  /** The published words of a room, to show what an empty field falls back to. */
+  publishedRoom(roomId: string) {
+    return this.originalRooms.find((r) => r.id === roomId);
   }
 
   /** Put the food court back as published. */
@@ -1335,12 +1384,33 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
-  /** A message from the organiser to everyone in the hall. */
+  /** The organiser's announcements: the one on screen and the ones sent before. */
+  announcementBoard(): AnnounceBoard {
+    return this.org.announcements ?? legacyBoard(this.org);
+  }
+
+  /** Take a board (the server's, on the live site) and show its current announcement. */
+  setAnnounceBoard(board: AnnounceBoard) {
+    const now = currentAnnouncement(board);
+    this.org.announcements = board;
+    this.org.announcement = now ? { text: now.text, at: now.at } : undefined;
+    this.saveOrg();
+  }
+
+  /** A message from the organiser to everyone in the hall. Empty text takes the current one down. */
   announce(text: string) {
     const t = text.trim().slice(0, 200);
-    this.org.announcement = t ? { text: t, at: this.now() } : undefined;
+    const board = this.announcementBoard();
+    this.setAnnounceBoard(t ? postAnnouncement(board, t, this.now(), this.id(`ann${this.now().toString(36)}`)) : hideAnnouncement(board));
     if (t) this.notices.push(`📢 Panitia: ${t}`);
-    this.saveOrg();
+  }
+
+  /** Show a past announcement again, or delete one from the history (and the screen). */
+  repostAnnouncement(id: string) {
+    this.setAnnounceBoard(repostAnnouncement(this.announcementBoard(), id, this.now(), this.id(`ann${this.now().toString(36)}`)));
+  }
+  removeAnnouncement(id: string) {
+    this.setAnnounceBoard(removeAnnouncement(this.announcementBoard(), id));
   }
 
   psychConfig(): PsychConfig {
@@ -1683,6 +1753,8 @@ export class DemoJobFair {
   private serverReviews: ServerReviews | null = null;
   /** Live: a booth's notifications are worked out from its applications, the same on every device. */
   serverInbox = false;
+  /** Live: the event setup is the server's; other tabs' saved copies of it are not taken. */
+  serverOrg = false;
   /** Live: which booth notifications the company has read, per booth. */
   private boothRead = new Map<string, BoothRead>();
   /** Notes being saved: the server's older copy must not overwrite them meanwhile. */
@@ -1866,7 +1938,9 @@ export class DemoJobFair {
   /** Another tab saved: take its company edits and any newer applications. */
   mergeSaved(saved: FairSaved | null) {
     if (!saved) return;
-    this.loadOrg(saved.org);
+    // Live: the event setup comes from the server. Another tab's saved copy may be older than what
+    // this tab just changed (a deleted announcement, an edited stall) and must not undo it.
+    if (!this.serverOrg) this.loadOrg(saved.org);
     this.loadCompany(saved.company);
     for (const a of saved.applications ?? []) {
       if (!this.booth(a.boothId)) continue;

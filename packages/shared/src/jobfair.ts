@@ -501,6 +501,79 @@ export function makeStall(id: string, slot: number, input: StallInput): FoodStal
   };
 }
 
+/** What the organiser may change on a stall already standing. Unset fields keep what it has. */
+export interface StallEdit {
+  name?: string;
+  emoji?: string;
+  color?: string;
+  vendor?: string;
+  promo?: string;
+  about?: string;
+  address?: string;
+  hours?: string;
+  website?: string;
+  /** Vouchers in order; an id keeps the one it names (and its sales), no id makes a new one. */
+  deals?: { id?: string; title: string; worth: string; price: number; terms?: string }[];
+  menu?: { id?: string; name: string; emoji?: string; price: string }[];
+}
+
+export const STALL_MAX_DEALS = 4;
+export const STALL_MAX_MENU = 6;
+
+/** A stall with the organiser's changes, every field trimmed to the same sizes as a new one. Id and slot stay. */
+export function editStall(stall: FoodStall, edit: StallEdit): FoodStall {
+  const t = (v: string | undefined, n: number, keep: string) => (v === undefined ? keep : v.trim().slice(0, n));
+  const name = t(edit.name, 40, stall.name) || stall.name;
+  const used = new Set<string>();
+  const newId = (base: string) => {
+    let id = base;
+    // Never an id another voucher here has or had, so a kept voucher and a new one can't be confused.
+    for (let n = 2; used.has(id) || stall.deals.some((d) => d.id === id) || edit.deals?.some((x) => x.id === id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return id;
+  };
+  const deals = edit.deals
+    ? edit.deals
+        .filter((d) => d.title.trim() && Number.isFinite(d.price) && d.price > 0)
+        .slice(0, STALL_MAX_DEALS)
+        .map((d) => {
+          const id = d.id && /^[\w-]{1,60}$/.test(d.id) && !used.has(d.id) ? (used.add(d.id), d.id) : newId(`${stall.id}-deal`);
+          return {
+            id,
+            title: d.title.trim().slice(0, 60),
+            worth: d.worth.trim().slice(0, 20) || "-",
+            price: Math.min(200, Math.max(1, Math.round(d.price))),
+            terms: d.terms?.trim().slice(0, 120) || "Berlaku 30 hari.",
+          };
+        })
+    : stall.deals;
+  const menu = edit.menu
+    ? edit.menu
+        .filter((m) => m.name.trim())
+        .slice(0, STALL_MAX_MENU)
+        .map((m, i) => ({
+          id: m.id && /^[\w-]{1,60}$/.test(m.id) ? m.id : `${stall.id}-menu-${i + 1}`,
+          name: m.name.trim().slice(0, 40),
+          emoji: m.emoji?.trim().slice(0, 8) || "🍽️",
+          price: m.price.trim().slice(0, 20),
+        }))
+    : stall.menu;
+  return {
+    ...stall,
+    name,
+    emoji: edit.emoji === undefined ? stall.emoji : edit.emoji.trim().slice(0, 8) || stall.emoji,
+    color: edit.color !== undefined && /^#[0-9a-f]{6}$/i.test(edit.color) ? edit.color : stall.color,
+    vendor: t(edit.vendor, 30, stall.vendor) || "Penjaga stan",
+    promo: t(edit.promo, 80, stall.promo) || `Promo spesial dari ${name}`,
+    about: t(edit.about, 300, stall.about),
+    address: t(edit.address, 120, stall.address),
+    hours: t(edit.hours, 40, stall.hours),
+    website: edit.website === undefined ? stall.website : (safeUrl(edit.website) ?? ""),
+    deals,
+    menu,
+  };
+}
+
 /** Free food court slots, given the stalls standing there. */
 export const freeStallSlotsOf = (stalls: { slot?: number }[]) => {
   const taken = new Set(stalls.map((st, i) => stallSlot(st, i)));

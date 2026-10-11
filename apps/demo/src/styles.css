@@ -2217,6 +2217,191 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .org-move-plan svg { vertical-align: -2px; }
 .org-move .row { position: sticky; bottom: -14px; padding: 8px 0 2px; background: inherit; }
 
+/* ---- organizer-fixes: announcement history, food court editing, seller data explained ---- */
+.ann-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.ann-now > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ann-h {
+  margin: 14px 0 6px;
+}
+.ann-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.ann-item {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.ann-item[data-on] {
+  border-color: var(--text);
+}
+.ann-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.ann-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ann-tools .small-btn,
+.ann-now .small-btn,
+.fc-del,
+.fc-set > .small-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+@media (min-width: 640px) {
+  .ann-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+.fc-form label {
+  min-width: 0;
+}
+.fc-form input,
+.fc-form textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.fc-pair {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.fc-set {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px 10px;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.fc-set legend {
+  padding: 0 4px;
+  font-weight: 700;
+}
+.fc-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.fc-row:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.fc-wide {
+  grid-column: 1 / -1;
+}
+.fc-del {
+  justify-self: start;
+}
+@media (min-width: 640px) {
+  .fc-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fc-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .fc-row .fc-wide:first-child {
+    grid-column: auto;
+  }
+}
+
+.sel-intro {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5f5f5;
+  font-size: 14px;
+}
+.sel-intro p {
+  margin: 0 0 6px;
+}
+.sel-intro ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+.sel-group {
+  margin: 6px 0 -2px;
+}
+.cp-form label .sel-hint,
+.sel-hint {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.sel-preview {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.sel-preview-doc {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.sel-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #111;
+}
+.sel-preview-head > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sel-preview-head b {
+  font-size: 14px;
+}
+.sel-preview-title {
+  text-align: right;
+  justify-items: end;
+}
+.sel-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sel-preview-pay {
+  margin: 4px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  overflow-wrap: anywhere;
+}
 /* ======================================================================
    mobile-polish: phone fixes. List rows stack (text full width, actions
    below), titles wrap, the KPI strip keeps its gutter, popups sit above the
