@@ -5,6 +5,7 @@ import { z } from "zod";
 import { companyDoc, PRODUCT_IDS } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth } from "@/lib/fair";
+import { defaultBuyer, readBuyer } from "@/lib/invoices";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { liveCoins } from "@/lib/coins";
 import { CoinsShortError, type Purchase, payWithCoins, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
@@ -17,10 +18,25 @@ export const dynamic = "force-dynamic";
 
 const schema = z.discriminatedUnion("kind", [
   // Where the gateway sends the buyer back: the fair, a company's portal, or the registration page.
-  z.object({ kind: z.literal("coins"), pack: z.string().max(40), back: z.string().regex(/^\/(play\/#\/jobfair(\/company\/[\w-]{1,80})?|daftar-perusahaan)$/).optional() }),
+  z.object({
+    kind: z.literal("coins"),
+    pack: z.string().max(40),
+    back: z
+      .string()
+      .regex(/^\/(play\/#\/jobfair(\/company\/[\w-]{1,80})?|daftar-perusahaan)$/)
+      .optional(),
+  }),
   z.object({ kind: z.literal("registration"), id: z.string().uuid() }),
   z.object({ kind: z.literal("invoice"), booth: z.string().regex(/^[\w-]{1,80}$/), invoice: z.string().max(80) }),
-  z.object({ kind: z.literal("stall"), slot: z.number().int().min(0).max(STALL_SLOTS.length - 1), stall: stallInput }),
+  z.object({
+    kind: z.literal("stall"),
+    slot: z
+      .number()
+      .int()
+      .min(0)
+      .max(STALL_SLOTS.length - 1),
+    stall: stallInput,
+  }),
 ]);
 
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
@@ -29,7 +45,10 @@ const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
-  const kinds = new URL(req.url).searchParams.get("kind")?.split(",").filter((k): k is PaymentKind => ["coins", "registration", "invoice", "stall"].includes(k));
+  const kinds = new URL(req.url).searchParams
+    .get("kind")
+    ?.split(",")
+    .filter((k): k is PaymentKind => ["coins", "registration", "invoice", "stall"].includes(k));
   let rows = await myPayments(db, user.id, kinds);
   if (rows.some((p) => p.status === "pending" && p.providerId) && (await allow(`pay-refresh:${user.id}`, 30, 600_000))) {
     rows = await Promise.all(rows.map((p) => (p.status === "pending" ? refresh(p).catch(() => p) : p)));
@@ -57,12 +76,29 @@ export async function POST(req: Request) {
     if (!pkg) return fail(404, "not_found");
     const amount = priceFrom(prices, `pack.${pkg.id}`);
     const n = (x: number) => x.toLocaleString("id-ID");
-    purchase = { kind: "coins", ref: pkg.id, amount, description: `${n(pkg.coins)}${pkg.bonus ? ` + ${n(pkg.bonus)} bonus` : ""} koin Job Fair`, meta: { coins: pkg.coins + pkg.bonus }, back: b.back ?? "/play/#/jobfair" };
+    // Who the invoice is made out to (the saved buyer details, else the account), and the booth it was bought from.
+    const buyer = (await readBuyer(user.id)) ?? defaultBuyer(user);
+    const fromBooth = b.back?.match(/\/company\/([\w-]{1,80})$/)?.[1];
+    const booth = fromBooth && (await canManageBooth(user, fromBooth)) ? fromBooth : undefined;
+    purchase = {
+      kind: "coins",
+      ref: pkg.id,
+      amount,
+      description: `${n(pkg.coins)}${pkg.bonus ? ` + ${n(pkg.bonus)} bonus` : ""} koin Job Fair`,
+      meta: { coins: pkg.coins + pkg.bonus, buyer, ...(booth ? { booth } : {}) },
+      back: b.back ?? "/play/#/jobfair",
+    };
   } else if (b.kind === "registration") {
     const reg = await registrationById(db, b.id);
     if (!reg || reg.userId !== user.id) return fail(404, "not_found");
     if (reg.status !== "unpaid") return fail(409, "not_payable");
-    purchase = { kind: "registration", ref: reg.id, amount: reg.price, description: `Pendaftaran stand ${reg.tier === "premium" ? "VIP" : "reguler"} · ${reg.company}`.slice(0, 200), back: "/daftar-perusahaan" };
+    purchase = {
+      kind: "registration",
+      ref: reg.id,
+      amount: reg.price,
+      description: `Pendaftaran stand ${reg.tier === "premium" ? "VIP" : "reguler"} · ${reg.company}`.slice(0, 200),
+      back: "/daftar-perusahaan",
+    };
   } else if (b.kind === "stall") {
     if (!freeStallSlotsOf(stallsIn(await readFairState(db))).includes(b.slot)) return fail(409, "slot_taken");
     purchase = {
@@ -80,7 +116,9 @@ export async function POST(req: Request) {
     if (inv.status !== "Belum dibayar") return fail(409, "not_payable");
     // Only real products, each once, at the organiser's current price; the bill's own prices are ignored.
     const ids = [...new Set((inv.items ?? []).map((i) => i.id))].filter((id) => PRODUCT_IDS.has(id));
-    const items = ids.map((id) => ({ id, name: String(inv.items?.find((i) => i.id === id)?.name ?? id).slice(0, 60), price: priceFrom(prices, `product.${id}`) })).filter((i) => i.price > 0);
+    const items = ids
+      .map((id) => ({ id, name: String(inv.items?.find((i) => i.id === id)?.name ?? id).slice(0, 60), price: priceFrom(prices, `product.${id}`) }))
+      .filter((i) => i.price > 0);
     if (!items.length) return fail(409, "not_payable");
     purchase = {
       kind: "invoice",

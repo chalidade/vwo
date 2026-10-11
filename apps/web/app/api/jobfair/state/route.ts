@@ -34,6 +34,8 @@ export async function GET() {
   for (const r of rows) {
     // A booth's inbox read marks are that company's alone (see booths/[booth]/inbox).
     if (r.key.startsWith("inbox:")) continue;
+    // Seller and buyer invoice details are never part of the public setup (the read skips them too).
+    if (r.key.startsWith("billing:")) continue;
     version = Math.max(version, r.updatedAt.getTime());
     const data = r.data as Doc;
     if (r.key === "org") {
