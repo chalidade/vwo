@@ -21,3 +21,4 @@ export * from "./cleanup";
 export * from "./push";
 export * from "./reminders";
 export * from "./fair-referrals";
+export * from "./fair-booth-hooks";

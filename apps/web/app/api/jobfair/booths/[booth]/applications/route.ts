@@ -3,6 +3,7 @@ import { fairApplicationStatusSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { notifyBoothHook } from "@/lib/ats-hook";
 import { applicationOut, canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { pushTo } from "@/lib/push";
@@ -36,12 +37,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ booth:
   const body = await readBody(req, patchSchema);
   if ("error" in body) return body.error;
   const b = body.data;
+  const before = "notes" in b ? null : await fairApplicationById(db, b.id);
   const ok = "notes" in b ? await setFairApplicationNotes(db, { id: b.id, boothKey: booth, notes: b.notes }) : await setFairApplicationStatus(db, { id: b.id, boothKey: booth, status: b.status });
   if (!ok) return fail(404, "not_found");
   if (!("notes" in b)) {
     // Tell the applicant on their phone, even with the app closed.
     const row = await fairApplicationById(db, b.id);
     const d = (row?.data ?? {}) as { company?: string; jobTitle?: string };
+    // The company's ATS hears about real moves only, not the same status saved twice.
+    if (row && before && before.boothKey === booth && before.status !== row.status) notifyBoothHook(booth, "application.status_changed", row, { previousStatus: before.status });
     if (row) pushTo([row.userId], { title: `📋 ${d.company ?? "Lamaranmu"}`, body: `Lamaran ${d.jobTitle ?? ""} sekarang "${b.status}"`, url: "/play/#/jobfair", tag: `app-${row.id}` });
   }
   return NextResponse.json({ ok: true });

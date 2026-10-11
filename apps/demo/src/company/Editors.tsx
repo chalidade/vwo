@@ -1,6 +1,6 @@
 import { Palette, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { type BoothTheme, type CompanyBooth, type JobPosting, type VipStyle, fairFloorId } from "@vwo/shared";
+import { type BoothTheme, type CompanyBooth, EDUCATION_LEVELS, type JobPosting, PROVINCES, type VipStyle, fairFloorId } from "@vwo/shared";
 import { BOOTH_THEMES, BoothLogo, VIP_STYLES, CafeScene, FLOOR_SLOTS, boothExtras, lookFor } from "@vwo/ui";
 import { readImageFile } from "../imageFile";
 import { staffLook } from "../fair/staff-look";
@@ -382,7 +382,19 @@ export function JobsEditor({ booth }: { booth: CompanyBooth }) {
 
 function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth; onDone: (msg?: string) => void }) {
   const isNew = !booth.jobs.some((j) => j.id === job.id);
-  const [f, setF] = useState({ ...job, salary: job.salary ?? "", description: job.description ?? "", deadline: job.deadline ?? "", quota: job.quota ? String(job.quota) : "", req: job.requirements.join("\n") });
+  const [f, setF] = useState({
+    ...job,
+    salary: job.salary ?? "",
+    description: job.description ?? "",
+    deadline: job.deadline ?? "",
+    quota: job.quota ? String(job.quota) : "",
+    req: job.requirements.join("\n"),
+    education: job.education ?? "",
+    major: job.major ?? "",
+    experience: job.experience ?? "",
+    province: job.province ?? "",
+    city: job.city ?? "",
+  });
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   return (
     <form
@@ -398,6 +410,11 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
           description: f.description.trim() || undefined,
           deadline: f.deadline || undefined,
           quota: Number(f.quota) || undefined,
+          education: f.education || undefined,
+          major: f.major.trim() || undefined,
+          experience: f.experience.trim() || undefined,
+          province: f.province || undefined,
+          city: f.city.trim() || undefined,
           closed: job.closed,
           requirements: f.req
             .split("\n")
@@ -435,6 +452,39 @@ function JobForm({ job, booth, onDone }: { job: JobPosting; booth: CompanyBooth;
       <label>
         Kebutuhan (orang)
         <input type="number" min={1} max={999} value={f.quota} onChange={set("quota")} />
+      </label>
+      <p className="cp-span muted small" style={{ margin: "4px 0 0" }}>
+        Untuk lapor lowongan ke SIAPkerja/Karirhub (opsional, tidak tampil di stand):
+      </p>
+      <label>
+        Pendidikan minimal
+        <select value={f.education} onChange={set("education")}>
+          <option value="">-</option>
+          {EDUCATION_LEVELS.map((e) => (
+            <option key={e}>{e}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Jurusan
+        <input value={f.major} onChange={set("major")} maxLength={120} placeholder="Teknik Informatika, Sistem Informasi" />
+      </label>
+      <label>
+        Pengalaman
+        <input value={f.experience} onChange={set("experience")} maxLength={60} placeholder="Min. 1 tahun / fresh graduate" />
+      </label>
+      <label>
+        Provinsi
+        <select value={f.province} onChange={set("province")}>
+          <option value="">-</option>
+          {PROVINCES.map((p) => (
+            <option key={p}>{p}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Kabupaten/Kota
+        <input value={f.city} onChange={set("city")} maxLength={60} placeholder="Kota Jakarta Selatan" />
       </label>
       <label className="cp-span">
         Deskripsi pekerjaan

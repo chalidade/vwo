@@ -13,14 +13,16 @@ import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
-import { Bell, Briefcase, Coins, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Tent, Users, Wallet } from "lucide-react";
+import { Bell, Briefcase, Coins, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Plug, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
+import { Integrations } from "./Integrations";
 
 const TABS = [
   ["overview", LayoutDashboard, "Ringkasan"],
   ["applicants", Users, "Pelamar"],
   ["jobs", Briefcase, "Lowongan"],
+  ["integrations", Plug, "Ekspor & ATS"],
   ["booth", Palette, "Tampilan booth"],
   ["profile", Building2, "Profil perusahaan"],
   ["faq", CircleHelp, "FAQ"],
@@ -28,7 +30,7 @@ const TABS = [
 ] as const;
 export type PortalTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: PortalTab[] }[] = [
-  { label: "Rekrutmen", ids: ["overview", "applicants", "jobs"] },
+  { label: "Rekrutmen", ids: ["overview", "applicants", "jobs", "integrations"] },
   { label: "Stand", ids: ["booth", "profile", "faq"] },
   { label: "Keuangan", ids: ["billing"] },
 ];
@@ -344,6 +346,7 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
       {tab === "overview" && <Overview booth={booth} onTab={setTab} />}
       {tab === "applicants" && <Applicants key={focus?.n} booth={booth} focusId={focus?.id} />}
       {tab === "jobs" && <JobsEditor booth={booth} />}
+      {tab === "integrations" && <Integrations booth={booth} />}
       {tab === "booth" && <BoothEditor booth={booth} onTab={setTab} />}
       {tab === "profile" && <ProfileEditor booth={booth} />}
       {tab === "faq" && <FaqEditor booth={booth} />}

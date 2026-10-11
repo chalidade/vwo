@@ -60,6 +60,9 @@ export const PIPELINE = ["Terkirim", "Dilihat", "Shortlist", "Diundang interview
 
 export const INTERVIEW_MODES = ["Video call", "Telepon", "Di stand", "Di kantor"] as const;
 
+/** Shown with the vacancy-report export: its columns follow Permenaker 18/2024, not a downloaded Karirhub template. */
+export const LAPOR_LABEL = "format lapor lowongan (sesuaikan bila template Karirhub berubah)";
+
 const words = (s: string) =>
   s
     .toLowerCase()
