@@ -24,54 +24,12 @@ export interface JobPosting {
   education?: string;
   major?: string;
   experience?: string;
-  province?: string;
+  /** Kabupaten or kota from the regions list (taxonomy.ts); the province follows from it. */
   city?: string;
 }
 
 /** Lowest schooling a vacancy can ask for, as Indonesian job forms list it. */
 export const EDUCATION_LEVELS = ["SD", "SMP", "SMA/SMK", "D1", "D2", "D3", "D4", "S1", "S2", "S3"] as const;
-
-/** Indonesia's 38 provinces, for the vacancy's work location. */
-export const PROVINCES = [
-  "Aceh",
-  "Sumatera Utara",
-  "Sumatera Barat",
-  "Riau",
-  "Kepulauan Riau",
-  "Jambi",
-  "Sumatera Selatan",
-  "Kepulauan Bangka Belitung",
-  "Bengkulu",
-  "Lampung",
-  "DKI Jakarta",
-  "Jawa Barat",
-  "Banten",
-  "Jawa Tengah",
-  "DI Yogyakarta",
-  "Jawa Timur",
-  "Bali",
-  "Nusa Tenggara Barat",
-  "Nusa Tenggara Timur",
-  "Kalimantan Barat",
-  "Kalimantan Tengah",
-  "Kalimantan Selatan",
-  "Kalimantan Timur",
-  "Kalimantan Utara",
-  "Sulawesi Utara",
-  "Gorontalo",
-  "Sulawesi Tengah",
-  "Sulawesi Barat",
-  "Sulawesi Selatan",
-  "Sulawesi Tenggara",
-  "Maluku",
-  "Maluku Utara",
-  "Papua",
-  "Papua Barat",
-  "Papua Barat Daya",
-  "Papua Tengah",
-  "Papua Pegunungan",
-  "Papua Selatan",
-] as const;
 
 /** Vacancies still taking applications. */
 export const openJobs = (b: { jobs: JobPosting[] }) => b.jobs.filter((j) => !j.closed);

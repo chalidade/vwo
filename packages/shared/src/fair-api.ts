@@ -23,7 +23,7 @@ export const fairApplicationSchema = z.object({
   message: text(1000),
   headline: text(200),
   education: text(200),
-  skills: text(300),
+  skills: text(600),
   city: text(80),
   /** A small profile photo the game already shrank to 160 px. */
   photo: z

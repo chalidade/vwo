@@ -15,7 +15,7 @@ const exports = () => import("../fair/exports");
 export function Integrations({ booth }: { booth: CompanyBooth }) {
   const apps = fair.applications.filter((a) => a.boothId === booth.id);
   const open = booth.jobs.filter((j) => !j.closed);
-  const missing = open.filter((j) => !j.quota || !j.education || !j.province || !j.deadline).length;
+  const missing = open.filter((j) => !j.quota || !j.education || !j.city || !j.deadline).length;
 
   return (
     <div className="cp-int">
@@ -51,7 +51,7 @@ export function Integrations({ booth }: { booth: CompanyBooth }) {
         </p>
         {missing > 0 && (
           <p className="small cp-int-warn">
-            {missing} lowongan belum lengkap (jumlah, pendidikan, provinsi atau batas waktu). Lengkapi di menu Lowongan supaya laporan tidak ditolak.
+            {missing} lowongan belum lengkap (jumlah, pendidikan, kabupaten/kota atau batas waktu). Lengkapi di menu Lowongan supaya laporan tidak ditolak.
           </p>
         )}
         <div className="row">

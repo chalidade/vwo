@@ -1,7 +1,7 @@
 // Spreadsheet exports for the company portal and the organiser: applicants as a tidy Excel workbook,
 // and vacancies in the fields Kemnaker asks for when a vacancy is reported (wajib lapor lowongan).
 // Imported with import() so the xlsx writer only loads when someone exports.
-import type { CompanyBooth, JobPosting } from "@vwo/shared";
+import { type CompanyBooth, type JobPosting, provinceOf } from "@vwo/shared";
 import type { FairApplication } from "../jobfair-engine";
 import { type Column, type Sheet, XLSX_TYPE, xlsx } from "../xlsx";
 import { LAPOR_LABEL, PIPELINE } from "./company";
@@ -160,7 +160,7 @@ export function laporRows(booths: Pick<CompanyBooth, "company" | "jobs">[]) {
           j.education ?? "",
           j.major ?? "",
           j.experience ?? "",
-          j.province ?? "",
+          (j.city && provinceOf(j.city)) || "",
           j.city || j.location || "",
           pay.min ?? (j.salary || null),
           pay.max ?? null,

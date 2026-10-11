@@ -80,5 +80,14 @@ export async function boothNow(boothId: string): Promise<CompanyBooth | null> {
   return { ...base, ...(doc?.edits ?? {}) };
 }
 
+/** Every booth standing in the event now: published and not removed, added by the organiser, or booked. */
+export async function standingBoothIds(): Promise<string[]> {
+  const rows = await readFairState(db);
+  const org = (rows.find((r) => r.key === "org")?.data ?? {}) as Org;
+  const removed = new Set(org.removed ?? []);
+  const booked = rows.map((r) => (r.key.startsWith("booking:") ? (r.data as { booth?: CompanyBooth }).booth : undefined)).filter((b): b is CompanyBooth => !!b);
+  return [...new Set([...DEMO_JOB_FAIR.booths, ...(org.added ?? []), ...booked].map((b) => b.id))].filter((id) => !removed.has(id));
+}
+
 /** Whether a booth stands in the event now: published and not removed, added by the organiser, or booked. */
 export const boothStands = async (boothId: string) => !!(await boothNow(boothId));

@@ -1,6 +1,6 @@
 import { FileSpreadsheet, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type CompanyBooth, messageTime, safeImage, safeUrl } from "@vwo/shared";
+import { type CompanyBooth, hasSkill, inPlace, messageTime, placeSkillFacets, safeImage, safeUrl } from "@vwo/shared";
 import { lookFor } from "@vwo/ui";
 import { CrashGuard } from "../crash";
 import { type ApplicationStatus, type FairApplication, PLAYER_ID } from "../jobfair-engine";
@@ -9,6 +9,7 @@ import { type CallKind, type RingSignal, canCallOtherTabs, newCallId } from "../
 import { LIVE } from "../mode";
 import { INTERVIEW_MODES, PIPELINE, applicantsCsv, matchScore } from "../fair/company";
 import { fair } from "../useFair";
+import { PlaceSkillFilters } from "./TalentPool";
 
 const when = (at: number) => new Date(at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const waNumber = (phone: string) => phone.replace(/\D/g, "").replace(/^0/, "62");
@@ -30,6 +31,8 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
   const [job, setJob] = useState("all");
   const [status, setStatus] = useState<string>("all");
   const [q, setQ] = useState("");
+  const [place, setPlace] = useState<{ skill?: string; province?: string; city?: string }>({});
+  const facets = useMemo(() => placeSkillFacets(apps), [apps.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const [sort, setSort] = useState<Sort>("new");
   const [openId, setOpenId] = useState<string | null>(focusId ?? null);
   const jobOf = (a: FairApplication) => booth.jobs.find((j) => j.id === a.jobId);
@@ -41,6 +44,8 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
       (a) =>
         (job === "all" || a.jobId === job) &&
         (status === "all" || a.status === status) &&
+        (!place.skill || hasSkill(a.skills ?? "", place.skill)) &&
+        inPlace(a.city ?? "", place) &&
         (!term || [a.name, a.email, a.skills, a.headline, a.jobTitle].some((s) => s?.toLowerCase().includes(term))),
     );
     const key: Record<Sort, (a: FairApplication) => number> = {
@@ -51,7 +56,7 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
     };
     return out.sort((x, y) => key[sort](y) - key[sort](x));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apps.length, job, status, q, sort, fair.applications.map((a) => a.updatedAt).join()]);
+  }, [apps.length, job, status, q, place, sort, fair.applications.map((a) => a.updatedAt).join()]);
 
   const open = openId ? apps.find((a) => a.id === openId) : undefined;
 
@@ -86,6 +91,7 @@ export function Applicants({ booth, focusId }: { booth: CompanyBooth; focusId?: 
               </option>
             ))}
           </select>
+          <PlaceSkillFilters facets={facets} value={place} onChange={(v) => setPlace((p) => ({ ...p, ...v }))} />
           <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Urutkan">
             <option value="new">Terbaru</option>
             <option value="match">Paling cocok</option>

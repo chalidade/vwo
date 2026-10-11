@@ -11,9 +11,11 @@ import { AccountGate } from "../AccountGate";
 import { boothApplications, boothInboxRead, claimBooth, claimErrorText } from "../server-fair";
 import { fair, useFair } from "../useFair";
 import { Applicants } from "./Applicants";
+import { TalentPool } from "./TalentPool";
 import { sessionLogin, signedInCompany } from "./login";
 import { Billing } from "./Billing";
-import { Bell, Briefcase, Coins, Building2, CircleHelp, LayoutDashboard, LogOut, Palette, Plug, Tent, Users, Wallet } from "lucide-react";
+import { Report } from "./Report";
+import { Bell, Briefcase, Coins, Building2, CircleHelp, Contact, FileChartColumn, LayoutDashboard, LogOut, Palette, Plug, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 import { Integrations } from "./Integrations";
@@ -21,8 +23,10 @@ import { Integrations } from "./Integrations";
 const TABS = [
   ["overview", LayoutDashboard, "Ringkasan"],
   ["applicants", Users, "Pelamar"],
+  ["pool", Contact, "Talent pool"],
   ["jobs", Briefcase, "Lowongan"],
   ["integrations", Plug, "Ekspor & ATS"],
+  ["report", FileChartColumn, "Laporan"],
   ["booth", Palette, "Tampilan booth"],
   ["profile", Building2, "Profil perusahaan"],
   ["faq", CircleHelp, "FAQ"],
@@ -30,7 +34,7 @@ const TABS = [
 ] as const;
 export type PortalTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: PortalTab[] }[] = [
-  { label: "Rekrutmen", ids: ["overview", "applicants", "jobs", "integrations"] },
+  { label: "Rekrutmen", ids: ["overview", "applicants", "pool", "jobs", "integrations", "report"] },
   { label: "Stand", ids: ["booth", "profile", "faq"] },
   { label: "Keuangan", ids: ["billing"] },
 ];
@@ -345,12 +349,22 @@ function Portal({ booth, onOut }: { booth: CompanyBooth; onOut?: () => void }) {
       )}
       {tab === "overview" && <Overview booth={booth} onTab={setTab} />}
       {tab === "applicants" && <Applicants key={focus?.n} booth={booth} focusId={focus?.id} />}
+      {tab === "pool" && (
+        <TalentPool
+          booth={booth}
+          onChat={(id) => {
+            setFocus({ id, n: Date.now() });
+            setTab("applicants");
+          }}
+        />
+      )}
       {tab === "jobs" && <JobsEditor booth={booth} />}
       {tab === "integrations" && <Integrations booth={booth} />}
       {tab === "booth" && <BoothEditor booth={booth} onTab={setTab} />}
       {tab === "profile" && <ProfileEditor booth={booth} />}
       {tab === "faq" && <FaqEditor booth={booth} />}
       {tab === "billing" && <Billing booth={booth} />}
+      {tab === "report" && <Report booth={booth} />}
       </DashShell>
     </main>
   );
