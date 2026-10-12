@@ -2746,3 +2746,63 @@ a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
   .park-card { padding: 8px 12px; font-size: 12px; }
   .park-card-name { font-size: 15px; }
 }
+
+/* ---- Perpustakaan: shelves, search, "Lanjut baca", and the paged reader ---- */
+.lib { width: min(720px, 100%); }
+.lib .mb-page { grid-template-columns: minmax(0, 1fr); }
+.lib-shelves { display: flex; flex-direction: column; gap: 14px; }
+.lib-shelf h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; color: var(--text); }
+.lib-shelf > .sp-muted { margin: 2px 0 6px; }
+.lib-tag { flex: none; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: #23345c; color: #fff; font-size: 11px; font-weight: 700; }
+.lib-rail { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+button.lib-book { flex: none; width: 108px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 0; background: none; border: 0; box-shadow: none; color: var(--text); text-align: left; scroll-snap-align: start; font-weight: 400; }
+button.lib-book:active { transform: translateY(1px); box-shadow: none; }
+.lib-book b { font-size: 12px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-book .sp-muted { font-size: 11px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-cover { flex: none; display: block; width: 108px; height: 150px; border-radius: 4px 8px 8px 4px; border: 2px solid #3b2a20; box-shadow: 0 3px 0 #3b2a20; object-fit: cover; background: #fff; }
+.lib-cover-drawn { position: relative; display: flex; align-items: center; justify-content: center; padding: 10px 8px 10px 14px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, #000) 0 8px, var(--c) 8px); color: #fff; font: 700 13px/1.25 Georgia, "Times New Roman", serif; text-align: center; overflow: hidden; }
+.lib-cover-drawn::after { content: ""; position: absolute; left: 14px; right: 8px; top: 8px; bottom: 8px; border: 1.5px solid rgb(255 255 255 / 0.45); border-radius: 3px; pointer-events: none; }
+.lib-cover-drawn span { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; hyphens: auto; }
+.lib-list { display: flex; flex-direction: column; gap: 8px; }
+.lib-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 10px; background: #fff; color: var(--text); border: 2px solid #3b2a20; border-radius: 10px; box-shadow: 0 2px 0 #3b2a20; text-align: left; font-size: 13px; font-weight: 400; text-decoration: none; }
+.lib-row .lib-cover { width: 54px; height: 76px; font-size: 8px; padding: 4px 4px 4px 9px; box-shadow: none; }
+.lib-row .lib-cover-drawn { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, #000) 0 5px, var(--c) 5px); }
+.lib-row .lib-cover-drawn::after { display: none; }
+.lib-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lib-row-main b { font-size: 14px; overflow-wrap: anywhere; }
+.lib-go { font-weight: 800; color: #23345c; white-space: nowrap; }
+.lib-progress { display: block; height: 6px; margin-top: 4px; border-radius: 999px; background: #eadfd2; overflow: hidden; }
+.lib-progress span { display: block; height: 100%; background: #16a34a; }
+.lib-search { display: flex; gap: 8px; }
+.lib-search input { flex: 1; min-width: 0; padding: 8px 10px; border: 2px solid #3b2a20; border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: var(--text); }
+.lib-btn { padding: 6px 12px; font-size: 14px; }
+.lib-btn:disabled { opacity: 0.45; cursor: default; }
+.lib-foot { margin: 0; font-size: 11px; color: var(--muted); }
+
+.lib-reader { --r-bg: #f6efe0; --r-ink: #3b2a1e; --r-line: #d9c7a6; --r-soft: #ede1c8; display: flex; flex-direction: column; width: min(760px, 100%); height: 100%; max-height: 100%; padding: 12px 14px 10px; border-radius: 14px; border: 3px solid #3b2a20; background: var(--r-bg); color: var(--r-ink); box-shadow: 0 6px 0 rgb(0 0 0 / 0.3); }
+.lib-reader[data-theme="light"] { --r-bg: #ffffff; --r-ink: #1f2328; --r-line: #d8dee4; --r-soft: #f1f3f5; }
+.lib-reader[data-theme="dark"] { --r-bg: #16181d; --r-ink: #d9dde3; --r-line: #343a46; --r-soft: #23272f; }
+.lib-r-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.lib-r-title { display: flex; flex-direction: column; min-width: 0; }
+.lib-r-title b { font: 700 17px/1.25 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
+.lib-r-title span { font-size: 12px; opacity: 0.75; }
+.lib-r-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1.5px solid var(--r-line); }
+.lib-r-tools button { padding: 3px 10px; border-radius: 999px; border: 1.5px solid var(--r-line); background: var(--r-soft); color: var(--r-ink); box-shadow: none; font-size: 12px; }
+.lib-r-tools button[data-active] { background: #23345c; border-color: #23345c; color: #fff; }
+.lib-r-tools button:disabled { opacity: 0.4; }
+.lib-r-sep { width: 1px; height: 18px; background: var(--r-line); }
+.lib-r-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 4px 4px; font-family: Georgia, "Times New Roman", serif; line-height: 1.65; overscroll-behavior: contain; touch-action: pan-y; }
+.lib-r-body p { margin: 0 0 0.8em; white-space: pre-wrap; overflow-wrap: anywhere; hyphens: auto; }
+.lib-r-note { font-family: system-ui, sans-serif; font-size: 14px; }
+.lib-r-note a, .lib-licence a { color: inherit; font-weight: 700; }
+.lib-licence { font-family: system-ui, sans-serif; font-size: 13px; }
+.lib-licence pre { white-space: pre-wrap; font-size: 11px; line-height: 1.45; padding: 10px; border-radius: 8px; background: var(--r-soft); overflow-wrap: anywhere; }
+.lib-r-nav { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-top: 8px; border-top: 1.5px solid var(--r-line); }
+.lib-r-count { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; font: 600 12px system-ui, sans-serif; }
+.lib-r-count input { width: 100%; accent-color: #23345c; }
+@media (max-width: 640px) {
+  .lib-reader { padding: 10px 10px 8px; border-radius: 10px; }
+  .lib-r-nav .lib-btn { padding: 6px 9px; font-size: 13px; }
+  button.lib-book, .lib-shelf .lib-cover { width: 92px; }
+  .lib-shelf .lib-cover { height: 128px; font-size: 12px; }
+}

@@ -652,6 +652,29 @@ export function loungeBoardSpot() {
   return { x: LOUNGE.board.x + LOUNGE.board.width / 2, y: LOUNGE.board.y + LOUNGE.board.height + 0.7 };
 }
 
+/** The Perpustakaan, in the lounge's right-hand corner beside the sofas: two bookcases, and the
+ *  librarian's desk in front of them. Free books to read (see library.ts). */
+export const LIBRARY = {
+  shelves: [
+    { x: 35.0, y: 9.8, width: 4.2, height: 0.7 },
+    { x: 40.6, y: 9.8, width: 4.2, height: 0.7 },
+  ],
+  desk: { x: 34.8, y: 13.2, width: 4.2, height: 0.8 },
+} as const;
+
+/** Where the librarian stands behind the desk, and where a visitor stands to talk to them. */
+export function librarySpot(spot: "librarian" | "front") {
+  const d = LIBRARY.desk;
+  return spot === "librarian" ? { x: d.x + d.width / 2, y: d.y - 0.6 } : { x: d.x + d.width / 2, y: d.y + d.height + 0.7 };
+}
+
+/** True when standing at the librarian's desk or in front of a bookcase. */
+export function atLibrary(x: number, y: number) {
+  const f = librarySpot("front");
+  if (Math.abs(x - f.x) < 1.8 && Math.abs(y - f.y) < 0.9) return true;
+  return LIBRARY.shelves.some((s) => x > s.x - 0.2 && x < s.x + s.width + 0.2 && y > s.y + s.height && y < s.y + s.height + 1.3);
+}
+
 /** Seats along a sofa: two on a short one, three on a long one. `right` sofas face right. */
 function sofaSeats(id: string, n: number, o: { x: number; y: number; width: number; height: number }, right: boolean): SeatView[] {
   const count = Math.max(2, Math.round((o.height - 0.3) / 1.1));
@@ -731,7 +754,7 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
     LOUNGE.pods.forEach((x) => {
       blocked.push({ x, y: 0.3, width: LOUNGE.podW, height: 0.5 }, { x: x + LOUNGE.podW / 2 - 1.5, y: 2.0, width: 3, height: 0.6 });
     });
-    blocked.push(LOUNGE.board);
+    blocked.push(LOUNGE.board, LIBRARY.desk, ...LIBRARY.shelves);
     // Coffee tables between each pair of sofas; the sofas themselves are added as decor below.
     for (const y of LOUNGE.rows) for (const cx of LOUNGE.groups) blocked.push({ x: cx - 0.9, y: y + 1.3, width: 1.8, height: 0.9 });
   } else {
@@ -1562,7 +1585,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       id: "konsultasi",
       kind: "konsultasi",
       name: "Lounge Konsultasi",
-      tagline: "Konsultasi dengan HR lewat telepon, atau ngobrol santai di sofa",
+      tagline: "Konsultasi dengan HR, ngobrol santai di sofa, dan baca buku gratis di perpustakaan",
       emoji: "🛋️",
       color: "#0f766e",
       level: 6,
