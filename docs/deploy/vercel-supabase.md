@@ -58,6 +58,32 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 
+## API and database load (optional env vars)
+All optional; the defaults suit Vercel Pro with Supabase Free. The game reads the polling ones
+from `GET /api/jobfair/config` (no redeploy needed; browsers pick them up on their next visit).
+The public setup (`/api/jobfair/state`), the public visit totals and booth ratings are the same for
+everyone and are kept by Vercel's CDN; what is per account (`/api/jobfair/state/mine`, own stats,
+own reviews) is never cached. Big inline pictures (logos) are served from
+`/api/jobfair/state/media/<hash>` and kept by browsers for good. Nothing is polled while the tab is hidden.
+- `DB_POOL_MAX`: Postgres connections per Vercel instance; default 3 (10 off Vercel); raise only on a paid Supabase compute whose pooler takes more clients (Free: 200 in total, shared by every instance).
+- `STATE_CDN_SEC`: seconds the CDN serves the public setup before asking again; default 20; raise to 60 for a quieter event, 0 turns CDN caching off.
+- `STATE_SWR_SEC`: seconds the CDN may serve the old setup while it fetches the new one; default 60; rarely needs changing.
+- `STATE_INLINE_MAX`: pictures in the setup longer than this (characters) are served by hash; default 4096; raise to a huge number to keep them inline.
+- `STATS_CACHE_SEC`: seconds an instance reuses the visit totals, and the CDN keeps the public ones; default 30; lower (10) if organisers want livelier counters and the database has room.
+- `STATE_POLL_SEC`: seconds between a visitor's pulls of the event setup; default 60 (was 30); lower to 30 when the budget allows.
+- `APPLICATIONS_POLL_SEC`: seconds between pulls of a seeker's applications and HR's answers; default 30 (was 15); lower to 15 for chattier HR replies.
+- `STATS_POLL_SEC`: seconds between pulls of the visit totals; default 120 (was 30); lower for livelier counters.
+- `STATS_SEND_SEC`: seconds between sends of a player's visits and clicks; default 30 (was 15); lower if the live feed should move faster.
+- `PROGRESS_POLL_SEC`: seconds between pulls of an account's progress saved on another device; default 90 (was 45); rarely needs changing.
+- `PROGRESS_PUSH_SEC`: at most one progress save per this many seconds, only when something changed; default 8 (was 4); lower to 4 on a paid plan.
+- `REVIEWS_POLL_SEC`: seconds between pulls of booth ratings; default 180 (was 60).
+- `FRIENDS_POLL_SEC`: seconds between pulls of the friends list; default 180 (was 90).
+- `PORTAL_POLL_SEC`: seconds between pulls of a booth's applicants in the company portal; default 15 (was 8); lower to 8 when HR teams chat live.
+- `GOOGLE_RATE_PER_IP`: Google sign-ins started per address per 10 minutes; default 300 (was 30); raise for a big venue or campus behind one Wi-Fi address.
+- `GOOGLE_RATE_PER_DEVICE`: the same per address and browser; default 30; rarely needs changing.
+- `PUSH_BATCH`: phone notifications sent at once (seminar pushes, reminders); default 50; raise to 100 when the functions have time to spare.
+- `REMINDER_BUDGET_SEC`: how long one `/api/cron/reminders` run works before it stops and answers `more: true`; default 45. Accounts are marked before they are sent, so calling it again (e.g. cron-job.org every 5 minutes from 06.00 to 07.00 WIB) carries on with the rest and never sends twice.
+
 ## Players online: limits from env (no rebuild)
 The game reads these from `GET /api/jobfair/config` (cached 60 s), so a change takes effect after
 a redeploy of the env vars and a page reload, without rebuilding the game. Defaults fit Supabase
@@ -85,7 +111,8 @@ route and the speed); other devices walk the player along it. Joining a floor co
 channel size (presence join and leave), plus one message to look at each channel. Measured with
 the real code on an in-memory Supabase stand-in (`apps/demo/test/live-budget.test.ts`, run with
 `MEASURE=1` to print): 100 players, 40 on one floor, a walk every ~17 s, a floor change every few
-minutes: ~69 messages/second; everyone walking and chatting nonstop: ~82/second.
+minutes: ~58 messages/second; everyone walking and chatting nonstop: ~82/second. 100 people
+arriving within one minute cost ~60/second while they come in (within 20 seconds: ~125/second).
 
 ## What keeps the move to DigitalOcean free of rework
 - Only plain Postgres through Drizzle. No Supabase Auth, Storage or REST client in the app.

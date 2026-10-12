@@ -20,22 +20,38 @@ export interface StatTotal {
 /** How often one account counts per key, action and day. */
 const CAP: Record<StatWhat, number> = { view: 30, click: 30, sold: 10 };
 
-/** Count what one account did today. */
-export async function addStats(db: Db, userId: string, day: string, hits: StatHit[]) {
+/** One row per key and action: how many hits it got in this send, and the coins of the ones that count. */
+export function groupHits(hits: StatHit[]) {
+  const out = new Map<string, { key: string; what: StatWhat; n: number; coins: number }>();
   for (const h of hits) {
-    const coins = Math.max(0, Math.min(500, Math.round(h.coins ?? 0)));
-    await db
-      .insert(fairStats)
-      .values({ key: h.key, what: h.what, userId, day, n: 1, coins })
-      .onConflictDoUpdate({
-        target: [fairStats.key, fairStats.what, fairStats.userId, fairStats.day],
-        set: {
-          n: sql`least(${fairStats.n} + 1, ${CAP[h.what]})`,
-          coins: sql`case when ${fairStats.n} < ${CAP[h.what]} then ${fairStats.coins} + ${coins} else ${fairStats.coins} end`,
-          updatedAt: sql`now()`,
-        },
-      });
+    const g = out.get(`${h.what} ${h.key}`) ?? { key: h.key, what: h.what, n: 0, coins: 0 };
+    // Past the day's cap a hit counts for nothing, here as on the server.
+    if (g.n < CAP[h.what]) {
+      g.n++;
+      g.coins += Math.max(0, Math.min(500, Math.round(h.coins ?? 0)));
+    }
+    out.set(`${h.what} ${h.key}`, g);
   }
+  return [...out.values()];
+}
+
+/** Count what one account did today: one statement for the whole send, however many hits it carries. */
+export async function addStats(db: Db, userId: string, day: string, hits: StatHit[]) {
+  const rows = groupHits(hits);
+  if (!rows.length) return;
+  const cap = sql.raw(`(case excluded.what when 'sold' then ${CAP.sold} else ${CAP.view} end)`);
+  await db
+    .insert(fairStats)
+    .values(rows.map((r) => ({ key: r.key, what: r.what, userId, day, n: r.n, coins: r.coins })))
+    .onConflictDoUpdate({
+      target: [fairStats.key, fairStats.what, fairStats.userId, fairStats.day],
+      set: {
+        n: sql`least(${fairStats.n} + excluded.n, ${cap})`,
+        // Only the hits that still fit under the cap bring their coins (hits on one key cost the same).
+        coins: sql`${fairStats.coins} + case when ${fairStats.n} < ${cap} then excluded.coins * least(excluded.n, ${cap} - ${fairStats.n}) / excluded.n else 0 end`,
+        updatedAt: sql`now()`,
+      },
+    });
 }
 
 /** Totals per key, optionally only keys starting with one of the prefixes. */

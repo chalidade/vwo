@@ -73,7 +73,6 @@ import { claimPaidCoins, pay } from "./payments";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
 import { type FloorPass, MAX_BOTS, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, spgId, spgName, stallStaffId } from "./jobfair-engine";
 import { LiveChannel, type LiveStatus } from "./live";
-import { runtimeConfig } from "./runtime-config";
 import { PING_REPLIES, PING_STARTERS, PING_TEXT, type Ping, PingLimiter, parsePing } from "./fair/social";
 import { FollowBar, type PingCardView, PingCards } from "./fair/Pings";
 import { playPing } from "./fair/ringtone";
@@ -113,6 +112,8 @@ import { onFrame } from "./loop";
 import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
 import { fair, useFair } from "./useFair";
 import { claimAnomaly, startAnomalies, useAnomaly, useAnomalyCollection } from "./anomaly-sync";
+import { pollVisible } from "./poll";
+import { loadRuntimeConfig, runtimeConfig } from "./runtime-config";
 
 interface Session {
   visitorId: string;
@@ -192,15 +193,8 @@ export function JobFair() {
   useEffect(() => {
     if (!LIVE || !account) return;
     const pull = () => void myApplications().then((r) => r.ok && fair.mergeServer(r.data.applications, true));
-    pull();
-    // Often enough for a chat with HR to feel live; a returning tab catches up at once.
-    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 15_000);
-    const back = () => document.visibilityState === "visible" && pull();
-    document.addEventListener("visibilitychange", back);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", back);
-    };
+    // Often enough for a chat with HR to feel live (APPLICATIONS_POLL_SEC); a returning tab catches up at once.
+    return pollVisible(pull, () => runtimeConfig().applicationsPollSec);
   }, [account?.email]);
   /** The saved character for this account: set once, then changed from the profile. */
   const character = account ? loadCharacter() : null;
@@ -295,9 +289,10 @@ export function JobFair() {
   // Friends: loaded on sign-in, and now and then for requests sent from other devices.
   useEffect(() => {
     if (!session) return;
-    void loadFriends();
-    const timer = window.setInterval(() => document.visibilityState === "visible" && void loadFriends(), 90_000);
-    return () => window.clearInterval(timer);
+    return pollVisible(
+      () => void loadFriends(),
+      () => runtimeConfig().friendsPollSec,
+    );
   }, [session]);
 
   // Remember where the player stands, so a reload or a trip to the payment page comes back here.
@@ -594,7 +589,9 @@ export function JobFair() {
     let gone = false;
     let toldFull = false;
     let stop = () => {};
-    void runtimeConfig().then((cfg) => {
+    // Waits a moment for the server's limits; an unreachable server leaves the defaults.
+    void Promise.race([loadRuntimeConfig(), new Promise<void>((r) => setTimeout(r, 4000))]).then(() => {
+      const cfg = runtimeConfig();
       if (gone) return;
       const channel = new LiveChannel({
         room: "jobfair",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ChatLimit, nextShard, ShardBudget, shardRate } from "../src/live-budget";
 import { decodeMove, encodeMove, KEY_CARRY_MS, motionAt, type MoveIntent, startMotion } from "../src/live-motion";
-import { readConfig } from "../src/runtime-config";
+import { DEFAULT_CONFIG, mergeConfig, readLive } from "../src/runtime-config";
 import { simulate } from "./live-sim";
 
 const counts = (o: Record<number, number>) => new Map(Object.entries(o).map(([k, v]) => [Number(k), v]));
@@ -77,8 +77,8 @@ describe("message budget", () => {
   });
 
   it("reads the server's limits, falling back to defaults for anything odd", () => {
-    expect(readConfig(null).live).toEqual({ enabled: true, maxConnections: 120, floorCap: 10, msgBudget: 70, heartbeatSec: 0, chatPerMin: 6 });
-    expect(readConfig({ live: { enabled: false, floorCap: 1, msgBudget: "lots", maxConnections: 2500.4 } }).live).toMatchObject({
+    expect(readLive(null)).toEqual({ enabled: true, maxConnections: 120, floorCap: 10, msgBudget: 70, heartbeatSec: 0, chatPerMin: 6 });
+    expect(mergeConfig(DEFAULT_CONFIG, { live: { enabled: false, floorCap: 1, msgBudget: "lots", maxConnections: 2500.4 } }).live).toMatchObject({
       enabled: false,
       floorCap: 2,
       msgBudget: 70,

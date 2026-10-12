@@ -17,6 +17,7 @@ import { cronAuthorized } from "@/lib/cron";
 import { db } from "@/lib/db";
 import { fail } from "@/lib/http";
 import { appUrl, sendMail } from "@/lib/mail";
+import { reminderBudgetSec } from "@/lib/limits";
 import { sendPush } from "@/lib/push";
 import { allow } from "@/lib/ratelimit";
 
@@ -32,7 +33,9 @@ const MARK_MS = 36 * 3_600_000;
  * Every morning (06.00 WIB): each seeker with an interview, office visit, Aula item they asked to be
  * reminded of or seminar they registered for today gets one email and one push listing them; seminars
  * tomorrow (H-1) are added to it, or sent on their own when that is all. Each account is marked per day before
- * it is sent, so a repeated or overlapping run never sends twice.
+ * it is sent, so a repeated or overlapping run never sends twice. A run stops after REMINDER_BUDGET_SEC
+ * and answers `more: true`: the next run (the scheduler calling again a few minutes later) skips the
+ * marked accounts and carries on with the rest.
  */
 export async function GET(req: Request) {
   if (!cronAuthorized(req)) return fail(401, "unauthorized");
@@ -68,10 +71,16 @@ export async function GET(req: Request) {
 
   const people = await reminderRecipients(db, [...new Set([...due.keys(), ...tomorrow.keys()])]);
   const url = `${appUrl()}/play/`;
+  const deadline = now + reminderBudgetSec() * 1000;
+  let left = 0;
   let sent = 0;
   let skipped = 0;
   let failed = 0;
   for (let i = 0; i < people.length; i += BATCH) {
+    if (Date.now() >= deadline) {
+      left = people.length - i;
+      break;
+    }
     await Promise.all(
       people.slice(i, i + BATCH).map(async (u) => {
         const list = (due.get(u.id) ?? []).sort((a, b) => a.at - b.at);
@@ -93,5 +102,5 @@ export async function GET(req: Request) {
       }),
     );
   }
-  return NextResponse.json({ ok: true, day, due: due.size, tomorrow: tomorrow.size, sent, skipped, failed });
+  return NextResponse.json({ ok: true, day, due: due.size, tomorrow: tomorrow.size, sent, skipped, failed, left, more: left > 0 });
 }

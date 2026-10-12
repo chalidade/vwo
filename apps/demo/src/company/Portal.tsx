@@ -19,6 +19,8 @@ import { Bell, Briefcase, Coins, Building2, CircleHelp, Contact, FileChartColumn
 import { DashShell } from "../Dash";
 import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
 import { Integrations } from "./Integrations";
+import { pollVisible } from "../poll";
+import { runtimeConfig } from "../runtime-config";
 
 const TABS = [
   ["overview", LayoutDashboard, "Ringkasan"],
@@ -506,14 +508,10 @@ function useServerApplicants(boothId: string) {
         if (r.ok) void boothInboxRead(boothId).then((x) => !gone && x.ok && fair.setBoothRead(boothId, x.data.read));
         setState(r.ok ? "ok" : r.error === "not_signed_in" ? "signin" : r.error === "not_allowed" ? "denied" : "offline");
       });
-    pull();
-    const timer = window.setInterval(() => document.visibilityState === "visible" && pull(), 8_000);
-    const back = () => document.visibilityState === "visible" && pull();
-    document.addEventListener("visibilitychange", back);
+    const stop = pollVisible(pull, () => runtimeConfig().portalPollSec);
     return () => {
       gone = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", back);
+      stop();
     };
   }, [boothId]);
   return state;

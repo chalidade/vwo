@@ -1,6 +1,6 @@
-// The organiser's price list. Live: kept in the server's price table, which everyone pulls and only
-// event admins change. Demo: kept in this browser.
-import { cleanPrices, type Prices, priceTable } from "@vwo/shared";
+// The organiser's price list. Live: kept in the server's price table, which only event admins change;
+// it comes to everyone with the shared event setup (shared-state.ts). Demo: kept in this browser.
+import { cleanPrices, type Prices } from "@vwo/shared";
 import { LIVE } from "./mode";
 import { fair } from "./useFair";
 
@@ -15,20 +15,11 @@ function readLocal(): Prices {
   }
 }
 
-/** Load the price list once, and keep it fresh on the live site. Safe to call again. */
+/** Load the demo's price list once. On the live site the shared setup brings it. Safe to call again. */
 export function startPriceSync() {
   if (started) return;
   started = true;
-  if (!LIVE) return fair.applyPrices(readLocal());
-  const pull = () =>
-    fetch("/api/jobfair/prices", { credentials: "same-origin" })
-      .then((r) => (r.ok ? (r.json() as Promise<{ prices?: unknown }>) : null))
-      .then((d) => {
-        if (d && JSON.stringify(cleanPrices(d.prices)) !== JSON.stringify(priceTable())) fair.applyPrices(cleanPrices(d.prices));
-      })
-      .catch(() => undefined);
-  void pull();
-  window.setInterval(() => document.visibilityState === "visible" && void pull(), 60_000);
+  if (!LIVE) fair.applyPrices(readLocal());
 }
 
 /** Save changed prices. Returns an error to show, or null when saved. */

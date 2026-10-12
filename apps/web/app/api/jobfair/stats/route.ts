@@ -6,6 +6,7 @@ import { isFairAdmin } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { maybeCleanup } from "@/lib/cleanup";
+import { publicCache, statsCacheSec } from "@/lib/limits";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,19 +26,41 @@ const event = z.object({
 });
 const schema = z.object({ hits: z.array(hit).max(50).default([]), events: z.array(event).max(10).default([]) });
 
+/** The totals, shared by every request on this instance for a few seconds: one aggregation, not one per visitor. */
+let totals: { at: number; data: Promise<Awaited<ReturnType<typeof statTotals>>> } | null = null;
+function cachedTotals() {
+  const ttl = statsCacheSec() * 1000;
+  if (!totals || Date.now() - totals.at >= ttl) {
+    const data = statTotals(db);
+    totals = { at: Date.now(), data };
+    // A failed read isn't kept: the next request tries again.
+    data.catch(() => totals?.data === data && (totals = null));
+  }
+  return totals.data;
+}
+
+/** What everyone may see: booth visits, seminar attendance and how much merchandise is gone. */
+const isPublic = (k: string) => k.startsWith("visit:") || k.startsWith("seminar:") || (k.startsWith("acc:") && k.endsWith(":giveaway"));
+
 /**
  * Reach counters. Everyone gets booth visits, seminar attendance and how much merchandise is gone;
  * a company also its own booth's decorations and promoter; event admins everything, with the live feed.
+ * `?public=1` is that public part without looking at the session, the same for everyone, so the CDN keeps it.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.get("public") === "1") {
+    const stats = Object.fromEntries(Object.entries(await cachedTotals()).filter(([k]) => isPublic(k)));
+    return NextResponse.json({ stats }, { headers: { "Cache-Control": publicCache(statsCacheSec(), statsCacheSec() * 2) } });
+  }
   const user = await currentUser();
   const admin = isFairAdmin(user);
-  const all = await statTotals(db);
-  if (admin) return NextResponse.json({ stats: all, events: await recentEvents(db) }, { headers: { "Cache-Control": "no-store" } });
+  const all = await cachedTotals();
+  const priv = { "Cache-Control": "private, no-store" };
+  if (admin) return NextResponse.json({ stats: all, events: await recentEvents(db) }, { headers: priv });
   const mine = user ? await boothsOf(db, user.id) : [];
   const own = (k: string) => mine.some((b) => k.startsWith(`acc:${b}:`) || k === `promo:co-${b}`);
-  const stats = Object.fromEntries(Object.entries(all).filter(([k]) => k.startsWith("visit:") || k.startsWith("seminar:") || (k.startsWith("acc:") && k.endsWith(":giveaway")) || own(k)));
-  return NextResponse.json({ stats }, { headers: { "Cache-Control": "no-store" } });
+  const stats = Object.fromEntries(Object.entries(all).filter(([k]) => isPublic(k) || own(k)));
+  return NextResponse.json({ stats }, { headers: priv });
 }
 
 /** What the signed-in player did since the last send: views, clicks and sales, and lines for the live feed. */
