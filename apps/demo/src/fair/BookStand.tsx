@@ -1,166 +1,137 @@
 import { useState } from "react";
-import { STAND_PRICES } from "../jobfair-engine";
-import { sessionLogin } from "../company/login";
+import { standSlotIndex, standSlotName } from "@vwo/shared";
+import { currentAccount } from "../account";
+import { leadError, sendLead } from "../leads";
 import { LIVE } from "../mode";
 import { fair } from "../useFair";
-import { coinText } from "./company";
-import { CoinBalance, TopUp } from "./TopUp";
-import { coinPrice, koinText, standSlotIndex, standSlotName } from "@vwo/shared";
 import { Modal } from "./Modal";
 
-const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
-
-/** Booking an empty stand from the hall (demo): company details, payment with coins, then the portal code and PIN. */
+/**
+ * An empty stand in the hall: the company fills in a short form (no prices, no payment) and the
+ * organiser calls back, then builds the stand and sends the portal code and PIN.
+ */
 export function BookStand({ slot, onClose }: { slot: { floor: number; x: number; y: number }; onClose: () => void }) {
-  const [step, setStep] = useState<"form" | "pay" | "done">("form");
-  const [company, setCompany] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [contact, setContact] = useState("");
-  const [email, setEmail] = useState("");
-  const [color, setColor] = useState(COLORS[0]!);
-  const [tier, setTier] = useState<"regular" | "premium">("regular");
-  const [done, setDone] = useState<{ id: string; company: string; pin: string } | null>(null);
+  const account = currentAccount();
+  const [f, setF] = useState({
+    company: "",
+    industry: "",
+    city: "",
+    website: "",
+    contactName: account?.name ?? "",
+    contactRole: "HR",
+    email: account?.email ?? "",
+    phone: "",
+    note: "",
+    website2: "",
+  });
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
   const floorName = fair.fair.floors[slot.floor]?.name ?? "Aula";
-  if (LIVE)
+  const place = `${floorName}, ${standSlotName(standSlotIndex(slot.x, slot.y)).toLowerCase()}`;
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => (setF({ ...f, [k]: e.target.value }), setError(""));
+
+  if (LIVE && !account)
     return (
-      <Modal title="🏬 Booking stand" onClose={onClose} className="bk">
+      <Modal title="🏬 Ajukan stand" onClose={onClose} className="bk">
         <div className="bk-form">
-          <p className="bk-place">📍 Stand ini masih kosong.</p>
+          <p className="bk-place">📍 {place} · masih kosong</p>
           <p className="small">
-            Untuk membuka booth, perusahaan mendaftar lewat formulir perusahaan: isi data perusahaan, pilih paket, dan bayar. Panitia memverifikasi bahwa perusahaannya nyata, lalu mengirim kode dan PIN untuk masuk ke portal perusahaan.
+            Masuk dulu ke job fair dengan akun Google kantor, lalu ketuk stand ini lagi untuk mengisi formulir. Akun itu yang nanti mengelola booth perusahaanmu.
           </p>
-          <div className="row">
-            <a className="small-btn cp-link" href="/daftar-perusahaan">
-              Daftarkan perusahaan →
-            </a>
-            <button type="button" className="ghost" onClick={onClose}>
-              Kembali
-            </button>
-          </div>
+          <button type="button" className="ghost" onClick={onClose}>
+            Kembali
+          </button>
         </div>
       </Modal>
     );
-  const place = `${floorName}, ${standSlotName(standSlotIndex(slot.x, slot.y)).toLowerCase()}`;
 
   return (
-    <Modal title="🏬 Booking stand" onClose={onClose} className="bk">
-      {step === "form" && (
+    <Modal title="🏬 Ajukan stand" onClose={onClose} className="bk">
+      {sent ? (
+        <div className="bk-form bk-done">
+          <p className="bk-ok">✓ Formulir terkirim. Panitia akan menghubungi kamu.</p>
+          <p className="small">
+            Panitia akan menelepon atau mengirim WhatsApp ke {f.phone} untuk membicarakan paket dan tempat stand. Setelah sepakat, panitia membuat stand {f.company} dan mengirim
+            kode serta PIN portal perusahaan ke {f.email}.
+          </p>
+          <button type="button" className="ghost" onClick={onClose}>
+            Kembali ke job fair
+          </button>
+        </div>
+      ) : (
         <form
           className="bk-form"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (company.trim() && contact.trim() && email.includes("@")) setStep("pay");
+            setBusy(true);
+            const r = await sendLead({ kind: "booth", data: { ...f, want: slot } });
+            setBusy(false);
+            if (!r.ok) return setError(leadError(r.error));
+            setSent(true);
           }}
         >
           <p className="bk-place">
             📍 {place} · <b>tersedia</b>
           </p>
-          <div className="bk-tiers">
-            {(["regular", "premium"] as const).map((t) => (
-              <button key={t} type="button" className="bk-tier" data-active={tier === t ? "" : undefined} onClick={() => setTier(t)}>
-                <b>{t === "premium" ? "👑 Stand VIP" : "Stand reguler"}</b>
-                <span>{coinText(STAND_PRICES[t])}</span>
-                <small>{t === "premium" ? "Lampu sorot, karpet emas, LED berjalan" : "Panel, meja recruiter, roll-up banner"}</small>
-              </button>
-            ))}
-          </div>
+          <p className="small lead-intro">
+            Isi data perusahaan. Panitia akan menghubungi kamu untuk membicarakan paket dan tempat, lalu membuatkan stand dan memberi akses portal.
+          </p>
           <label>
             Nama perusahaan
-            <input value={company} onChange={(e) => setCompany(e.target.value)} required maxLength={40} placeholder="PT Contoh Maju" />
+            <input value={f.company} onChange={set("company")} required minLength={2} maxLength={60} placeholder="PT Contoh Maju" />
           </label>
-          <label>
-            Bidang usaha
-            <input value={industry} onChange={(e) => setIndustry(e.target.value)} maxLength={40} placeholder="Teknologi, Retail, …" />
-          </label>
-          <label>
-            Nama PIC / recruiter
-            <input value={contact} onChange={(e) => setContact(e.target.value)} required maxLength={30} />
-          </label>
-          <label>
-            Email PIC
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={60} placeholder="hr@perusahaan.example" />
-          </label>
-          <div className="bk-colors" role="radiogroup" aria-label="Warna brand">
-            <span className="small">Warna brand</span>
-            {COLORS.map((c) => (
-              <button key={c} type="button" role="radio" aria-checked={color === c} aria-label={c} data-active={color === c ? "" : undefined} style={{ background: c }} onClick={() => setColor(c)} />
-            ))}
+          <div className="lead-pair">
+            <label>
+              Bidang usaha
+              <input value={f.industry} onChange={set("industry")} required minLength={2} maxLength={60} placeholder="Teknologi, Retail, …" />
+            </label>
+            <label>
+              Kota kantor
+              <input value={f.city} onChange={set("city")} required minLength={2} maxLength={60} placeholder="Jakarta" />
+            </label>
           </div>
-          <button type="submit" className="bk-go">
-            Lanjut ke pembayaran · {coinText(STAND_PRICES[tier])}
-          </button>
-        </form>
-      )}
-
-      {step === "pay" && (
-        <div className="bk-form">
-          <table className="list bk-sum">
-            <tbody>
-              <tr>
-                <td>{tier === "premium" ? "Stand VIP" : "Stand reguler"}</td>
-                <td>{coinText(STAND_PRICES[tier])}</td>
-              </tr>
-              <tr>
-                <td className="muted small">
-                  {company} · {place}
-                </td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
-          <CoinBalance need={coinPrice(STAND_PRICES[tier])} />
-          {fair.player.coins < coinPrice(STAND_PRICES[tier]) && <TopUp back="/play/#/jobfair" need={coinPrice(STAND_PRICES[tier]) - fair.player.coins} compact />}
-          <p className="muted small">Sewa stand dibayar dengan koin. Demo: koin yang diisi tidak menarik uang sungguhan.</p>
+          <label>
+            Website (boleh dikosongkan)
+            <input value={f.website} onChange={set("website")} maxLength={120} inputMode="url" placeholder="perusahaan.co.id" />
+          </label>
+          <div className="lead-pair">
+            <label>
+              Nama PIC
+              <input value={f.contactName} onChange={set("contactName")} required minLength={2} maxLength={60} />
+            </label>
+            <label>
+              Jabatan
+              <input value={f.contactRole} onChange={set("contactRole")} required minLength={2} maxLength={60} placeholder="HR Manager" />
+            </label>
+          </div>
+          <div className="lead-pair">
+            <label>
+              Email kantor
+              <input type="email" value={f.email} onChange={set("email")} required maxLength={120} placeholder="hr@perusahaan.co.id" />
+            </label>
+            <label>
+              No. HP / WhatsApp
+              <input type="tel" inputMode="tel" value={f.phone} onChange={set("phone")} required maxLength={20} placeholder="0812 3456 7890" />
+            </label>
+          </div>
+          <label>
+            Catatan (boleh dikosongkan)
+            <textarea rows={2} value={f.note} onChange={set("note")} maxLength={500} placeholder="Misalnya: ingin stand VIP, butuh 2 stand, waktu terbaik dihubungi" />
+          </label>
+          <label className="lead-hp" aria-hidden>
+            Website kedua
+            <input tabIndex={-1} autoComplete="off" value={f.website2} onChange={set("website2")} />
+          </label>
           {error && <p className="bk-err">{error}</p>}
-          <div className="row">
-            <button type="button" className="ghost" onClick={() => setStep("form")}>
-              ← Ubah data
-            </button>
-            <button
-              type="button"
-              className="bk-go"
-              onClick={() => {
-                const need = coinPrice(STAND_PRICES[tier]);
-                if (fair.player.coins < need) return setError(`Koin belum cukup: kurang ${koinText(need - fair.player.coins)}. Isi koin dulu.`);
-                const r = fair.bookStand({ company, industry, color, contact, email, tier, method: "Koin", ...slot });
-                if (!r) return setError("Maaf, stand ini baru saja dibooking perusahaan lain. Pilih stand kosong lain.");
-                fair.payCoins(need, `Sewa stand ${tier === "premium" ? "VIP" : "reguler"} · ${company}`);
-                setDone({ id: r.booth.id, company: r.booth.company, pin: r.pin });
-                setStep("done");
-              }}
-            >
-              Bayar {coinText(STAND_PRICES[tier])}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === "done" && done && (
-        <div className="bk-form bk-done">
-          <p className="bk-ok">✓ Sewa stand dibayar dengan koin. Stand {done.company} sudah berdiri di {floorName}.</p>
-          <p className="small">
-            {LIVE
-              ? "Akunmu sudah jadi pengelola stand ini. Bagikan kode dan PIN ke rekan kerja supaya mereka bisa ikut mengelola dengan akun Google masing-masing:"
-              : "Masuk ke portal perusahaan untuk mengisi lowongan, profil, dan dekorasi stand:"}
+          <button type="submit" className="bk-go" disabled={busy}>
+            {busy ? "Mengirim…" : "Kirim formulir"}
+          </button>
+          <p className="muted small" style={{ margin: 0 }}>
+            Belum ada pembayaran di sini. Paket dan biaya dibicarakan langsung dengan panitia.
           </p>
-          <dl className="bk-cred">
-            <dt>Kode perusahaan</dt>
-            <dd>{done.id}</dd>
-            <dt>PIN</dt>
-            <dd>{done.pin}</dd>
-          </dl>
-          <div className="row">
-            <a className="small-btn cp-link" href={`#/jobfair/company/${done.id}`} onClick={() => !LIVE && sessionLogin(done.id)}>
-              Buka portal perusahaan →
-            </a>
-            <button type="button" className="ghost" onClick={onClose}>
-              Kembali ke job fair
-            </button>
-          </div>
-        </div>
+        </form>
       )}
     </Modal>
   );
 }
-

@@ -187,7 +187,7 @@ function CompanyLogin({ code: start, onIn }: { code: string; onIn: (id: string) 
       >
         <h1 className="cp-h1">Masuk portal perusahaan</h1>
         <p className="muted small" style={{ marginTop: 0 }}>
-          Kelola stand, lowongan, dan pelamar di {fair.fair.name}. Kode dan PIN dikirim panitia, atau kamu dapat saat booking stand kosong di peta.
+          Kelola stand, lowongan, dan pelamar di {fair.fair.name}. Kode dan PIN dikirim panitia setelah stand perusahaanmu dibuat. Belum punya? Ketuk stand kosong di peta untuk mengajukan.
         </p>
         <label>
           Kode perusahaan

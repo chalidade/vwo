@@ -44,6 +44,8 @@ export async function GET() {
     if (r.key.startsWith("inbox:")) continue;
     // Seller and buyer invoice details are never part of the public setup (the read skips them too).
     if (r.key.startsWith("billing:")) continue;
+    // Booth and stall requests carry contact details: organiser only, through their own route (the read skips them too).
+    if (r.key.startsWith("lead:")) continue;
     // Lounge consultants: only the public profile, desk and open lamp, never who owns the desk or how to reach them.
     // They don't move the version: an open desk is refreshed every minute, and the game applies them on every pull.
     if (r.key.startsWith("consultant:")) {

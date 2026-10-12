@@ -791,7 +791,7 @@ export function boothExtras(live: CompanyBooth, opts: { onBanner?: () => void; o
 export function emptyBoothExtras(slot: { floor: number; x: number; y: number }, onClick?: () => void): SceneExtra[] {
   const { x, y } = slot;
   const key = `empty-${slot.floor}-${x}-${y}`;
-  const title = onClick ? "Stand kosong: booking stand" : "Stand kosong";
+  const title = onClick ? "Stand kosong: ajukan stand" : "Stand kosong";
   return [
     {
       key: `${key}-floor`,
@@ -803,7 +803,7 @@ export function emptyBoothExtras(slot: { floor: number; x: number; y: number }, 
       title,
       node: (
         <div className="jb-empty" style={{ width: (BOOTH_W - 0.2) * T, height: (BOOTH_H - 0.5) * T }}>
-          <span>{onClick ? "＋ BOOKING STAND" : "STAND KOSONG"}</span>
+          <span>{onClick ? "＋ AJUKAN STAND" : "STAND KOSONG"}</span>
         </div>
       ),
     },

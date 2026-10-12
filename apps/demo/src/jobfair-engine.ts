@@ -1432,13 +1432,13 @@ export class DemoJobFair {
   }
 
   /** A company books an empty stand, pays (demo), and its booth appears on the map with a portal PIN. */
-  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: BoothTier; method: string; floor: number; x: number; y: number }) {
+  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: BoothTier; method: string; floor: number; x: number; y: number; price?: number }) {
     const booth = this.addBooth({ company: input.company, industry: input.industry, color: input.color, recruiter: input.contact, email: input.email, floor: input.floor, x: input.x, y: input.y, tier: input.tier });
     if (!booth) return null;
     const pin = String(1000 + Math.floor(this.rand() * 9000));
     this.org.pins = { ...this.org.pins, [booth.id]: pin };
     this.org.bookings = [
-      { id: this.newAdId("book"), boothId: booth.id, company: booth.company, contact: input.contact.trim(), email: input.email.trim(), tier: input.tier, price: STAND_PRICES[input.tier], method: input.method, at: this.now() },
+      { id: this.newAdId("book"), boothId: booth.id, company: booth.company, contact: input.contact.trim(), email: input.email.trim(), tier: input.tier, price: input.price ?? STAND_PRICES[input.tier], method: input.method, at: this.now() },
       ...(this.org.bookings ?? []),
     ];
     this.saveOrg();
