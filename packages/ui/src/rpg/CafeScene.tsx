@@ -275,7 +275,13 @@ export function CafeScene({
   const motion = useRef(new Map<string, { x: number; y: number; at: number }>());
   const now = performance.now();
   const walking = new Set<string>();
-  for (const a of [...avatars.map((v) => ({ id: v.memberId, x: v.x, y: v.y })), ...npcs]) {
+  const onFloor = [...avatars.filter((v) => v.floorId === floor.id).map((v) => ({ id: v.memberId, x: v.x, y: v.y })), ...npcs.filter((n) => n.floorId === floor.id)];
+  // Forget people who left this floor, so the map stays the size of the crowd in view.
+  if (motion.current.size > onFloor.length * 2 + 50) {
+    const here = new Set(onFloor.map((a) => a.id));
+    for (const id of motion.current.keys()) if (!here.has(id)) motion.current.delete(id);
+  }
+  for (const a of onFloor) {
     const m = motion.current.get(a.id);
     if (!m || Math.abs(m.x - a.x) > 0.001 || Math.abs(m.y - a.y) > 0.001) {
       motion.current.set(a.id, { x: a.x, y: a.y, at: m ? now : 0 });

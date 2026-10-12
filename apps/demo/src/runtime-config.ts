@@ -6,6 +6,34 @@ import { STAGE_DEFAULTS, type StageConfig, cleanStageConfig } from "@vwo/shared"
 import { useEffect, useState } from "react";
 import { LIVE } from "./mode";
 
+/** Players online (see apps/web/lib/runtime-config.ts and live.ts). */
+export interface LiveConfig {
+  enabled: boolean;
+  maxConnections: number;
+  floorCap: number;
+  msgBudget: number;
+  heartbeatSec: number;
+  chatPerMin: number;
+}
+
+export const LIVE_DEFAULTS: LiveConfig = { enabled: true, maxConnections: 120, floorCap: 10, msgBudget: 70, heartbeatSec: 0, chatPerMin: 6 };
+
+const num = (v: unknown, fallback: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback);
+
+/** The players-online limits the server sent, field by field, falling back to the defaults for anything missing or odd. */
+export function readLive(raw: unknown): LiveConfig {
+  const d = LIVE_DEFAULTS;
+  const l = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    enabled: typeof l.enabled === "boolean" ? l.enabled : d.enabled,
+    maxConnections: num(l.maxConnections, d.maxConnections, 0, 100_000),
+    floorCap: num(l.floorCap, d.floorCap, 2, 200),
+    msgBudget: num(l.msgBudget, d.msgBudget, 5, 1_000_000),
+    heartbeatSec: num(l.heartbeatSec, d.heartbeatSec, 0, 3600),
+    chatPerMin: num(l.chatPerMin, d.chatPerMin, 0, 120),
+  };
+}
+
 export interface RuntimeConfig {
   /** Seconds between pulls of the shared event setup (paused while the tab is hidden). */
   statePollSec: number;
@@ -21,6 +49,7 @@ export interface RuntimeConfig {
   reviewsPollSec: number;
   friendsPollSec: number;
   portalPollSec: number;
+  live: LiveConfig;
   /** Seminar and Aula broadcasts: mesh cap, heartbeat, chat. */
   stage: StageConfig;
 }
@@ -35,6 +64,7 @@ export const DEFAULT_CONFIG: RuntimeConfig = {
   reviewsPollSec: 180,
   friendsPollSec: 180,
   portalPollSec: 15,
+  live: LIVE_DEFAULTS,
   stage: STAGE_DEFAULTS,
 };
 /** Asked again after this long, so a change on the server reaches tabs left open all day. */
@@ -55,11 +85,12 @@ export function mergeConfig(base: RuntimeConfig, got: unknown): RuntimeConfig {
   if (!got || typeof got !== "object") return out;
   const g = got as Record<string, unknown>;
   for (const k of Object.keys(base) as (keyof RuntimeConfig)[]) {
-    if (k === "stage") continue;
+    if (k === "stage" || k === "live") continue;
     const v = g[k];
     if (typeof v === "number" && Number.isFinite(v) && v > 0) out[k] = v;
   }
   if (g.stage !== undefined) out.stage = cleanStageConfig(g.stage);
+  if (g.live !== undefined) out.live = readLive(g.live);
   return out;
 }
 

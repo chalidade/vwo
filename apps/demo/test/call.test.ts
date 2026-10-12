@@ -8,8 +8,8 @@ vi.mock("../src/realtime", () => ({
   realtimeClient: async () => ({
     channel(name: string) {
       const ch = {
-        on(_t: string, _f: unknown, fn: (m: { payload: unknown }) => void) {
-          handlers.set(name, fn);
+        on(_t: string, f: { event: string }, fn: (m: { payload: unknown }) => void) {
+          if (f.event === "s") handlers.set(name, fn);
           return ch;
         },
         subscribe(cb: (s: string) => void) {
@@ -19,12 +19,16 @@ vi.mock("../src/realtime", () => ({
         async send(m: { payload: unknown }) {
           sent.push({ channel: name, payload: m.payload });
         },
+        async httpSend(_event: string, payload: unknown) {
+          sent.push({ channel: name, payload });
+        },
         async unsubscribe() {
           handlers.delete(name);
         },
       };
       return ch;
     },
+    getChannels: () => [],
     async removeChannel(ch: { unsubscribe(): Promise<void> }) {
       await ch.unsubscribe();
     },
