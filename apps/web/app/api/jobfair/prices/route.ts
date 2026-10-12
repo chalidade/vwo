@@ -5,14 +5,15 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { isFairAdmin } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
+import { publicCache, stateCdnSec, stateSwrSec } from "@/lib/limits";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-/** The organiser's price list, for everyone: the game shows these prices. */
+/** The organiser's price list, for everyone: the game shows these prices. The same for all, so the CDN keeps it a little. */
 export async function GET() {
-  return NextResponse.json({ prices: cleanPrices(await readPrices(db)) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ prices: cleanPrices(await readPrices(db)) }, { headers: { "Cache-Control": publicCache(stateCdnSec(), stateSwrSec()) } });
 }
 
 const bodySchema = z.object({ prices: z.record(z.string().max(60), z.number().int().min(0)) });

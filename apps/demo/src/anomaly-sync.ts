@@ -122,11 +122,25 @@ function demoSpawn(): number {
   return ANOMALY_LIVE_MS + 60_000 + Math.random() * 120_000;
 }
 
+function whenVisible() {
+  return new Promise<void>((done) => {
+    if (document.visibilityState === "visible") return done();
+    const on = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", on);
+      done();
+    };
+    document.addEventListener("visibilitychange", on);
+  });
+}
+
 /** Start showing anomalies. Safe to call again. */
 export function startAnomalies() {
   if (started) return;
   started = true;
   const run = async () => {
+    // A hidden tab doesn't ask; it asks as soon as it is looked at again.
+    if (LIVE) await whenVisible();
     const wait = LIVE ? await poll() : demoSpawn();
     setTimeout(() => void run(), wait);
   };

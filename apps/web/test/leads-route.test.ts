@@ -39,6 +39,7 @@ vi.mock("@vwo/db", async (orig) => ({
   deleteFairState: (_db: unknown, ...a: unknown[]) => db.deleteFairState(...a),
   readFairState: () => db.readFairState(),
   boothsOf: async () => [],
+  readPrices: async () => ({}),
 }));
 
 const leads = await import("../app/api/jobfair/leads/route");
@@ -204,7 +205,7 @@ describe("the public setup", () => {
       { key: "org", data: { removed: [], added: [] }, updatedAt: new Date(1) },
       { key: `lead:${ID}`, data: stored, updatedAt: new Date(2) },
     ]);
-    const body = JSON.stringify(await (await state.GET()).json());
+    const body = JSON.stringify(await (await state.GET(new Request("https://jobfair.co.id/api/jobfair/state"))).json());
     expect(body).not.toContain("hr@contoh.co.id");
     expect(body).not.toContain("0812 3456 7890");
   });

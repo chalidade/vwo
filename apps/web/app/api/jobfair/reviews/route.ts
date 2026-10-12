@@ -4,6 +4,7 @@ import { z } from "zod";
 import { boothStands } from "@/lib/booths";
 import { db } from "@/lib/db";
 import { fail, readBody, sameOrigin } from "@/lib/http";
+import { publicCache, stateCdnSec, stateSwrSec } from "@/lib/limits";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
 
@@ -11,11 +12,17 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({ booth: z.string().regex(/^[\w-]{1,80}$/), stars: z.number().int().min(1).max(5) });
 
-/** Every booth's star rating (counts only, never who wrote what), and this account's own stars. */
-export async function GET() {
+/**
+ * Every booth's star rating (counts only, never who wrote what), and this account's own stars.
+ * `?totals=1` is the ratings alone without looking at the session, the same for everyone, so the CDN keeps it.
+ */
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.get("totals") === "1") {
+    return NextResponse.json({ totals: await reviewTotals(db) }, { headers: { "Cache-Control": publicCache(stateCdnSec() * 3, stateSwrSec()) } });
+  }
   const user = await currentUser();
   const [totals, mine] = await Promise.all([reviewTotals(db), user ? myReviews(db, user.id) : {}]);
-  return NextResponse.json({ totals, mine }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ totals, mine }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /** A signed-in job seeker reviews a booth; a new review replaces their earlier one. */
