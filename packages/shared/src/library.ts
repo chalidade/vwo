@@ -239,6 +239,67 @@ export function gutendexSearchUrl(q: string, page = 1) {
   return `https://gutendex.com/books/?${p}`;
 }
 
+/** Project Gutenberg's own search (OPDS, an Atom feed), used when Gutendex is slow or down. Empty
+ *  query: the most downloaded books. Pages hold 25 entries. */
+export function gutenbergOpdsSearchUrl(q: string, page = 1) {
+  const p = new URLSearchParams();
+  if (q) p.set("query", q);
+  else p.set("sort_order", "downloads");
+  if (page > 1) p.set("start_index", String((page - 1) * 25 + 1));
+  return `https://www.gutenberg.org/ebooks/search.opds/?${p}`;
+}
+
+/** A book's cover on gutenberg.org. Only ever built from a checked book number. */
+export const gutenbergCoverUrl = (id: number) => `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/** XML text to plain text: tags dropped, entities decoded, spaces collapsed. */
+function xmlText(s: string) {
+  return s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+      if (e[0] === "#") {
+        const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : "";
+      }
+      return ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const tag = (entry: string, name: string) => new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i").exec(entry)?.[1];
+
+/** Project Gutenberg's OPDS search feed, in the same shape as libraryHits. Only entries that are a
+ *  book (their id or link is /ebooks/<number>) count; the sort links, authors and subjects that the
+ *  feed also lists are skipped. Strings are capped like libraryHits. */
+export function opdsHits(xml: string): { count: number; more: boolean; results: LibraryHit[] } {
+  const results: LibraryHit[] = [];
+  const seen = new Set<number>();
+  const entries = xml.match(/<entry[\s>][\s\S]*?<\/entry>/gi) ?? [];
+  for (const e of entries.slice(0, 60)) {
+    const ref = `${tag(e, "id") ?? ""} ${(/<link[^>]*rel="(?:subsection|alternate)"[^>]*>/i.exec(e) ?? [""])[0]}`;
+    const m = /(?:gutenberg\.org|["\s])\/ebooks\/(\d{1,6})(?:\.opds)?(?=["\s<]|$)/.exec(ref) ?? /\/ebooks\/(\d{1,6})(?:\.opds)?\s*$/.exec(tag(e, "id") ?? "");
+    const id = bookIdOf(m?.[1]);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    const author = xmlText(tag(tag(e, "author") ?? "", "name") ?? tag(e, "content") ?? "");
+    results.push({
+      id,
+      title: xmlText(tag(e, "title") ?? "").slice(0, 200) || `Buku #${id}`,
+      // The content line is the author, sometimes followed by a download count: keep the name only.
+      authors: author && !/^\d[\d,.]* downloads?$/i.test(author) ? [author.replace(/\s*\d[\d,.]* downloads?$/i, "").slice(0, 100)] : [],
+      languages: [],
+      cover: gutenbergCoverUrl(id),
+      downloads: 0,
+    });
+    if (results.length >= 40) break;
+  }
+  return { count: results.length, more: /<link[^>]*rel="next"/i.test(xml), results };
+}
+
 /** One search result, as the reader shows it. */
 export interface LibraryHit {
   id: number;

@@ -1,5 +1,20 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { bookIdOf, gutenbergTextUrl, gutendexSearchUrl, LIBRARY_SHELVES, libraryHits, libraryQuery, libraryUrlOk, pageAtPos, paginate, splitGutenberg, toParagraphs } from "../src";
+import {
+  bookIdOf,
+  gutenbergOpdsSearchUrl,
+  gutenbergTextUrl,
+  gutendexSearchUrl,
+  LIBRARY_SHELVES,
+  libraryHits,
+  libraryQuery,
+  libraryUrlOk,
+  opdsHits,
+  pageAtPos,
+  paginate,
+  splitGutenberg,
+  toParagraphs,
+} from "../src";
 
 /** A trimmed copy of how a Project Gutenberg plain-text file looks today. */
 const FIXTURE = [
@@ -172,5 +187,38 @@ describe("libraryHits", () => {
     expect(out.results[1]!.title.length).toBe(200);
     expect(out.results[1]!.languages).toEqual(["en"]);
     expect(libraryHits("nonsense").results).toEqual([]);
+  });
+});
+
+describe("opdsHits (Gutenberg's own search, the fallback)", () => {
+  const xml = readFileSync(new URL("./fixtures/gutenberg-search.opds.xml", import.meta.url), "utf8");
+
+  it("keeps only book entries, in order, with authors and gutenberg.org covers", () => {
+    const out = opdsHits(xml);
+    expect(out.results.map((r) => r.id)).toEqual([1661, 2852, 244]);
+    expect(out.results[0]).toMatchObject({
+      title: "The Adventures of Sherlock Holmes",
+      authors: ["Arthur Conan Doyle"],
+      cover: "https://www.gutenberg.org/cache/epub/1661/pg1661.cover.medium.jpg",
+    });
+    expect(out.results[1]!.title).toBe("The Hound of the Baskervilles & Other Tales \u2014 Vol. 1");
+    expect(out.results[1]!.authors).toEqual(["Arthur Conan Doyle"]);
+    expect(out.results[2]!.authors).toEqual(["Doyle, Arthur Conan"]);
+    expect(out.results.every((r) => libraryUrlOk(r.cover!))).toBe(true);
+    expect(out.more).toBe(true);
+  });
+
+  it("survives empty and broken feeds", () => {
+    expect(opdsHits("")).toEqual({ count: 0, more: false, results: [] });
+    expect(opdsHits("<html>Service unavailable</html>").results).toEqual([]);
+  });
+
+  it("builds search and popular URLs on the allowed host", () => {
+    const u = new URL(gutenbergOpdsSearchUrl("sherlock & co", 2));
+    expect(u.host).toBe("www.gutenberg.org");
+    expect(u.searchParams.get("query")).toBe("sherlock & co");
+    expect(u.searchParams.get("start_index")).toBe("26");
+    expect(new URL(gutenbergOpdsSearchUrl("")).searchParams.get("sort_order")).toBe("downloads");
+    expect(libraryUrlOk(gutenbergOpdsSearchUrl("x"))).toBe(true);
   });
 });

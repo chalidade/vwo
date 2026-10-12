@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+<id>https://www.gutenberg.org/ebooks/search.opds/?query=sherlock</id>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>Books: sherlock (sorted by popularity)</title>
+<link rel="self" type="application/atom+xml;profile=opds-catalog" href="/ebooks/search.opds/?query=sherlock"/>
+<link rel="next" type="application/atom+xml;profile=opds-catalog" title="Next Page" href="/ebooks/search.opds/?query=sherlock&amp;start_index=26"/>
+<opensearch:itemsPerPage>25</opensearch:itemsPerPage>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>Sort Alphabetically by Title</title>
+<content type="text"></content>
+<id>https://www.gutenberg.org/ebooks/search.opds/?sort_order=title&amp;query=sherlock</id>
+<link type="application/atom+xml;profile=opds-catalog" rel="http://opds-spec.org/sort/new" href="/ebooks/search.opds/?sort_order=title&amp;query=sherlock"/>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>Doyle, Arthur Conan</title>
+<content type="text">212 books</content>
+<id>https://www.gutenberg.org/ebooks/author/69.opds</id>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/author/69.opds"/>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>The Adventures of Sherlock Holmes</title>
+<content type="text">Arthur Conan Doyle</content>
+<id>https://www.gutenberg.org/ebooks/1661.opds</id>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/1661.opds"/>
+<link type="image/jpeg" rel="http://opds-spec.org/image/thumbnail" href="/cache/epub/1661/pg1661.cover.small.jpg"/>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>The Hound of the Baskervilles &amp; Other Tales &#8212; Vol. 1</title>
+<content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">Arthur Conan Doyle</div></content>
+<id>https://www.gutenberg.org/ebooks/2852.opds</id>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/2852.opds"/>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>A Study in Scarlet</title>
+<author><name>Doyle, Arthur Conan</name></author>
+<id>urn:gutenberg:244:2</id>
+<link type="text/html" rel="alternate" href="https://www.gutenberg.org/ebooks/244"/>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>The Adventures of Sherlock Holmes (again)</title>
+<content type="text">Arthur Conan Doyle</content>
+<id>https://www.gutenberg.org/ebooks/1661.opds</id>
+</entry>
+<entry>
+<updated>2026-10-12T12:00:00Z</updated>
+<title>Spoofed</title>
+<content type="text">x</content>
+<id>https://evil.example/ebooks/99999999.opds</id>
+</entry>
+</feed>
