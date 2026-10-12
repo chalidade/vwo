@@ -60,11 +60,28 @@ const isSignal = (x: unknown): x is CallSignal => {
 const calls = new Map<string, Promise<RealtimeChannel | null>>();
 const inboxes = new Map<string, RealtimeChannel>();
 
-function subscribed(name: string, onMessage?: (s: CallSignal) => void): Promise<RealtimeChannel | null> {
+/** Other mail an inbox receives (the live presence's quick messages and floor snapshots), by address. */
+type InboxFn = (address: string, from: string, text: string) => void;
+const inboxFns = new Set<InboxFn>();
+
+/** Hear the non-call messages arriving in the inboxes this device listens on (see listenForCalls). */
+export function onInbox(fn: InboxFn) {
+  inboxFns.add(fn);
+  return () => {
+    inboxFns.delete(fn);
+  };
+}
+
+function subscribed(name: string, onMessage?: (s: CallSignal) => void, onMail?: (from: string, text: string) => void): Promise<RealtimeChannel | null> {
   return realtimeClient().then(async (sb) => {
     if (!sb) return null;
     const ch = await openChannel(sb, name, { config: { broadcast: { self: false } } });
     return new Promise<RealtimeChannel | null>((resolve) => {
+      if (onMail)
+        ch.on("broadcast", { event: "d" }, (m: { payload?: { from?: unknown; t?: unknown } }) => {
+          const { from, t } = m.payload ?? {};
+          if (typeof from === "string" && typeof t === "string" && t.length < 8000) onMail(from, t);
+        });
       if (onMessage) ch.on("broadcast", { event: "s" }, (m: { payload?: unknown }) => isSignal(m.payload) && onMessage(m.payload));
       ch.subscribe((status: string) => {
         if (status === "SUBSCRIBED") resolve(ch);
@@ -104,12 +121,41 @@ export function leaveCall(callId: string) {
   void ch?.then((c) => unsubscribed(`jobfair:call:${callId}`, c));
 }
 
+/**
+ * Live site: one message to an address's inbox (a ring, a quick message, a floor snapshot).
+ * Sent over HTTP without joining the inbox, so the sender never hears the address's other mail
+ * and a burst of messages costs no channel joins.
+ */
+export async function toInbox(address: string, event: "s" | "d", payload: unknown) {
+  const sb = await realtimeClient();
+  if (!sb) return;
+  const name = `jobfair:inbox:${address}`;
+  // Already on it (our own inbox, in another tab's test): send through the channel we have.
+  const open = sb.getChannels().find((c) => c.topic === `realtime:${name}`);
+  if (open) {
+    await open.send({ type: "broadcast", event, payload }).catch(() => undefined);
+    return;
+  }
+  const ch = sb.channel(name, { config: { broadcast: { self: false } } });
+  let sent = true;
+  try {
+    await ch.httpSend(event, payload);
+  } catch {
+    sent = false;
+  } finally {
+    await sb.removeChannel(ch).catch(() => undefined);
+  }
+  if (sent) return;
+  // HTTP refused (an older Realtime server): join the inbox for a moment, as calls always did.
+  const box = await subscribed(name);
+  await box?.send({ type: "broadcast", event, payload });
+  setTimeout(() => unsubscribed(name, box), 2000);
+}
+
 async function sendRemote(s: CallSignal) {
   if (s.type === "ring") {
     await callChannel(s.callId);
-    const box = await subscribed(`jobfair:inbox:${s.to}`);
-    await box?.send({ type: "broadcast", event: "s", payload: s });
-    setTimeout(() => unsubscribed(`jobfair:inbox:${s.to}`, box), 2000);
+    await toInbox(s.to, "s", s);
     return;
   }
   const ch = await callChannel(s.callId);
@@ -125,10 +171,14 @@ export function listenForCalls(addresses: string[]) {
   if (!hasRealtime()) return () => {};
   const mine = addresses.filter((a) => !inboxes.has(a));
   for (const a of mine)
-    void subscribed(`jobfair:inbox:${a}`, (s) => {
-      if (s.type !== "ring" || s.to !== a) return;
-      void callChannel(s.callId).then(() => deliver(s));
-    }).then((ch) => ch && inboxes.set(a, ch));
+    void subscribed(
+      `jobfair:inbox:${a}`,
+      (s) => {
+        if (s.type !== "ring" || s.to !== a) return;
+        void callChannel(s.callId).then(() => deliver(s));
+      },
+      (from, text) => inboxFns.forEach((fn) => fn(a, from, text)),
+    ).then((ch) => ch && inboxes.set(a, ch));
   return () => {
     for (const a of mine) {
       unsubscribed(`jobfair:inbox:${a}`, inboxes.get(a));

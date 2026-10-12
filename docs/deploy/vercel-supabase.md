@@ -58,6 +58,35 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 
+## Players online: limits from env (no rebuild)
+The game reads these from `GET /api/jobfair/config` (cached 60 s), so a change takes effect after
+a redeploy of the env vars and a page reload, without rebuilding the game. Defaults fit Supabase
+Free (200 connections, 100 messages/second, every broadcast counted once per receiver).
+- `LIVE_ENABLED` (default `1`): players see each other. `0`: everyone plays solo with bots and no
+  Realtime connection is made for it (calls still ring). The emergency switch for the event day.
+- `LIVE_MAX_CONNECTIONS` (default `120`): players online together; the next one plays solo with
+  "Ramai sekali, kamu masuk mode solo". `0` = no cap. Leaves room under Free's 200 for company
+  portals, organisers and calls. Raise to ~450 on Pro with spend cap, ~9000 without.
+- `LIVE_FLOOR_CAP` (default `10`): people per floor channel; a busier floor opens another channel,
+  and people only see their own channel. Bigger = see more people, but each walker is updated
+  less often on a small budget. Raise to 20–25 together with `LIVE_MSG_BUDGET`.
+- `LIVE_MSG_BUDGET` (default `70`): Realtime messages/second that walking and chat may cost in
+  total (the rest of the plan's limit is left for joins, leaves, calls and the stage). Raise to
+  ~400 on Pro with spend cap (500/s), ~2000 without (2500/s).
+- `LIVE_HEARTBEAT_SEC` (default `0` = off): a standing player repeats where they are this often.
+  Presence already tells when someone leaves; set 30–60 only if people are seen in wrong places.
+- `LIVE_CHAT_PER_MIN` (default `6`): speech bubbles one player may send to others per minute.
+
+How the budget holds: a message on a channel of n people costs n. Every channel may carry
+`LIVE_MSG_BUDGET / people online` broadcasts a second (people online is counted on arrival and
+assumed 25% higher), shared fairly by whoever is walking or talking there, so all channels
+together stay under `LIVE_MSG_BUDGET` even when all are full and busy. A walk is one message (the
+route and the speed); other devices walk the player along it. Joining a floor costs about 2 × the
+channel size (presence join and leave), plus one message to look at each channel. Measured with
+the real code on an in-memory Supabase stand-in (`apps/demo/test/live-budget.test.ts`, run with
+`MEASURE=1` to print): 100 players, 40 on one floor, a walk every ~17 s, a floor change every few
+minutes: ~69 messages/second; everyone walking and chatting nonstop: ~82/second.
+
 ## What keeps the move to DigitalOcean free of rework
 - Only plain Postgres through Drizzle. No Supabase Auth, Storage or REST client in the app.
 - Rate limits are counted in Postgres (`rate_limits`), so they work across serverless functions
@@ -74,5 +103,7 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
 - Never put a database URL in a `NEXT_PUBLIC_*` variable; those are shipped to browsers.
 - Each account's game progress (`fair_players`) is client-reported: coins are play money while
   payments are a demo. Move the coin balance to server-side rules before coins buy anything real.
-- Realtime runs on Supabase broadcast channels (`apps/demo/src/live.ts`); on DigitalOcean the same
-  `Transport` interface gets a Socket.IO implementation.
+- Realtime runs on Supabase broadcast and presence channels (`apps/demo/src/live.ts`); on
+  DigitalOcean the same `Net` interface gets a Socket.IO implementation. Channels are public: quick
+  messages go to the receiver's own inbox channel, which anyone who knows the address could also
+  listen to, so they carry only canned texts, never personal data.

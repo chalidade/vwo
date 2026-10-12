@@ -71,8 +71,9 @@ import { applyErrorText, myApplications, sendApplication as sendToServer } from 
 import { LIVE } from "./mode";
 import { claimPaidCoins, pay } from "./payments";
 import { KEY_DIRS, RUN, WALK, facingOf, useHud } from "./controls";
-import { type FloorPass, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, spgId, spgName, stallStaffId } from "./jobfair-engine";
-import { LiveChannel, type LiveStatus, pickTransport } from "./live";
+import { type FloorPass, MAX_BOTS, PLAYER_ID, loungePlans, consultantId, promoterId, recruiterId, remoteId, roomStaffId, spgId, spgName, stallStaffId } from "./jobfair-engine";
+import { LiveChannel, type LiveStatus } from "./live";
+import { runtimeConfig } from "./runtime-config";
 import { PING_REPLIES, PING_STARTERS, PING_TEXT, type Ping, PingLimiter, parsePing } from "./fair/social";
 import { FollowBar, type PingCardView, PingCards } from "./fair/Pings";
 import { playPing } from "./fair/ringtone";
@@ -584,40 +585,90 @@ export function JobFair() {
     });
   }, [session]);
 
-  // --- Real people on other devices: share our player, mirror theirs.
+  // --- Real people on other devices: share our player, mirror theirs. Limits come from the server's
+  // env (see runtime-config.ts); switched off or too crowded, this visit is played solo with bots.
+  const friendTags = useRef<string[]>([]);
+  friendTags.current = friends.friends.filter((f) => f.state === "friend").map((f) => f.tag);
   useEffect(() => {
     if (!session) return;
-    const channel = new LiveChannel(
-      "jobfair",
-      () => {
-        const v = fair.visitors.get(session.visitorId);
-        if (!v) return null;
-        const b = fair.bubbles.get(session.visitorId);
-        return { name: session.name, look: session.look, floorId: v.floorId, x: v.x, y: v.y, facing: v.facing, seatId: v.seatId ?? null, say: b && b.until > Date.now() ? b.text : null, verified: !!fair.player.verified, tag: myTag() };
-      },
-      (p) => {
-        remoteLooks.current.set(remoteId(p.id), p.look);
-        fair.upsertRemote(p);
-      },
-      (id) => {
-        remoteLooks.current.delete(remoteId(id));
-        fair.removeRemote(id);
-      },
-      (id) => fair.floors.some((f) => f.id === id),
-      (status, peers) => setLive({ status, peers }),
-      pickTransport,
-      (from, data) => receivePing(remoteId(from), data),
-    );
-    liveChannel.current = channel;
-    channel.start();
-    const off = onFrame(() => channel.publish());
-    // Other job seekers ring this player from the lounge.
-    const stopCalls = listenForCalls([`peer:${channel.id}`]);
+    let gone = false;
+    let toldFull = false;
+    let stop = () => {};
+    void runtimeConfig().then((cfg) => {
+      if (gone) return;
+      const channel = new LiveChannel({
+        room: "jobfair",
+        self: () => {
+          const v = fair.visitors.get(session.visitorId);
+          if (!v) return null;
+          const b = fair.bubbles.get(session.visitorId);
+          // Walking a clicked route, or steering with the keys: sent as where to and how fast, not step by step.
+          const run = keys.current.has("ShiftLeft") || keys.current.has("ShiftRight");
+          let ix = 0;
+          let iy = 0;
+          if (!busy.current)
+            for (const k of keys.current) {
+              const d = KEY_DIRS[k];
+              if (d) {
+                ix += d[0];
+                iy += d[1];
+              }
+            }
+          const len = Math.hypot(ix, iy);
+          const speed = run ? RUN : WALK;
+          const walking = !busy.current && route.current?.length ? route.current : null;
+          return {
+            name: session.name,
+            look: session.look,
+            floorId: v.floorId,
+            x: v.x,
+            y: v.y,
+            facing: v.facing,
+            seatId: v.seatId ?? null,
+            say: b && b.until > Date.now() ? b.text : null,
+            verified: !!fair.player.verified,
+            tag: myTag(),
+            route: len ? null : walking,
+            routeSeat: walking && goal.current?.floorId === v.floorId ? (goal.current.seatId ?? null) : null,
+            vel: len ? { x: (ix / len) * speed, y: (iy / len) * speed } : null,
+            speed,
+          };
+        },
+        onPeer: (p) => {
+          remoteLooks.current.set(remoteId(p.id), p.look);
+          fair.upsertRemote(p);
+        },
+        onGone: (id) => {
+          remoteLooks.current.delete(remoteId(id));
+          fair.removeRemote(id);
+        },
+        knownFloor: (id) => fair.floors.some((f) => f.id === id),
+        onStatus: (status, peers) => {
+          setLive({ status, peers });
+          if (status === "full" && !toldFull) {
+            toldFull = true;
+            setToast("Ramai sekali, kamu masuk mode solo");
+          }
+          // Playing solo on the live site: the fair's bots keep it lively.
+          if (LIVE && (status === "solo" || status === "full")) fair.maxBots = MAX_BOTS;
+        },
+        onDirect: (from, data) => receivePing(remoteId(from), data),
+        friends: () => friendTags.current,
+        config: cfg.live,
+      });
+      liveChannel.current = channel;
+      channel.start();
+      const off = onFrame(() => channel.frame());
+      stop = () => {
+        off();
+        channel.stop();
+        liveChannel.current = null;
+        if (LIVE) fair.maxBots = 0;
+      };
+    });
     return () => {
-      off();
-      stopCalls();
-      channel.stop();
-      liveChannel.current = null;
+      gone = true;
+      stop();
     };
   }, [session]);
 
@@ -1573,7 +1624,8 @@ export function JobFair() {
     if (s.id.startsWith("spg:")) return { id: s.id, name: `✨ ${s.name}`, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, seated: s.seated, look: spgLook(s.name, b?.color ?? "#be185d") };
     return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
-  const avatars: AvatarState[] = [...fair.visitors.values()];
+  // Only who is on the floor in view: people elsewhere cost nothing to draw.
+  const avatars: AvatarState[] = [...fair.visitors.values()].filter((v) => v.floorId === floor.id);
   const bubbles = Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]));
   const lookOf = (a: AvatarState) =>
     session && a.memberId === session.visitorId ? session.look : (remoteLooks.current.get(a.memberId) ?? lookFor(`${a.displayName}:${a.memberId}`));
@@ -1657,7 +1709,17 @@ export function JobFair() {
               )}
               {session && (
                 <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
-                  {live.status === "online" ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}` : live.status === "connecting" ? "⏳ Menyambung…" : LIVE ? "⚪ Offline, pemain lain belum terlihat" : "⚪ Offline, hanya bot"}
+                  {live.status === "online"
+                    ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}`
+                    : live.status === "connecting"
+                      ? "⏳ Menyambung…"
+                      : live.status === "full"
+                        ? "🟡 Ramai sekali, kamu masuk mode solo"
+                        : live.status === "solo"
+                          ? "⚪ Mode solo, pemain online sedang dimatikan"
+                          : LIVE
+                            ? "⚪ Offline, pemain lain belum terlihat"
+                            : "⚪ Offline, hanya bot"}
                 </div>
               )}
               <div className="hud-stats">

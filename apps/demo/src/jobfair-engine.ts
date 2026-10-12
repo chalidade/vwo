@@ -665,7 +665,7 @@ interface Bot {
 
 const BOT_NAMES = ["Andi", "Sari", "Dimas", "Putri", "Bayu", "Nadia", "Raka", "Tiara", "Fajar", "Laras", "Yoga", "Maya", "Rizky", "Intan", "Galih", "Citra"];
 const WALK_SPEED = 2.3;
-const MAX_BOTS = 10;
+export const MAX_BOTS = 10;
 const QUESTIONS = [
   (b: CompanyBooth, job: string) => `Lowongan ${job} masih buka?`,
   (b: CompanyBooth) => `Kerja di ${b.company} seru nggak?`,
@@ -2678,8 +2678,25 @@ export class DemoJobFair {
     return () => this.listeners.delete(fn);
   }
 
-  private emit() {
+  /** Changes waiting for the next frame (when batched), so a burst of them redraws the scene once. */
+  private batched = false;
+  private emitWaiting = false;
+
+  /** From now on, tell listeners at most once per animation frame (the game calls flushEmits each frame). */
+  batchEmits() {
+    this.batched = true;
+  }
+
+  /** Tell listeners about the changes since the last frame, if any. */
+  flushEmits() {
+    if (!this.emitWaiting) return;
+    this.emitWaiting = false;
     this.listeners.forEach((fn) => fn());
+  }
+
+  private emit() {
+    if (this.batched) this.emitWaiting = true;
+    else this.listeners.forEach((fn) => fn());
   }
 
   private id(prefix: string) {

@@ -1,11 +1,20 @@
 type FrameHook = (dtMs: number) => void;
 const hooks = new Set<FrameHook>();
+const endHooks = new Set<() => void>();
 
 /** Run `fn` every animation frame. Returns an unsubscribe function. */
 export function onFrame(fn: FrameHook) {
   hooks.add(fn);
   return () => {
     hooks.delete(fn);
+  };
+}
+
+/** Run `fn` after every frame's hooks (to redraw once for everything they changed). */
+export function onFrameEnd(fn: () => void) {
+  endHooks.add(fn);
+  return () => {
+    endHooks.delete(fn);
   };
 }
 
@@ -17,6 +26,7 @@ const step = () => {
   const dt = Math.min(now - last, 250);
   last = now;
   hooks.forEach((fn) => fn(dt));
+  endHooks.forEach((fn) => fn());
 };
 const frame = () => {
   step();

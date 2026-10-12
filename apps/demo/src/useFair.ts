@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import { DEMO_JOB_FAIR } from "@vwo/shared";
 import { DemoJobFair, PLAYER_ID, type FairApplication, type FairSaved, type FairStorage } from "./jobfair-engine";
-import { onFrame } from "./loop";
+import { onFrame, onFrameEnd } from "./loop";
 import { LIVE } from "./mode";
 import { markBoothInboxRead, saveNotes, sendShared, setApplicationStatus } from "./server-fair";
 
@@ -80,6 +80,9 @@ if (LIVE) {
 onFrame((dt) => {
   if (fair.watched) fair.tick(dt);
 });
+// Players walking, bots and realtime messages all change the fair many times a frame: redraw once.
+fair.batchEmits();
+onFrameEnd(() => fair.flushEmits());
 window.addEventListener("pagehide", () => fair.flush());
 // Another tab (say the company portal) saved: pick up its booth edits and application changes.
 window.addEventListener("storage", (e) => {
