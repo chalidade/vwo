@@ -101,7 +101,7 @@ export function Billing({ booth }: { booth: CompanyBooth }) {
           <div>
             <h2 className="cp-h2">Dompet koin perusahaan</h2>
             <p className="muted small">
-              Semua pembelian di job fair dibayar dengan koin: sewa stand, upgrade VIP, promotor, aksesoris, dan stan food court. Isi koin sekali, pakai kapan saja.
+              Pembelian di portal dibayar dengan koin: upgrade VIP, promotor, dan aksesoris stand. Isi koin sekali, pakai kapan saja.
             </p>
           </div>
           <CoinBalance need={short > 0 ? fair.player.coins + short : undefined} />
