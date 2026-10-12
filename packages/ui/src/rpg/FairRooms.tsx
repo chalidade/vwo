@@ -1,25 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
-// stalls, the seminar stage, the psikotes proctor's desk, and the lounge's Perpustakaan corner.
-import {
-  AULA,
-  COIN_STAND_H,
-  consultantDesk,
-  LIBRARY,
-  LIBRARY_SHELVES,
-  LOUNGE,
-  LOUNGE_PLANS,
-  COIN_STAND_W,
-  type CoinStandView,
-  FAIR_LIFT,
-  type FairRoom,
-  type FairStop,
-  type Promoter,
-  price,
-  STALL_SLOTS,
-  stallRect,
-  stallSlot,
-} from "@vwo/shared";
+// stalls, the seminar stage, and the psikotes proctor's desk.
+import { AULA, COIN_STAND_H, consultantDesk, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, price, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
 import { useEffect, useRef } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -669,7 +651,7 @@ export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void
       node: (
         <div className="fr-lounge-sign" style={{ width: 10 * T, height: 1.4 * T, ["--c" as string]: room.color }}>
           <b>🛋️ LOUNGE KONSULTASI</b>
-          <span>Telepon HR & konsultan karier · ngobrol santai di sofa · perpustakaan</span>
+          <span>Telepon HR & konsultan karier · ngobrol santai di sofa</span>
         </div>
       ),
     },
@@ -838,101 +820,6 @@ export function promoterExtras(p: Promoter, onClick?: () => void): SceneExtra[] 
           <span className="fr-promoter-line">{p.headline}</span>
           <span className="fr-promoter-foot" />
         </div>
-      ),
-    },
-  ];
-}
-
-/** The Perpustakaan corner of the lounge: two tall bookcases full of coloured spines (in the colours
- *  of the library's shelves), a hanging sign, and the librarian's desk with a stack of books. */
-export function libraryExtras(on: { open?: () => void } = {}): SceneExtra[] {
-  const spines = LIBRARY_SHELVES.map((s) => s.color);
-  const title = on.open ? "Perpustakaan: baca buku gratis" : undefined;
-  const d = LIBRARY.desk;
-  const dw = d.width * T;
-  return [
-    ...LIBRARY.shelves.map((sh, k): SceneExtra => {
-      const w = sh.width * T;
-      const h = 2.9 * T;
-      const rows = 4;
-      const rowH = (h - 14) / rows;
-      return {
-        key: `library-shelf-${k}`,
-        x: sh.x,
-        y: sh.y + sh.height - 2.9,
-        z: sh.y + sh.height,
-        onClick: on.open,
-        title,
-        node: (
-          <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
-            <rect x={0} y={0} width={w} height={h} rx={4} fill="#7b4a2c" {...ink} />
-            {Array.from({ length: rows }, (_, r) => (
-              <g key={r}>
-                <rect x={7} y={7 + r * rowH} width={w - 14} height={rowH - 5} fill="#4e2e1b" />
-                {Array.from({ length: Math.floor((w - 20) / 11) }, (_, i) => {
-                  const tall = rowH - 10 - ((i * 7 + r * 3 + k) % 4) * 2;
-                  // Every so often a book leans, so the rows do not look printed.
-                  const lean = (i + r + k) % 9 === 4;
-                  return (
-                    <rect
-                      key={i}
-                      x={11 + i * 11}
-                      y={7 + r * rowH + (rowH - 5 - tall)}
-                      width={9}
-                      height={tall}
-                      rx={1.5}
-                      fill={spines[(i + r * 3 + k * 5) % spines.length]}
-                      stroke={INK}
-                      strokeWidth={1}
-                      transform={lean ? `rotate(-12 ${11 + i * 11} ${7 + r * rowH + rowH - 5})` : undefined}
-                    />
-                  );
-                })}
-              </g>
-            ))}
-          </svg>
-        ),
-      };
-    }),
-    {
-      key: "library-sign",
-      x: LIBRARY.shelves[0].x + 1.2,
-      y: LIBRARY.shelves[0].y - 3.4,
-      // Under whoever stands at the lounge's price board just above it.
-      z: LIBRARY.shelves[0].y - 3.6,
-      onClick: on.open,
-      title,
-      w: 8,
-      node: (
-        <div className="fr-lounge-sign" style={{ width: 7.4 * T, height: 1.1 * T, ["--c" as string]: "#92400e" }}>
-          <b style={{ fontSize: 19 }}>📚 PERPUSTAKAAN</b>
-          <span>Baca buku gratis · Project Gutenberg</span>
-        </div>
-      ),
-    },
-    {
-      key: "library-desk",
-      x: d.x,
-      y: d.y - 0.45,
-      z: d.y + d.height,
-      onClick: on.open,
-      title,
-      node: (
-        <svg width={dw} height={1.3 * T} style={{ display: "block", overflow: "visible" }}>
-          <rect x={0} y={12} width={dw} height={20} rx={4} fill="#e7d3b5" {...ink} />
-          <rect x={4} y={32} width={dw - 8} height={1.3 * T - 32} fill="#92400e" {...ink} />
-          {/* A stack of books, an open book, and a desk lamp. */}
-          {["#b45309", "#1e3a8a", "#0f766e"].map((c, i) => (
-            <rect key={c} x={14 + (i % 2) * 3} y={6 - i * 6} width={40} height={7} rx={1.5} fill={c} {...ink} strokeWidth={1.1} />
-          ))}
-          <path d={`M${dw / 2 - 26} 10l26 6l26 -6v12l-26 6l-26 -6Z`} fill="#fff" {...ink} strokeWidth={1.2} />
-          <path d={`M${dw / 2} 16v12`} stroke={INK} strokeWidth={1.1} />
-          <path d={`M${dw - 30} 22v-22l-12 -6`} fill="none" stroke="#1f2937" strokeWidth={3} strokeLinecap="round" />
-          <path d={`M${dw - 50} -10l14 -6l6 12Z`} fill="#facc15" {...ink} strokeWidth={1.1} />
-          <text x={dw / 2} y={52} textAnchor="middle" fontSize={11} fontWeight={900} fill="#fff" fontFamily={font}>
-            📚 PUSTAKAWAN
-          </text>
-        </svg>
       ),
     },
   ];

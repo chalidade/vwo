@@ -29,6 +29,10 @@ import {
   loungeBoardSpot,
   loungeSpot,
   librarySpot,
+  isLibraryFloor,
+  libraryFloorId,
+  LIBRARY_ENTRY,
+  LIBRARY_FRONT,
   consultantDesk,
   loungeConsultants,
   type PublicConsultant,
@@ -663,7 +667,8 @@ type Goal = Point & { floorId: string };
 /** One leg toward another floor: walk to `at`, then come out at `arrive` on `floorId`. The park is
  *  outside the building: its only way in and out is the lobby door, so the lift never goes there. */
 export interface Hop {
-  via: "lift" | "out" | "in";
+  /** The lift; out of the lobby into the park and back in; into the Perpustakaan and back out. */
+  via: "lift" | "out" | "in" | "libIn" | "libOut";
   at: Point;
   floorId: string;
   arrive: Point;
@@ -943,6 +948,8 @@ export class DemoJobFair {
         y: fair.coinStand.y + COIN_STAND_SPOTS.staff.y,
         facing: "front",
       },
+      // The librarian in the Perpustakaan in the park.
+      { id: LIBRARIAN_ID, name: LIBRARIAN, boothId: null, floorId: libraryFloorId(fair), ...librarySpot("librarian"), facing: "front" },
       ...fair.rooms.flatMap((room): FairStaff[] => {
         const floorId = fairRoomFloorId(fair, room.id);
         const host = { id: roomStaffId(room.id), name: room.staff.name, boothId: null, floorId, facing: "front" as Facing };
@@ -962,7 +969,6 @@ export class DemoJobFair {
         if (room.kind === "konsultasi")
           return [
             { ...host, x: loungeBoardSpot().x - 2.2, y: loungeBoardSpot().y },
-            { id: LIBRARIAN_ID, name: LIBRARIAN, boothId: null, floorId, ...librarySpot("librarian"), facing: "front" as Facing },
             ...(room.consultants ?? [])
               .slice(0, LOUNGE.pods.length)
               .map((c, i) => ({ id: consultantId(c.id), name: c.name, boothId: null, floorId, ...loungeSpot(consultantDesk(c, i), "consultant"), facing: "front" as Facing })),
@@ -2342,13 +2348,14 @@ export class DemoJobFair {
 
   /** The building level of a floor: the level its hall or room sits on. The park is outside: -1. */
   levelOf(floorId: string) {
-    if (isParkFloor(floorId)) return -1;
+    if (isParkFloor(floorId) || isLibraryFloor(floorId)) return -1;
     return this.roomOf(floorId)?.level ?? hallLevel(this.fair, Math.max(0, fairFloorIndex(floorId)));
   }
 
   /** The lift stop for a floor id; the park, which the lift never goes to, gets a stop of its own. */
   stopOf(floorId: string): FairStop {
     if (floorId === this.parkId) return this.parkStop();
+    if (floorId === this.libraryId) return this.libraryStop();
     return this.stops.find((s) => s.floorId === floorId) ?? this.stops[0]!;
   }
 
@@ -2361,6 +2368,15 @@ export class DemoJobFair {
   /** The park as a place in lists (the HUD, the organiser's live view). Not a lift stop. */
   parkStop(): FairStop {
     return { level: -1, floorId: this.parkId, name: "Taman", label: "Di luar gedung", emoji: "🌳" };
+  }
+
+  /** The Perpustakaan, a building of its own in the park. */
+  get libraryId() {
+    return libraryFloorId(this.fair);
+  }
+
+  libraryStop(): FairStop {
+    return { level: -1, floorId: this.libraryId, name: "Perpustakaan", label: "Di taman", emoji: "📚" };
   }
 
   /** The floor whose door leads out to the park: the one everyone comes in on. */
@@ -2420,6 +2436,10 @@ export class DemoJobFair {
   /** The next leg from one floor toward another: out through the lobby door, back in through the
    *  event building's door, or the lift. */
   hop(from: string, to: string): Hop {
+    // The Perpustakaan opens onto the park: everything else is through the park.
+    const lib = this.libraryId;
+    if (from === lib) return { via: "libOut", at: LIBRARY_ENTRY, floorId: this.parkId, arrive: LIBRARY_FRONT };
+    if (to === lib) return from === this.parkId ? { via: "libIn", at: LIBRARY_FRONT, floorId: lib, arrive: LIBRARY_ENTRY } : this.hop(from, this.parkId);
     const lobby = this.lobbyId;
     const door = lobbyDoorFront(this.floor(lobby));
     if (from === this.parkId) return { via: "in", at: PARK.arrive, floorId: lobby, arrive: door };
@@ -2433,7 +2453,7 @@ export class DemoJobFair {
     if (h.via === "lift") return this.ride(id, h.floorId);
     this.changeFloor(id, h.floorId, h.arrive.x, h.arrive.y);
     const v = this.visitors.get(id);
-    if (v) v.facing = h.via === "out" ? "front" : "back";
+    if (v) v.facing = h.via === "out" || h.via === "libOut" ? "front" : "back";
   }
 
   /** Ride the lift: step out in front of the lift doors on the chosen floor. */
@@ -4031,7 +4051,12 @@ export class DemoJobFair {
         // A stroll to a bench or the front of a building, then a look around.
         if (!bot.target) {
           const plots = parkPlots(this.shownParkBuildings());
-          const spots = [...plots.flatMap((p, i) => (p.building ? [plotFront(i)] : [])), ...PARK.benches.map((b) => ({ x: b.x + 1, y: b.y + 1.3 })), { x: 28, y: 18.6 }];
+          const spots = [
+            ...plots.flatMap((p, i) => (p.building ? [plotFront(i)] : [])),
+            ...PARK.benches.map((b) => ({ x: b.x + 1, y: b.y + 1.3 })),
+            { x: 28, y: 18.6 },
+            LIBRARY_FRONT,
+          ];
           const at = this.pick(spots);
           bot.target = { floorId: this.parkId, x: at.x + (this.rand() - 0.5) * 1.2, y: at.y + this.rand() * 0.3 };
         }

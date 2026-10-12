@@ -5,6 +5,7 @@ export { BARISTA_LOOK } from "./rpg/Furniture";
 export * from "./rpg/JobFair";
 export * from "./rpg/FairRooms";
 export { parkExtras, parkDoorExtras, parkLights } from "./rpg/Park";
+export { libraryBuildingExtra, libraryRoomExtras } from "./rpg/Library";
 export * from "./rpg/BoothDecor";
 export * from "./rpg/Mascot";
 export * from "./rpg/Anomaly";

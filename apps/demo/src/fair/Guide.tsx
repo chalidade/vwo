@@ -10,8 +10,8 @@ export interface PlaceGuide {
   steps: string[];
 }
 
-/** The booth floors, each kind of room, and the park outside. */
-export type GuidePlace = "hall" | FairRoomKind | "taman";
+/** The booth floors, each kind of room, the park outside, and the Perpustakaan in the park. */
+export type GuidePlace = "hall" | FairRoomKind | "taman" | "perpustakaan";
 
 export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
   hall: {
@@ -77,8 +77,21 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Gedung yang masih dibangun adalah acara berikutnya. Dekati untuk melihat nama dan tanggalnya.",
       "Duduk di bangku taman untuk main mini game berhadiah koin.",
       "Telepon umum merah di dekat air mancur: telepon teman yang sedang online di job fair.",
+      "Gedung bertiang di kanan adalah Perpustakaan: masuk lewat pintunya untuk membaca buku gratis.",
       "Taman ikut jam Jakarta: sore lampu menyala, malam ada kunang-kunang. Ada kejutan khusus taman, siang dan malam, termasuk hantu iseng.",
       "Taman tidak bisa dicapai dengan lift: keluar lewat pintu taman di lobi.",
+    ],
+  },
+  perpustakaan: {
+    emoji: "📚",
+    title: "Perpustakaan",
+    intro: "Perpustakaan di taman: baca buku klasik gratis dari Project Gutenberg, seperti membuka PDF.",
+    steps: [
+      "Datangi meja pustakawan atau rak buku, lalu tekan E (atau ketuk) untuk memilih buku.",
+      "Duduk di kursi meja baca untuk membuka buku dengan tenang.",
+      "Halaman terakhir yang kamu baca tersimpan. Lanjutkan dari tab Lanjut baca.",
+      "Buku berbahasa Indonesia ada di tab Buku Indonesia, dibuka di situs resminya.",
+      "Keluar lewat pintu di bawah untuk kembali ke taman.",
     ],
   },
   konsultasi: {
@@ -89,7 +102,6 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Datangi meja konsultan untuk konsultasi berbayar koin (2, 5, atau 10 menit).",
       "Duduk di sofa lalu tekan 📞 Telepon seseorang untuk menelepon pengunjung lain.",
       "Papan tarif di dinding menampilkan harga tiap durasi. Panggilan berhenti otomatis saat waktu habis.",
-      "Di pojok kanan ada Perpustakaan: datangi meja pustakawan untuk membaca buku klasik gratis.",
     ],
   },
 };
@@ -252,7 +264,11 @@ export function reachHint(kind: string): string | null {
     case "loungeBoard":
       return "📞 Lihat tarif telepon";
     case "library":
-      return "📚 Buka perpustakaan";
+      return "📚 Pilih buku";
+    case "libraryIn":
+      return "📚 Masuk perpustakaan";
+    case "libraryOut":
+      return "🌳 Keluar ke taman";
     case "parkOut":
       return "🌳 Keluar ke taman";
     case "parkIn":

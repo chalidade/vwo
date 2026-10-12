@@ -2844,3 +2844,6 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
 
 /* ---- Perpustakaan: search unavailable notice ---- */
 .lib-unavailable { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 2px solid #fdba74; color: #9a3412; font-size: 14px; font-weight: 700; }
+
+/* ---- Perpustakaan in the park: the reading room's rug ---- */
+.lib-rug { border-radius: 14px; background: radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.08) 0 40%, transparent 41%), repeating-linear-gradient(45deg, #7f1d1d 0 12px, #8b2323 12px 24px); border: 6px solid #b45309; box-shadow: inset 0 0 0 4px #fcd34d; opacity: 0.9; }
