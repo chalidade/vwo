@@ -51,6 +51,8 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      the token from Settings → Webhooks, where the "Invoices paid" URL is
      `https://<domain>/api/payments/xendit/webhook`. While the key is unset every payment is a
      simulation that charges nothing and is recorded as "Simulasi (tanpa uang)".
+   - optional `PAYMENTS_OPEN`: set to `0` between events to switch buying coins off (the wallet
+     says it is closed and the server refuses coin purchases). Unset or any other value: open.
    - optional `PREVIEW_SECRET`: signs the pre-launch pass cookie (falls back to `DATABASE_URL`).
    - optional `PASSWORD_LOGIN=1`: brings back the email-and-password forms (local testing).
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
