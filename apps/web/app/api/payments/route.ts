@@ -10,7 +10,7 @@ import { canManageBooth } from "@/lib/fair";
 import { defaultBuyer, readBuyer } from "@/lib/invoices";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { liveCoins } from "@/lib/coins";
-import { CoinsShortError, type Purchase, payWithCoins, paymentOut, provider, refresh, startPayment } from "@/lib/payments";
+import { CoinsShortError, type Purchase, payWithCoins, paymentOut, paymentsOpen, provider, refresh, startPayment } from "@/lib/payments";
 import { allow } from "@/lib/ratelimit";
 import { FOOD_COURT, stallInput, stallsIn } from "@/lib/stalls";
 import { XenditError } from "@/lib/xendit";
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
   if (rows.some((p) => p.status === "pending" && p.providerId) && (await allow(`pay-refresh:${user.id}`, 30, 600_000))) {
     rows = await Promise.all(rows.map((p) => (p.status === "pending" ? refresh(p).catch(() => p) : p)));
   }
-  return NextResponse.json({ provider: provider(), payments: rows.map(paymentOut) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ provider: paymentsOpen() ? provider() : "closed", payments: rows.map(paymentOut) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -76,6 +76,7 @@ export async function POST(req: Request) {
   let purchase: Purchase;
 
   if (b.kind === "coins") {
+    if (!paymentsOpen()) return fail(403, "payments_closed");
     const pkg = ALL_COIN_PACKAGES.find((p) => p.id === b.pack);
     if (!pkg) return fail(404, "not_found");
     const amount = priceFrom(prices, `pack.${pkg.id}`);

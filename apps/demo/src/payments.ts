@@ -6,7 +6,8 @@ import { whenPlayerReady } from "./player-sync";
 import { refreshShared } from "./shared-state";
 import { fair } from "./useFair";
 
-export type Gateway = "xendit" | "demo";
+/** "closed": the organiser switched buying coins off between events (PAYMENTS_OPEN=0). */
+export type Gateway = "xendit" | "demo" | "closed";
 
 export interface PaymentView {
   id: string;
@@ -15,7 +16,7 @@ export interface PaymentView {
   description: string;
   amount: number;
   status: "pending" | "paid" | "expired" | "failed" | "refunded";
-  provider: Gateway | "koin";
+  provider: Exclude<Gateway, "closed"> | "koin";
   method: string | null;
   checkoutUrl: string | null;
   claimed: boolean;
@@ -30,6 +31,7 @@ const ERRORS: Record<string, string> = {
   invalid_input: "Data belum lengkap atau terlalu panjang. Periksa lagi isiannya.",
   too_many_requests: "Terlalu banyak percobaan bayar. Coba lagi nanti.",
   gateway_error: "Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.",
+  payments_closed: "Pembelian koin sedang ditutup. Coba lagi saat acara berlangsung.",
   not_delivered: "Pembelian gagal diproses. Koinmu sudah dikembalikan; coba lagi.",
 };
 
