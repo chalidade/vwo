@@ -1,6 +1,7 @@
 // What the game in the browser needs to know of the server's limits, read from the environment
 // (docs/deploy/vercel-supabase.md lists each with its default). Served by /api/jobfair/config.
-// Public: never put a secret here.
+// Public: never put a secret here, only numbers and switches.
+import { stageConfigFromEnv } from "@vwo/shared";
 import { envInt } from "./limits";
 
 /** Polling intervals in seconds; the defaults keep requests per visitor low for a small budget. */
@@ -20,5 +21,11 @@ export function pollConfig(env: Record<string, string | undefined> = process.env
 
 /** Everything the browser takes from the server's environment. */
 export function runtimeConfig(env: Record<string, string | undefined> = process.env) {
-  return { ...pollConfig(env) };
+  return {
+    ...pollConfig(env),
+    /** Seminar and Aula broadcasts: mesh cap, heartbeat, chat. */
+    stage: stageConfigFromEnv(env),
+  };
 }
+
+export type RuntimeConfig = ReturnType<typeof runtimeConfig>;

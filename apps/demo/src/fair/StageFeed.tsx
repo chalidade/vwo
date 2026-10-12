@@ -1,11 +1,30 @@
+import type { StreamEmbed } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
 import type { PeerInfo } from "./call";
 import type { StageLive } from "./stage";
 import { linkText } from "./StageWatch";
+import { StreamPlayer } from "./StreamPlayer";
 
 /** The live broadcast in a corner of the screen while the job seeker is in the room it plays in:
- *  the speaker's shared screen and voice, without having to open the full viewer. */
-export function StageFeedPanel({ live, stream, link, onOpen }: { live: StageLive; stream: MediaStream | null; link?: (PeerInfo & { tries: number }) | null; onOpen: () => void }) {
+ *  the session's stream link (muted until tapped), or the speaker's shared screen and voice, without
+ *  having to open the full viewer. */
+export function StageFeedPanel({
+  live,
+  stream,
+  link,
+  embed,
+  full,
+  onOpen,
+}: {
+  live: StageLive;
+  stream: MediaStream | null;
+  link?: (PeerInfo & { tries: number }) | null;
+  /** The stream link to play instead of the speaker's browser. */
+  embed?: StreamEmbed | null;
+  /** The speaker's mesh had no place for this tab. */
+  full?: boolean;
+  onOpen: () => void;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const [blocked, setBlocked] = useState(false);
   const [small, setSmall] = useState(false);
@@ -43,8 +62,11 @@ export function StageFeedPanel({ live, stream, link, onOpen }: { live: StageLive
         </button>
       </div>
       <div className="sf-stage" hidden={small}>
+        {embed && !small && <StreamPlayer embed={embed} title={`Siaran ${live.title}`} muted />}
         <video ref={ref} autoPlay playsInline style={{ display: video ? undefined : "none" }} />
-        {!video && (
+        {!video && !embed && live.embed && <div className="sf-wait">Siaran belum dimulai.</div>}
+        {!video && !embed && !live.embed && full && <div className="sf-wait">Siaran penuh: buka layar penuh untuk slide dan chat, atau tonton rekamannya nanti.</div>}
+        {!video && !embed && !live.embed && !full && (
           <div className="sf-wait">
             {stream ? `🎙️ ${live.speaker} sedang berbicara` : live.screen ? "Menyambungkan layar pembicara…" : `🎤 ${live.speaker}`}
             <div className="sf-link">{linkText(link ?? null)}</div>

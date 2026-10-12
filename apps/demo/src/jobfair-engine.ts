@@ -95,6 +95,7 @@ import {
   type StandSpot,
   placeStands,
   planStandMove,
+  cleanStreamUrl,
 } from "@vwo/shared";
 import {
   CAREER_ARTICLES,
@@ -1550,7 +1551,18 @@ export class DemoJobFair {
   saveRundown(list: AulaEvent[]) {
     const clean = list
       .filter((e) => e.title.trim() && /^\d{2}[.:]\d{2}$/.test(e.start) && /^\d{2}[.:]\d{2}$/.test(e.end))
-      .map((e) => ({ ...e, start: e.start.replace(":", "."), end: e.end.replace(":", "."), title: e.title.trim(), host: e.host.trim() }))
+      .map(({ streamUrl, streamSource, ...e }) => {
+        const url = cleanStreamUrl(streamUrl);
+        return {
+          ...e,
+          start: e.start.replace(":", "."),
+          end: e.end.replace(":", "."),
+          title: e.title.trim(),
+          host: e.host.trim(),
+          ...(streamSource === "link" && { streamSource }),
+          ...(url && { streamUrl: url }),
+        };
+      })
       .sort((a, b) => a.start.localeCompare(b.start));
     this.org.rundown = clean;
     this.saveOrg();

@@ -1,8 +1,10 @@
 import { Trash2 } from "lucide-react";
+import { streamEmbed } from "@vwo/shared";
 import { useState } from "react";
 import { type AulaEvent, DEFAULT_RUNDOWN } from "../jobfair-engine";
 import { useStageLive } from "../fair/stage";
 import { fair } from "../useFair";
+import { StreamField, streamLinkError } from "./StreamField";
 
 const KINDS: [AulaEvent["kind"], string][] = [
   ["sambutan", "Sambutan"],
@@ -19,12 +21,15 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
   const { current } = fair.aulaNow();
   const set = (i: number, patch: Partial<AulaEvent>) => setRows((r) => r.map((e, k) => (k === i ? { ...e, ...patch } : e)));
   const custom = !!fair.org.rundown;
+  /** The item whose stream link is open for editing, with its preview. */
+  const [linkOf, setLinkOf] = useState<string | null>(null);
   return (
     <div className="org">
       <div className="card org-stagecard">
         <h2 className="cp-h2">Aula Utama · Lantai 1</h2>
         <p className="muted small">
-          Panggung untuk sambutan, talkshow, hiburan, dan door prize. Jadwal di bawah tampil di layar LED panggung, papan jadwal, dan papan info Aula. Meeting point ada di pojok kiri bawah.
+          Panggung untuk sambutan, talkshow, hiburan, dan door prize. Jadwal di bawah tampil di layar LED panggung, papan jadwal, dan papan info Aula. Meeting point ada di pojok kiri bawah. Tiap acara
+          bisa disiarkan lewat Platform kita (dari laptop pembicara, untuk penonton sedikit) atau YouTube (link, tanpa batas penonton; tayang otomatis sesuai jam di rundown).
         </p>
         {live?.venue === "aula" ? (
           <p>
@@ -64,6 +69,19 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
               <button type="button" className="small-btn ghost" onClick={() => setRows((r) => r.filter((_, k) => k !== i))} aria-label={`Hapus ${e.title || "acara"}`}>
                 <Trash2 size={16} aria-hidden />
               </button>
+              <button
+                type="button"
+                className="small-btn ghost au-edit-link"
+                data-on={e.streamSource === "link" ? "" : undefined}
+                data-bad={e.streamSource === "link" && !streamEmbed(e.streamUrl) ? "" : undefined}
+                aria-expanded={linkOf === e.id}
+                onClick={() => setLinkOf(linkOf === e.id ? null : e.id)}
+              >
+                Siaran: {e.streamSource !== "link" ? "Platform kita" : streamEmbed(e.streamUrl) ? "YouTube" : streamLinkError(e.streamUrl) ? "YouTube, link tidak valid" : "YouTube, link belum diisi"}
+              </button>
+              {linkOf === e.id && (
+                <StreamField source={e.streamSource === "link" ? "link" : "platform"} url={e.streamUrl ?? ""} onSource={(v) => set(i, { streamSource: v === "link" ? "link" : undefined })} onUrl={(v) => set(i, { streamUrl: v })} />
+              )}
             </div>
           ))}
         </div>
@@ -72,6 +90,11 @@ export function OrgAula({ onToast }: { onToast: (t: string) => void }) {
             type="button"
             className="small-btn"
             onClick={() => {
+              const bad = rows.find((e) => e.streamSource === "link" && streamLinkError(e.streamUrl));
+              if (bad) {
+                setLinkOf(bad.id);
+                return onToast(`Link siaran "${bad.title || "acara"}" bukan link YouTube atau Vimeo`);
+              }
               const n = fair.saveRundown(rows);
               setRows(structuredClone(fair.rundown()));
               onToast(`Rundown disimpan · ${n} acara`);

@@ -55,6 +55,21 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      says it is closed and the server refuses coin purchases). Unset or any other value: open.
    - optional `PREVIEW_SECRET`: signs the pre-launch pass cookie (falls back to `DATABASE_URL`).
    - optional `PASSWORD_LOGIN=1`: brings back the email-and-password forms (local testing).
+   - Seminar and Aula broadcasts (optional; the defaults fit Supabase Free). The game reads them from
+     `GET /api/jobfair/config` (public, cached 60 s), so a change needs a redeploy of env only, no rebuild:
+     - `STAGE_MESH_MAX_VIEWERS` (default `8`): viewers the speaker's laptop streams to directly when a session
+       is set to "Platform kita"; the rest see slides only. Raise only for a strong laptop and upload (~1 Mbps each).
+     - `STAGE_BEAT_SEC` (default `10`): how often a live speaker tells every player it is on air; each beat
+       costs one message per player online. Lower (e.g. `3`) on Supabase Pro for a quicker "LIVE" badge.
+     - `STAGE_CHAT_ENABLED` (default on; `0` turns stage chat, questions and reactions off).
+     - `STAGE_CHAT_COOLDOWN_SEC` (default `10`): least seconds between two chat messages from one viewer.
+     - `STAGE_REACT_COOLDOWN_SEC` (default `3`): the same for reactions.
+     - `STAGE_CHAT_BUDGET` (default `30`): Realtime messages per second the room's chat and reactions may
+       cost, every watcher receiving counted; past it the room goes into slow mode. Raise to ~300 on
+       Supabase Pro (500/s), ~1500 without the spend cap (2,500/s).
+     For a big audience set the session to "YouTube atau Vimeo (link)" (Panitia → Seminar or Aula) and
+     stream to YouTube Live: viewers watch the embed, which costs no Realtime messages and no upload from
+     the speaker.
 4. A daily Vercel cron calls `/api/health`, so the free Supabase project never sits idle long
    enough to be paused.
 
