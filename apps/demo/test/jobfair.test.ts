@@ -455,6 +455,42 @@ describe("DemoJobFair", () => {
     expect(fair.booth(old.id)?.company).toBe(old.company);
   });
 
+  it("saves the speaker page's stream source and link on the session or Aula item, and keeps them across reloads", () => {
+    let saved: FairSaved | null = null;
+    const storage = { load: () => saved, save: (d: FairSaved) => (saved = JSON.parse(JSON.stringify(d))), clear() {} };
+    const a = new DemoJobFair(() => 0.5, undefined, undefined, storage);
+    const YT = "https://www.youtube.com/live/dQw4w9WgXcQ";
+    const sem = a.seminars()[0]!;
+    // Choosing YouTube alone is saved, without a link yet.
+    expect(a.setStream("seminar", sem.id, "link")).toBe(true);
+    expect(a.seminars()[0]).toMatchObject({ id: sem.id, title: sem.title, streamSource: "link" });
+    expect(a.seminars()[0]!.streamUrl).toBeUndefined();
+    // A link that is not YouTube or Vimeo is refused and changes nothing.
+    expect(a.setStream("seminar", sem.id, "link", "https://evil.example/live")).toBe(false);
+    expect(a.seminars()[0]!.streamUrl).toBeUndefined();
+    expect(a.setStream("seminar", sem.id, "link", `  ${YT} `)).toBe(true);
+    expect(a.seminars()[0]).toMatchObject({ streamSource: "link", streamUrl: YT });
+    // Back to "Platform kita": the link stays for later, as in the organiser's tab.
+    expect(a.setStream("seminar", sem.id, "platform")).toBe(true);
+    expect(a.seminars()[0]!.streamSource).toBeUndefined();
+    expect(a.seminars()[0]!.streamUrl).toBe(YT);
+    // An empty link takes it out.
+    expect(a.setStream("seminar", sem.id, "link", "")).toBe(true);
+    expect(a.seminars()[0]!.streamUrl).toBeUndefined();
+    // Aula: the item is changed, every other item of the rundown kept.
+    const before = a.rundown().length;
+    const ev = a.rundown()[1]!;
+    expect(a.setStream("aula", ev.id, "link", YT)).toBe(true);
+    expect(a.rundown()).toHaveLength(before);
+    expect(a.rundown().find((e) => e.id === ev.id)).toMatchObject({ title: ev.title, streamSource: "link", streamUrl: YT });
+    expect(a.setStream("aula", "gone", "link", YT)).toBe(false);
+    expect(a.setStream("seminar", "gone", "link", YT)).toBe(false);
+    a.flush();
+    const b = new DemoJobFair(() => 0.5, undefined, undefined, storage);
+    expect(b.seminars()[0]).toMatchObject({ id: sem.id, streamSource: "link" });
+    expect(b.rundown().find((e) => e.id === ev.id)).toMatchObject({ streamSource: "link", streamUrl: YT });
+  });
+
   it("keeps the organiser's booths, ads, psikotes and seminars across reloads", () => {
     let saved: FairSaved | null = null;
     const storage = { load: () => saved, save: (d: FairSaved) => (saved = JSON.parse(JSON.stringify(d))), clear() {} };

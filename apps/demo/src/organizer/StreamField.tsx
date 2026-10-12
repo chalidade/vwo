@@ -7,8 +7,6 @@ export const streamLinkError = (url: string | undefined) => (url?.trim() && !str
 /** "Siaran lewat": the speaker's browser (default) or a YouTube/Vimeo link, with the link and a preview
  *  of what viewers will see when the link is chosen. */
 export function StreamField({ source, url, onSource, onUrl }: { source: StreamSource; url: string; onSource: (s: StreamSource) => void; onUrl: (v: string) => void }) {
-  const embed = streamEmbed(url);
-  const error = streamLinkError(url);
   return (
     <fieldset className="org-stream cp-span">
       <legend>Siaran lewat</legend>
@@ -29,27 +27,32 @@ export function StreamField({ source, url, onSource, onUrl }: { source: StreamSo
           </span>
         </span>
       </label>
-      {source === "link" && (
-        <>
-          <label>
-            Link siaran (YouTube)
-            <input
-              value={url}
-              onChange={(e) => onUrl(e.target.value)}
-              inputMode="url"
-              maxLength={STREAM_URL_MAX}
-              placeholder="https://youtube.com/live/..."
-              aria-invalid={error ? true : undefined}
-            />
-          </label>
-          {error ? (
-            <p className="org-sem-error">{error}</p>
-          ) : !embed ? (
-            <p className="muted small">Belum ada link: penonton melihat "Siaran belum dimulai" sampai link diisi.</p>
-          ) : null}
-          {embed && <StreamPlayer embed={embed} title="Pratinjau link siaran" autoplay={false} />}
-        </>
-      )}
+      {source === "link" && <StreamLinkInput url={url} onUrl={onUrl} />}
     </fieldset>
+  );
+}
+
+/** The link box of "Siaran lewat": the pasted link, why it can't be used, and a preview of what viewers will see.
+ *  Read-only for an account that may not change the event setup. */
+export function StreamLinkInput({ url, onUrl, readOnly, preview = true }: { url: string; onUrl?: (v: string) => void; readOnly?: boolean; preview?: boolean }) {
+  const embed = streamEmbed(url);
+  const error = streamLinkError(url);
+  return (
+    <>
+      <label>
+        Link siaran (YouTube)
+        <input
+          value={url}
+          onChange={(e) => onUrl?.(e.target.value)}
+          readOnly={readOnly}
+          inputMode="url"
+          maxLength={STREAM_URL_MAX}
+          placeholder={readOnly ? "Belum diisi panitia" : "https://youtube.com/live/..."}
+          aria-invalid={error ? true : undefined}
+        />
+      </label>
+      {error ? <p className="org-sem-error">{error}</p> : !embed ? <p className="muted small">Belum ada link: penonton melihat "Siaran belum dimulai" sampai link diisi.</p> : null}
+      {preview && embed && <StreamPlayer embed={embed} title="Pratinjau link siaran" autoplay={false} />}
+    </>
   );
 }

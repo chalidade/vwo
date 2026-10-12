@@ -1,6 +1,7 @@
 import { Mic } from "lucide-react";
 import { cleanSchedule, meshAdmit, seminarPhase, sortByStart, streamEmbed } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
+import { currentAccount } from "../account";
 import { type PeerInfo, connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
 import { announceLive } from "../fair/seminar-reg";
@@ -9,6 +10,7 @@ import { StreamPlayer } from "../fair/StreamPlayer";
 import { LIVE } from "../mode";
 import { useRuntimeConfig } from "../runtime-config";
 import { fair, useFair } from "../useFair";
+import { StreamLinkInput, streamLinkError } from "./StreamField";
 
 const canShare = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -67,10 +69,26 @@ export function SpeakerStage() {
   // "Siaran lewat": this browser straight to a few viewers (default), or the organiser's YouTube/Vimeo link,
   // which viewers watch while this page runs chat and Q&A. Starts on what the organiser chose for the item.
   const item = venue === "aula" ? ev : picked;
-  const stream = streamEmbed(item?.streamUrl);
   const [source, setSource] = useState<"platform" | "link">(item?.streamSource === "link" ? "link" : "platform");
   useEffect(() => setSource(item?.streamSource === "link" ? "link" : "platform"), [venue, sessionId, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
   const embed = source === "link";
+  // The setup is saved by the event admins only (the server refuses everyone else); the offline demo saves in this browser.
+  const canSave = !LIVE || !!currentAccount()?.fairAdmin;
+  // The link as typed here; the stage previews it, viewers get it once it is saved.
+  const savedUrl = item?.streamUrl ?? "";
+  const [draft, setDraft] = useState(savedUrl);
+  useEffect(() => setDraft(savedUrl), [venue, sessionId, eventId, savedUrl]);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  useEffect(() => setSavedNote(null), [venue, sessionId, eventId]);
+  const dirty = draft.trim() !== savedUrl;
+  const stream = streamEmbed(draft);
+  /** Save the source (and the link, when given) on the session or Aula item, as the organiser's tabs do. */
+  const saveStream = (to: "platform" | "link", url?: string) => {
+    if (!canSave || !item) return false;
+    const ok = fair.setStream(venue, item.id, to, url);
+    setSavedNote(ok ? (url === undefined ? "Pilihan siaran disimpan." : url.trim() ? "Link siaran disimpan." : "Link siaran dihapus.") : null);
+    return ok;
+  };
   const cfg = useRuntimeConfig().stage;
   const [live, setLive] = useState(false);
   const [screen, setScreen] = useState<MediaStream | null>(null);
@@ -265,6 +283,8 @@ export function SpeakerStage() {
     startedAt.current = Date.now();
     setSeconds(0);
     setChat([{ id: chatId(), name: session.speaker, text: `Selamat datang di sesi "${session.title}"! Silakan tulis pertanyaan di Q&A.`, at: Date.now(), host: true }]);
+    // A link typed but not saved yet goes up first, so viewers get the stream being previewed here.
+    if (embed && dirty && !streamLinkError(draft)) saveStream("link", draft);
     setLive(true);
     now.current.live = true;
     beat();
@@ -339,19 +359,50 @@ export function SpeakerStage() {
           <div className="st-pick">
             <label>
               Siaran lewat
-              <select value={source} disabled={live} onChange={(e) => setSource(e.target.value === "link" ? "link" : "platform")}>
+              <select
+                value={source}
+                disabled={live}
+                onChange={(e) => {
+                  const to = e.target.value === "link" ? "link" : "platform";
+                  setSource(to);
+                  saveStream(to);
+                }}
+              >
                 <option value="platform">Platform kita (langsung dari laptop pembicara)</option>
                 <option value="link">YouTube atau Vimeo (link)</option>
               </select>
             </label>
           </div>
-          <p className="muted small st-note">
-            Platform kita cocok untuk penonton sedikit, maksimal {cfg.meshMaxViewers} penonton; penonton lain melihat slide saja. Untuk penonton banyak pilih YouTube: siarkan ke YouTube Live
-            lalu tempel linknya di Panitia, tab {venue === "aula" ? "Aula" : "Seminar"}.
-          </p>
-          {embed && !stream && (
-            <p className="cp-warn">Belum ada link siaran yang valid untuk {venue === "aula" ? "acara" : "sesi"} ini. Isi di Panitia, tab {venue === "aula" ? "Aula" : "Seminar"}; sampai itu penonton melihat "Siaran belum dimulai".</p>
+          {embed && item && (
+            <form
+              className="st-link"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (dirty && !streamLinkError(draft)) saveStream("link", draft);
+              }}
+            >
+              <StreamLinkInput url={draft} onUrl={canSave ? (v) => (setDraft(v), setSavedNote(null)) : undefined} readOnly={!canSave} preview={false} />
+              {canSave ? (
+                <div className="st-link-save">
+                  <button type="submit" className="small-btn" disabled={!dirty || !!streamLinkError(draft)}>
+                    Simpan link
+                  </button>
+                  {dirty && !streamLinkError(draft) ? (
+                    <span className="muted small">Belum disimpan: penonton baru melihat link ini setelah disimpan.</span>
+                  ) : savedNote ? (
+                    <span className="cp-saved small">{savedNote}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="muted small">Hanya panitia yang bisa mengubah link siaran. Minta panitia mengisinya di Panitia, tab {venue === "aula" ? "Aula" : "Seminar"}.</p>
+              )}
+            </form>
           )}
+          {!embed && savedNote && <p className="cp-saved small st-note">{savedNote}</p>}
+          <p className="muted small st-note">
+            Platform kita cocok untuk penonton sedikit, maksimal {cfg.meshMaxViewers} penonton; penonton lain melihat slide saja. Untuk penonton banyak pilih YouTube: siarkan ke
+            YouTube Live lalu tempel linknya {canSave ? "di kolom link siaran" : `di Panitia, tab ${venue === "aula" ? "Aula" : "Seminar"}`}.
+          </p>
           <div className="st-stage">
             {embed && stream ? <StreamPlayer embed={stream} title="Pratinjau link siaran" autoplay={false} /> : screen ? <Video stream={screen} /> : <StageSlide session={session} slide={slide} />}
             <div className="sx-claps" aria-hidden>
@@ -362,6 +413,7 @@ export function SpeakerStage() {
               ))}
             </div>
             {screen && <span className="st-tag">Layar kamu dibagikan</span>}
+            {embed && stream && dirty && <span className="st-tag st-tag-draft">Pratinjau, belum disimpan</span>}
           </div>
           {!screen && !embed && (
             <div className="mb-nav st-slidenav">
