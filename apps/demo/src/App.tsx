@@ -13,6 +13,7 @@ import { startStatsSync } from "./stats-sync";
 import { startSharedSync } from "./shared-state";
 import { claimStoredRef } from "./fair/viral";
 import { pullSeminarRegs } from "./fair/seminar-reg";
+import { startConsultSync } from "./consult";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -67,11 +68,14 @@ const CompanyPortal = lazy(() => import("./company/Portal").then((m) => ({ defau
 const InvoicePage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicePage })));
 const InvoicesPage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicesPage })));
 const SpeakerStage = lazy(() => import("./organizer/Speaker").then((m) => ({ default: m.SpeakerStage })));
+const ConsultantPage = lazy(() => import("./fair/Consultant").then((m) => ({ default: m.ConsultantPage })));
 
 export function App() {
   const hash = useHash();
   const account = useLiveAccount();
   useEffect(startPriceSync, []);
+  // The offline demo seats this browser's consultants in the lounge (live: the shared setup does).
+  useEffect(startConsultSync, []);
   // On the live site only event admins run the organiser pages; companies use their portal.
   const organizer = !LIVE || !!account?.fairAdmin;
   const route = hash.replace(/^#\/?/, "");
@@ -80,7 +84,8 @@ export function App() {
   const lite = route === "ringan";
   const home = !route.startsWith("jobfair") && !lite;
   // The organiser pages and the company portal use the light dashboard look.
-  const dash = route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route.startsWith("jobfair/invoice") || route === "jobfair/speaker";
+  const dash =
+    route.startsWith("jobfair/admin") || route.startsWith("jobfair/company") || route.startsWith("jobfair/invoice") || route === "jobfair/speaker" || route === "jobfair/konsultan";
   return (
     <div className={game ? "app app-game" : home ? "app app-home" : dash ? "app app-dash" : lite ? "app app-lite" : "app"}>
       <Suspense fallback={<p className="app-loading">Memuat…</p>}>
@@ -98,6 +103,8 @@ export function App() {
           <JobFairAdmin tab={route.split("/")[2]} />
         ) : route === "jobfair/speaker" ? (
           <SpeakerStage />
+        ) : route === "jobfair/konsultan" ? (
+          <ConsultantPage />
         ) : route.startsWith("jobfair/invoice/") ? (
           <InvoicePage id={route.split("/")[2] ?? ""} />
         ) : route === "jobfair/invoices" ? (

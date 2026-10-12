@@ -1,5 +1,5 @@
 import { boothsOf, readFairState, readFairStateKey, writeFairState } from "@vwo/db";
-import { ANNOUNCE_KEY, cleanBoard, currentAnnouncement } from "@vwo/shared";
+import { ANNOUNCE_KEY, cleanBoard, CONSULT_CFG_KEY, type ConsultantDoc, currentAnnouncement, type PublicConsultant, publicConsultant } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { PLACEMENT_KEY } from "@/lib/booths";
 import { guardCompanyDoc } from "@/lib/company-doc";
@@ -35,12 +35,25 @@ export async function GET() {
   const stalls: unknown[] = [];
   let board: ReturnType<typeof cleanBoard> | null = null;
   let placements: Doc = {};
+  const consultants: PublicConsultant[] = [];
+  let consultBotsOff: string[] = [];
   let version = 0;
+  const now = Date.now();
   for (const r of rows) {
     // A booth's inbox read marks are that company's alone (see booths/[booth]/inbox).
     if (r.key.startsWith("inbox:")) continue;
     // Seller and buyer invoice details are never part of the public setup (the read skips them too).
     if (r.key.startsWith("billing:")) continue;
+    // Lounge consultants: only the public profile, desk and open lamp, never who owns the desk or how to reach them.
+    // They don't move the version: an open desk is refreshed every minute, and the game applies them on every pull.
+    if (r.key.startsWith("consultant:")) {
+      consultants.push(publicConsultant(r.data as ConsultantDoc, now));
+      continue;
+    }
+    if (r.key === CONSULT_CFG_KEY) {
+      consultBotsOff = ((r.data as { botsOff?: unknown }).botsOff as string[] | undefined) ?? [];
+      continue;
+    }
     version = Math.max(version, r.updatedAt.getTime());
     const data = r.data as Doc;
     if (r.key === ANNOUNCE_KEY) {
@@ -71,7 +84,10 @@ export async function GET() {
     const now = currentAnnouncement(board);
     org = { ...rest, ...(now ? { announcement: { text: now.text, at: now.at } } : {}), ...(admin ? { announcements: board } : {}) };
   }
-  return NextResponse.json({ org, companies, bookings, stalls, placements, version, admin, booths: [...mine] }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { org, companies, bookings, stalls, placements, consultants, consultBotsOff, version, admin, booths: [...mine] },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 /** Save the organiser's setup (event admins) or one company's booth (its accounts, or admins). */

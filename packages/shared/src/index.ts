@@ -22,3 +22,4 @@ export * from "./booth-report";
 export * from "./seminars";
 export * from "./stand-placement";
 export * from "./anomaly";
+export * from "./consultants";

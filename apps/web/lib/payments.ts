@@ -20,6 +20,7 @@ import { liveCoins } from "./coins";
 import { db } from "./db";
 import { settleInvoice } from "./company-doc";
 import { invoiceForPayment } from "./invoices";
+import { placePaidSlot } from "./consultants";
 import { placeRentedStall } from "./stalls";
 import { createXenditInvoice, getXenditInvoice, methodName, xenditEnabled } from "./xendit";
 
@@ -32,7 +33,8 @@ export function siteOrigin(req: Request) {
   return `${proto}://${host}`;
 }
 
-export type Purchase = { kind: PaymentKind; ref: string; description: string; amount: number; meta?: Record<string, unknown>; back: string };
+/** `amount` is rupiah, except with `unit: "koin"`: a price the organiser sets in coins (a consultant slot). */
+export type Purchase = { kind: PaymentKind; ref: string; description: string; amount: number; unit?: "koin"; meta?: Record<string, unknown>; back: string };
 
 /**
  * Start paying for something whose price the server already worked out. With Xendit the buyer gets
@@ -72,13 +74,13 @@ export class CoinsShortError extends Error {
 }
 
 /**
- * Pay for a booth registration, a company bill or a food court stand with coins from the account's
+ * Pay for a booth registration, a company bill, a food court stand or a consultant desk with coins from the account's
  * ledger. The coin price comes from the server's rupiah price and the organiser's coin value. The
  * charge is keyed to the thing bought (a bill or registration is never charged twice); if what was
  * bought can't be handed over, the coins go back.
  */
 export async function payWithCoins(user: { id: string }, p: Purchase): Promise<Payment> {
-  const coins = coinsFor(await readPrices(db), p.amount);
+  const coins = p.unit === "koin" ? p.amount : coinsFor(await readPrices(db), p.amount);
   await liveCoins(user.id);
   const row = await createPayment(db, {
     userId: user.id,
@@ -86,7 +88,7 @@ export async function payWithCoins(user: { id: string }, p: Purchase): Promise<P
     ref: p.ref,
     description: `${p.description} · ${coins.toLocaleString("id-ID")} koin`.slice(0, 200),
     amount: coins,
-    meta: { ...p.meta, rupiah: p.amount, coins },
+    meta: { ...p.meta, ...(p.unit === "koin" ? {} : { rupiah: p.amount }), coins },
     provider: "koin",
   });
   // A bill can be charged once ever; a registration or a stand once per attempt (a second attempt
@@ -111,6 +113,7 @@ export async function payWithCoins(user: { id: string }, p: Purchase): Promise<P
     if (p.kind === "registration") ok = await payRegistration(db, p.ref, user.id, "Koin");
     else if (p.kind === "invoice") await settleInvoice(paid, user.id);
     else if (p.kind === "stall") ok = !!(await placeRentedStall(paid));
+    else if (p.kind === "consultant") ok = !!(await placePaidSlot(paid));
   } catch (e) {
     console.error("coin purchase not delivered", row.id, e);
     ok = false;
@@ -130,6 +133,7 @@ async function fulfil(p: Payment) {
   if (p.kind === "registration") await payRegistration(db, p.ref, p.userId, p.method ?? "Xendit");
   if (p.kind === "invoice") await settleInvoice(p, p.userId);
   if (p.kind === "stall") await placeRentedStall(p);
+  if (p.kind === "consultant") await placePaidSlot(p);
   // Money paid gets its numbered invoice; a failure here is retried when the buyer opens their invoices.
   await invoiceForPayment(p).catch((e) => console.error("invoice not issued", p.id, e));
 }

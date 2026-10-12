@@ -44,6 +44,7 @@ export function CallScreen({
   limit,
   outgoing,
   incoming,
+  onAnswered,
   onEnd,
 }: {
   kind: CallKind;
@@ -62,6 +63,8 @@ export function CallScreen({
   limit?: number;
   outgoing?: RingSignal;
   incoming?: RingSignal;
+  /** The other side picked up an outgoing call (a paid lounge call is charged now). Returning false hangs up. */
+  onAnswered?: () => boolean | void;
   onEnd: (r: CallResult) => void;
 }) {
   const callId = (outgoing ?? incoming)?.callId ?? "bot";
@@ -125,6 +128,7 @@ export function CallScreen({
       onSignal((s) => {
         if (s.callId !== callId || done.current) return;
         if (s.type === "accept" && outgoing) {
+          if (onAnswered?.() === false) return finish("missed");
           setPhase("connecting");
           peer.current = connectPeer({
             callId,

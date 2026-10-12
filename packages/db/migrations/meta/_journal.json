@@ -155,6 +155,13 @@
       "when": 1791715693378,
       "tag": "0021_company_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791772743462,
+      "tag": "0022_consultant_payments",
+      "breakpoints": true
     }
   ]
 }

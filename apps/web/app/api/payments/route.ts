@@ -1,9 +1,10 @@
-import { myPayments, type PaymentKind, readFairState, readPrices, registrationById } from "@vwo/db";
-import { ALL_COIN_PACKAGES, type BoothTier, freeStallSlotsOf, priceFrom, productAllowed, STALL_SLOTS, TIER_LABEL } from "@vwo/shared";
+import { myPayments, type PaymentKind, readConsultants, readFairState, readPrices, registrationById } from "@vwo/db";
+import { ALL_COIN_PACKAGES, BOT_CONSULTANTS, type BoothTier, deskName, freeConsultDesks, freeStallSlotsOf, priceFrom, productAllowed, STALL_SLOTS, TIER_LABEL } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { boothNow } from "@/lib/booths";
 import { companyDoc, PRODUCT_IDS } from "@/lib/company-doc";
+import { consultContact, consultDesk, consultProfile } from "@/lib/consultants";
 import { db } from "@/lib/db";
 import { canManageBooth } from "@/lib/fair";
 import { defaultBuyer, readBuyer } from "@/lib/invoices";
@@ -38,6 +39,8 @@ const schema = z.discriminatedUnion("kind", [
       .max(STALL_SLOTS.length - 1),
     stall: stallInput,
   }),
+  // A desk in the consultation lounge, with the consultant's public profile and how the organiser reaches them.
+  z.object({ kind: z.literal("consultant"), desk: consultDesk, profile: consultProfile, contact: consultContact }),
 ]);
 
 const rupiah = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
@@ -49,7 +52,7 @@ export async function GET(req: Request) {
   const kinds = new URL(req.url).searchParams
     .get("kind")
     ?.split(",")
-    .filter((k): k is PaymentKind => ["coins", "registration", "invoice", "stall"].includes(k));
+    .filter((k): k is PaymentKind => ["coins", "registration", "invoice", "stall", "consultant"].includes(k));
   let rows = await myPayments(db, user.id, kinds);
   if (rows.some((p) => p.status === "pending" && p.providerId) && (await allow(`pay-refresh:${user.id}`, 30, 600_000))) {
     rows = await Promise.all(rows.map((p) => (p.status === "pending" ? refresh(p).catch(() => p) : p)));
@@ -58,8 +61,8 @@ export async function GET(req: Request) {
 }
 
 /**
- * Buy coins through the gateway, or pay for a booth registration, a company bill or a food court
- * stand with coins. The price is always the server's.
+ * Buy coins through the gateway, or pay for a booth registration, a company bill, a food court
+ * stand or a consultant desk with coins. The price is always the server's.
  */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
@@ -109,6 +112,19 @@ export async function POST(req: Request) {
       description: `Sewa stan food court · ${b.stall.name}`.slice(0, 200),
       meta: { roomId: FOOD_COURT, slot: b.slot, input: b.stall },
       back: "/play/#/jobfair",
+    };
+  } else if (b.kind === "consultant") {
+    const s = await readConsultants(db);
+    if (s.placed.some((p) => p.by === user.id)) return fail(409, "has_desk");
+    if (!freeConsultDesks(BOT_CONSULTANTS, s.botsOff, s.placed).includes(b.desk)) return fail(409, "slot_taken");
+    purchase = {
+      kind: "consultant",
+      ref: `konsultasi:${b.desk}`,
+      amount: priceFrom(prices, "consult.slot"),
+      unit: "koin",
+      description: `Slot konsultan ${deskName(b.desk)} · ${b.profile.name}`.slice(0, 200),
+      meta: { desk: b.desk, profile: b.profile, ...b.contact },
+      back: "/play/#/jobfair/konsultan",
     };
   } else {
     if (!(await canManageBooth(user, b.booth))) return fail(403, "not_allowed");

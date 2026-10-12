@@ -1,5 +1,6 @@
 // Live site: paying real money through the server's payment gateway (Xendit). The server works out
 // every price; the browser only says what to buy and is sent to the gateway's checkout page.
+import type { ConsultantProfile } from "@vwo/shared";
 import { refreshCoins } from "./coin-sync";
 import { whenPlayerReady } from "./player-sync";
 import { refreshShared } from "./shared-state";
@@ -9,7 +10,7 @@ export type Gateway = "xendit" | "demo";
 
 export interface PaymentView {
   id: string;
-  kind: "coins" | "registration" | "invoice" | "stall";
+  kind: "coins" | "registration" | "invoice" | "stall" | "consultant";
   ref: string;
   description: string;
   amount: number;
@@ -24,7 +25,8 @@ const ERRORS: Record<string, string> = {
   not_signed_in: "Sesi login habis. Muat ulang halaman lalu masuk lagi.",
   not_allowed: "Akun ini tidak bisa membayar tagihan stand ini.",
   not_payable: "Tagihan ini sudah dibayar atau tidak bisa dibayar lagi.",
-  slot_taken: "Maaf, stan ini baru saja disewa usaha lain. Pilih stan kosong lain.",
+  slot_taken: "Maaf, tempat ini baru saja diambil orang lain. Pilih yang masih kosong.",
+  has_desk: "Akun ini sudah punya meja konsultan.",
   invalid_input: "Data belum lengkap atau terlalu panjang. Periksa lagi isiannya.",
   too_many_requests: "Terlalu banyak percobaan bayar. Coba lagi nanti.",
   gateway_error: "Halaman pembayaran belum bisa dibuat. Coba lagi sebentar lagi.",
@@ -50,7 +52,8 @@ export async function paymentGateway(): Promise<Gateway> {
 export type PayFor =
   | { kind: "coins"; pack: string; back?: string }
   | { kind: "invoice"; booth: string; invoice: string }
-  | { kind: "stall"; slot: number; stall: { name: string; vendor?: string; promo?: string; emoji?: string; color?: string; deal?: { title: string; worth: string; price: number } | null } };
+  | { kind: "stall"; slot: number; stall: { name: string; vendor?: string; promo?: string; emoji?: string; color?: string; deal?: { title: string; worth: string; price: number } | null } }
+  | { kind: "consultant"; desk: number; profile: ConsultantProfile; contact: { email: string; phone: string } };
 
 /**
  * Buy coins (through the gateway), or pay a company bill or a food court stand with coins. Returns

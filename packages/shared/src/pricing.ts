@@ -82,6 +82,7 @@ export const PRICE_CATALOG: PriceItem[] = [
   rupiah("Sewa stand", "stand.regular", "Daftar booth: stand reguler", 7_500_000),
   rupiah("Sewa stand", "stand.premium", "Daftar booth: stand VIP", 15_000_000),
   rupiah("Sewa stand", "stall", "Sewa stan food court", 750_000),
+  koin("Sewa stand", "consult.slot", "Slot meja konsultan di Lounge Konsultasi (per acara)", 500, "Dibayar konsultan dengan koin; daftar lewat panitia gratis"),
   rupiah("Upgrade & paket VIP", "product.vip", "Upgrade stand reguler ke VIP", 2_500_000),
   rupiah("Upgrade & paket VIP", "product.promoter", "NPC promotor keliling", 1_000_000),
   rupiah("Upgrade & paket VIP", "product.featured", "Lowongan unggulan (1 lowongan di urutan teratas daftar)", 500_000),

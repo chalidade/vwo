@@ -339,6 +339,14 @@ export interface Consultant {
   topics: string[];
   /** What they say during a call (the demo's consultants are bots). */
   lines: string[];
+  /** Which desk they sit at (see LOUNGE.pods); without it, their place in the list. */
+  desk?: number;
+  /** A real person (placed by the organiser or a paid slot): calls ring them for real instead of a script. */
+  live?: boolean;
+  /** A real consultant's short introduction. */
+  bio?: string;
+  /** A real consultant has their desk open and takes calls now. */
+  open?: boolean;
 }
 
 /** Paid calls in the consultation lounge: how long a call may last and what starting it costs.

@@ -28,6 +28,9 @@ import {
   setPriceTable,
   loungeBoardSpot,
   loungeSpot,
+  consultantDesk,
+  loungeConsultants,
+  type PublicConsultant,
   safeImage,
   safeUrl,
   makeStall,
@@ -883,7 +886,9 @@ export class DemoJobFair {
         if (room.kind === "konsultasi")
           return [
             { ...host, x: loungeBoardSpot().x - 2.2, y: loungeBoardSpot().y },
-            ...(room.consultants ?? []).slice(0, LOUNGE.pods.length).map((c, i) => ({ id: consultantId(c.id), name: c.name, boothId: null, floorId, ...loungeSpot(i, "consultant"), facing: "front" as Facing })),
+            ...(room.consultants ?? [])
+              .slice(0, LOUNGE.pods.length)
+              .map((c, i) => ({ id: consultantId(c.id), name: c.name, boothId: null, floorId, ...loungeSpot(consultantDesk(c, i), "consultant"), facing: "front" as Facing })),
           ];
         return [{ ...host, x: room.width / 2, y: room.kind === "seminar" ? 2.0 : 0.85 }];
       }),
@@ -962,7 +967,34 @@ export class DemoJobFair {
         if (i >= 0) this.floors[i] = buildFairRoom(this.fair, room);
       }
     }
+    this.seatConsultants();
     this.rebuildStaff();
+  }
+
+  // ---- Lounge consultants: the published bots, unless switched off, and real people at their desks ----
+
+  /** Real consultants and the bots the organiser switched off, as last given (server feed, or this browser in the demo). */
+  private consultPlaced: PublicConsultant[] = [];
+  private consultBotsOff: string[] = [];
+  private consultSig = "";
+
+  private seatConsultants() {
+    for (const room of this.fair.rooms) {
+      const bots = this.originalRooms.find((r) => r.id === room.id)?.consultants;
+      if (bots) room.consultants = loungeConsultants(bots, this.consultPlaced, this.consultBotsOff);
+    }
+  }
+
+  /** Who sits at the lounge desks now. Only rebuilds when something changed. */
+  setConsultants(placed: PublicConsultant[], botsOff: string[]) {
+    const sig = JSON.stringify([placed, botsOff]);
+    if (sig === this.consultSig) return;
+    this.consultSig = sig;
+    this.consultPlaced = structuredClone(placed);
+    this.consultBotsOff = [...botsOff];
+    this.seatConsultants();
+    this.rebuildStaff();
+    this.emit();
   }
 
   private saveOrg() {

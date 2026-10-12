@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { OrgAds } from "./organizer/Ads";
 import { OrgAula } from "./organizer/Aula";
 import { OrgBooths } from "./organizer/Booths";
+import { OrgConsultants } from "./organizer/Consultants";
 import { OrgFloors } from "./organizer/Floors";
 import { OrgInvoices } from "./organizer/Invoices";
 import { OrgLive } from "./organizer/Live";
@@ -22,6 +23,7 @@ import {
   ClipboardList,
   FileChartColumn,
   FlaskConical,
+  Headset,
   Landmark,
   Layers,
   Megaphone,
@@ -48,12 +50,13 @@ const TABS = [
   ["seminar", Presentation, "Seminar"],
   ["aula", Landmark, "Aula"],
   ["food", UtensilsCrossed, "Food Court"],
+  ["consult", Headset, "Konsultan"],
   ["reports", FileChartColumn, "Laporan event"],
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: OrgTab[] }[] = [
   { label: "Pantau", ids: ["live", "registrations", "early"] },
-  { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food", "reports"] },
+  { label: "Acara", ids: ["floors", "booths", "aula", "seminar", "psych", "food", "consult", "reports"] },
   { label: "Bisnis", ids: ["ads", "prices", "invoices"] },
 ];
 
@@ -120,6 +123,9 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
             <a className="small-btn ghost cp-link" href="#/jobfair/speaker">
               <Mic size={16} aria-hidden /> Pembicara
             </a>
+            <a className="small-btn ghost cp-link" href="#/jobfair/konsultan">
+              <Headset size={16} aria-hidden /> Konsultan
+            </a>
             {!LIVE && (
               <button
                 type="button"
@@ -146,6 +152,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         {tab === "seminar" && <OrgSeminars onToast={setToast} />}
         {tab === "aula" && <OrgAula onToast={setToast} />}
         {tab === "food" && <OrgFoodCourt onToast={setToast} />}
+        {tab === "consult" && <OrgConsultants onToast={setToast} />}
         {tab === "reports" && <OrgReports onToast={setToast} />}
       </DashShell>
       {toast && <div className="cp-toast">{toast}</div>}
