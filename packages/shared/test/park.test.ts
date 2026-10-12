@@ -4,7 +4,12 @@ import {
   atParkDoor,
   buildJobFairFloors,
   buildParkFloor,
+  cleanDateRange,
+  cleanDay,
   cleanParkBuildings,
+  formatDateRange,
+  parkBuildingDate,
+  readTypedDate,
   DEMO_JOB_FAIR,
   entranceFloorId,
   fairStops,
@@ -139,5 +144,50 @@ describe("the organiser's buildings", () => {
     const plots = parkPlots(cleanParkBuildings(raw));
     expect(plots).toHaveLength(PARK.plots.length);
     expect(plots.map((p) => p.building?.id ?? null)).toEqual(["b", "c", null, null, null]);
+  });
+});
+
+describe("the buildings' dates", () => {
+  it("keeps a picked range: real days, a sane year, the end after the start", () => {
+    expect(cleanDay("2026-11-12")).toBe("2026-11-12");
+    for (const bad of ["2026-02-30", "2026-13-01", "1999-12-31", "2101-01-01", "12-11-2026", "2026-1-5", 20261112, null]) expect(cleanDay(bad)).toBe("");
+    expect(cleanDateRange("2026-11-12", "2026-11-14")).toEqual({ startDate: "2026-11-12", endDate: "2026-11-14" });
+    expect(cleanDateRange("2026-11-12", "2026-11-12")).toEqual({ startDate: "2026-11-12" });
+    expect(cleanDateRange("2026-11-12", "2026-11-10")).toEqual({ startDate: "2026-11-12" });
+    expect(cleanDateRange("2026-11-12", "2028-01-01")).toEqual({ startDate: "2026-11-12" });
+    expect(cleanDateRange("", "2026-11-14")).toEqual({ startDate: "2026-11-14" });
+    expect(cleanDateRange("nope", "")).toBeNull();
+  });
+
+  it("stores the range in org.buildings, drops the old typed date once there is one, and keeps old typed dates", () => {
+    const [a, b, c] = cleanParkBuildings([
+      { id: "a", name: "A", startDate: "2026-11-12", endDate: "2026-11-14", date: "Maret 2027" },
+      { id: "b", name: "B", date: "Maret 2027" },
+      { id: "c", name: "C", startDate: "2026-02-30", endDate: "<script>", date: "x".repeat(90) },
+    ]);
+    expect(a).toEqual({ id: "a", name: "A", startDate: "2026-11-12", endDate: "2026-11-14", status: "soon" });
+    expect(b).toEqual({ id: "b", name: "B", date: "Maret 2027", status: "soon" });
+    expect(c).toEqual({ id: "c", name: "C", date: "x".repeat(40), status: "soon" });
+    expect(parkBuildingDate(a!)).toBe("12–14 Nov 2026");
+    expect(parkBuildingDate(b!)).toBe("Maret 2027");
+    expect(parkBuildingDate({})).toBe("");
+  });
+
+  it("writes the range the Indonesian way", () => {
+    expect(formatDateRange("2026-11-12")).toBe("12 Nov 2026");
+    expect(formatDateRange("2026-11-12", "2026-11-14")).toBe("12–14 Nov 2026");
+    expect(formatDateRange("2026-11-30", "2026-12-02")).toBe("30 Nov – 2 Des 2026");
+    expect(formatDateRange("2026-12-30", "2027-01-02")).toBe("30 Des 2026 – 2 Jan 2027");
+    expect(formatDateRange("2027-05-01", "2027-08-17")).toBe("1 Mei – 17 Agu 2027");
+  });
+
+  it("reads an old typed date into the calendar when it names days", () => {
+    expect(readTypedDate("12 Nov 2026")).toEqual({ startDate: "2026-11-12" });
+    expect(readTypedDate("12-14 November 2026")).toEqual({ startDate: "2026-11-12", endDate: "2026-11-14" });
+    expect(readTypedDate("3–5 Agustus 2027")).toEqual({ startDate: "2027-08-03", endDate: "2027-08-05" });
+    expect(readTypedDate("2027-03-01")).toEqual({ startDate: "2027-03-01" });
+    expect(readTypedDate("Maret 2027")).toBeNull();
+    expect(readTypedDate("31 Feb 2027")).toBeNull();
+    expect(readTypedDate(undefined)).toBeNull();
   });
 });

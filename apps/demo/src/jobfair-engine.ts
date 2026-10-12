@@ -2379,7 +2379,7 @@ export class DemoJobFair {
   }
 
   /** Add a building, or change one (same id). False without a name, or when every plot is taken. */
-  saveParkBuilding(input: { id?: string; name: string; date?: string; about?: string; status?: ParkBuilding["status"] }) {
+  saveParkBuilding(input: { id?: string; name: string; startDate?: string; endDate?: string; date?: string; about?: string; status?: ParkBuilding["status"] }) {
     const list = this.parkBuildings();
     const i = input.id ? list.findIndex((b) => b.id === input.id) : -1;
     if (i < 0 && list.length >= PARK_MAX_BUILDINGS) return false;

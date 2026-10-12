@@ -90,6 +90,10 @@ export interface NpcView {
   carrying?: boolean;
   /** Sitting (drawn like a seated visitor). */
   seated?: boolean;
+  /** A child: drawn smaller. */
+  small?: boolean;
+  /** Walking on the spot it is given each frame (legs move even before the position settles). */
+  moving?: boolean;
 }
 
 const DIR: Record<Facing, string> = { front: "down", back: "up", left: "side", right: "side" };
@@ -139,6 +143,10 @@ export interface CafeSceneProps {
   onMenuClick?: () => void;
   onNpcClick?: (npcId: string) => void;
   extras?: SceneExtra[];
+  /** Outdoors after dark, 0 (day) to 1 (night): the floor gets a night tint and the sky darkens. */
+  darkness?: number;
+  /** Drawn over the night tint, so they shine: lamp light, fireflies, a glowing ghost. */
+  lights?: SceneExtra[];
   /** Sponsors shown on a hall's back wall. */
   hallSponsors?: SponsorView[];
   /** Big title on the hall banner; the floor's name then goes underneath. */
@@ -195,6 +203,8 @@ export function CafeScene({
   onMenuClick,
   onNpcClick,
   extras = [],
+  darkness = 0,
+  lights = [],
   hallSponsors,
   hallTitle,
   hallSubtitle,
@@ -493,8 +503,9 @@ export function CafeScene({
         <div
           className="rpg-sprite"
           data-dir={DIR[n.facing]}
-          data-walking={walking.has(n.id) && !n.seated ? "" : undefined}
+          data-walking={(walking.has(n.id) || n.moving) && !n.seated ? "" : undefined}
           data-seated={n.seated ? "" : undefined}
+          data-small={n.small ? "" : undefined}
           data-clickable={onNpcClick ? "" : undefined}
           style={breath(n.id)}
         >
@@ -594,7 +605,7 @@ export function CafeScene({
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
         ) : floor.theme === "park" ? (
-          <ParkSky w={worldW} h={wall} />
+          <ParkSky w={worldW} h={wall} dark={Math.round(darkness * 20) / 20} />
         ) : floor.theme === "hall" ? (
           <HallWall
             w={worldW}
@@ -673,6 +684,33 @@ export function CafeScene({
             </div>
           ))}
         </CrowdMode.Provider>
+        {darkness > 0 && (
+          <>
+            {/* One flat tint over the whole floor (cheap to draw), and the lights above it. */}
+            <div className="rpg-night" style={{ left: 0, top: oy, width: worldW, height: worldH - oy, opacity: darkness }} />
+            {lights
+              .map((e) => ({ ...e, x: px(e.x), y: py(e.y), w: e.w && e.w * TILE, h: e.h && e.h * TILE }))
+              .filter((e) => onScreen({ ...e, z: 0 }))
+              .map((e) => (
+                <div
+                  key={e.key}
+                  className="rpg-ent"
+                  data-hit={e.onClick ? "" : undefined}
+                  title={e.title}
+                  onPointerDown={e.onClick ? (ev) => ev.stopPropagation() : undefined}
+                  onClick={e.onClick}
+                  style={{
+                    transform: `translate(${e.x}px, ${e.y}px)`,
+                    zIndex: 2_000_001 + Math.round(py(e.z)),
+                    cursor: e.onClick ? "pointer" : undefined,
+                    pointerEvents: e.onClick ? undefined : "none",
+                  }}
+                >
+                  {e.node}
+                </div>
+              ))}
+          </>
+        )}
       </div>
       <div className="rpg-vignette" />
       {canZoom && (

@@ -1,6 +1,6 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { PARK_MAX_BUILDINGS, type ParkBuilding } from "@vwo/shared";
+import { PARK_MAX_BUILDINGS, PARK_MAX_RANGE_DAYS, type ParkBuilding, cleanDay, formatDateRange, parkBuildingDate, readTypedDate } from "@vwo/shared";
 import { FloorScene } from "../fair/FloorScene";
 import { fair, useFair } from "../useFair";
 
@@ -48,7 +48,7 @@ export function OrgPark({ onToast }: { onToast: (t: string) => void }) {
                   <span className="fl-label">{b.name}</span>
                   <span className="muted small">
                     <span className="fl-soon">{hidden ? "Disembunyikan" : "Coming soon"}</span>
-                    {b.date || "Tanggal belum diisi"}
+                    {parkBuildingDate(b) || "Tanggal belum diisi"}
                   </span>
                   {b.about && <span className="muted small park-row-about">{b.about}</span>}
                 </div>
@@ -116,9 +116,24 @@ export function OrgPark({ onToast }: { onToast: (t: string) => void }) {
   );
 }
 
+/** What is wrong with a picked range, or null. Both empty is fine (no date yet). */
+export function dateRangeError(start: string, end: string) {
+  if (!start && !end) return null;
+  if (!start) return "Isi tanggal mulai dulu";
+  if (!cleanDay(start) || (end && !cleanDay(end))) return "Tanggal tidak valid";
+  if (end && end < start) return "Tanggal selesai tidak boleh sebelum tanggal mulai";
+  if (end && (Date.parse(end) - Date.parse(start)) / 86_400_000 > PARK_MAX_RANGE_DAYS) return "Rentang tanggal paling lama satu tahun";
+  return null;
+}
+
 function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; onSave: (b: Omit<ParkBuilding, "id">) => void; onClose: () => void }) {
   const [name, setName] = useState(building?.name ?? "");
-  const [date, setDate] = useState(building?.date ?? "");
+  // An old typed date fills the calendar when it names days; otherwise it is shown until a range is picked.
+  const typed = building?.startDate ? null : readTypedDate(building?.date);
+  const [start, setStart] = useState(building?.startDate ?? typed?.startDate ?? "");
+  const [end, setEnd] = useState(building?.endDate ?? typed?.endDate ?? "");
+  const legacy = !building?.startDate && !typed ? building?.date : undefined;
+  const error = dateRangeError(start, end);
   const [about, setAbout] = useState(building?.about ?? "");
   const [status, setStatus] = useState<ParkBuilding["status"]>(building?.status ?? "soon");
   return (
@@ -126,7 +141,9 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
       className="card cp-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (name.trim()) onSave({ name, date, about, status });
+        if (!name.trim() || error) return;
+        // A picked range replaces the old typed date; without one the old text stays.
+        onSave(start ? { name, startDate: start, endDate: end && end !== start ? end : undefined, about, status } : { name, date: legacy, about, status });
       }}
     >
       <h2 className="cp-h2 cp-span" style={{ margin: 0 }}>
@@ -136,10 +153,50 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
         Nama acara
         <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={40} placeholder="Job Fair Kampus 2027" autoFocus={!building} />
       </label>
-      <label>
-        Tanggal (opsional)
-        <input value={date} onChange={(e) => setDate(e.target.value)} maxLength={40} placeholder="Maret 2027" />
-      </label>
+      <fieldset className="org-range">
+        <legend>
+          <CalendarDays size={14} aria-hidden /> Tanggal acara (opsional)
+        </legend>
+        <label>
+          Mulai
+          <input
+            type="date"
+            value={start}
+            min="2000-01-01"
+            max="2100-12-31"
+            onChange={(e) => {
+              const v = e.target.value;
+              setStart(v);
+              // Moving the start past the end takes the end along.
+              if (end && v && end < v) setEnd(v);
+            }}
+          />
+        </label>
+        <label>
+          Selesai
+          <input type="date" value={end} min={start || "2000-01-01"} max="2100-12-31" disabled={!start} onChange={(e) => setEnd(e.target.value)} />
+        </label>
+        <small className="muted org-range-note" role={error ? "alert" : undefined} data-error={error ? "" : undefined}>
+          {error ??
+            (start
+              ? `Tampil di banner: ${formatDateRange(start, end && end !== start ? end : undefined)}`
+              : legacy
+                ? `Tanggal lama: "${legacy}". Pilih tanggal untuk menggantinya.`
+                : "Kosongkan selesai untuk acara satu hari.")}
+        </small>
+        {(start || end) && (
+          <button
+            type="button"
+            className="small-btn ghost org-range-clear"
+            onClick={() => {
+              setStart("");
+              setEnd("");
+            }}
+          >
+            Hapus tanggal
+          </button>
+        )}
+      </fieldset>
       <label className="cp-span">
         Keterangan singkat (opsional)
         <textarea value={about} onChange={(e) => setAbout(e.target.value)} maxLength={200} rows={2} placeholder="Satu atau dua kalimat tentang acaranya." />
@@ -156,7 +213,7 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
         <button type="button" className="ghost" onClick={onClose}>
           Batal
         </button>
-        <button type="submit" className="small-btn">
+        <button type="submit" className="small-btn" disabled={!!error}>
           Simpan
         </button>
       </div>

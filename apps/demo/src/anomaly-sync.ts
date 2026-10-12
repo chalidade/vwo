@@ -18,7 +18,8 @@ import {
   pickAnomalyKind,
   price,
 } from "@vwo/shared";
-import { type Caught, anomalyFloorId, anomalySpot, anomalyStops, mergeCaught } from "./fair/anomaly";
+import { type Caught, anomalyFloorId, anomalySpot, anomalyStops, mergeCaught, parkAnomalySpot } from "./fair/anomaly";
+import { parkNow } from "./fair/park-clock";
 import { LIVE } from "./mode";
 import { fair } from "./useFair";
 
@@ -48,8 +49,9 @@ function place(): AnomalyHere | null {
   if (!spawn) return null;
   const mine = claimed?.id === spawn.id;
   if (!mine && (Date.now() >= spawn.until || done.has(spawn.id))) return null;
-  // Never on a floor the organiser closed for now; the room ones only on their room's floor.
-  const stops = anomalyStops(fair.openStops(), ANOMALY_INFO[spawn.kind].place, (id) => fair.room(id)?.kind);
+  // Never on a floor the organiser closed for now; the room ones only on their room's floor, the
+  // park ones only in the park.
+  const stops = anomalyStops(fair.openStops(), ANOMALY_INFO[spawn.kind].place, (id) => fair.room(id)?.kind, fair.parkStop());
   const floorId = anomalyFloorId(stops, spawn.floor);
   if (!floorId) return null;
   const floor = fair.floor(floorId);
@@ -59,7 +61,7 @@ function place(): AnomalyHere | null {
     name: ANOMALY_NAMES[spawn.kind],
     rare: !!ANOMALY_INFO[spawn.kind].rare,
     floorId,
-    ...anomalySpot(floor, spawn.seed),
+    ...(floorId === fair.parkId ? parkAnomalySpot(spawn.kind, floor, spawn.seed) : anomalySpot(floor, spawn.seed)),
     until: spawn.until,
     claimed: mine ? claimed!.reward : undefined,
   };
@@ -108,9 +110,18 @@ function demoSpawn(): number {
     return 30_000;
   }
   const id = `demo-${now}`;
+  // The demo's park clock may be set to another hour (see park-clock.ts), and a kind can be asked for
+  // to try it out: localStorage "vwo:demo-anomaly".
+  const at = parkNow();
+  let asked: string | null = null;
+  try {
+    asked = localStorage.getItem("vwo:demo-anomaly");
+  } catch {
+    // No storage: a random one.
+  }
   spawn = {
     id,
-    kind: pickAnomalyKind(Math.random(), now),
+    kind: isAnomalyKind(asked) ? asked : pickAnomalyKind(Math.random(), at, at + ANOMALY_LIVE_MS),
     floor: Math.floor(Math.random() * 1e9),
     seed: Math.floor(Math.random() * 1e9),
     startsAt: now,
@@ -158,6 +169,7 @@ const ERRORS: Record<string, string> = {
   daily_cap: "Jatah kejutan hari ini sudah habis, coba lagi besok",
   expired: "Yah, keburu pergi",
   not_yet: "Yah, keburu pergi",
+  not_now: "Sudah ganti hari, dia menghilang",
   off: "Kejutan sedang dimatikan panitia",
   seekers_only: "Kejutan ini khusus pencari kerja",
   too_many_requests: "Pelan-pelan, coba lagi sebentar",
@@ -297,7 +309,7 @@ export async function claimAnomaly(): Promise<{ ok: true; reward: AnomalyReward;
     }
     const error = d?.error ?? "";
     if (error === "already_collected") return again(isAnomalyKind(d?.kind) ? d.kind : s.kind);
-    if (error === "already_claimed" || error === "expired" || error === "bad_token" || error === "daily_cap" || error === "seekers_only") {
+    if (error === "already_claimed" || error === "expired" || error === "not_now" || error === "bad_token" || error === "daily_cap" || error === "seekers_only") {
       done.add(s.id);
       changed();
     }

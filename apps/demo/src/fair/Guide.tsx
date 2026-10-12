@@ -76,6 +76,8 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Gedung di tengah adalah acara ini: masuk lewat pintunya untuk kembali ke lobi.",
       "Gedung yang masih dibangun adalah acara berikutnya. Dekati untuk melihat nama dan tanggalnya.",
       "Duduk di bangku taman untuk main mini game berhadiah koin.",
+      "Telepon umum merah di dekat air mancur: telepon teman yang sedang online di job fair.",
+      "Taman ikut jam Jakarta: sore lampu menyala, malam ada kunang-kunang. Ada kejutan khusus taman, siang dan malam, termasuk hantu iseng.",
       "Taman tidak bisa dicapai dengan lift: keluar lewat pintu taman di lobi.",
     ],
   },
@@ -255,6 +257,8 @@ export function reachHint(kind: string): string | null {
       return "🌳 Keluar ke taman";
     case "parkIn":
       return "🏢 Masuk ke gedung";
+    case "phone":
+      return "☎️ Telepon teman";
     default:
       return null;
   }

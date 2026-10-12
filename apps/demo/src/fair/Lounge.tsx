@@ -17,6 +17,8 @@ export interface LoungeCallStart {
   minutes: number;
   consultant?: Consultant;
   peer?: LoungePeer;
+  /** Where the call is made from, as the other side sees it ("Telepon umum di taman"); the lounge by default. */
+  via?: string;
 }
 
 /** Things to talk about when calling another job seeker (a bot, in the demo). */

@@ -36,7 +36,16 @@ import {
   safeImage,
   vipSeatBooth,
   anomalyRewardText,
+  ANOMALY_INFO,
   type ParkBuilding,
+  type ParkNpc,
+  PHONE_FRONT,
+  atPhoneBox,
+  darkness,
+  parkNpcHello,
+  parkNpcSeats,
+  parkNpcsAt,
+  scaredFlocks,
   PARK,
   atLobbyDoor,
   atParkDoor,
@@ -75,6 +84,7 @@ import {
   anomalyExtras,
   parkDoorExtras,
   parkExtras,
+  parkLights,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
 import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
@@ -108,7 +118,10 @@ import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, loadRelay, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
-import { ParkCard } from "./fair/Park";
+import { ParkCard, parkNpcLook } from "./fair/Park";
+import { PhoneBox } from "./fair/PhoneBox";
+import { phoneBook } from "./fair/phone-book";
+import { parkNow } from "./fair/park-clock";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard, VisitCard } from "./fair/Invite";
 import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
@@ -176,6 +189,7 @@ type Reach =
   | { kind: "library" }
   | { kind: "parkOut" }
   | { kind: "parkIn" }
+  | { kind: "phone" }
   | { kind: "soon"; building: ParkBuilding };
 
 const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
@@ -309,6 +323,8 @@ export function JobFair() {
     (LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal; payOnAnswer?: boolean }) | null
   >(null);
   const [lift, setLift] = useState(false);
+  /** The park's phone box is open. */
+  const [phone, setPhone] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
   const [media, setMedia] = useState<{ boothId: string; acc: string } | null>(null);
@@ -407,6 +423,7 @@ export function JobFair() {
     notifs ||
     lounge ||
     loungeCall ||
+    phone ||
     guide ||
     intro
   );
@@ -449,7 +466,14 @@ export function JobFair() {
   const feed = useStageFeed(stageLive, liveHere && !seminar, session?.name ?? "Pengunjung");
   const me = fair.player;
   const seeker = levelOf(me.xp);
-  const occupied = fair.occupiedSeats();
+  // The park by its clock: how dark it is, and its people (worked out here, never sent anywhere).
+  const parkAt = park ? parkNow() : 0;
+  const dark = park ? darkness(parkAt) : 0;
+  const benchSeatId = (bench: number, side: 0 | 1) => `${fair.parkId}-bench${bench + 1}-${"AB"[side]}`;
+  const visitorSeats = fair.occupiedSeats();
+  const parkPeople: ParkNpc[] = park ? parkNpcsAt(parkAt, (b, side) => visitorSeats.has(benchSeatId(b, side))) : [];
+  /** Seats taken: by visitors, and in the park the bench seats its people sit on. */
+  const occupied = park ? new Set([...visitorSeats, ...parkNpcSeats(parkAt).map(([b, side]) => benchSeatId(b, side))]) : visitorSeats;
   const mine = session ? fair.applications.filter((a) => a.visitorId === session.visitorId) : [];
   const appliedIds = new Set(mine.map((a) => a.jobId));
 
@@ -567,6 +591,7 @@ export function JobFair() {
     if (self.seatId) return { kind: "sofa" };
     if (park) {
       if (atParkDoor(self.x, self.y)) return { kind: "parkIn" };
+      if (atPhoneBox(self.x, self.y)) return { kind: "phone" };
       const i = plotAt(self.x, self.y);
       const b = i >= 0 ? parkPlots(fair.shownParkBuildings())[i]?.building : null;
       if (b) return { kind: "soon", building: b };
@@ -850,6 +875,7 @@ export function JobFair() {
     else if (r.kind === "library") setLibrary(true);
     else if (r.kind === "parkOut") stepThrough(fair.parkId);
     else if (r.kind === "parkIn") stepThrough(fair.lobbyId);
+    else if (r.kind === "phone") setPhone(true);
     else if (r.kind === "soon") return;
     else talkToVisitor(r.memberId);
   }
@@ -896,6 +922,9 @@ export function JobFair() {
   /** Walk out to the park, from anywhere in the building. */
   const goToPark = () => goTo(fair.parkId, PARK.arrive.x, PARK.arrive.y + 0.8);
 
+  /** Walk to the park's phone box and pick a friend to call. */
+  const goToPhone = () => goTo(fair.parkId, PHONE_FRONT.x, PHONE_FRONT.y, () => setPhone(true));
+
   /** In the park: walk to the event building's door and go back in. */
   const goInside = () => {
     if (reachRef.current?.kind === "parkIn") return stepThrough(fair.lobbyId);
@@ -938,7 +967,7 @@ export function JobFair() {
     const me = session && fair.visitors.get(session.visitorId);
     if (!me || busy.current) return;
     if (followRef.current) setFollow(null);
-    const taken = fair.occupiedSeats();
+    const taken = me.floorId === fair.parkId ? new Set([...fair.occupiedSeats(), ...parkNpcSeats(parkNow()).map(([b, side]) => benchSeatId(b, side))]) : fair.occupiedSeats();
     const seat = fair
       .floor(me.floorId)
       .seats.filter((st) => !taken.has(st.id) || st.id === me.seatId)
@@ -1613,7 +1642,7 @@ export function JobFair() {
       setLoungeCall({
         ...c,
         name: c.peer.name,
-        sub: "Pencari kerja · Lounge Konsultasi",
+        sub: `Pencari kerja · ${c.via ?? "Lounge Konsultasi"}`,
         color: "#0f766e",
         look: live ? remoteLooks.current.get(c.peer.memberId) : lookFor(`${c.peer.name}:${c.peer.memberId}`),
         lines: PEER_LINES,
@@ -1627,7 +1656,7 @@ export function JobFair() {
               recruiter: session?.name ?? "Pencari kerja",
               logo: "",
               color: "#0f766e",
-              jobTitle: "Lounge Konsultasi",
+              jobTitle: c.via ?? "Lounge Konsultasi",
               kind: c.kind,
               from: "seeker",
               minutes: c.minutes,
@@ -1792,10 +1821,13 @@ export function JobFair() {
     });
   };
   const anomalyHere = anomaly && anomaly.floorId === floor.id ? anomaly : null;
+  /** A night one in the dark park glows: drawn over the night's tint. */
+  const anomalyGlows = !!anomalyHere && dark > 0.5 && ANOMALY_INFO[anomalyHere.kind].phase === "night";
+  const anomalyScene = anomalyHere ? anomalyExtras({ ...anomalyHere, claimed: anomalyHere.claimed?.coins }, session ? catchAnomaly : undefined) : [];
 
   // --- Scene.
   const extras = [
-    ...(anomalyHere ? anomalyExtras({ ...anomalyHere, claimed: anomalyHere.claimed?.coins }, session ? catchAnomaly : undefined) : []),
+    ...(anomalyGlows ? [] : anomalyScene),
     ...(room ? [] : fair.freeSlots().filter((sl) => sl.floor === hall)).flatMap((sl) => emptyBoothExtras(sl, () => setBooking(sl))),
     ...booths.flatMap((b) =>
       boothExtras(b, {
@@ -1811,6 +1843,10 @@ export function JobFair() {
           plots: parkPlots(fair.shownParkBuildings()),
           onEnter: session ? goInside : undefined,
           onPlot: session ? (i) => goTo(fair.parkId, plotFront(i).x, plotFront(i).y) : undefined,
+          onPhone: session ? goToPhone : undefined,
+          dark,
+          npcs: parkPeople,
+          scared: self ? scaredFlocks(self.x, self.y) : undefined,
         })
       : [
           ...infoDeskExtras(desk, session ? goToInfo : undefined),
@@ -1855,9 +1891,26 @@ export function JobFair() {
       return { id: s.id, name: `✨ ${s.name}`, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, seated: s.seated, look: spgLook(s.name, b?.color ?? "#be185d") };
     return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
+  // The park's people: drawn like staff, never counted as visitors.
+  for (const n of parkPeople)
+    npcs.push({
+      id: n.id,
+      name: n.name,
+      floorId: floor.id,
+      x: n.x,
+      y: n.y,
+      facing: n.facing,
+      seated: n.seated,
+      small: n.small,
+      moving: n.moving,
+      look: parkNpcLook(n, dark > 0.5),
+    });
   // Only who is on the floor in view: people elsewhere cost nothing to draw.
   const avatars: AvatarState[] = [...fair.visitors.values()].filter((v) => v.floorId === floor.id);
-  const bubbles = Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]));
+  const bubbles = {
+    ...Object.fromEntries(parkPeople.flatMap((n) => (n.say ? [[n.id, n.say]] : []))),
+    ...Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text])),
+  };
   const lookOf = (a: AvatarState) =>
     session && a.memberId === session.visitorId ? session.look : (remoteLooks.current.get(a.memberId) ?? lookFor(`${a.displayName}:${a.memberId}`));
 
@@ -1896,6 +1949,8 @@ export function JobFair() {
         npcs={npcs}
         bubbles={bubbles}
         extras={extras}
+        darkness={park ? dark : 0}
+        lights={park ? [...parkLights({ dark, npcs: parkPeople }), ...(anomalyGlows ? anomalyScene : [])] : undefined}
         hallSponsors={fair.fair.sponsors}
         follow={self ? { x: self.x, y: self.y } : null}
         onTileClick={session ? walkTo : undefined}
@@ -1908,7 +1963,8 @@ export function JobFair() {
                 const st = room?.stalls?.findIndex((x) => stallStaffId(x.id) === id) ?? -1;
                 const pr = fair.fair.promoters.find((x) => promoterId(x.id) === id);
                 const ci = room?.consultants?.findIndex((x) => consultantId(x.id) === id) ?? -1;
-                if (ci >= 0) goToConsultant(ci);
+                if (id.startsWith("park:")) fair.say(id, parkNpcHello(id, parkNow()), 3000);
+                else if (ci >= 0) goToConsultant(ci);
                 else if (id === LIBRARIAN_ID) goToLibrary();
                 else if (b) goToBooth(b);
                 else if (id.startsWith("spg:")) {
@@ -2282,7 +2338,7 @@ export function JobFair() {
           <CallScreen
             kind={ring.kind}
             peerName={ring.from === "seeker" ? ring.company : `${ring.recruiter} · ${ring.company}`}
-            peerSub={ring.from === "seeker" ? "Pencari kerja · Lounge Konsultasi" : `Tentang lamaran ${ring.jobTitle}`}
+            peerSub={ring.from === "seeker" ? `Pencari kerja · ${ring.jobTitle?.slice(0, 40) || "Lounge Konsultasi"}` : `Tentang lamaran ${ring.jobTitle}`}
             peerLogo={ring.logo || undefined}
             peerLook={ring.from === "seeker" ? lookFor(ring.company) : undefined}
             peerColor={ring.color}
@@ -2533,6 +2589,21 @@ export function JobFair() {
                   }
                 : undefined
             }
+          />
+        )}
+
+        {session && phone && (
+          <PhoneBox
+            book={phoneBook(friends.friends, friendsOnline())}
+            coins={me.coins}
+            canCall={canCallOtherTabs()}
+            onStart={(c) => {
+              setPhone(false);
+              startLoungeCall({ ...c, via: "Telepon umum di taman" });
+            }}
+            onFriends={() => (setPhone(false), setFriendsOpen(true))}
+            onTopUp={() => (setPhone(false), setWallet(true))}
+            onClose={() => setPhone(false)}
           />
         )}
 
