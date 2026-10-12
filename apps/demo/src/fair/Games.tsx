@@ -32,6 +32,7 @@ export function SofaGames({
   jobsFor,
   onGoToBooth,
   myName,
+  onLibrary,
   onClose,
 }: {
   /** Coins the games can still pay out today. */
@@ -52,6 +53,8 @@ export function SofaGames({
   onGoToBooth: (boothId: string) => void;
   /** The player's name, for the demo's leaderboard. */
   myName: string;
+  /** Open the Perpustakaan's free books. */
+  onLibrary?: () => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"play" | "read" | "rank">("play");
@@ -107,6 +110,16 @@ export function SofaGames({
           <>
             <p className="sp-summary">Kenali profesi sambil istirahat. Selesai membaca dapat XP dan bisa langsung lihat lowongan yang cocok di job fair ini.</p>
             <div className="gm-list">
+              {onLibrary && (
+                <button type="button" className="gm-card" onClick={onLibrary}>
+                  <span className="gm-emoji">🏛️</span>
+                  <span>
+                    <b>Perpustakaan</b>
+                    <span className="sp-muted">Buku klasik gratis: novel, sains, puisi, pengembangan diri</span>
+                  </span>
+                  <span className="gm-max">Buka</span>
+                </button>
+              )}
               {CAREER_ARTICLES.map((a) => (
                 <button key={a.id} type="button" className="gm-card" onClick={() => setArticle(a)}>
                   <span className="gm-emoji">{a.emoji}</span>

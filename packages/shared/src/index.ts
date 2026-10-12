@@ -26,3 +26,4 @@ export * from "./anomaly";
 export * from "./consultants";
 export * from "./leads";
 export * from "./stage-stream";
+export * from "./library";

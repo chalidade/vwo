@@ -87,6 +87,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Datangi meja konsultan untuk konsultasi berbayar koin (2, 5, atau 10 menit).",
       "Duduk di sofa lalu tekan 📞 Telepon seseorang untuk menelepon pengunjung lain.",
       "Papan tarif di dinding menampilkan harga tiap durasi. Panggilan berhenti otomatis saat waktu habis.",
+      "Di pojok kanan ada Perpustakaan: datangi meja pustakawan untuk membaca buku klasik gratis.",
     ],
   },
 };
@@ -248,6 +249,8 @@ export function reachHint(kind: string): string | null {
       return "📞 Konsultasi dengan konsultan";
     case "loungeBoard":
       return "📞 Lihat tarif telepon";
+    case "library":
+      return "📚 Buka perpustakaan";
     case "parkOut":
       return "🌳 Keluar ke taman";
     case "parkIn":
