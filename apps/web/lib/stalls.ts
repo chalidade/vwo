@@ -1,6 +1,6 @@
 import "server-only";
-import { addFairStateLocked, type Payment } from "@vwo/db";
-import { DEMO_JOB_FAIR, type FoodStall, freeStallSlotsOf, makeStall, type StallInput } from "@vwo/shared";
+import { addFairStateLocked, type Payment, putFairStateLocked } from "@vwo/db";
+import { DEMO_JOB_FAIR, type FoodStall, freeStallSlotsOf, type Lead, makeStall, type StallInput } from "@vwo/shared";
 import { z } from "zod";
 import { db } from "./db";
 
@@ -17,8 +17,9 @@ export const stallInput = z.object({
   deal: z.object({ title: z.string().trim().max(60), worth: z.string().trim().max(20), price: z.number().int().min(1).max(200) }).nullish(),
 });
 
-/** A paid rental, stored as its own `stall:<payment id>` document. */
-type RentedDoc = { roomId: string; stall: FoodStall; by: string; paymentId: string };
+/** A paid rental, stored as its own `stall:<payment id>` document, or a stall the organiser opened
+ *  for a request (`stall:lead-<request id>`, with the request instead of a payment). */
+type RentedDoc = { roomId: string; stall: FoodStall; by: string; paymentId?: string; leadId?: string };
 
 type Row = { key: string; data: unknown };
 
@@ -56,6 +57,32 @@ export async function placeRentedStall(p: Payment) {
   });
   if (!placed) console.warn("paid stall rental not placed", p.id);
   return placed;
+}
+
+/** The `stall:` document a request's stall is kept in. */
+export const leadStallKey = (leadId: string) => `stall:lead-${leadId}`;
+
+/**
+ * The organiser opens a food business's requested stall in slot `slot` (exactly that one: it is
+ * refused when taken). The stall belongs to the account that asked, like a paid rental. Under the
+ * same lock as paid rentals; a request gets at most one stall.
+ */
+export async function placeLeadStall(
+  lead: Lead,
+  slot: number,
+  adminId: string,
+  roomId = FOOD_COURT,
+): Promise<{ stall: FoodStall } | { error: "slot_taken" | "exists" | "invalid" }> {
+  const key = leadStallKey(lead.id);
+  const r = await putFairStateLocked(db, `stalls:${roomId}`, adminId, (rows) => {
+    if (rows.some((x) => x.key === key)) return { error: "exists" };
+    if (!freeStallSlotsOf(stallsIn(rows, roomId)).includes(slot)) return { error: "slot_taken" };
+    const stall = makeStall(`lead-${lead.id.slice(0, 8)}`, slot, { name: lead.name, vendor: lead.contactName.slice(0, 30), promo: (lead.sells ?? "").slice(0, 80) });
+    if (!stall) return { error: "invalid" };
+    const doc: RentedDoc = { roomId, stall, by: lead.userId ?? adminId, leadId: lead.id };
+    return { key, data: doc };
+  });
+  return "error" in r ? { error: r.error as "slot_taken" | "exists" | "invalid" } : { stall: (r.data as RentedDoc).stall };
 }
 
 /** Rented stalls for the state feed; who paid only for the organiser. */

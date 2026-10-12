@@ -28,3 +28,4 @@ export * from "./booth-reports";
 export * from "./seminar-registrations";
 export * from "./anomaly";
 export * from "./consultants";
+export * from "./leads";

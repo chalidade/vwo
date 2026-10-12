@@ -23,3 +23,4 @@ export * from "./seminars";
 export * from "./stand-placement";
 export * from "./anomaly";
 export * from "./consultants";
+export * from "./leads";

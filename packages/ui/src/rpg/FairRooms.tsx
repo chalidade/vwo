@@ -157,14 +157,14 @@ export function coinStandExtras(stand: CoinStandView, onClick?: () => void): Sce
   ];
 }
 
-/** Free food court slots: an empty counter with a "for rent" sign, tappable to rent it. */
+/** Free food court slots: an empty counter with an "ask for it" sign, tappable to send a request. */
 export function emptyStallExtras(room: FairRoom, onRent?: (slot: number) => void): SceneExtra[] {
   const taken = new Set((room.stalls ?? []).map((st, i) => stallSlot(st, i)));
   return STALL_SLOTS.flatMap((_, slot): SceneExtra[] => {
     if (taken.has(slot)) return [];
     const r = stallRect(slot);
     const w = r.width * T;
-    const title = onRent ? "Stan kosong: sewa stan" : "Stan kosong";
+    const title = onRent ? "Stan kosong: ajukan stan" : "Stan kosong";
     return [
       {
         key: `stall-free-${slot}`,
@@ -180,7 +180,7 @@ export function emptyStallExtras(room: FairRoom, onRent?: (slot: number) => void
             <g transform={`translate(${w / 2}, ${0.75 * T})`}>
               <rect x={-58} y={-13} width={116} height={26} rx={6} fill="#16a34a" {...ink} strokeWidth={1.6} />
               <text x={0} y={5} textAnchor="middle" fontSize={12} fontWeight={900} fill="#fff" fontFamily={font}>
-                {onRent ? "＋ SEWA STAN" : "STAN KOSONG"}
+                {onRent ? "＋ AJUKAN STAN" : "STAN KOSONG"}
               </text>
             </g>
           </svg>

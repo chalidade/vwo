@@ -2599,3 +2599,45 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
   .org-move-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .org-move-cell { grid-column: var(--gcm); grid-row: var(--grm); }
 }
+
+/* ---- booking-inquiry: booth and food court stall requests (form in the game, list for the organiser) ---- */
+.lead-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.lead-intro { margin: 0; }
+.lead-pair { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.lead-pair > label { min-width: 0; }
+.lead-pair input { width: 100%; box-sizing: border-box; min-width: 0; }
+.bk .bk-form textarea { font: inherit; font-weight: 400; padding: 8px 10px; border-radius: 10px; border: 3px solid #3b2a20; background: #fff; color: var(--text); resize: vertical; }
+.lead-card { margin-bottom: 16px; }
+.lead-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
+.lead-filters button { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; background: #fff; color: var(--text); border: 1px solid #d1d5db; box-shadow: none; }
+.lead-filters button[data-active] { background: #111827; color: #fff; border-color: #111827; }
+.lead-n { min-width: 18px; padding: 0 5px; border-radius: 999px; background: rgb(0 0 0 / 0.08); font-size: 11px; font-weight: 700; text-align: center; }
+.lead-filters button[data-active] .lead-n { background: rgb(255 255 255 / 0.2); }
+.lead-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.lead { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #111827; min-width: 0; }
+.lead[data-status="contacted"] { border-left-color: #6b7280; }
+.lead[data-status="done"], .lead[data-status="rejected"] { border-left-color: #d1d5db; }
+.lead[data-status="rejected"] .lead-title b { text-decoration: line-through; color: #6b7280; }
+.lead-head { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.lead-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #f3f4f6; color: #111827; }
+.lead-title { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lead-status { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #111827; color: #fff; white-space: nowrap; }
+.lead-status[data-status="contacted"] { background: #e5e7eb; color: #111827; }
+.lead-status[data-status="done"] { background: #fff; color: #111827; border: 1px solid #111827; }
+.lead-status[data-status="rejected"] { background: #fff; color: #6b7280; border: 1px solid #d1d5db; }
+.lead-contact { display: grid; gap: 6px; font-size: 14px; overflow-wrap: anywhere; }
+.lead-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-links a { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.app-dash .lead-links a.cp-link { padding: 5px 10px; font-size: 13px; }
+.lead-want, .lead-result { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
+.lead-note { margin: 0; padding: 6px 10px; border-left: 3px solid #e5e7eb; color: #374151; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lead-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.lead-status-pick { display: grid; gap: 2px; }
+.lead-status-pick select { min-height: 32px; padding: 4px 8px; font-size: 14px; }
+.lead-org-note { display: grid; gap: 4px; }
+.lead-org-note textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; resize: vertical; }
+.lead-make { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); padding: 10px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; }
+.lead-make label { display: grid; gap: 4px; min-width: 0; }
+.lead-make select { width: 100%; min-height: 36px; }
+.lead-span { grid-column: 1 / -1; margin: 0; }
+.lead-make .bk-colors { margin-top: 4px; }
