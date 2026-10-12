@@ -14,7 +14,7 @@ type Picked = { id: number; title: string; author: string };
 const API = "/api/library";
 
 async function getJson<T>(url: string): Promise<T> {
-  const r = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(20_000) });
+  const r = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(30_000) });
   if (!r.ok) throw new Error(String(r.status));
   if (!r.headers.get("content-type")?.includes("json")) throw new Error("not_json");
   return (await r.json()) as T;
@@ -128,9 +128,10 @@ export function Library({ onClose }: { onClose: () => void }) {
 
 const shelfColor = (id: number) => LIBRARY_SHELVES.find((s) => s.books.some((b) => b.id === id))?.color ?? "#57534e";
 
-function Shelves({ onPick }: { onPick: (b: Picked) => void }) {
+function Shelves({ onPick, withPopular = true }: { onPick: (b: Picked) => void; withPopular?: boolean }) {
   const [popular, setPopular] = useState<LibraryHit[] | "error" | null>(null);
   useEffect(() => {
+    if (!withPopular) return;
     let on = true;
     getJson<{ results: LibraryHit[] }>(`${API}/search`)
       .then((d) => on && setPopular(d.results.slice(0, 12)))
@@ -138,7 +139,7 @@ function Shelves({ onPick }: { onPick: (b: Picked) => void }) {
     return () => {
       on = false;
     };
-  }, []);
+  }, [withPopular]);
   return (
     <div className="lib-shelves">
       {LIBRARY_SHELVES.map((s) => (
@@ -159,23 +160,25 @@ function Shelves({ onPick }: { onPick: (b: Picked) => void }) {
           </div>
         </section>
       ))}
-      <section className="lib-shelf">
-        <h3>Populer di Project Gutenberg</h3>
-        <p className="sp-muted">Paling banyak diunduh pembaca di seluruh dunia.</p>
-        {popular === null && <p className="sp-muted">Memuat…</p>}
-        {popular === "error" && <p className="sp-muted">Daftar populer belum bisa dimuat. Rak di atas tetap bisa dibaca.</p>}
-        {Array.isArray(popular) && (
-          <div className="lib-rail">
-            {popular.map((h) => (
-              <button key={h.id} type="button" className="lib-book" onClick={() => onPick({ id: h.id, title: h.title, author: authorsOf(h) })}>
-                <Cover title={h.title} color="#57534e" img={h.cover} />
-                <b>{h.title}</b>
-                <span className="sp-muted">{authorsOf(h)}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      {withPopular && (
+        <section className="lib-shelf">
+          <h3>Populer di Project Gutenberg</h3>
+          <p className="sp-muted">Paling banyak diunduh pembaca di seluruh dunia.</p>
+          {popular === null && <p className="sp-muted">Memuat…</p>}
+          {popular === "error" && <p className="sp-muted">Daftar populer belum bisa dimuat. Rak di atas tetap bisa dibaca.</p>}
+          {Array.isArray(popular) && (
+            <div className="lib-rail">
+              {popular.map((h) => (
+                <button key={h.id} type="button" className="lib-book" onClick={() => onPick({ id: h.id, title: h.title, author: authorsOf(h) })}>
+                  <Cover title={h.title} color="#57534e" img={h.cover} />
+                  <b>{h.title}</b>
+                  <span className="sp-muted">{authorsOf(h)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -183,7 +186,9 @@ function Shelves({ onPick }: { onPick: (b: Picked) => void }) {
 function Search({ onPick }: { onPick: (b: Picked) => void }) {
   const [q, setQ] = useState("");
   const [state, setState] = useState<{ q: string; hits: LibraryHit[]; more: boolean; page: number } | "loading" | "error" | null>(null);
+  const lastQ = useRef("");
   const run = (query: string, page = 1) => {
+    lastQ.current = query;
     setState("loading");
     getJson<{ results: LibraryHit[]; more: boolean }>(`${API}/search?${new URLSearchParams({ q: query, ...(page > 1 ? { page: String(page) } : {}) })}`)
       .then((d) => setState((cur) => ({ q: query, page, more: d.more, hits: page > 1 && cur && typeof cur === "object" ? [...cur.hits, ...d.results] : d.results })))
@@ -204,7 +209,18 @@ function Search({ onPick }: { onPick: (b: Picked) => void }) {
       </form>
       <p className="sp-muted">Mencari di 70.000+ buku domain publik Project Gutenberg. Kebanyakan berbahasa Inggris.</p>
       {state === "loading" && <p className="sp-muted">Mencari…</p>}
-      {state === "error" && <p className="sp-muted">Pencarian belum bisa dilakukan sekarang. Coba lagi sebentar lagi.</p>}
+      {state === "error" && (
+        <>
+          <p className="lib-unavailable">
+            Pencarian sedang tidak tersedia, coba lagi.{" "}
+            <button type="button" className="lib-btn" onClick={() => lastQ.current && run(lastQ.current)}>
+              Coba lagi
+            </button>
+          </p>
+          <p className="sp-muted">Sementara itu, pilih buku dari rak di bawah.</p>
+          <Shelves onPick={onPick} withPopular={false} />
+        </>
+      )}
       {state && typeof state === "object" && (
         <div className="lib-list">
           {state.hits.length === 0 && <p className="sp-summary">Tidak ada buku untuk “{state.q}”.</p>}

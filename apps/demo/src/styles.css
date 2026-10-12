@@ -2841,3 +2841,6 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
   button.lib-book, .lib-shelf .lib-cover { width: 92px; }
   .lib-shelf .lib-cover { height: 128px; font-size: 12px; }
 }
+
+/* ---- Perpustakaan: search unavailable notice ---- */
+.lib-unavailable { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 2px solid #fdba74; color: #9a3412; font-size: 14px; font-weight: 700; }
