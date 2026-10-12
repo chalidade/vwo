@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type CompanyBooth, type FairFloorInfo, type TalentOffer, hasStand, isFeatured, messageTime, safeImage, UMKM_CORNER } from "@vwo/shared";
+import { ANOMALY_KINDS, type CompanyBooth, type FairFloorInfo, type TalentOffer, hasStand, isFeatured, messageTime, safeImage, UMKM_CORNER } from "@vwo/shared";
 import { LIVE } from "./mode";
 import { dropOffer, myOffers } from "./server-fair";
 import { BoothLogo, type Look, Person } from "@vwo/ui";
@@ -11,10 +11,12 @@ import type { SeekerProfile } from "./profile";
 import { readImageFile } from "./imageFile";
 import { canRecommend, recommendBooths, recommendJobs } from "./fair/recommend";
 import { SeminarSchedule } from "./fair/SeminarSchedule";
+import { AnomalyCollection } from "./fair/AnomalyCollection";
+import { useAnomalyCollection } from "./anomaly-sync";
 import { ViralTab } from "./fair/Viral";
 import { RegionPicker, SkillPicker } from "./pickers";
 
-export type SeekerTab = "profile" | "match" | "seminar" | "invite" | "applications" | "stamps";
+export type SeekerTab = "profile" | "match" | "seminar" | "invite" | "applications" | "stamps" | "anomalies";
 
 const FIELDS: { key: Exclude<keyof SeekerProfile, "contactable">; label: string; placeholder?: string; type?: string }[] = [
   { key: "name", label: "Nama lengkap" },
@@ -77,6 +79,7 @@ export function SeekerPanel({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<SeekerTab>(startTab);
+  const caught = useAnomalyCollection();
   /** Applications opened to show their details and chat; the rest stay folded to one line. */
   const [openApps, setOpenApps] = useState<Set<string>>(() => new Set());
   const toggleApp = (id: string) =>
@@ -126,6 +129,7 @@ export function SeekerPanel({
               ["invite", "🎉 Ajak & lencana"],
               ["applications", `📋 Lamaran (${applications.length})`],
               ["stamps", `🏅 Stempel (${visited.size}/${stands.length})`],
+              ["anomalies", `🐾 Koleksi (${caught.size}/${ANOMALY_KINDS.length})`],
             ] as const
           ).map(([id, label]) => (
             <button key={id} type="button" data-active={tab === id ? "" : undefined} onClick={() => setTab(id)}>
@@ -523,6 +527,7 @@ export function SeekerPanel({
               })}
             </>
           )}
+          {tab === "anomalies" && <AnomalyCollection />}
         </div>
       </div>
     </div>
