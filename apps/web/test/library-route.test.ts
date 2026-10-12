@@ -1,9 +1,15 @@
 // The Perpustakaan routes with upstream faked: only book numbers get through, only allowlisted hosts
 // are ever fetched (redirects included), big or slow answers are refused, and good answers are cached.
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ allowed: true }));
-vi.mock("@/lib/ratelimit", () => ({ allow: async () => state.allowed }));
+const state = vi.hoisted(() => ({ allowed: true, throws: false }));
+vi.mock("@/lib/ratelimit", () => ({
+  allow: async () => {
+    if (state.throws) throw new Error("db down");
+    return state.allowed;
+  },
+}));
 
 const { GET: getBook } = await import("../app/api/library/books/[id]/route");
 const { GET: search } = await import("../app/api/library/search/route");
@@ -32,6 +38,7 @@ const fetchMock = vi.fn(async (input: string | URL | Request) => {
 beforeEach(() => {
   fetched = [];
   state.allowed = true;
+  state.throws = false;
   clearLibraryCache();
   reply = () => new Response(TEXT, { status: 200 });
   vi.stubGlobal("fetch", fetchMock);
@@ -130,9 +137,73 @@ describe("GET /api/library/search", () => {
     expect(fetched).toEqual([]);
   });
 
-  it("returns 502 on broken JSON", async () => {
-    reply = () => new Response("<html>", { status: 200 });
-    expect((await search(new Request("https://jobfair.co.id/api/library/search"))).status).toBe(502);
+  const OPDS = readFileSync(new URL("../../../packages/shared/test/fixtures/gutenberg-search.opds.xml", import.meta.url), "utf8");
+  const atom = () => new Response(OPDS, { headers: { "content-type": "application/atom+xml" } });
+  const ids = async (res: Response) => ((await res.json()) as { results: { id: number }[] }).results.map((r) => r.id);
+
+  it("falls back to Gutenberg's own search when Gutendex errors", async () => {
+    reply = (url) => (url.startsWith("https://gutendex.com/") ? new Response("busy", { status: 503 }) : atom());
+    const res = await search(new Request("https://jobfair.co.id/api/library/search?q=sherlock"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toMatch(/s-maxage=86400/);
+    expect(await ids(res)).toEqual([1661, 2852, 244]);
+    expect(fetched.map((u) => new URL(u).host)).toEqual(["gutendex.com", "www.gutenberg.org"]);
+    expect(new URL(fetched[1]!).searchParams.get("query")).toBe("sherlock");
+  });
+
+  it("falls back on a Gutendex timeout or junk, then skips Gutendex for a while", async () => {
+    reply = (url) => {
+      if (url.startsWith("https://gutendex.com/")) throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      return atom();
+    };
+    expect((await search(new Request("https://jobfair.co.id/api/library/search?q=holmes"))).status).toBe(200);
+    fetched = [];
+    // The next search goes straight to Gutenberg.
+    expect((await search(new Request("https://jobfair.co.id/api/library/search?q=watson"))).status).toBe(200);
+    expect(fetched.map((u) => new URL(u).host)).toEqual(["www.gutenberg.org"]);
+    clearLibraryCache();
+    fetched = [];
+    reply = (url) => (url.startsWith("https://gutendex.com/") ? new Response("<html>oops</html>") : atom());
+    expect(await ids(await search(new Request("https://jobfair.co.id/api/library/search?q=pride")))).toEqual([1661, 2852, 244]);
+  });
+
+  it("uses the fallback for the popular row too, sorted by downloads", async () => {
+    reply = (url) => (url.startsWith("https://gutendex.com/") ? new Response("x", { status: 500 }) : atom());
+    expect((await search(new Request("https://jobfair.co.id/api/library/search"))).status).toBe(200);
+    expect(new URL(fetched[1]!).searchParams.get("sort_order")).toBe("downloads");
+  });
+
+  it("answers a clean 503 when both sources fail, and caches nothing", async () => {
+    for (const second of [
+      () => new Response("down", { status: 502 }),
+      () => new Response("<html>blocked</html>"),
+      () => new Response(null, { status: 302, headers: { location: "https://evil.example/feed" } }),
+    ]) {
+      clearLibraryCache();
+      fetched = [];
+      reply = (url) => (url.startsWith("https://gutendex.com/") ? new Response("x", { status: 500 }) : second());
+      const res = await search(new Request("https://jobfair.co.id/api/library/search?q=sherlock"));
+      expect(res.status).toBe(503);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(await res.json()).toEqual({ error: "search_unavailable" });
+      expect(fetched.every((u) => ["gutendex.com", "www.gutenberg.org"].includes(new URL(u).host))).toBe(true);
+    }
+    // Back up: the next try works, nothing bad was cached.
+    reply = () => Response.json({ count: 0, next: null, results: [] });
+    clearLibraryCache();
+    expect((await search(new Request("https://jobfair.co.id/api/library/search?q=sherlock"))).status).toBe(200);
+  });
+
+  it("refuses an oversized fallback feed", async () => {
+    reply = (url) => (url.startsWith("https://gutendex.com/") ? new Response("x", { status: 500 }) : new Response(new Blob(["<feed>", "x".repeat(1_000_001)]).stream()));
+    expect((await search(new Request("https://jobfair.co.id/api/library/search?q=big"))).status).toBe(503);
+  });
+
+  it("does not crash when the rate limiter itself fails", async () => {
+    state.throws = true;
+    const res = await search(new Request("https://jobfair.co.id/api/library/search?q=sherlock"));
+    expect(res.status).toBe(503);
+    expect(fetched).toEqual([]);
   });
 });
 

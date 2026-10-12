@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = bookIdOf((await params).id);
   if (id == null) return fail(400, "bad_id");
-  if (!(await allow(`library:${clientIp(req)}`, 60, 600_000))) return fail(429, "too_many_requests");
   try {
+    if (!(await allow(`library:${clientIp(req)}`, 60, 600_000))) return fail(429, "too_many_requests");
     const book = await loadBook(id);
     return NextResponse.json({ ...book, source: gutenbergPageUrl(id), licenceUrl: GUTENBERG_LICENSE_URL }, { headers: { "Cache-Control": LIBRARY_CACHE } });
   } catch (e) {
