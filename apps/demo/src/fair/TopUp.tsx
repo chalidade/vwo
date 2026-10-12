@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BUSINESS_PACKAGES, koinText, price, rp } from "@vwo/shared";
 import { LIVE } from "../mode";
-import { pay } from "../payments";
+import { type Gateway, pay, paymentGateway } from "../payments";
 import { fair } from "../useFair";
 
 /**
@@ -12,6 +12,10 @@ export function TopUp({ back, need = 0, compact }: { back: string; /** Coins sti
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  const [gateway, setGateway] = useState<Gateway | null>(null);
+  useEffect(() => {
+    if (LIVE) void paymentGateway().then(setGateway);
+  }, []);
   const packs = BUSINESS_PACKAGES.map((p) => ({ ...p, total: p.coins + p.bonus, price: price(`pack.${p.id}`) }));
   // The smallest package that covers what is missing gets the highlight.
   const best = need > 0 ? (packs.find((p) => p.total >= need) ?? packs[packs.length - 1]) : undefined;
@@ -32,6 +36,13 @@ export function TopUp({ back, need = 0, compact }: { back: string; /** Coins sti
     if (!r.ok) return setError(r.error);
     setDone("Koin sudah masuk ke saldo.");
   };
+
+  if (gateway === "closed")
+    return (
+      <div className="tu" data-compact={compact ? "" : undefined}>
+        <p className="muted small tu-note">Pembelian koin sedang ditutup di luar masa acara. Hubungi panitia kalau butuh koin.</p>
+      </div>
+    );
 
   return (
     <div className="tu" data-compact={compact ? "" : undefined}>
