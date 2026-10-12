@@ -1574,6 +1574,31 @@ export class DemoJobFair {
     this.saveOrg();
   }
 
+  /**
+   * "Siaran lewat" for one seminar session or Aula item, as the speaker page saves it: the source and,
+   * when given, the link ("" takes it out; left out, the saved one stays). A link that is not YouTube or
+   * Vimeo is refused, as in the organiser's tabs. False when the item is gone or the link is refused.
+   */
+  setStream(venue: "seminar" | "aula", id: string, source: "platform" | "link", url?: string) {
+    if (url !== undefined && url.trim() && !cleanStreamUrl(url)) return false;
+    const patch = <T extends { streamSource?: "platform" | "link"; streamUrl?: string }>({ streamSource: _s, streamUrl: old, ...rest }: T) => {
+      const link = url === undefined ? old : cleanStreamUrl(url);
+      return { ...rest, ...(source === "link" && { streamSource: source }), ...(link && { streamUrl: link }) } as T;
+    };
+    if (venue === "seminar") {
+      const s = this.seminars().find((x) => x.id === id);
+      if (!s) return false;
+      this.saveSeminar(patch(structuredClone(s)));
+      return true;
+    }
+    const list = structuredClone(this.rundown());
+    const i = list.findIndex((e) => e.id === id);
+    if (i < 0) return false;
+    list[i] = patch(list[i]!);
+    this.saveRundown(list);
+    return true;
+  }
+
   /** What is on the Aula stage now and what comes next, by the clock. */
   aulaNow(now = new Date()) {
     return aulaNow(this.rundown(), now);

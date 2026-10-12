@@ -2718,3 +2718,14 @@ a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
 /* In a row made only of buttons, every button on a line takes the tallest one's height (e.g. an
    icon-only button next to a labelled one). */
 :is(.row, .iv-actions, .iv-reply, .mb-nav, .mb-foot, .cp-job-tools, .org-card-tools, .inv-actions):not(:has(> :not(button, a.cp-link, a.small-btn, label.small-btn))) > :is(button, a.cp-link, a.small-btn, label.small-btn) { align-self: stretch; }
+/* ---- spk: stacked page cards keep their distance; the speaker page's stream link ---- */
+/* The dashboards' own pages (speaker, consultant, invoices) stack their cards straight in <main>: the
+   same 16px as between the sections of the organiser and company dashboards. */
+.app-dash main.cp:not(.cp-dash):not(.cp-login) { gap: 16px; }
+.st-link { display: grid; gap: 6px; margin: 0; }
+.st-link > label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+.st-link input { width: 100%; box-sizing: border-box; }
+.st-link input[readonly] { background: #f9fafb; color: var(--muted); }
+.st-link p { margin: 0; }
+.st-link-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.st-tag.st-tag-draft { background: #b45309; }
