@@ -111,7 +111,7 @@ import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
 import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
 import { fair, useFair } from "./useFair";
-import { claimAnomaly, startAnomalies, useAnomaly } from "./anomaly-sync";
+import { claimAnomaly, startAnomalies, useAnomaly, useAnomalyCollection } from "./anomaly-sync";
 
 interface Session {
   visitorId: string;
@@ -207,6 +207,7 @@ export function JobFair() {
   const [toast, setToast] = useState<string | null>(null);
   /** A cat, fireflies or another surprise somewhere in the building (the server says which and where). */
   const anomaly = useAnomaly();
+  const collection = useAnomalyCollection();
   const catching = useRef(false);
   useEffect(() => startAnomalies(), []);
   // How much of the screen the bottom tab bar really covers (taller with big system fonts or a
@@ -1514,7 +1515,7 @@ export function JobFair() {
       catching.current = true;
       const r = await claimAnomaly();
       catching.current = false;
-      setToast(r.ok ? `🎉 ${r.name} tertangkap! ${anomalyRewardText(r.reward)}` : r.text);
+      setToast(r.ok ? `${r.rare ? "🌟" : "🎉"} ${r.name} tertangkap! ${anomalyRewardText(r.reward)}. ${r.line}` : r.text);
     });
   };
   const anomalyHere = anomaly && anomaly.floorId === floor.id ? anomaly : null;
@@ -1754,7 +1755,7 @@ export function JobFair() {
             </button>
           ) : session && anomalyHere && !anomalyHere.claimed ? (
             <button type="button" className="rpg-box seated-btn anom-hint" onPointerDown={(e) => e.stopPropagation()} onClick={catchAnomaly}>
-              ✨ {anomalyHere.name} muncul di lantai ini! Tangkap
+              {anomalyHere.rare ? "🌟" : "✨"} {anomalyHere.name} muncul di lantai ini! {collection.has(anomalyHere.kind) ? "Sudah di koleksi" : "Tangkap"}
             </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
@@ -1763,7 +1764,11 @@ export function JobFair() {
           ) : null}
         </div>
 
-        {toast && <div className="toast rpg-box">{toast}</div>}
+        {toast && (
+          <div className="toast rpg-box" data-long={toast.length > 48 ? "" : undefined}>
+            {toast}
+          </div>
+        )}
         <PingCards items={pings} onClose={(id) => setPings((list) => list.filter((p) => p.id !== id))} />
         {follow && !pings.length && (
           <FollowBar name={follow.name} where={fair.visitors.get(follow.memberId) && floorLabel(fair.visitors.get(follow.memberId)!.floorId)} onStop={() => setFollow(null)} />

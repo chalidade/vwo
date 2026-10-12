@@ -2600,6 +2600,87 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
   .org-move-cell { grid-column: var(--gcm); grid-row: var(--grm); }
 }
 
+/* ---- more-anomalies: new kinds' idle moves, the rare ones' glints, the collection and the organiser's list ---- */
+.anom-wave { animation: anom-wave 0.9s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes anom-wave { to { transform: rotate(-22deg); } }
+.anom-wing { animation: anom-wing 0.5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 100% 50%; }
+.anom-wing-r { transform-origin: 0% 50%; }
+@keyframes anom-wing { to { transform: scaleX(0.45); } }
+.anom-blink { animation: anom-blink 1.2s steps(2) infinite; }
+@keyframes anom-blink { 50% { opacity: 0.25; } }
+.anom-rock { animation: anom-rock 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes anom-rock { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+.anom-beam { animation: anom-beam 1.6s ease-in-out infinite; }
+@keyframes anom-beam { 50% { opacity: 0.12; } }
+.anom-puff { animation: anom-puff 2.4s ease-out infinite; transform-box: fill-box; transform-origin: 0% 50%; }
+@keyframes anom-puff { 0%, 60% { opacity: 0; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -6px) scale(1.4); } }
+.anom[data-rare] .anom-wander > div { filter: drop-shadow(0 0 4px #fde047) drop-shadow(0 0 2px #facc15); }
+.anom-glints { position: absolute; inset: -16px; width: calc(100% + 32px); height: calc(100% + 32px); overflow: visible; pointer-events: none; }
+.anom-glint { animation: anom-glint 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+@keyframes anom-glint { 0%, 100% { opacity: 0; transform: scale(0.3); } 40% { opacity: 1; transform: scale(1) rotate(45deg); } }
+.anom-icon { flex: none; }
+.ac-note { margin: -4px 0 10px; font-size: 12px; }
+.ac-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 45%), 1fr)); gap: 10px; }
+.ac-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; background: #fff; border: 2px dashed #c9a27c; border-radius: 10px; font-size: 13px; text-align: center; min-width: 0; }
+.ac-item[data-got] { border-style: solid; border-color: #8b5a2b; }
+.ac-item[data-got][data-rare] { border-color: #ca8a04; background: #fffbeb; }
+.ac-item .sp-muted { font-size: 11px; overflow-wrap: anywhere; }
+.ac-pic { display: grid; place-items: center; height: 62px; }
+.ac-pic .anom-icon { transform: scale(1.1); transform-origin: 50% 100%; }
+.ac-item:not([data-got]) .ac-pic { filter: brightness(0); opacity: 0.18; }
+.ac-item:not([data-got]) .ac-pic * { animation: none !important; }
+.ac-rare { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #a16207; }
+.anom-kinds { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 6px 14px; }
+.anom-kinds li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.anom-kinds .muted { flex-basis: 100%; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.anom-kind-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.anom-kind-tag[data-rare] { color: var(--text); border-color: var(--text); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  .anom-wave, .anom-wing, .anom-blink, .anom-rock, .anom-beam, .anom-puff, .anom-glint { animation: none; }
+}
+/* A long toast (a catch with its line) wraps to two or three lines instead of cutting the end off. */
+.toast[data-long] { white-space: normal; width: max-content; max-width: min(360px, calc(100% - 32px)); text-align: center; line-height: 1.35; }
+/* ---- booking-inquiry: booth and food court stall requests (form in the game, list for the organiser) ---- */
+.lead-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.lead-intro { margin: 0; }
+.lead-pair { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.lead-pair > label { min-width: 0; }
+.lead-pair input { width: 100%; box-sizing: border-box; min-width: 0; }
+.bk .bk-form textarea { font: inherit; font-weight: 400; padding: 8px 10px; border-radius: 10px; border: 3px solid #3b2a20; background: #fff; color: var(--text); resize: vertical; }
+.lead-card { margin-bottom: 16px; }
+.lead-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
+.lead-filters button { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; background: #fff; color: var(--text); border: 1px solid #d1d5db; box-shadow: none; }
+.lead-filters button[data-active] { background: #111827; color: #fff; border-color: #111827; }
+.lead-n { min-width: 18px; padding: 0 5px; border-radius: 999px; background: rgb(0 0 0 / 0.08); font-size: 11px; font-weight: 700; text-align: center; }
+.lead-filters button[data-active] .lead-n { background: rgb(255 255 255 / 0.2); }
+.lead-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.lead { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #111827; min-width: 0; }
+.lead[data-status="contacted"] { border-left-color: #6b7280; }
+.lead[data-status="done"], .lead[data-status="rejected"] { border-left-color: #d1d5db; }
+.lead[data-status="rejected"] .lead-title b { text-decoration: line-through; color: #6b7280; }
+.lead-head { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.lead-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #f3f4f6; color: #111827; }
+.lead-title { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lead-status { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #111827; color: #fff; white-space: nowrap; }
+.lead-status[data-status="contacted"] { background: #e5e7eb; color: #111827; }
+.lead-status[data-status="done"] { background: #fff; color: #111827; border: 1px solid #111827; }
+.lead-status[data-status="rejected"] { background: #fff; color: #6b7280; border: 1px solid #d1d5db; }
+.lead-contact { display: grid; gap: 6px; font-size: 14px; overflow-wrap: anywhere; }
+.lead-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-links a { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.app-dash .lead-links a.cp-link { padding: 5px 10px; font-size: 13px; }
+.lead-want, .lead-result { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
+.lead-note { margin: 0; padding: 6px 10px; border-left: 3px solid #e5e7eb; color: #374151; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lead-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.lead-status-pick { display: grid; gap: 2px; }
+.lead-status-pick select { min-height: 32px; padding: 4px 8px; font-size: 14px; }
+.lead-org-note { display: grid; gap: 4px; }
+.lead-org-note textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; resize: vertical; }
+.lead-make { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); padding: 10px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; }
+.lead-make label { display: grid; gap: 4px; min-width: 0; }
+.lead-make select { width: 100%; min-height: 36px; }
+.lead-span { grid-column: 1 / -1; margin: 0; }
+.lead-make .bk-colors { margin-top: 4px; }
 /* ---- ui-polish-2: buttons side by side share one height ---- */
 /* A link drawn as a button is boxed like a <button>: content centred, no underline. A small link
    button (`small-btn cp-link`) takes the small-button size, the same as the small buttons next to it. */
@@ -2607,7 +2688,7 @@ a.small-btn, a.cp-link, label.small-btn { display: inline-flex; align-items: cen
 a.small-btn:where(:not(.cp-link)) { border: 2px solid #3b2a20; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; }
 a.small-btn.ghost:where(:not(.cp-link)) { background: var(--surface); color: var(--text); }
 a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
-.app-dash a.small-btn.cp-link { padding: 6px 12px; font-size: 13px; }
+.app-dash a.cp-link:where(.small-btn) { padding: 6px 12px; font-size: 13px; }
 /* In a game dialog's action row that has a regular button, the small buttons grow to the regular size,
    and the buttons share the row's width (one under the other when they do not fit on a phone). */
 .mb:not(.app-dash *) .row:has(> button:not(.small-btn)) > :is(.small-btn, a.cp-link) { padding: 7px 12px; font-size: inherit; border-width: 3px; box-shadow: 0 3px 0 #3b2a20; }

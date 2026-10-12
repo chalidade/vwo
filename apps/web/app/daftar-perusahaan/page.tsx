@@ -1,44 +1,31 @@
-import { myPayments, myRegistrations, readPrices } from "@vwo/db";
-import { BUSINESS_PACKAGES, coinsFor, priceFrom } from "@vwo/shared";
-import { liveCoins } from "@/lib/coins";
+import { leadsOf, myRegistrations } from "@vwo/db";
 import { db } from "@/lib/db";
 import { googleEnabled } from "@/lib/google";
-import { provider, refresh } from "@/lib/payments";
 import { currentUser } from "@/lib/session";
-import { RegisterCompany, type RegistrationView } from "./RegisterCompany";
+import { InquiryForm, type LeadView, type RegistrationView } from "./InquiryForm";
 import "../soon.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Daftar booth perusahaan · jobfair" };
 
-/** The company registration link: sign in with Google, fill in the company, pick a package, pay, wait for the organiser. */
+/** The company registration link: sign in with Google, fill in the form, and the organiser calls back. No prices, no payment. */
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const q = await searchParams;
   const user = await currentUser();
-  const prices = await readPrices(db);
-  const mini = priceFrom(prices, "stand.mini");
-  const regular = priceFrom(prices, "stand.regular");
-  const premium = priceFrom(prices, "stand.premium");
-  // Back from the checkout page: ask Xendit straight away instead of waiting for its webhook.
-  if (user && q.bayar) {
-    const open = (await myPayments(db, user.id, ["coins", "registration"])).filter((p) => p.status === "pending");
-    await Promise.all(open.map((p) => refresh(p).catch(() => p)));
-  }
-  const balance = user ? (await liveCoins(user.id)).balance : 0;
-  const packs = BUSINESS_PACKAGES.map((p) => ({ id: p.id, coins: p.coins + p.bonus, bonus: p.bonus, price: priceFrom(prices, `pack.${p.id}`) }));
   const mine: RegistrationView[] = user
     ? (await myRegistrations(db, user.id)).map((r) => ({
         id: r.id,
         company: r.company,
-        tier: r.tier,
-        price: r.price,
-        coins: coinsFor(prices, r.price),
         status: r.status,
         boothKey: r.status === "verified" ? r.boothKey : null,
         pin: r.status === "verified" ? r.pin : null,
         note: r.note,
         createdAt: r.createdAt.getTime(),
       }))
+    : [];
+  // A request the organiser fulfilled shows up as a verified registration (with its code and PIN) instead.
+  const leads: LeadView[] = user
+    ? (await leadsOf(db, user.id)).filter((l) => l.kind === "booth" && l.status !== "done").map((l) => ({ id: l.id, name: l.name, status: l.status, at: l.at }))
     : [];
   return (
     <div className="cs">
@@ -55,28 +42,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           Buka booth di <span className="cs-shine">jobfair</span>
         </h1>
         <p className="cs-sub" style={{ margin: "12px 0 0" }}>
-          Isi data perusahaan dan pilih paket stand (ada paket mini untuk UMKM), lalu bayar dengan koin (isi koin lewat QRIS, virtual account, e-wallet atau kartu). Setelah pembayaran, panitia memverifikasi bahwa perusahaanmu nyata. Kode perusahaan dan PIN untuk masuk ke portal dikirim setelah terverifikasi.
+          Isi data perusahaan dan kontak PIC. Panitia akan menghubungi kamu untuk membicarakan paket dan tempat stand, lalu membuatkan booth dan mengirim kode serta PIN untuk masuk
+          ke portal perusahaan.
         </p>
         <ol className="rg-steps">
           <li>Masuk dengan Google</li>
-          <li>Isi data & pilih paket</li>
-          <li>Bayar dengan koin</li>
-          <li>Verifikasi panitia</li>
+          <li>Isi formulir</li>
+          <li>Panitia menghubungi</li>
           <li>Terima kode & PIN</li>
         </ol>
         {user ? (
-          <RegisterCompany
-            email={user.email}
-            name={user.name}
-            prices={{ mini, regular, premium }}
-            coins={{ mini: coinsFor(prices, mini), regular: coinsFor(prices, regular), premium: coinsFor(prices, premium) }}
-            featured={{ price: priceFrom(prices, "product.featured"), coins: coinsFor(prices, priceFrom(prices, "product.featured")) }}
-            balance={balance}
-            packs={packs}
-            initial={mine}
-            gateway={provider()}
-            back={q.bayar ?? null}
-          />
+          <InquiryForm email={user.email} name={user.name} registrations={mine} initial={leads} />
         ) : (
           <div className="rg-card">
             <h2>Masuk dulu</h2>

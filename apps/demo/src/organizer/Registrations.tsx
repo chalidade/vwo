@@ -3,6 +3,7 @@ import { type BoothTier, standSlotIndex, standSlotName, TIER_LABEL, UMKM_CORNER 
 import { coinText, rupiah } from "../fair/company";
 import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
+import { OrgLeads } from "./Leads";
 
 interface Registration {
   id: string;
@@ -39,49 +40,49 @@ async function call<T>(path: string, body?: unknown): Promise<{ ok: true; data: 
   }
 }
 
-/** Companies that registered through the company link: the organiser checks they are real, then opens their booth. */
+/** Booth requests from the form, then the earlier paid registrations: the organiser checks they are real, then opens their booth. */
 export function OrgRegistrations({ onToast }: { onToast: (t: string) => void }) {
   useFair();
   const [list, setList] = useState<Registration[] | null>(null);
   const [error, setError] = useState("");
   const load = () => void call<{ registrations: Registration[] }>("/api/jobfair/registrations").then((r) => (r.ok ? setList(r.data.registrations) : setError("Daftar pendaftaran gagal dimuat.")));
-  useEffect(load, []);
+  useEffect(() => {
+    if (LIVE) load();
+  }, []);
 
-  if (!LIVE)
-    return (
-      <div className="org">
-        <p className="card cp-server-note">Pendaftaran perusahaan lewat link registrasi hanya ada di versi live (jobfair.co.id/daftar-perusahaan).</p>
-      </div>
-    );
   const order = ["paid", "unpaid", "verified", "rejected"] as const;
+  // Booths are now asked for through the form (above); this list keeps the earlier paid registrations
+  // (still verifiable) and the booths opened from the form.
+  const old = LIVE && (error || (list && list.length > 0));
   return (
     <div className="org">
-      <div className="card">
-        <h2 className="cp-h2">Pendaftaran perusahaan</h2>
-        <p className="muted small" style={{ marginTop: 0 }}>
-          Perusahaan mendaftar lewat <b>jobfair.co.id/daftar-perusahaan</b>, memilih paket, lalu membayar. Cek website, email kantor, dan nomor HP-nya. Kalau benar perusahaan nyata, pilih tempat stand lalu verifikasi: booth langsung berdiri dan perusahaan menerima kode dan PIN lewat email dan halaman pendaftarannya.
-        </p>
-        {error && <p className="bk-err">{error}</p>}
-        {!list && !error && <p className="muted small">Memuat…</p>}
-        {list && list.length === 0 && <p className="muted small">Belum ada pendaftaran.</p>}
-        {list &&
-          order.map((s) => {
-            const rows = list.filter((r) => r.status === s);
-            if (!rows.length) return null;
-            return (
-              <section key={s} className="pr-group">
-                <h3 className="cp-h3">
-                  {STATUS[s]} ({rows.length})
-                </h3>
-                <ul className="cp-jobs">
-                  {rows.map((r) => (
-                    <Row key={r.id} r={r} onDone={(t) => (onToast(t), load())} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-      </div>
+      <OrgLeads kind="booth" onToast={onToast} />
+      {old && (
+        <div className="card">
+          <h2 className="cp-h2">Riwayat pendaftaran</h2>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            Pendaftaran berbayar dari alur lama, dan stand yang sudah dibuat dari formulir. Pendaftaran yang sudah dibayar tetap bisa diverifikasi di sini: pilih tempat stand lalu verifikasi, booth langsung berdiri dan perusahaan menerima kode dan PIN lewat email.
+          </p>
+          {error && <p className="bk-err">{error}</p>}
+          {list &&
+            order.map((s) => {
+              const rows = list.filter((r) => r.status === s);
+              if (!rows.length) return null;
+              return (
+                <section key={s} className="pr-group">
+                  <h3 className="cp-h3">
+                    {STATUS[s]} ({rows.length})
+                  </h3>
+                  <ul className="cp-jobs">
+                    {rows.map((r) => (
+                      <Row key={r.id} r={r} onDone={(t) => (onToast(t), load())} />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
@@ -97,7 +98,7 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
   const pick = free[slot];
   return (
     <li style={{ display: "block" }}>
-      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {TIER_LABEL[r.tier as BoothTier] ?? TIER_LABEL.regular} · {coinText(r.price)} (≈ {rupiah(r.price)})
+      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {TIER_LABEL[r.tier as BoothTier] ?? TIER_LABEL.regular} · {r.price ? `${coinText(r.price)} (≈ ${rupiah(r.price)})` : "lewat formulir"}
       {r.method && <span className="muted small"> · dibayar via {r.method}</span>}
       <div className="muted small">
         {r.industry} · {r.city} · {r.website ? (

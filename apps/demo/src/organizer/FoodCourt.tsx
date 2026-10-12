@@ -1,9 +1,8 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type FoodStall, STALL_MAX_DEALS, STALL_MAX_MENU, STALL_SLOTS, type StallEdit, stallSlot } from "@vwo/shared";
-import { stallPrice } from "../jobfair-engine";
-import { coinText, rupiah } from "../fair/company";
 import { fair } from "../useFair";
+import { OrgLeads } from "./Leads";
 
 const COLORS = ["#ea580c", "#dc2626", "#ca8a04", "#16a34a", "#0d9488", "#2563eb", "#9333ea", "#7c2d12"];
 const sideOf = (slot: number) => (slot < 8 ? `Belakang ${slot + 1}` : slot < 12 ? `Kiri ${slot - 7}` : `Kanan ${slot - 11}`);
@@ -20,12 +19,13 @@ export function OrgFoodCourt({ onToast }: { onToast: (t: string) => void }) {
 
   return (
     <div className="org">
+      <OrgLeads kind="stall" onToast={onToast} />
       <FoodCourtInfo roomId={room.id} onToast={onToast} />
       <div className="card">
         <h2 className="cp-h2">Stan food court</h2>
         <p className="muted small" style={{ marginTop: 0 }}>
-          {STALL_SLOTS.length} tempat stan: 8 di dinding belakang, 4 di sisi kiri, 3 di sisi kanan. {free} kosong. Stan kosong tampil di peta dengan tanda "Sewa stan" dan bisa
-          disewa usaha sendiri seharga {coinText(stallPrice())} (≈ {rupiah(stallPrice())}). Ketuk Ubah untuk mengganti nama, tampilan, jam buka, menu, atau voucher sebuah stan.
+          {STALL_SLOTS.length} tempat stan: 8 di dinding belakang, 4 di sisi kiri, 3 di sisi kanan. {free} kosong. Stan kosong tampil di peta dengan tanda "Ajukan stan": usaha
+          kuliner mengisi formulir tanpa harga, lalu permintaannya muncul di atas. Ketuk Ubah untuk mengganti nama, tampilan, jam buka, menu, atau voucher sebuah stan.
         </p>
         <div className="org-slots">
           {STALL_SLOTS.map((_, slot) => {

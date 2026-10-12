@@ -141,3 +141,10 @@
 .rg-tier-tag { display: inline-block; margin-bottom: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgb(34 197 94 / 0.18); color: #86efac; }
 .rg-addon { font-size: 13px; margin: 0 0 20px; }
 @media (max-width: 760px) { .rg-tiers-3 { grid-template-columns: 1fr; } }
+
+/* booking-inquiry: the registration page is a form now; the organiser calls back. */
+.rg textarea { width: 100%; box-sizing: border-box; padding: 12px 13px; border-radius: 12px; border: 1px solid rgb(255 255 255 / 0.16); background: #111118; color: var(--cs-ink); font: inherit; font-weight: 500; resize: vertical; }
+.rg textarea:focus { outline: 2px solid var(--cs-yellow); outline-offset: 1px; }
+.rg-status[data-s="new"] { background: rgb(253 224 71 / 0.16); color: var(--cs-yellow); }
+.rg-status[data-s="contacted"] { background: rgb(56 189 248 / 0.18); color: #7dd3fc; }
+.rg-status[data-s="done"] { background: rgb(34 197 94 / 0.18); color: #86efac; }

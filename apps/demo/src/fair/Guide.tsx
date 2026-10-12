@@ -65,7 +65,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Berdiri di depan stan lalu ketuk atau tekan E untuk melihat menu dan voucher.",
       "Beli voucher dengan koin; ada cashback koin untuk beberapa pembelian.",
       "Duduk di meja makan untuk beristirahat sambil main mini game (2048, kuis, tangkap koin).",
-      "Punya usaha kuliner? Stan kosong bisa disewa langsung dari sini.",
+      "Punya usaha kuliner? Ketuk stan kosong untuk mengajukan stan ke panitia.",
     ],
   },
   konsultasi: {
