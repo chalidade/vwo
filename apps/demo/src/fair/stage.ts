@@ -1,10 +1,17 @@
 // The seminar stage: a speaker broadcasts their screen (or their slides) to everyone watching.
 // Like calls, the demo has no server: the stage reaches other tabs of this browser through a
-// BroadcastChannel. The live site sends the same messages over a Supabase Realtime channel, so
-// viewers on any device see the talk. The screen itself goes over WebRTC, one connection per viewer.
+// BroadcastChannel. The live site sends the same messages over Supabase Realtime, so viewers on any
+// device see the talk. The screen itself goes over WebRTC, one connection per viewer, so only a few
+// viewers (STAGE_MESH_MAX_VIEWERS) get it; for a crowd the organiser streams to YouTube and the
+// viewers play that instead (`embed`).
+//
+// Supabase counts every message once per client that receives it, so the traffic is split in two:
+// "on air" (on/off) goes to every player, a few times a minute; chat, reactions and the mesh's
+// join/leave go to a second channel that only the people watching join.
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
-import { hasRealtime, realtimeClient } from "../realtime";
+import { STAGE_DEFAULTS, stageStaleMs } from "@vwo/shared";
+import { useEffect, useRef, useState } from "react";
+import { closeChannel, hasRealtime, openChannel, realtimeClient } from "../realtime";
 import { type PeerInfo, connectPeer, joinCall, leaveCall } from "./call";
 
 export interface StageChat {
@@ -33,6 +40,14 @@ export interface StageLive {
   viewers: number;
   /** Where the broadcast plays: the seminar room (default) or the Aula stage, e.g. for opening speeches. */
   venue?: "seminar" | "aula";
+  /** Viewers play the session's stream link (YouTube, Vimeo) from the organiser's setup, not the mesh. */
+  embed?: boolean;
+  /** The mesh has no free place: new viewers get the slides only. */
+  full?: boolean;
+  /** Seconds between two "on air" messages; viewers wait three of them before taking the speaker as gone. */
+  every?: number;
+  /** No speaker page is open: the session's stream link plays because the schedule says it is on now. */
+  scheduled?: boolean;
 }
 
 export type StageMsg =
@@ -42,6 +57,8 @@ export type StageMsg =
   | { type: "restart" }
   | { type: "join" | "leave"; viewerId: string; name: string }
   | { type: "history"; to: string; chat: StageChat[] }
+  /** The speaker's mesh is full: that viewer gets the slides only. */
+  | { type: "full"; to: string }
   | { type: "chat"; chat: StageChat }
   | { type: "react"; e: string };
 
@@ -82,7 +99,12 @@ export function parseStage(x: unknown): StageMsg | null {
         slide: Math.max(0, Math.min(500, Math.floor(num(m.slide)))),
         viewers: Math.max(0, Math.min(100_000, Math.floor(num(m.viewers)))),
         venue: m.venue === "aula" ? "aula" : "seminar",
+        embed: m.embed === true || undefined,
+        full: m.full === true || undefined,
+        every: Math.max(2, Math.min(60, Math.floor(num(m.every) || STAGE_DEFAULTS.beatSec))),
       };
+    case "full":
+      return typeof m.to === "string" && ID.test(m.to) ? { type: "full", to: m.to } : null;
     case "join":
     case "leave":
       return typeof m.viewerId === "string" && ID.test(m.viewerId) ? { type: m.type, viewerId: m.viewerId, name: clean(m.name, 40) } : null;
@@ -105,32 +127,70 @@ export function parseStage(x: unknown): StageMsg | null {
 const local: BroadcastChannel | null = !hasRealtime() && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("vwo-seminar") : null;
 local?.addEventListener("message", (e: MessageEvent<StageMsg>) => deliver(e.data));
 
-// The live site: every device, through one Realtime channel joined on first use.
+// The live site: every device. "On air" goes over a channel every player joins on first use; the
+// rest over the room channel, joined only while watching (see enterStageRoom).
+const MAIN = "jobfair:stage";
+const ROOM = "jobfair:stage-room";
+const ROOM_TYPES = new Set<StageMsg["type"]>(["join", "leave", "history", "full", "chat", "react", "restart"]);
+
+function subscribe(topic: string, onGone: () => void) {
+  return realtimeClient().then(async (sb) => {
+    if (!sb) return null;
+    const ch = await openChannel(sb, topic, { config: { broadcast: { self: false } } });
+    return new Promise<RealtimeChannel | null>((resolve) => {
+      ch.on("broadcast", { event: "m" }, (e: { payload?: unknown }) => {
+        const m = parseStage(e.payload);
+        if (m) deliver(m);
+      });
+      ch.subscribe((status: string) => {
+        if (status === "SUBSCRIBED") resolve(ch);
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          onGone();
+          resolve(null);
+        }
+      });
+    });
+  });
+}
+
 let remote: Promise<RealtimeChannel | null> | null = null;
 function stageChannel() {
-  remote ??= realtimeClient().then(
-    (sb) =>
-      new Promise<RealtimeChannel | null>((resolve) => {
-        if (!sb) return resolve(null);
-        const ch = sb.channel("jobfair:stage", { config: { broadcast: { self: false } } });
-        ch.on("broadcast", { event: "m" }, (e: { payload?: unknown }) => {
-          const m = parseStage(e.payload);
-          if (m) deliver(m);
-        });
-        ch.subscribe((status: string) => {
-          if (status === "SUBSCRIBED") resolve(ch);
-          else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            remote = null;
-            resolve(null);
-          }
-        });
-      }),
-  );
+  remote ??= subscribe(MAIN, () => (remote = null));
   return remote;
 }
 
+let room: Promise<RealtimeChannel | null> | null = null;
+let roomUsers = 0;
+let roomTimer: ReturnType<typeof setTimeout> | null = null;
+function roomChannel() {
+  room ??= subscribe(ROOM, () => (room = null));
+  return room;
+}
+
+/** Join the room channel (chat, reactions, the mesh) while watching or speaking; returns a function that leaves.
+ *  The last one out leaves the channel a little later, so going from the full viewer to the corner panel keeps it. */
+export function enterStageRoom() {
+  roomUsers++;
+  if (roomTimer) clearTimeout(roomTimer);
+  roomTimer = null;
+  if (hasRealtime()) void roomChannel();
+  let left = false;
+  return () => {
+    if (left) return;
+    left = true;
+    if (--roomUsers > 0) return;
+    roomTimer = setTimeout(() => {
+      roomTimer = null;
+      const r = room;
+      if (roomUsers > 0 || !r) return;
+      room = null;
+      void Promise.all([r, realtimeClient()]).then(([ch, sb]) => ch && sb && closeChannel(sb, ROOM, ch));
+    }, 15_000);
+  };
+}
+
 export function sendStage(m: StageMsg) {
-  if (hasRealtime()) void stageChannel().then((ch) => ch?.send({ type: "broadcast", event: "m", payload: m }));
+  if (hasRealtime()) void (ROOM_TYPES.has(m.type) ? roomChannel() : stageChannel()).then((ch) => ch?.send({ type: "broadcast", event: "m", payload: m }));
   else local?.postMessage(m);
 }
 
@@ -156,20 +216,44 @@ export function leaveStage(viewerId: string, name: string) {
   leaveCall(stageCallId(viewerId));
 }
 
-/** Whether a speaker is live in another tab right now, and what they show. */
+// Who is on air, shared by every part of the game that asks (the hall, the seminar seat, the organiser).
+let onAir: (StageLive & { seen: number }) | null = null;
+const airSubs = new Set<(l: StageLive | null) => void>();
+let airUsers = 0;
+let airStop: (() => void) | null = null;
+const setAir = (l: (StageLive & { seen: number }) | null) => {
+  onAir = l;
+  for (const fn of airSubs) fn(l);
+};
+function startAir() {
+  const off = onStage((m) => {
+    if (m.type === "on") setAir({ ...m, seen: Date.now() });
+    else if (m.type === "off") setAir(null);
+  });
+  // In the demo a new tab asks a speaker in another tab right away. On the live site that question would
+  // reach every player, so a newcomer waits for the next "on air" instead (STAGE_BEAT_SEC at most).
+  if (!hasRealtime()) sendStage({ type: "hello" });
+  // Silence for three beats means the speaker closed the tab.
+  const t = setInterval(() => onAir && Date.now() - onAir.seen > stageStaleMs(onAir.every ?? STAGE_DEFAULTS.beatSec) && setAir(null), 2000);
+  return () => {
+    off();
+    clearInterval(t);
+  };
+}
+
+/** Whether a speaker is live right now, and what they show. */
 export function useStageLive() {
-  const [live, setLive] = useState<(StageLive & { seen: number }) | null>(null);
+  const [live, setLive] = useState<StageLive | null>(onAir);
   useEffect(() => {
-    const off = onStage((m) => {
-      if (m.type === "on") setLive({ ...m, seen: Date.now() });
-      else if (m.type === "off") setLive(null);
-    });
-    sendStage({ type: "hello" });
-    // The speaker says it is live every two seconds; silence means it closed the tab.
-    const t = setInterval(() => setLive((l) => (l && Date.now() - l.seen > 6000 ? null : l)), 2000);
+    airSubs.add(setLive);
+    if (airUsers++ === 0) airStop = startAir();
+    setLive(onAir);
     return () => {
-      off();
-      clearInterval(t);
+      airSubs.delete(setLive);
+      if (--airUsers === 0) {
+        airStop?.();
+        airStop = null;
+      }
     };
   }, []);
   return live;
@@ -192,9 +276,17 @@ export const BOT_NAMES = ["Rina", "Dimas", "Putri", "Fajar", "Ayu", "Bagas", "Na
 /**
  * Watch the speaker as one viewer: ask for the stream, and ask again when the speaker restarts
  * (a new screen or microphone), when nothing connects within a while, or when the connection drops.
+ * When the speaker's mesh is full it stops asking and calls `onFull`: the viewer follows the slides.
  * Returns a function that leaves.
  */
-export function watchStage(viewerId: string, name: string, onStream: (s: MediaStream | null) => void, onInfo?: (i: PeerInfo & { tries: number }) => void) {
+export function watchStage(
+  viewerId: string,
+  name: string,
+  onStream: (s: MediaStream | null) => void,
+  onInfo?: (i: PeerInfo & { tries: number }) => void,
+  onFull?: () => void,
+) {
+  const exit = enterStageRoom();
   let peer: { close(): void } | null = null;
   let tries = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -226,19 +318,32 @@ export function watchStage(viewerId: string, name: string, onStream: (s: MediaSt
     retryIn(Math.min(30_000, 12_000 * tries));
   };
   const off = onStage((m) => {
+    if (stopped) return;
     if (m.type === "restart") {
       tries = 0;
       join();
+    } else if (m.type === "full" && m.to === viewerId) {
+      // No place left: stop asking, and stop hearing the mesh's traffic.
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      peer?.close();
+      peer = null;
+      leaveCall(stageCallId(viewerId));
+      onStream(null);
+      off();
+      onFull?.();
     }
   });
   join();
   return () => {
+    const wasOn = !stopped;
     stopped = true;
     if (timer) clearTimeout(timer);
     off();
-    leaveStage(viewerId, name);
+    if (wasOn) leaveStage(viewerId, name);
     peer?.close();
     onStream(null);
+    exit();
   };
 }
 
@@ -251,15 +356,22 @@ export function useStageFeed(live: StageLive | null, on: boolean, name: string) 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [link, setLink] = useState<(PeerInfo & { tries: number }) | null>(null);
   const [viewerId] = useState(() => `feed-${Math.random().toString(36).slice(2, 10)}`);
-  const key = on && live ? live.startedAt : null;
+  /** The broadcast (by start time) whose mesh had no place for this tab, and the one it is watching. */
+  const [fullAt, setFullAt] = useState<number | null>(null);
+  const watching = useRef<number | null>(null);
+  // A stream link plays in the panel itself, and a full mesh is not asked again for this broadcast
+  // (a tab already in keeps its place).
+  const key = on && live && !live.embed && fullAt !== live.startedAt && (!live.full || watching.current === live.startedAt) ? live.startedAt : null;
   useEffect(() => {
+    watching.current = key;
     if (key === null) {
       setStream(null);
       setLink(null);
       return;
     }
-    return watchStage(viewerId, name, setStream, setLink);
+    return watchStage(viewerId, name, setStream, setLink, () => setFullAt(key));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, viewerId]);
-  return { stream, link };
+  const full = !!live && !live.embed && key === null && (fullAt === live.startedAt || !!live.full);
+  return { stream, link, full };
 }

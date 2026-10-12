@@ -93,7 +93,8 @@ import { addFriend, friendOf, loadFriends, myTag, removeFriend, useFriends } fro
 import { MissionsPanel } from "./fair/Missions";
 import { PromoCard } from "./fair/Promo";
 import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
-import { useStageFeed, useStageLive } from "./fair/stage";
+import { useStageFeed } from "./fair/stage";
+import { streamFor, useStageNow } from "./fair/stage-now";
 import { StageFeedPanel } from "./fair/StageFeed";
 import { LoungeDesk, type LoungeCallStart, type LoungeView, PEER_LINES } from "./fair/Lounge";
 import { PsychTest } from "./fair/PsychTest";
@@ -283,7 +284,6 @@ export function JobFair() {
   const friends = useFriends();
   const [friendsOpen, setFriendsOpen] = useState(false);
   const hud = useHud();
-  const stageLive = useStageLive();
   savedSession = session;
 
   // Calls and the stage broadcast need the relay servers; fetch them ahead so ringing isn't delayed.
@@ -339,6 +339,8 @@ export function JobFair() {
   const floor = fair.floor(self?.floorId ?? fair.floors[0]!.id);
   /** Set when the player is on a room floor (food court, seminar, psikotes) rather than a hall. */
   const room = fair.roomOf(floor.id);
+  /** On air in the room the job seeker is in (a speaker, or a session's stream link by the schedule). */
+  const stageLive = useStageNow(room?.kind === "aula" ? "aula" : room?.kind === "seminar" ? "seminar" : undefined);
   const level = fair.levelOf(floor.id);
   /** Which hall this is (booths, sponsors and slots are stored per hall), or -1 in a room. */
   const hall = room ? -1 : fairFloorIndex(floor.id);
@@ -1736,7 +1738,7 @@ export function JobFair() {
           />
         )}
 
-        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed.stream} link={feed.link} onOpen={() => setSeminar(true)} />}
+        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed.stream} link={feed.link} embed={stageLive.embed ? streamFor(stageLive) : null} full={feed.full} onOpen={() => setSeminar(true)} />}
 
         <div className="hud-bottom">
           {talk ? (
@@ -2154,6 +2156,7 @@ export function JobFair() {
             name={profile.name || session.name}
             speakerLook={(n) => staffLook(n, "#0e7490")}
             audience={avatars.filter((a) => a.floorId === floor.id).length}
+            venue={room?.kind === "aula" ? "aula" : "seminar"}
             onFinish={(id) => {
               fair.track("seminar");
               if (fair.attendSeminar(id)) setToast("🎓 E-sertifikat didapat, +30 XP");

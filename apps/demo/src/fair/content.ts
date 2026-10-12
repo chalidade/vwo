@@ -48,6 +48,10 @@ export interface SeminarSession {
   minutes?: number;
   /** Seats; unset means no limit. */
   capacity?: number;
+  /** Broadcast from the speaker's browser (default) or from a YouTube/Vimeo link. */
+  streamSource?: "platform" | "link";
+  /** The live stream link (YouTube, Vimeo) viewers watch in the game when the source is "link". */
+  streamUrl?: string;
 }
 
 export const SEMINARS: SeminarSession[] = [
