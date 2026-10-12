@@ -1,5 +1,21 @@
-import { fairFloorIndex, hasStand, infoDeskOn } from "@vwo/shared";
-import { CafeScene, anomalyExtras, boothExtras, coinStandExtras, emptyBoothExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
+import { fairFloorIndex, hasStand, infoDeskOn, parkPlots } from "@vwo/shared";
+import {
+  CafeScene,
+  anomalyExtras,
+  boothExtras,
+  coinStandExtras,
+  emptyBoothExtras,
+  foodStallExtras,
+  infoDeskExtras,
+  liftExtras,
+  lookFor,
+  parkDoorExtras,
+  parkExtras,
+  promoterExtras,
+  psikotesExtras,
+  seminarStageExtras,
+  sponsorExtras,
+} from "@vwo/ui";
 import { staffLook } from "./staff-look";
 import { levelOf } from "./content";
 import { fair } from "../useFair";
@@ -16,9 +32,10 @@ export function FloorScene({ floorId, className, area = "all" }: { floorId: stri
   const stop = fair.stopOf(floorId);
   const floor = fair.floor(stop.floorId);
   const room = fair.roomOf(floor.id);
-  const hall = fairFloorIndex(floor.id);
+  const park = floor.id === fair.parkId;
+  const hall = park ? -1 : fairFloorIndex(floor.id);
   const half = floor.width / 2;
-  const fitArea = room || area === "all" ? undefined : { x: area === "left" ? 0 : half, width: half };
+  const fitArea = room || park || area === "all" ? undefined : { x: area === "left" ? 0 : half, width: half };
   const anomaly = useAnomaly();
   useEffect(() => startAnomalies(), []);
   return (
@@ -27,33 +44,51 @@ export function FloorScene({ floorId, className, area = "all" }: { floorId: stri
       floor={floor}
       fitArea={fitArea}
       floorName={(id) => fair.stopOf(id).name}
-      hallTitle={room ? undefined : fair.hallBanner(hall).title}
-      hallSubtitle={room ? undefined : fair.hallBanner(hall).subtitle}
-      hallBanner={!room}
+      hallTitle={room || park ? undefined : fair.hallBanner(hall).title}
+      hallSubtitle={room || park ? undefined : fair.hallBanner(hall).subtitle}
+      hallBanner={!room && !park}
       occupiedSeatIds={fair.occupiedSeats()}
       avatars={[...fair.visitors.values()]}
       lookOf={(a) => lookFor(`${a.displayName}:${a.memberId}`)}
-      npcs={fair.staff.map((s) => ({ id: s.id, name: s.name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || fair.fair.promoters.find((p) => s.id.endsWith(p.id))?.color || "#1e3a8a") }))}
+      npcs={fair.staff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        floorId: s.floorId,
+        x: s.x,
+        y: s.y,
+        facing: s.facing,
+        look: staffLook(s.name, (s.boothId && fair.booth(s.boothId)?.color) || fair.fair.promoters.find((p) => s.id.endsWith(p.id))?.color || "#1e3a8a"),
+      }))}
       bubbles={Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text]))}
-      extras={[
-        ...(anomaly?.floorId === floor.id ? anomalyExtras({ ...anomaly, claimed: anomaly.claimed?.coins }) : []),
-        ...liftExtras(stop.name, fair.stops),
-        ...infoDeskExtras(infoDeskOn(fair.fair, floor.id)),
-        ...fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks).flatMap((p) => promoterExtras(p)),
-        ...(room
-          ? room.kind === "foodcourt"
-            ? foodStallExtras(room)
-            : room.kind === "psikotes"
-              ? psikotesExtras(room)
-              : seminarStageExtras(room, null)
+      extras={
+        park
+          ? parkExtras({ eventName: fair.fair.name, plots: parkPlots(fair.shownParkBuildings()) })
           : [
-              ...fair.fair.booths.filter((b) => b.floor === hall && hasStand(b)).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
-              // Free slots show as empty stands, so the organiser sees what is still open.
-              ...fair.freeSlots().filter((sl) => sl.floor === hall).flatMap((sl) => emptyBoothExtras(sl)),
-              ...fair.fair.sponsors.filter((sp) => sp.floor === hall).map((sp) => sponsorExtras(sp)),
-              ...(fair.fair.coinStand.floor === hall ? coinStandExtras(fair.fair.coinStand) : []),
-            ]),
-      ]}
+              ...(anomaly?.floorId === floor.id ? anomalyExtras({ ...anomaly, claimed: anomaly.claimed?.coins }) : []),
+              ...(floor.id === fair.lobbyId ? parkDoorExtras(floor) : []),
+              ...liftExtras(stop.name, fair.stops),
+              ...infoDeskExtras(infoDeskOn(fair.fair, floor.id)),
+              ...fair.fair.promoters.filter((p) => p.level === stop.level && !p.walks).flatMap((p) => promoterExtras(p)),
+              ...(room
+                ? room.kind === "foodcourt"
+                  ? foodStallExtras(room)
+                  : room.kind === "psikotes"
+                    ? psikotesExtras(room)
+                    : seminarStageExtras(room, null)
+                : [
+                    ...fair.fair.booths
+                      .filter((b) => b.floor === hall && hasStand(b))
+                      .flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
+                    // Free slots show as empty stands, so the organiser sees what is still open.
+                    ...fair
+                      .freeSlots()
+                      .filter((sl) => sl.floor === hall)
+                      .flatMap((sl) => emptyBoothExtras(sl)),
+                    ...fair.fair.sponsors.filter((sp) => sp.floor === hall).map((sp) => sponsorExtras(sp)),
+                    ...(fair.fair.coinStand.floor === hall ? coinStandExtras(fair.fair.coinStand) : []),
+                  ]),
+            ]
+      }
       hallSponsors={fair.fair.sponsors}
     />
   );

@@ -22,7 +22,10 @@ const time = (at: number) => new Date(at).toLocaleTimeString("id-ID", { hour: "2
 export function OrgLive() {
   const booths = fair.fair.booths;
   const [tab, setTab] = useState(0);
-  const stop = fair.stops[tab] ?? fair.stops[0]!;
+  // Every lift stop, then the park outside.
+  const places = [...fair.stops, fair.parkStop()];
+  const stop = places[tab] ?? places[0]!;
+  const whole = !!stop.roomId || stop.floorId === fair.parkId;
   // A booth floor is twice as wide as it is tall: the organiser can look at one half up close.
   const [area, setArea] = useState<FloorArea>("all");
   const visitors = [...fair.visitors.values()];
@@ -44,13 +47,14 @@ export function OrgLive() {
         ))}
       </div>
       <div className="floor-tabs" role="tablist">
-        {fair.stops.map((st, i) => (
+        {places.map((st, i) => (
           <button key={st.floorId} type="button" role="tab" aria-selected={i === tab} data-active={i === tab ? "" : undefined} onClick={() => setTab(i)}>
-            {st.name} · {st.emoji} {st.label} <span className="muted">({visitors.filter((v) => v.floorId === st.floorId).length} orang)</span>
+            {st.floorId === fair.parkId ? `${st.emoji} ${st.name}` : `${st.name} · ${st.emoji} ${st.label}`}{" "}
+            <span className="muted">({visitors.filter((v) => v.floorId === st.floorId).length} orang)</span>
           </button>
         ))}
       </div>
-      {!stop.roomId && (
+      {!whole && (
         <div className="floor-tabs org-area" role="tablist" aria-label="Bagian lantai">
           {(
             [
@@ -66,124 +70,144 @@ export function OrgLive() {
         </div>
       )}
       <div className="layout2">
-        <FloorScene className="admin-scene" floorId={stop.floorId} area={stop.roomId ? "all" : area} />
+        <FloorScene className="admin-scene" floorId={stop.floorId} area={whole ? "all" : area} />
         <div className="card org-log">
           <h2 className="cp-h2">Riwayat</h2>
           <div className="org-scroll">
-<table className="list">
-            <tbody>
-              {fair.events.slice(0, 40).map((e, i) => (
-                <tr key={i}>
-                  <td className="muted">{time(e.at)}</td>
-                  <td>
-                    {e.name} {EVENT_TEXT[e.type]} {e.type === "apply" ? `${e.jobTitle} · ${e.company}` : e.type === "rate" ? `oleh ${e.company} ${e.jobTitle}` : e.type === "review" ? `${e.company} ${e.jobTitle}` : (e.company ?? "")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-</div>
+            <table className="list">
+              <tbody>
+                {fair.events.slice(0, 40).map((e, i) => (
+                  <tr key={i}>
+                    <td className="muted">{time(e.at)}</td>
+                    <td>
+                      {e.name} {EVENT_TEXT[e.type]}{" "}
+                      {e.type === "apply"
+                        ? `${e.jobTitle} · ${e.company}`
+                        : e.type === "rate"
+                          ? `oleh ${e.company} ${e.jobTitle}`
+                          : e.type === "review"
+                            ? `${e.company} ${e.jobTitle}`
+                            : (e.company ?? "")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div className="card">
         <h2 className="cp-h2">Stand perusahaan</h2>
         <div className="org-scroll">
-<table className="list">
-          <thead>
-            <tr>
-              <th>Perusahaan</th>
-              <th>Lantai</th>
-              <th>Recruiter</th>
-              <th>Di stand sekarang</th>
-              <th>Kunjungan</th>
-              <th>Lamaran</th>
-              <th>Rating</th>
-              <th>Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...booths].sort((a, b) => a.floor - b.floor).map((b) => (
-              <tr key={b.id}>
-                <td>
-                  <span className="dot" style={{ background: b.color }} /> {b.company} {b.tier === "premium" && <span className="cp-vip" title="Stand VIP">VIP</span>}
-                </td>
-                <td>{fair.fair.floors[b.floor]?.name}</td>
-                <td>{b.recruiter}</td>
-                <td>{fair.peopleAt(b.id)}</td>
-                <td>{fair.visits.get(b.id) ?? 0}</td>
-                <td>{fair.applications.filter((a) => a.boothId === b.id).length}</td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <Stars value={fair.companyRating(b.id).average} count={fair.companyRating(b.id).count} />
-                </td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  {(() => {
-                    const lv = levelOf(fair.companyXp(b.id)).level;
-                    return `Lv ${lv} · ${COMPANY_TITLES[lv - 1]}`;
-                  })()}
-                </td>
+          <table className="list">
+            <thead>
+              <tr>
+                <th>Perusahaan</th>
+                <th>Lantai</th>
+                <th>Recruiter</th>
+                <th>Di stand sekarang</th>
+                <th>Kunjungan</th>
+                <th>Lamaran</th>
+                <th>Rating</th>
+                <th>Level</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-</div>
+            </thead>
+            <tbody>
+              {[...booths]
+                .sort((a, b) => a.floor - b.floor)
+                .map((b) => (
+                  <tr key={b.id}>
+                    <td>
+                      <span className="dot" style={{ background: b.color }} /> {b.company}{" "}
+                      {b.tier === "premium" && (
+                        <span className="cp-vip" title="Stand VIP">
+                          VIP
+                        </span>
+                      )}
+                    </td>
+                    <td>{fair.fair.floors[b.floor]?.name}</td>
+                    <td>{b.recruiter}</td>
+                    <td>{fair.peopleAt(b.id)}</td>
+                    <td>{fair.visits.get(b.id) ?? 0}</td>
+                    <td>{fair.applications.filter((a) => a.boothId === b.id).length}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <Stars value={fair.companyRating(b.id).average} count={fair.companyRating(b.id).count} />
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {(() => {
+                        const lv = levelOf(fair.companyXp(b.id)).level;
+                        return `Lv ${lv} · ${COMPANY_TITLES[lv - 1]}`;
+                      })()}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div className="card">
         <h2 className="cp-h2">Lamaran masuk</h2>
         {fair.applications.length === 0 && <p className="muted">Belum ada lamaran.</p>}
         <div>
           <div className="org-scroll">
-<table className="list">
-            <tbody>
-              {fair.applications.slice(0, 30).map((a) => (
-                <tr key={a.id}>
-                  <td className="muted">{time(a.at)}</td>
-                  <td>
-                    {a.name}{a.verified && <span className="rpg-check" title="Verified">✔</span>} {a.isBot && <span className="muted">· bot</span>}
-                    {a.email && (
-                      <>
-                        <br />
-                        <span className="muted small">{a.email}</span>
-                      </>
-                    )}
-                  </td>
-                  <td>
-                    {a.jobTitle}
-                    <br />
-                    <span className="muted small">{a.company}</span>
-                  </td>
-                  <td>
-                    <span className="status" data-status={a.status}>
-                      {a.status}
-                    </span>
-                    {a.psych != null && (
-                      <>
-                        <br />
-                        <span className="muted small">Psikotes {a.psych}</span>
-                      </>
-                    )}
-                  </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <span className="rate-pick" title="Nilai pelamar">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button key={n} type="button" data-on={(a.rating ?? 0) >= n ? "" : undefined} onClick={() => fair.rateApplicant(a.id, n)} aria-label={`${n} bintang`}>
-                          ★
-                        </button>
-                      ))}
-                    </span>
-                  </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button type="button" className="small-btn" onClick={() => decide(a.id, "Diundang interview")} disabled={a.status === "Diundang interview"}>
-                      Undang interview
-                    </button>{" "}
-                    <button type="button" className="small-btn ghost" onClick={() => decide(a.id, "Belum cocok")} disabled={a.status === "Belum cocok"}>
-                      Belum cocok
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-</div>
+            <table className="list">
+              <tbody>
+                {fair.applications.slice(0, 30).map((a) => (
+                  <tr key={a.id}>
+                    <td className="muted">{time(a.at)}</td>
+                    <td>
+                      {a.name}
+                      {a.verified && (
+                        <span className="rpg-check" title="Verified">
+                          ✔
+                        </span>
+                      )}{" "}
+                      {a.isBot && <span className="muted">· bot</span>}
+                      {a.email && (
+                        <>
+                          <br />
+                          <span className="muted small">{a.email}</span>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      {a.jobTitle}
+                      <br />
+                      <span className="muted small">{a.company}</span>
+                    </td>
+                    <td>
+                      <span className="status" data-status={a.status}>
+                        {a.status}
+                      </span>
+                      {a.psych != null && (
+                        <>
+                          <br />
+                          <span className="muted small">Psikotes {a.psych}</span>
+                        </>
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span className="rate-pick" title="Nilai pelamar">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button key={n} type="button" data-on={(a.rating ?? 0) >= n ? "" : undefined} onClick={() => fair.rateApplicant(a.id, n)} aria-label={`${n} bintang`}>
+                            ★
+                          </button>
+                        ))}
+                      </span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button type="button" className="small-btn" onClick={() => decide(a.id, "Diundang interview")} disabled={a.status === "Diundang interview"}>
+                        Undang interview
+                      </button>{" "}
+                      <button type="button" className="small-btn ghost" onClick={() => decide(a.id, "Belum cocok")} disabled={a.status === "Belum cocok"}>
+                        Belum cocok
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

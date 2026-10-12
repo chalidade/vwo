@@ -1,6 +1,6 @@
 import "server-only";
 import { readFairState } from "@vwo/db";
-import { ANNOUNCE_KEY, cleanBoard, CONSULT_CFG_KEY, type ConsultantDoc, currentAnnouncement, type PublicConsultant, publicConsultant } from "@vwo/shared";
+import { ANNOUNCE_KEY, cleanBoard, CONSULT_CFG_KEY, type ConsultantDoc, currentAnnouncement, type PublicConsultant, publicConsultant, publicParkBuildings } from "@vwo/shared";
 import { createHash } from "node:crypto";
 import { PLACEMENT_KEY } from "./booths";
 import { db } from "./db";
@@ -61,7 +61,8 @@ export function buildState(rows: StateRow[], who: { admin: boolean; mine: Set<st
       board = cleanBoard(r.data);
     } else if (r.key === "org") {
       const { pins: _p, bookings: _b, ...rest } = data;
-      org = admin ? data : rest;
+      // The park's buildings: everyone sees the ones on show; hidden ones are the organiser's alone.
+      org = admin ? data : "buildings" in rest ? { ...rest, buildings: publicParkBuildings(rest.buildings) } : rest;
     } else if (r.key.startsWith("booking:")) {
       // A stand a company booked itself: everyone sees the booth, admins also the booking and PIN.
       bookings.push(admin ? { booth: data.booth, booking: data.booking, pin: data.pin } : { booth: data.booth });

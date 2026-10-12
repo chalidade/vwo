@@ -42,8 +42,8 @@ export interface MapObjectView {
   targetY: number | null;
 }
 
-/** How a floor is drawn: an indoor room with walls, or an open rooftop deck. */
-export type FloorTheme = "indoor" | "rooftop" | "hall";
+/** How a floor is drawn: an indoor room with walls, an open rooftop deck, a hall, or the park outside. */
+export type FloorTheme = "indoor" | "rooftop" | "hall" | "park";
 
 export interface FloorView {
   id: string;
@@ -135,19 +135,21 @@ export function buildDemoFloors(): FloorView[] {
       theme: f.theme,
       objects: DEMO_VENUE.objects
         .filter((o) => o.floor === floorIndex)
-        .map((o: ObjectSpec, i): MapObjectView => ({
-          id: `${id}-obj-${i}`,
-          type: o.type,
-          x: o.x,
-          y: o.y,
-          width: o.width,
-          height: o.height,
-          spriteKey: o.spriteKey ?? null,
-          isWalkable: o.isWalkable ?? false,
-          targetFloorId: o.target ? `floor-${o.target.floor + 1}` : null,
-          targetX: o.target?.x ?? null,
-          targetY: o.target?.y ?? null,
-        })),
+        .map(
+          (o: ObjectSpec, i): MapObjectView => ({
+            id: `${id}-obj-${i}`,
+            type: o.type,
+            x: o.x,
+            y: o.y,
+            width: o.width,
+            height: o.height,
+            spriteKey: o.spriteKey ?? null,
+            isWalkable: o.isWalkable ?? false,
+            targetFloorId: o.target ? `floor-${o.target.floor + 1}` : null,
+            targetX: o.target?.x ?? null,
+            targetY: o.target?.y ?? null,
+          }),
+        ),
     };
   });
 }

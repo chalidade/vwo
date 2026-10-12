@@ -1301,3 +1301,23 @@
     opacity: 0;
   }
 }
+
+/* The park outside the building: grass, walkways, the fountain's water and the roof flags. */
+.rpg-floor-grass {
+  background-color: #7cb85a;
+  background-image:
+    radial-gradient(circle at 12px 14px, rgb(255 255 255 / 0.14) 2px, transparent 3px),
+    radial-gradient(circle at 34px 36px, rgb(20 83 45 / 0.22) 2px, transparent 3px),
+    repeating-linear-gradient(0deg, rgb(20 83 45 / 0.06) 0 2px, transparent 2px 48px);
+  background-size: 48px 48px, 48px 48px, 48px 48px;
+}
+.park-path { box-sizing: border-box; border-radius: 10px; background: #e7d3a8; background-image: radial-gradient(circle at 8px 8px, rgb(120 53 15 / 0.18) 2px, transparent 3px); background-size: 24px 24px; border: 3px solid #c8a76a; }
+.park-plaza { box-sizing: border-box; border-radius: 50%; background: #e7d3a8; background-image: repeating-radial-gradient(circle at center, transparent 0 22px, rgb(120 53 15 / 0.12) 22px 24px); border: 3px solid #c8a76a; }
+.park-sign { width: auto; white-space: nowrap; background: rgb(134 239 172 / 0.7); border-color: #15803d; color: #14532d; }
+.park-water { animation: park-water 1.6s ease-in-out infinite; }
+@keyframes park-water { 50% { opacity: 0.55; transform: translateY(2px); } }
+.park-ripple { transform-box: fill-box; transform-origin: center; animation: park-ripple 2.4s ease-out infinite; }
+@keyframes park-ripple { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+.park-flag { transform-box: fill-box; transform-origin: left center; animation: park-flag 2.2s ease-in-out infinite; }
+@keyframes park-flag { 50% { transform: scaleX(0.86) skewY(4deg); } }
+@media (prefers-reduced-motion: reduce) { .park-water, .park-ripple, .park-flag { animation: none; } }

@@ -34,6 +34,14 @@ import {
   safeImage,
   vipSeatBooth,
   anomalyRewardText,
+  type ParkBuilding,
+  PARK,
+  atLobbyDoor,
+  atParkDoor,
+  lobbyDoorFront,
+  parkPlots,
+  plotAt,
+  plotFront,
 } from "@vwo/shared";
 import {
   type ApplicationInput,
@@ -62,6 +70,8 @@ import {
   lookFor,
   sponsorExtras,
   anomalyExtras,
+  parkDoorExtras,
+  parkExtras,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
 import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
@@ -81,6 +91,7 @@ import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, loadRelay, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
+import { ParkCard } from "./fair/Park";
 import { LevelBar } from "./fair/Modal";
 import { InviteCard, VisitCard } from "./fair/Invite";
 import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
@@ -143,7 +154,10 @@ type Reach =
   | { kind: "sofa" }
   | { kind: "aula"; tab: AulaTab }
   | { kind: "consult"; index: number }
-  | { kind: "loungeBoard" };
+  | { kind: "loungeBoard" }
+  | { kind: "parkOut" }
+  | { kind: "parkIn" }
+  | { kind: "soon"; building: ParkBuilding };
 
 const ANN_SEEN_KEY = "vwo:jobfair-ann-seen";
 
@@ -153,15 +167,37 @@ const EMOTE_ICON: Record<Emote, string> = { wave: "👋", cheers: "🥂", laugh:
 
 /** A VIP booth's SPG: a neat blazer in the company colour, hair up, a big smile. */
 export function spgLook(name: string, color: string): Look {
-  return { ...lookFor(`spg:${name}`), outfit: "blazer", shirt: color, accent: "#fde68a", pants: "#1f2937", shoes: "#111827", style: name.length % 2 ? "bun" : "ponytail", face: "happy", hat: undefined, glasses: false, mustache: false, backpack: undefined, prop: undefined };
+  return {
+    ...lookFor(`spg:${name}`),
+    outfit: "blazer",
+    shirt: color,
+    accent: "#fde68a",
+    pants: "#1f2937",
+    shoes: "#111827",
+    style: name.length % 2 ? "bun" : "ponytail",
+    face: "happy",
+    hat: undefined,
+    glasses: false,
+    mustache: false,
+    backpack: undefined,
+    prop: undefined,
+  };
 }
 
 /** Floor arrows pointing to the lift, laid in the aisles of each kind of floor. */
 // The halls' right half, past the lift, has its own arrows pointing back to it.
-const RIGHT_SIGNS = [{ x: 52, y: 14.8 }, { x: 57, y: 6.7 }, { x: 74, y: 14.8 }, { x: 91, y: 6.7 }];
+const RIGHT_SIGNS = [
+  { x: 52, y: 14.8 },
+  { x: 57, y: 6.7 },
+  { x: 74, y: 14.8 },
+  { x: 91, y: 6.7 },
+];
 const GROUND_SIGNS = [{ x: 13, y: 15.2 }, { x: 23, y: 6.7 }, { x: 32.5, y: 14.8 }, ...RIGHT_SIGNS];
 const HALL_SIGNS = [{ x: 6, y: 15.2 }, { x: 23, y: 6.7 }, { x: 33.5, y: 14.8 }, ...RIGHT_SIGNS];
-const ROOM_SIGNS = [{ x: 11, y: 19.6 }, { x: 25, y: 19.6 }];
+const ROOM_SIGNS = [
+  { x: 11, y: 19.6 },
+  { x: 25, y: 19.6 },
+];
 
 let savedSession: Session | null = null; // survives switching to the organiser view and back
 
@@ -250,7 +286,9 @@ export function JobFair() {
   const [aula, setAula] = useState<AulaTab | null>(null);
   const [notifs, setNotifs] = useState(false);
   const [lounge, setLounge] = useState<LoungeView | null>(null);
-  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal; payOnAnswer?: boolean }) | null>(null);
+  const [loungeCall, setLoungeCall] = useState<
+    (LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal; payOnAnswer?: boolean }) | null
+  >(null);
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
@@ -328,7 +366,29 @@ export function JobFair() {
   /** `then` runs on arrival: tapping a recruiter walks there and opens the conversation. */
   const goal = useRef<{ floorId: string; x: number; y: number; seatId?: string; then?: () => void } | null>(null);
   const busy = useRef(false);
-  busy.current = !!(talk || board || applying || panel || sponsor || wallet || stall || psych || seminar || lift || verify || promo || games || missions || inviteId || aula || notifs || lounge || loungeCall || guide || intro);
+  busy.current = !!(
+    talk ||
+    board ||
+    applying ||
+    panel ||
+    sponsor ||
+    wallet ||
+    stall ||
+    psych ||
+    seminar ||
+    lift ||
+    verify ||
+    promo ||
+    games ||
+    missions ||
+    inviteId ||
+    aula ||
+    notifs ||
+    lounge ||
+    loungeCall ||
+    guide ||
+    intro
+  );
   const counted = useRef(new Set<string>());
 
   const self = session ? fair.visitors.get(session.visitorId) : undefined;
@@ -337,9 +397,12 @@ export function JobFair() {
   const room = fair.roomOf(floor.id);
   /** On air in the room the job seeker is in (a speaker, or a session's stream link by the schedule). */
   const stageLive = useStageNow(room?.kind === "aula" ? "aula" : room?.kind === "seminar" ? "seminar" : undefined);
-  const level = fair.levelOf(floor.id);
-  /** Which hall this is (booths, sponsors and slots are stored per hall), or -1 in a room. */
-  const hall = room ? -1 : fairFloorIndex(floor.id);
+  /** Outside, in the park: no booths, no lift, the way back in is the event building's door. */
+  const park = floor.id === fair.parkId;
+  /** The floor everyone comes in on: its door leads out to the park. */
+  const lobby = floor.id === fair.lobbyId;
+  /** Which hall this is (booths, sponsors and slots are stored per hall), or -1 in a room or the park. */
+  const hall = room || park ? -1 : fairFloorIndex(floor.id);
   /** The first hall has the entrance hall's info desk and its own lift signs. */
   const firstHall = hall === 0;
   const stop = fair.stopOf(floor.id);
@@ -352,7 +415,7 @@ export function JobFair() {
   const desk = infoDeskOn(fair.fair, floor.id);
   /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
   const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
-  const place: GuidePlace = room ? room.kind : "hall";
+  const place: GuidePlace = park ? "taman" : room ? room.kind : "hall";
   // The first time in a place (after the welcome), say what it is for and how to use it.
   useEffect(() => {
     if (!session || talk || intro || guide) return;
@@ -480,11 +543,18 @@ export function JobFair() {
         if (Math.abs(self.x - at.x) < 1.6 && Math.abs(self.y - at.y) < 0.9) return { kind: "aula", tab: tab === "rundown" ? "jadwal" : "info" };
       }
     if (self.seatId) return { kind: "sofa" };
+    if (park) {
+      if (atParkDoor(self.x, self.y)) return { kind: "parkIn" };
+      const i = plotAt(self.x, self.y);
+      const b = i >= 0 ? parkPlots(fair.shownParkBuildings())[i]?.building : null;
+      if (b) return { kind: "soon", building: b };
+    }
+    if (lobby && atLobbyDoor(floor, self.x, self.y)) return { kind: "parkOut" };
     if (coinHere) {
       const c = fair.fair.coinStand;
       if (Math.abs(self.x - (c.x + COIN_STAND_SPOTS.front.x)) < 2 && self.y > c.y + 2.1 && self.y < c.y + 3.6) return { kind: "coins" };
     }
-    if (Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
+    if (!park && Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
     if (room?.stalls) {
       for (const [i, st] of room.stalls.entries()) {
         const at = stallSpot(stallSlot(st, i), "order");
@@ -500,7 +570,7 @@ export function JobFair() {
     }
     for (const p of promotersHere) if (Math.hypot(self.x - p.x, self.y - (p.y + 1.1)) < 1.1) return { kind: "promoter", promoter: p };
     const d = desk;
-    if (self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
+    if (!park && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
     const other = [...fair.visitors.values()]
       .filter((v) => v.memberId !== self.memberId && v.floorId === self.floorId)
       .map((v) => ({ v, d: Math.hypot(v.x - self.x, v.y - self.y) }))
@@ -543,8 +613,7 @@ export function JobFair() {
           fair.stand(me.memberId);
           return;
         }
-      }
-      else if (route.current) {
+      } else if (route.current) {
         const path = route.current;
         let next = path[0];
         while (next && Math.hypot(next.x - me.x, next.y - me.y) < 0.08) {
@@ -553,9 +622,9 @@ export function JobFair() {
         }
         if (!next) {
           route.current = null;
-          // At the lift with somewhere else to be: ride up or down, then walk on.
+          // At the lift or the park door with somewhere else to be: go through, then walk on.
           if (goal.current && goal.current.floorId !== me.floorId) {
-            if (rideTo(goal.current.floorId)) planRoute();
+            if (travel(goal.current.floorId)) planRoute();
             else goal.current = null;
             return;
           }
@@ -728,7 +797,10 @@ export function JobFair() {
       pages: [
         `Halo, ${c.name}! Selamat datang di ${fair.fair.name}.`,
         `Ada ${fair.fair.booths.length} perusahaan dengan ${fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0)} lowongan di ${fair.fair.floors.length} lantai: ${fair.fair.floors.map((f) => `${f.name} ${f.theme}`).join(", ")}.`,
-        `Lift ada di bagian bawah tiap lantai (di lantai booth letaknya di tengah), ikuti tanda 🛗 di lantai. ${fair.stops.filter((st) => st.roomId).map((st) => `${st.name} ${st.label}`).join(", ")}.`,
+        `Lift ada di bagian bawah tiap lantai (di lantai booth letaknya di tengah), ikuti tanda 🛗 di lantai. ${fair.stops
+          .filter((st) => st.roomId)
+          .map((st) => `${st.name} ${st.label}`)
+          .join(", ")}.`,
         "Kalau bingung, tanya aku saja, nanti aku antar ke stand mana pun.",
         "Berdiri di depan meja stand untuk ngobrol dengan recruiter, atau dekati banner di samping meja untuk lihat lowongan. Tekan E untuk bicara.",
       ],
@@ -753,10 +825,13 @@ export function JobFair() {
     else if (r.kind === "aula") setAula(r.tab);
     else if (r.kind === "consult") setLounge({ mode: "consult", index: r.index });
     else if (r.kind === "loungeBoard") setLounge({ mode: "info" });
+    else if (r.kind === "parkOut") stepThrough(fair.parkId);
+    else if (r.kind === "parkIn") stepThrough(fair.lobbyId);
+    else if (r.kind === "soon") return;
     else talkToVisitor(r.memberId);
   }
 
-  /** Route toward the goal: straight there on this floor, or to the lift when it is on another floor. */
+  /** Route toward the goal: straight there on this floor, else to the lift or the park door on the way. */
   function planRoute() {
     let me = savedSession && fair.visitors.get(savedSession.visitorId);
     const g = goal.current;
@@ -772,8 +847,38 @@ export function JobFair() {
       route.current = findPath(f, me, g) ?? (g.seatId ? [{ x: g.x, y: g.y }] : null);
       return;
     }
-    route.current = findPath(f, me, LIFT_FRONT) ?? [LIFT_FRONT];
+    const at = fair.hop(me.floorId, g.floorId).at;
+    route.current = findPath(f, me, at) ?? [at];
   }
+
+  /** The next leg toward another floor, from where the player stands: the lift (a ticket first for a
+   *  paid floor), or through the door between the lobby and the park. False when not going. */
+  function travel(floorId: string) {
+    const me = savedSession && fair.visitors.get(savedSession.visitorId);
+    if (!me) return false;
+    const h = fair.hop(me.floorId, floorId);
+    if (h.via === "lift") return rideTo(h.floorId);
+    fair.takeHop(me.memberId, h);
+    setToast(h.via === "out" ? "🌳 Kamu di taman, di luar gedung" : `🏢 Kembali ke dalam · ${fair.stopOf(h.floorId).name}`);
+    return true;
+  }
+
+  /** Standing at a door: go through it now. */
+  function stepThrough(floorId: string) {
+    route.current = null;
+    goal.current = null;
+    travel(floorId);
+  }
+
+  /** Walk out to the park, from anywhere in the building. */
+  const goToPark = () => goTo(fair.parkId, PARK.arrive.x, PARK.arrive.y + 0.8);
+
+  /** In the park: walk to the event building's door and go back in. */
+  const goInside = () => {
+    if (reachRef.current?.kind === "parkIn") return stepThrough(fair.lobbyId);
+    const door = lobbyDoorFront(fair.floor(fair.lobbyId));
+    goTo(fair.lobbyId, door.x, door.y - 0.6);
+  };
 
   /** Take the lift to a floor; a premium floor asks for a ticket first. False when not riding. */
   function rideTo(floorId: string) {
@@ -972,9 +1077,7 @@ export function JobFair() {
     const enough = me.coins >= price;
     setTalk({
       speaker: `${r.staff} · ${r.name}`,
-      pages: [
-        `${r.tagline}. Tiket masuk ${r.price} koin${voucher ? `, pakai voucher "${voucher.title}" jadi ${price} koin` : ""}. Saldo kamu ${me.coins} koin.`,
-      ],
+      pages: [`${r.tagline}. Tiket masuk ${r.price} koin${voucher ? `, pakai voucher "${voucher.title}" jadi ${price} koin` : ""}. Saldo kamu ${me.coins} koin.`],
       choices: [
         enough
           ? {
@@ -987,7 +1090,13 @@ export function JobFair() {
                 }
               },
             }
-          : { label: "Koin kurang, isi koin", onPick: () => { setTalk(null); setWallet(true); } },
+          : {
+              label: "Koin kurang, isi koin",
+              onPick: () => {
+                setTalk(null);
+                setWallet(true);
+              },
+            },
         { label: "Nanti saja", onPick: () => setTalk(null) },
       ],
     });
@@ -1027,9 +1136,28 @@ export function JobFair() {
       pages,
       choices: [
         { label: "Tanya-tanya", onPick: () => setTalk(faq()) },
-        { label: "Lihat lowongan", onPick: () => { setTalk(null); setBoard({ boothId: b.id }); } },
-        { label: "Info perusahaan", onPick: () => { setTalk(null); setBoard({ boothId: b.id, about: true }); } },
-        { label: open ? "Lamar kerja" : "Lamaranku", onPick: () => { setTalk(null); if (open) setApplying({ boothId: b.id }); else setPanel("applications"); } },
+        {
+          label: "Lihat lowongan",
+          onPick: () => {
+            setTalk(null);
+            setBoard({ boothId: b.id });
+          },
+        },
+        {
+          label: "Info perusahaan",
+          onPick: () => {
+            setTalk(null);
+            setBoard({ boothId: b.id, about: true });
+          },
+        },
+        {
+          label: open ? "Lamar kerja" : "Lamaranku",
+          onPick: () => {
+            setTalk(null);
+            if (open) setApplying({ boothId: b.id });
+            else setPanel("applications");
+          },
+        },
         { label: "⭐ Beri rating", onPick: () => rateCompany(b) },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
@@ -1128,7 +1256,23 @@ export function JobFair() {
           };
         }),
         ...(umkm.length ? [{ label: `🏪 ${UMKM_CORNER}`, hint: `${umkm.length} usaha kecil · lowongan tanpa stand`, onPick: () => setTalk(umkmChoice) }] : []),
-        { label: "🪙 Beli koin di sini", hint: "tanpa ke Stand Koin", onPick: () => { setTalk(null); setWallet("desk"); } },
+        {
+          label: "🌳 Taman di luar gedung",
+          hint: `Lewat pintu taman di ${fair.stopOf(fair.lobbyId).name}`,
+          onPick: () => {
+            setTalk(null);
+            goToPark();
+            setToast("Menuju taman");
+          },
+        },
+        {
+          label: "🪙 Beli koin di sini",
+          hint: "tanpa ke Stand Koin",
+          onPick: () => {
+            setTalk(null);
+            setWallet("desk");
+          },
+        },
         { label: "Tutup", onPick: () => setTalk(null) },
       ],
     };
@@ -1210,24 +1354,35 @@ export function JobFair() {
     const later = { label: "🙏 Nanti", onPick: answer("later") };
     const actions =
       ping.key === "friend" && v.tag
-        ? [{ label: "⭐ Terima", primary: true, onPick: () => (close(), befriend(memberId)) }, { label: "🙏 Nanti", onPick: close }]
+        ? [
+            { label: "⭐ Terima", primary: true, onPick: () => (close(), befriend(memberId)) },
+            { label: "🙏 Nanti", onPick: close },
+          ]
         : ping.key === "friendok"
           ? [{ label: "👥 Lihat teman", primary: true, onPick: () => (close(), setFriendsOpen(true)) }]
           : ping.key === "follow"
-        ? [{ label: "👣 Ikuti", primary: true, onPick: () => (close(), startFollow(memberId, true)) }, later]
-        : ping.key === "floor" && ping.floorId
-          ? [{ label: `🛗 Ke ${fair.stopOf(ping.floorId).name}`, primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), pickFloor(ping.floorId!)) }, later]
-          : ping.key === "here" || ping.key === "where" || ping.key === "wait"
-            ? [
-                ...(ping.key === "where" ? [{ label: "📍 Kirim lokasiku", primary: true, onPick: () => (close(), sendHere(memberId)) }] : []),
-                ...(ping.key !== "where" ? [{ label: "🏃 Datangi", primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), walkToPerson(memberId)) }] : []),
-                later,
-              ]
-            : ["ok", "later", "following", "coming", "thanks", "hiback"].includes(ping.key)
-              ? [{ label: "📍 Lihat", onPick: () => (close(), mark(memberId)) }]
-              : PING_REPLIES.map((k) => ({ label: PING_TEXT[k](""), primary: k === "ok", onPick: answer(k) }));
+            ? [{ label: "👣 Ikuti", primary: true, onPick: () => (close(), startFollow(memberId, true)) }, later]
+            : ping.key === "floor" && ping.floorId
+              ? [
+                  { label: `🛗 Ke ${fair.stopOf(ping.floorId).name}`, primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), pickFloor(ping.floorId!)) },
+                  later,
+                ]
+              : ping.key === "here" || ping.key === "where" || ping.key === "wait"
+                ? [
+                    ...(ping.key === "where" ? [{ label: "📍 Kirim lokasiku", primary: true, onPick: () => (close(), sendHere(memberId)) }] : []),
+                    ...(ping.key !== "where"
+                      ? [{ label: "🏃 Datangi", primary: true, onPick: () => (close(), sendPing(memberId, { key: "coming" }), walkToPerson(memberId)) }]
+                      : []),
+                    later,
+                  ]
+                : ["ok", "later", "following", "coming", "thanks", "hiback"].includes(ping.key)
+                  ? [{ label: "📍 Lihat", onPick: () => (close(), mark(memberId)) }]
+                  : PING_REPLIES.map((k) => ({ label: PING_TEXT[k](""), primary: k === "ok", onPick: answer(k) }));
     actions.push({ label: "🔕", onPick: () => (close(), muted.current.add(memberId), setToast(`${name} dibisukan sampai kamu keluar`)) });
-    setPings((list) => [...list.slice(-2), { id, name, look: lookOfMember(memberId), text: PING_TEXT[ping.key](ping.floorId ? floorLabel(ping.floorId) : ""), where: floorLabel(v.floorId), actions }]);
+    setPings((list) => [
+      ...list.slice(-2),
+      { id, name, look: lookOfMember(memberId), text: PING_TEXT[ping.key](ping.floorId ? floorLabel(ping.floorId) : ""), where: floorLabel(v.floorId), actions },
+    ]);
     window.setTimeout(close, 30_000);
     mark(memberId);
     playPing();
@@ -1401,7 +1556,11 @@ export function JobFair() {
       });
       return;
     }
-    setCoinAsk({ price: c.consultant ? plan.consultCoins : plan.coins, what: `${c.kind === "video" ? "video call" : "telepon"} ${c.minutes} menit dengan ${who}`, run: () => placeLoungeCall(c, who) });
+    setCoinAsk({
+      price: c.consultant ? plan.consultCoins : plan.coins,
+      what: `${c.kind === "video" ? "video call" : "telepon"} ${c.minutes} menit dengan ${who}`,
+      run: () => placeLoungeCall(c, who),
+    });
   }
 
   function placeLoungeCall(c: LoungeCallStart, who: string) {
@@ -1412,7 +1571,14 @@ export function JobFair() {
     }
     setLounge(null);
     if (c.consultant)
-      setLoungeCall({ ...c, name: c.consultant.name, sub: `${c.consultant.role}${c.consultant.org ? ` · ${c.consultant.org}` : ""}`, color: c.consultant.color, look: staffLook(c.consultant.name, c.consultant.color), lines: c.consultant.lines });
+      setLoungeCall({
+        ...c,
+        name: c.consultant.name,
+        sub: `${c.consultant.role}${c.consultant.org ? ` · ${c.consultant.org}` : ""}`,
+        color: c.consultant.color,
+        look: staffLook(c.consultant.name, c.consultant.color),
+        lines: c.consultant.lines,
+      });
     else if (c.peer) {
       const live = c.peer.memberId.startsWith("net:");
       setLoungeCall({
@@ -1496,7 +1662,16 @@ export function JobFair() {
       }
       id = res.data.application.id;
     }
-    const a = fair.apply(session.visitorId, { id, boothId, ...input, headline: profile.headline, education: profile.education, skills: profile.skills, city: profile.city, photo: profile.photo });
+    const a = fair.apply(session.visitorId, {
+      id,
+      boothId,
+      ...input,
+      headline: profile.headline,
+      education: profile.education,
+      skills: profile.skills,
+      city: profile.city,
+      photo: profile.photo,
+    });
     // Applying turns on "Boleh dihubungi perusahaan untuk lowongan lain" unless they already chose.
     updateProfile({ ...profile, name: input.name || profile.name, email: input.email, phone: input.phone, cvUrl: input.cvUrl, contactable: profile.contactable ?? true });
     setApplying(null);
@@ -1532,14 +1707,33 @@ export function JobFair() {
     if (stageLive && stageLive.venue !== "aula") {
       const sem = list.find((x) => x.id === stageLive.sessionId);
       const sl = sem?.slides[stageLive.slide];
-      return { badge: "LIVE", live: true, title: stageLive.title, speaker: stageLive.speaker, role: stageLive.role, slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title), points: sl?.points, page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined, stream: feed.stream };
+      return {
+        badge: "LIVE",
+        live: true,
+        title: stageLive.title,
+        speaker: stageLive.speaker,
+        role: stageLive.role,
+        slideTitle: sl?.title ?? (stageLive.screen ? "Berbagi layar" : stageLive.title),
+        points: sl?.points,
+        page: sem ? `${stageLive.slide + 1}/${sem.slides.length}` : undefined,
+        stream: feed.stream,
+      };
     }
     const now = Date.now();
     const s = liveSeminar(now, list);
     const i = Math.floor(now / 9000) % Math.max(1, s.slides.length);
     const sl = s.slides[i];
     const next = list[(list.indexOf(s) + 1) % list.length];
-    return { badge: "Sedang berlangsung", title: s.title, speaker: s.speaker, role: s.role, slideTitle: sl?.title, points: sl?.points, page: sl ? `${i + 1}/${s.slides.length}` : undefined, next: next && next !== s ? `${next.title} · ${next.speaker}` : undefined };
+    return {
+      badge: "Sedang berlangsung",
+      title: s.title,
+      speaker: s.speaker,
+      role: s.role,
+      slideTitle: sl?.title,
+      points: sl?.points,
+      page: sl ? `${i + 1}/${s.slides.length}` : undefined,
+      next: next && next !== s ? `${next.title} · ${next.speaker}` : undefined,
+    };
   }
 
   /** What the Aula's LED wall and boards show, by the clock. */
@@ -1582,16 +1776,23 @@ export function JobFair() {
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...infoDeskExtras(desk, session ? goToInfo : undefined),
+    ...(park
+      ? parkExtras({
+          eventName: fair.fair.name,
+          plots: parkPlots(fair.shownParkBuildings()),
+          onEnter: session ? goInside : undefined,
+          onPlot: session ? (i) => goTo(fair.parkId, plotFront(i).x, plotFront(i).y) : undefined,
+        })
+      : [
+          ...infoDeskExtras(desk, session ? goToInfo : undefined),
+          ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
+          ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
+        ]),
+    ...(lobby ? parkDoorExtras(floor, session ? goToPark : undefined) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
-    ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
-    ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
     ...(room?.kind === "foodcourt"
-      ? [
-          ...foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined),
-          ...emptyStallExtras(room, session ? setRenting : undefined),
-        ]
+      ? [...foodStallExtras(room, session ? (id) => goToStall(room.stalls!.findIndex((x) => x.id === id)) : undefined), ...emptyStallExtras(room, session ? setRenting : undefined)]
       : []),
     ...(room?.kind === "psikotes" ? psikotesExtras(room) : []),
     ...promotersHere.flatMap((p) => promoterExtras(p, session ? () => goToPromoter(p) : undefined)),
@@ -1620,7 +1821,8 @@ export function JobFair() {
         : room?.kind === "aula" && s.id === roomStaffId(room.id) && stageLive?.venue === "aula"
           ? stageLive.speaker
           : s.name;
-    if (s.id.startsWith("spg:")) return { id: s.id, name: `✨ ${s.name}`, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, seated: s.seated, look: spgLook(s.name, b?.color ?? "#be185d") };
+    if (s.id.startsWith("spg:"))
+      return { id: s.id, name: `✨ ${s.name}`, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, seated: s.seated, look: spgLook(s.name, b?.color ?? "#be185d") };
     return { id: s.id, name, floorId: s.floorId, x: s.x, y: s.y, facing: s.facing, look: staffLook(pr?.name ?? name, pr?.color ?? b?.color ?? "#1e3a8a") };
   });
   // Only who is on the floor in view: people elsewhere cost nothing to draw.
@@ -1681,8 +1883,7 @@ export function JobFair() {
                 else if (id.startsWith("spg:")) {
                   const vb = fair.booth(id.slice(4));
                   if (vb) talkToRecruiter(vb, spgName(vb.id));
-                }
-                else if (pr) goToPromoter(pr);
+                } else if (pr) goToPromoter(pr);
                 else if (id === "coin-staff") goToCoinStand();
                 else if (st >= 0) goToStall(st);
                 else if (room && id === roomStaffId(room.id)) fair.say(id, room.tagline, 2600);
@@ -1698,7 +1899,9 @@ export function JobFair() {
                 🎪 {fair.fair.name} <span className="hud-caret">▴</span>
               </button>
               <button type="button" className="hud-floor" onClick={() => session && setLift(true)} title="Pindah lantai lewat lift">
-                <span>📍 {stop.name} · {stop.emoji} {stop.label}</span>
+                <span>
+                  📍 {stop.name} · {stop.emoji} {stop.label}
+                </span>
                 {session && <span className="hud-lift">🛗</span>}
               </button>
               {session && (
@@ -1707,7 +1910,11 @@ export function JobFair() {
                 </button>
               )}
               {session && (
-                <div className="hud-live" data-status={live.status} title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik.">
+                <div
+                  className="hud-live"
+                  data-status={live.status}
+                  title="Pengunjung lain yang sedang membuka job fair ini dari HP atau laptop mereka. Nama, tampilan karakter, dan posisi dibagikan lewat server publik."
+                >
                   {live.status === "online"
                     ? `🟢 Online · ${live.peers ? `${live.peers} orang dari device lain` : "belum ada orang lain"}`
                     : live.status === "connecting"
@@ -1757,13 +1964,23 @@ export function JobFair() {
               {(() => {
                 const asking = friends.friends.filter((f) => f.state === "received").length;
                 const on = friendsOnline().size;
-                return asking + on > 0 ? <span className="hud-friends-n" data-ask={asking ? "" : undefined}>{asking || on}</span> : null;
+                return asking + on > 0 ? (
+                  <span className="hud-friends-n" data-ask={asking ? "" : undefined}>
+                    {asking || on}
+                  </span>
+                ) : null;
               })()}
             </button>
             <button type="button" className="hud-ic guide-btn" onClick={() => setGuide(true)} title="Panduan: cara memakai tiap fitur" aria-label="Panduan">
               ❓
             </button>
-            <button type="button" className="hud-ic notif-btn" onClick={() => setNotifs(true)} title="Notifikasi dari HR" aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}>
+            <button
+              type="button"
+              className="hud-ic notif-btn"
+              onClick={() => setNotifs(true)}
+              title="Notifikasi dari HR"
+              aria-label={`Notifikasi${fair.unreadFor(PLAYER_ID) ? `, ${fair.unreadFor(PLAYER_ID)} belum dibaca` : ""}`}
+            >
               🔔
               {fair.unreadFor(PLAYER_ID) > 0 && <span className="menu-dot">{fair.unreadFor(PLAYER_ID)}</span>}
             </button>
@@ -1797,19 +2014,40 @@ export function JobFair() {
           />
         )}
 
-        {liveHere && stageLive && !seminar && <StageFeedPanel live={stageLive} stream={feed.stream} link={feed.link} embed={stageLive.embed ? streamFor(stageLive) : null} full={feed.full} onOpen={() => setSeminar(true)} />}
+        {liveHere && stageLive && !seminar && (
+          <StageFeedPanel
+            live={stageLive}
+            stream={feed.stream}
+            link={feed.link}
+            embed={stageLive.embed ? streamFor(stageLive) : null}
+            full={feed.full}
+            onOpen={() => setSeminar(true)}
+          />
+        )}
 
         <div className="hud-bottom">
           {talk ? (
             <DialogBox key={talk.speaker + talk.pages[0]} speaker={talk.speaker} pages={talk.pages} choices={talk.choices} onClose={() => setTalk(null)} />
           ) : reach?.kind === "seated" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => startActivity(reach.room)}>
-              {reach.room.kind === "foodcourt" ? "🎮 Main game sambil makan" : reach.room.kind === "seminar" ? "🎤 Tonton seminar" : reach.room.kind === "aula" ? (stageLive?.venue === "aula" ? "🔴 Tonton siaran panggung" : "🗓️ Lihat jadwal acara") : reach.room.kind === "konsultasi" ? "📞 Telepon seseorang" : "📝 Kerjakan psikotes"}
+              {reach.room.kind === "foodcourt"
+                ? "🎮 Main game sambil makan"
+                : reach.room.kind === "seminar"
+                  ? "🎤 Tonton seminar"
+                  : reach.room.kind === "aula"
+                    ? stageLive?.venue === "aula"
+                      ? "🔴 Tonton siaran panggung"
+                      : "🗓️ Lihat jadwal acara"
+                    : reach.room.kind === "konsultasi"
+                      ? "📞 Telepon seseorang"
+                      : "📝 Kerjakan psikotes"}
             </button>
           ) : reach?.kind === "sofa" ? (
             <button type="button" className="rpg-box seated-btn" onPointerDown={(e) => e.stopPropagation()} onClick={seatedAction}>
               {vipSeatBooth(self?.seatId ?? "") ? `💬 Ngobrol dengan ${spgName(vipSeatBooth(self!.seatId!)!)}` : "🎮 Main mini game"}
             </button>
+          ) : reach?.kind === "soon" ? (
+            <ParkCard building={reach.building} />
           ) : reach && reachHint(reach.kind) ? (
             <button type="button" className="rpg-box seated-btn reach-hint" onPointerDown={(e) => e.stopPropagation()} onClick={interact}>
               {reachHint(reach.kind)} <span className="rpg-kbd">E</span>
@@ -1820,7 +2058,11 @@ export function JobFair() {
             </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 ikuti panah ke lift · ❓ panduan
+              <span className="rpg-kbd">W</span>
+              <span className="rpg-kbd">A</span>
+              <span className="rpg-kbd">S</span>
+              <span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa ·{" "}
+              {park ? "🏢 pintu gedung membawa ke lobi" : "🛗 ikuti panah ke lift"} · ❓ panduan
             </div>
           ) : null}
         </div>
@@ -1960,7 +2202,11 @@ export function JobFair() {
             onToggleStep={(id, key) => fair.toggleStep(id, key)}
             jobsFor={(keys) =>
               fair.fair.booths
-                .flatMap((b) => openJobs(b).filter((j) => keys.some((k) => j.title.toLowerCase().includes(k))).map((j) => ({ boothId: b.id, company: b.company, title: j.title })))
+                .flatMap((b) =>
+                  openJobs(b)
+                    .filter((j) => keys.some((k) => j.title.toLowerCase().includes(k)))
+                    .map((j) => ({ boothId: b.id, company: b.company, title: j.title })),
+                )
                 .slice(0, 4)
             }
             onGoToBooth={(id) => {
@@ -1972,25 +2218,28 @@ export function JobFair() {
           />
         )}
 
-        {session && !ring && invite && (inviteVisit ? (
-          <VisitCard
-            application={invite}
-            onClose={() => setInviteId(null)}
-            onOpen={() => {
-              setInviteId(null);
-              setPanel("applications");
-            }}
-          />
-        ) : (
-          <InviteCard
-            application={invite}
-            onClose={() => setInviteId(null)}
-            onOpen={() => {
-              setInviteId(null);
-              setPanel("applications");
-            }}
-          />
-        ))}
+        {session &&
+          !ring &&
+          invite &&
+          (inviteVisit ? (
+            <VisitCard
+              application={invite}
+              onClose={() => setInviteId(null)}
+              onOpen={() => {
+                setInviteId(null);
+                setPanel("applications");
+              }}
+            />
+          ) : (
+            <InviteCard
+              application={invite}
+              onClose={() => setInviteId(null)}
+              onOpen={() => {
+                setInviteId(null);
+                setPanel("applications");
+              }}
+            />
+          ))}
 
         {ring && (
           <CallScreen
@@ -2115,6 +2364,14 @@ export function JobFair() {
           <LiftPanel
             stops={fair.stops}
             here={floor.id}
+            park={{
+              id: fair.parkId,
+              via: fair.stopOf(fair.lobbyId).name,
+              onPick: () => {
+                setLift(false);
+                if (!park) goToPark();
+              },
+            }}
             atLift={reach?.kind === "lift"}
             ticket={(floorId) => {
               const pass = fair.passFor(floorId);
@@ -2292,12 +2549,16 @@ export function JobFair() {
 
         {!session && (
           <div className="title-screen" onPointerDown={(e) => e.stopPropagation()}>
-            <a className="home-link rpg-box" href="#/">← Beranda</a>
+            <a className="home-link rpg-box" href="#/">
+              ← Beranda
+            </a>
             <InstallButton className="title-install rpg-box" />
             {account ? (
               <div className="title-stack">
                 <div className="title-account rpg-box">
-                  <span>👤 {account.name} · {account.email}</span>
+                  <span>
+                    👤 {account.name} · {account.email}
+                  </span>
                   <button type="button" onClick={signOut}>
                     Ganti akun
                   </button>
@@ -2313,7 +2574,14 @@ export function JobFair() {
                 {character ? (
                   <ReturningCard character={character} onEnter={() => enter(character)} />
                 ) : (
-                  <CharacterCreator key={account.email} defaultName={account.name} onCheckIn={enter} withCompanions={false} cta="Masuk job fair ▶" note="Tampilan ini bisa diubah lagi nanti dari 🎒 Profil." />
+                  <CharacterCreator
+                    key={account.email}
+                    defaultName={account.name}
+                    onCheckIn={enter}
+                    withCompanions={false}
+                    cta="Masuk job fair ▶"
+                    note="Tampilan ini bisa diubah lagi nanti dari 🎒 Profil."
+                  />
                 )}
               </div>
             ) : (

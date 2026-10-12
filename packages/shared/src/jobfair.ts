@@ -3,6 +3,7 @@
 // Coordinates are tiles, like the cafe floors.
 import { type BoothTier, hasStand } from "./booth-packages";
 import { seatPositionsAround } from "./layout";
+import { buildParkFloor, lobbyDoorObject } from "./park";
 import type { FloorView, MapObjectView, SeatView, TableView } from "./venue-view";
 
 export interface JobPosting {
@@ -453,6 +454,9 @@ export const hallLevel = (fair: { hallBase?: number }, i: number) => (fair.hallB
 /** "Lantai 3" for hall `i`. */
 export const hallName = (fair: { hallBase?: number }, i: number) => `Lantai ${hallLevel(fair, i) + 1}`;
 
+/** The floor everyone comes in on (the lowest one): its door leads out to the park. */
+export const entranceFloorId = (fair: JobFairView) => fairStops(fair)[0]?.floorId;
+
 /** Every floor the lift stops at, bottom first. */
 export function fairStops(fair: JobFairView): FairStop[] {
   return [
@@ -505,7 +509,17 @@ export function makeStall(id: string, slot: number, input: StallInput): FoodStal
     website: "",
     rating: 4.5,
     menu: [],
-    deals: deal ? [{ id: `${id}-deal`, title: deal.title.trim().slice(0, 60), worth: deal.worth.trim().slice(0, 20) || "-", price: Math.min(200, Math.max(1, Math.round(deal.price))), terms: "Berlaku 30 hari." }] : [],
+    deals: deal
+      ? [
+          {
+            id: `${id}-deal`,
+            title: deal.title.trim().slice(0, 60),
+            worth: deal.worth.trim().slice(0, 20) || "-",
+            price: Math.min(200, Math.max(1, Math.round(deal.price))),
+            terms: "Berlaku 30 hari.",
+          },
+        ]
+      : [],
   };
 }
 
@@ -688,7 +702,10 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
   } else if (room.kind === "seminar") {
     blocked.push({ x: 4, y: 0.3, width: room.width - 8, height: 2.6 });
     for (let r = 0; r < 5; r++)
-      for (const [side, x0] of [["L", ox + 3.5], ["R", room.width / 2 + 2.5]] as const) {
+      for (const [side, x0] of [
+        ["L", ox + 3.5],
+        ["R", room.width / 2 + 2.5],
+      ] as const) {
         const t = table(`${String.fromCharCode(65 + r)}${side}`, "rect", x0, 4.6 + r * 2.3, 10.6, 0.5);
         for (let i = 0; i < 7; i++) seat(t, i, t.x + 0.8 + i * 1.5, t.y + 1.0);
       }
@@ -699,7 +716,15 @@ function roomFurniture(room: FairRoom): { tables: TableView[]; seats: SeatView[]
       AULA.blocks.forEach((x0, k) => {
         for (let i = 0; i < AULA.perRow; i++) {
           const label = `${String.fromCharCode(65 + r)}${k * AULA.perRow + i + 1}`;
-          seats.push({ id: `${room.id}-${label}`, label: `Kursi ${label}`, tableId: null, x: x0 + 0.5 + i * AULA.chairGap, y: AULA.rowY + r * AULA.rowGap, isActive: true, facing: "back" });
+          seats.push({
+            id: `${room.id}-${label}`,
+            label: `Kursi ${label}`,
+            tableId: null,
+            x: x0 + 0.5 + i * AULA.chairGap,
+            y: AULA.rowY + r * AULA.rowGap,
+            isActive: true,
+            facing: "back",
+          });
         }
       });
   } else if (room.kind === "konsultasi") {
@@ -737,7 +762,10 @@ export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
   blocked.push({ x: desk.x, y: desk.y, width: desk.width, height: desk.height });
   const objects: MapObjectView[] = [
     liftObject(id),
-    ...blocked.map((b, i): MapObjectView => ({ id: `${id}-obj-${i}`, type: "blocked", ...b, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null })),
+    ...(id === entranceFloorId(fair) ? [lobbyDoorObject(fair, id, room)] : []),
+    ...blocked.map(
+      (b, i): MapObjectView => ({ id: `${id}-obj-${i}`, type: "blocked", ...b, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null }),
+    ),
     ...[
       { key: "plant-a", spriteKey: "plant-big", x: 0.2, y: room.height - 1.6, width: 1.2, height: 1 },
       { key: "plant-b", spriteKey: "plant", x: room.width - 1.3, y: 13.4, width: 1, height: 1 },
@@ -748,13 +776,46 @@ export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
     let n = 0;
     for (const y of LOUNGE.rows)
       for (const cx of LOUNGE.groups) {
-        objects.push({ id: `${id}-rug-${n}`, type: "decor", x: cx - 3.4, y: y - 0.2, width: 6.8, height: LOUNGE.sofaH + 0.6, spriteKey: "rug-plain", isWalkable: true, targetFloorId: null, targetX: null, targetY: null });
+        objects.push({
+          id: `${id}-rug-${n}`,
+          type: "decor",
+          x: cx - 3.4,
+          y: y - 0.2,
+          width: 6.8,
+          height: LOUNGE.sofaH + 0.6,
+          spriteKey: "rug-plain",
+          isWalkable: true,
+          targetFloorId: null,
+          targetX: null,
+          targetY: null,
+        });
         for (const right of [true, false]) {
           const o = { x: right ? cx - 3.1 : cx + 2.1, y: y + 0.1, width: 1, height: LOUNGE.sofaH };
           n++;
           // Sofas to sit on: the cushions are walkable seats, only the backrest blocks.
-          objects.push({ id: `${id}-sofa-${n}`, type: "decor", ...o, spriteKey: right ? "sofa" : "sofa-left", isWalkable: true, targetFloorId: null, targetX: null, targetY: null });
-          objects.push({ id: `${id}-sofa-${n}-back`, type: "blocked", x: right ? o.x : o.x + o.width - 0.3, y: o.y, width: 0.3, height: o.height, spriteKey: "invisible", isWalkable: false, targetFloorId: null, targetX: null, targetY: null });
+          objects.push({
+            id: `${id}-sofa-${n}`,
+            type: "decor",
+            ...o,
+            spriteKey: right ? "sofa" : "sofa-left",
+            isWalkable: true,
+            targetFloorId: null,
+            targetX: null,
+            targetY: null,
+          });
+          objects.push({
+            id: `${id}-sofa-${n}-back`,
+            type: "blocked",
+            x: right ? o.x : o.x + o.width - 0.3,
+            y: o.y,
+            width: 0.3,
+            height: o.height,
+            spriteKey: "invisible",
+            isWalkable: false,
+            targetFloorId: null,
+            targetX: null,
+            targetY: null,
+          });
           seats.push(...sofaSeats(id, n, o, right));
         }
       }
@@ -788,9 +849,18 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   const id = fairFloorId(fair, floor);
   const objects: MapObjectView[] = [];
   const add = (o: Omit<MapObjectView, "id" | "targetFloorId" | "targetX" | "targetY">, target?: { floor: number; x: number; y: number }) =>
-    objects.push({ ...o, id: `${id}-obj-${objects.length}`, targetFloorId: target ? fairFloorId(fair, target.floor) : null, targetX: target?.x ?? null, targetY: target?.y ?? null });
-  for (const b of fair.booths) if (b.floor === floor && hasStand(b)) for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
-  for (const sp of fair.sponsors) if (sp.floor === floor) add({ type: "blocked", x: sp.x, y: sp.y, width: SPONSOR_W, height: SPONSOR_H, spriteKey: "invisible", isWalkable: false });
+    objects.push({
+      ...o,
+      id: `${id}-obj-${objects.length}`,
+      targetFloorId: target ? fairFloorId(fair, target.floor) : null,
+      targetX: target?.x ?? null,
+      targetY: target?.y ?? null,
+    });
+  for (const b of fair.booths)
+    if (b.floor === floor && hasStand(b))
+      for (const p of boothParts(b)) add({ type: "blocked", x: p.x, y: p.y, width: p.width, height: p.height, spriteKey: "invisible", isWalkable: false });
+  for (const sp of fair.sponsors)
+    if (sp.floor === floor) add({ type: "blocked", x: sp.x, y: sp.y, width: SPONSOR_W, height: SPONSOR_H, spriteKey: "invisible", isWalkable: false });
   if (fair.coinStand.floor === floor) {
     const c = fair.coinStand;
     add({ type: "blocked", x: c.x, y: c.y, width: COIN_STAND_W, height: 0.5, spriteKey: "invisible", isWalkable: false });
@@ -799,6 +869,7 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   const d = infoDeskOn(fair, id);
   add({ type: "blocked", x: d.x, y: d.y, width: d.width, height: d.height, spriteKey: "invisible", isWalkable: false });
   if (floor === 0) add({ type: "door", x: fair.spawn.x - 1, y: fair.height - 1, width: 2, height: 1, spriteKey: null, isWalkable: true });
+  if (id === entranceFloorId(fair)) objects.push(lobbyDoorObject(fair, id, fair));
   objects.push(liftObject(id));
   const seats: SeatView[] = [];
   for (const b of fair.booths) if (b.floor === floor && b.tier === "premium") seats.push(...vipSeats(b));
@@ -819,9 +890,9 @@ export function buildJobFairFloor(fair: JobFairView, floor = 0): FloorView {
   return { id, name: info ? `${hallName(fair, floor)} · ${info.theme}` : fair.name, width: fair.width, height: fair.height, tables: [], seats, objects, theme: "hall" };
 }
 
-/** Every hall floor, then every room. */
+/** Every hall floor, then every room, then the park outside. */
 export function buildJobFairFloors(fair: JobFairView): FloorView[] {
-  return [...fair.floors.map((_, i) => buildJobFairFloor(fair, i)), ...fair.rooms.map((room) => buildFairRoom(fair, room))];
+  return [...fair.floors.map((_, i) => buildJobFairFloor(fair, i)), ...fair.rooms.map((room) => buildFairRoom(fair, room)), buildParkFloor(fair)];
 }
 
 const job = (id: string, title: string, type: JobPosting["type"], location: string, salary: string | undefined, requirements: string[]): JobPosting => ({
