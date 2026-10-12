@@ -1,7 +1,7 @@
 "use client";
 // Drawings for the job fair's extra places: the lift and its floor signs, the coin stand, food court
 // stalls, the seminar stage, and the psikotes proctor's desk.
-import { AULA, COIN_STAND_H, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, price, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
+import { AULA, COIN_STAND_H, consultantDesk, LOUNGE, LOUNGE_PLANS, COIN_STAND_W, type CoinStandView, FAIR_LIFT, type FairRoom, type FairStop, type Promoter, price, STALL_SLOTS, stallRect, stallSlot } from "@vwo/shared";
 import { useEffect, useRef } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -638,9 +638,10 @@ export function psikotesExtras(room: FairRoom): SceneExtra[] {
 
 /** The consultation lounge: a booth per consultant along the back wall (name sign, glass sides, a desk
  *  with a phone), coffee tables between the sofas, a big wall sign, and the price board. */
-export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void; board?: () => void } = {}): SceneExtra[] {
+export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void; board?: () => void; empty?: (desk: number) => void } = {}): SceneExtra[] {
   const pw = LOUNGE.podW * T;
   const consultants = (room.consultants ?? []).slice(0, LOUNGE.pods.length);
+  const held = new Set(consultants.map((c, i) => consultantDesk(c, i)));
   return [
     {
       key: "lounge-sign",
@@ -654,8 +655,35 @@ export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void
         </div>
       ),
     },
+    // A desk nobody sits at: an empty booth that invites consultants to take it.
+    ...LOUNGE.pods.flatMap((x, desk): SceneExtra[] =>
+      held.has(desk)
+        ? []
+        : [
+            {
+              key: `pod-empty-${desk}`,
+              x,
+              y: -1.9,
+              z: 0.8,
+              onClick: on.empty ? () => on.empty!(desk) : undefined,
+              title: on.empty ? "Meja kosong: jadi konsultan" : undefined,
+              node: (
+                <svg width={pw} height={2.7 * T} style={{ display: "block", overflow: "visible" }}>
+                  <rect x={4} y={0} width={pw - 8} height={2.7 * T} rx={6} fill="#f1f5f9" {...ink} strokeDasharray="6 5" />
+                  <text x={pw / 2} y={30} textAnchor="middle" fontSize={14} fontWeight={900} fill="#64748b" fontFamily={font}>
+                    MEJA KOSONG
+                  </text>
+                  <text x={pw / 2} y={50} textAnchor="middle" fontSize={10} fontWeight={700} fill="#64748b" fontFamily={font}>
+                    Jadi konsultan di sini
+                  </text>
+                </svg>
+              ),
+            },
+          ],
+    ),
     ...consultants.flatMap((c, i): SceneExtra[] => {
-      const x = LOUNGE.pods[i]!;
+      const x = LOUNGE.pods[consultantDesk(c, i)]!;
+      const away = c.live && !c.open;
       const click = on.consult ? () => on.consult!(i) : undefined;
       const title = click ? `Konsultasi dengan ${c.name}` : undefined;
       return [
@@ -688,10 +716,10 @@ export function loungeExtras(room: FairRoom, on: { consult?: (i: number) => void
                 ))}
               </g>
               <g transform="translate(24, 62)">
-                <rect width={74} height={22} rx={11} fill="#dcfce7" {...ink} strokeWidth={1.4} />
-                <circle cx={13} cy={11} r={5} fill="#16a34a" className="fr-avail" />
-                <text x={24} y={15} fontSize={10} fontWeight={900} fill="#166534" fontFamily={font}>
-                  TERSEDIA
+                <rect width={74} height={22} rx={11} fill={away ? "#e2e8f0" : "#dcfce7"} {...ink} strokeWidth={1.4} />
+                <circle cx={13} cy={11} r={5} fill={away ? "#94a3b8" : "#16a34a"} className={away ? undefined : "fr-avail"} />
+                <text x={24} y={15} fontSize={10} fontWeight={900} fill={away ? "#475569" : "#166534"} fontFamily={font}>
+                  {away ? "TUTUP" : "TERSEDIA"}
                 </text>
               </g>
               {/* Glass partitions on both sides. */}

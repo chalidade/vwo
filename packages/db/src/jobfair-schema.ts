@@ -504,7 +504,7 @@ export const fairPayments = pgTable(
     index("fair_payments_user_idx").on(t.userId),
     index("fair_payments_ref_idx").on(t.kind, t.ref),
     uniqueIndex("fair_payments_provider_uq").on(t.provider, t.providerId),
-    check("fair_payments_kind_ck", sql`${t.kind} in ('coins','registration','invoice','stall')`),
+    check("fair_payments_kind_ck", sql`${t.kind} in ('coins','registration','invoice','stall','consultant')`),
     check("fair_payments_status_ck", sql`${t.status} in ('pending','paid','expired','failed')`),
     check("fair_payments_amount_ck", sql`${t.amount} > 0`),
   ],

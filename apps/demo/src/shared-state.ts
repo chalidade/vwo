@@ -1,11 +1,20 @@
 // Live site: the event setup (organiser's changes, every company's booth) is kept on the server,
 // so the panitia, the companies and the job seekers all see the same event on every device.
 // Everyone pulls it; event admins push what they change here, and company accounts their own booth.
-import type { StandPlacements } from "@vwo/shared";
+import type { PublicConsultant, StandPlacements } from "@vwo/shared";
 import type { BookedBooth, CompanyState, OrgState, RentedStall } from "./jobfair-engine";
 import { fair } from "./useFair";
 
-type Shared = { org: OrgState | null; companies: Record<string, CompanyState>; bookings?: BookedBooth[]; stalls?: RentedStall[]; placements?: StandPlacements; version: number };
+type Shared = {
+  org: OrgState | null;
+  companies: Record<string, CompanyState>;
+  bookings?: BookedBooth[];
+  stalls?: RentedStall[];
+  placements?: StandPlacements;
+  consultants?: PublicConsultant[];
+  consultBotsOff?: string[];
+  version: number;
+};
 
 let started = false;
 let admin = false;
@@ -22,6 +31,11 @@ export async function flushShared() {
     if (!pending()) return;
     await new Promise((r) => setTimeout(r, 300));
   }
+}
+
+/** Pull now (the lounge consultants are taken on every pull, whatever the version). */
+export function pullShared() {
+  void pullNow?.();
 }
 
 /** Take the server's setup on the next pull, whatever this browser last applied. */
@@ -69,6 +83,8 @@ export function startSharedSync(asAdmin: boolean, booths: string[] = []) {
       const r = await fetch("/api/jobfair/state", { credentials: "same-origin" });
       if (!r.ok) return;
       const d = (await r.json()) as Shared;
+      // Who sits at the lounge desks, and whose desk is open: outside the version, it changes by the minute.
+      fair.setConsultants(d.consultants ?? [], d.consultBotsOff ?? []);
       // After the first pull, an admin's unsent edits win; they go up on the next push.
       if (d.version === version || unsent()) return;
       version = d.version;

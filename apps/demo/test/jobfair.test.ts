@@ -807,6 +807,39 @@ describe("DemoJobFair", () => {
     expect(fair.player.coins).toBe(3);
   });
 
+  it("seats real consultants at their desks in the lounge and frees the desks of bots switched off", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const room = fair.fair.rooms.find((r) => r.kind === "konsultasi")!;
+    const bots = room.consultants!.map((c) => c.id);
+    let changes = 0;
+    fair.subscribe(() => changes++);
+    const real = {
+      id: "k0123456789ab",
+      desk: 1,
+      via: "panitia" as const,
+      open: true,
+      profile: { name: "Kak Rani", role: "Konsultan karier", topics: ["Review CV"], emoji: "🧭", color: "#2563eb" },
+    };
+    fair.setConsultants([real], [bots[1]!, bots[3]!]);
+    expect(room.consultants!.map((c) => [c.desk, c.id, !!c.live])).toEqual([
+      [0, bots[0], false],
+      [1, real.id, true],
+      [2, bots[2], false],
+    ]);
+    // The real consultant stands behind desk 2 (index 1); the switched-off bots are gone.
+    expect(fair.staff.find((x) => x.id === consultantId(real.id))).toMatchObject(loungeSpot(1, "consultant"));
+    expect(fair.staff.some((x) => x.id === consultantId(bots[3]!))).toBe(false);
+    // The same seating again changes nothing.
+    const n = changes;
+    fair.setConsultants([real], [bots[1]!, bots[3]!]);
+    expect(changes).toBe(n);
+    // The organiser's setup reloading keeps them seated.
+    fair.applyShared(null, {});
+    expect(room.consultants!.some((c) => c.id === real.id)).toBe(true);
+    fair.setConsultants([], []);
+    expect(room.consultants!.map((c) => c.id)).toEqual(bots);
+  });
+
   it("keeps only inline PNG, JPEG or WebP pictures as logos and photos", () => {
     const png = "data:image/png;base64,iVBORw0KGgo=";
     expect(safeImage(png)).toBe(png);

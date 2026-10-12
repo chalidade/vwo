@@ -494,6 +494,7 @@ export function Landing() {
         <img src={LOGO} alt="jobfair" className="lp-foot-logo" />
         <span>Demo: data tersimpan di browser kamu dan pengunjung lain adalah bot.</span>
         <a href="#/jobfair/speaker">Halaman pembicara</a>
+        <a href="#/jobfair/konsultan">Halaman konsultan</a>
       </footer>
     </div>
   );

@@ -79,7 +79,7 @@ export function LoungeDesk({
           </tbody>
         </table>
         <ul className="lg-rules">
-          <li>Koin dipotong saat panggilan dimulai.</li>
+          <li>Koin dipotong saat panggilan dimulai. Untuk konsultan sungguhan, koin baru dipotong saat konsultan mengangkat.</li>
           <li>Sisa waktu terlihat di layar, dan panggilan berhenti otomatis saat waktunya habis.</li>
           <li>Pilih telepon (suara saja) atau video call.</li>
           <li>Konsultan ada di meja belakang. Untuk menelepon sesama pelamar, dekati orangnya atau duduk di sofa.</li>
@@ -103,6 +103,14 @@ export function LoungeDesk({
                 <span key={t}>{t}</span>
               ))}
             </div>
+            {consult.live && (
+              <>
+                {consult.bio && <p className="lg-bio">{consult.bio}</p>}
+                <span className="lg-status" data-open={consult.open ? "" : undefined}>
+                  {consult.open ? "● Sedang di meja, siap ditelepon" : "○ Sedang tidak di meja"}
+                </span>
+              </>
+            )}
           </div>
         </div>
       ) : peers.length ? (
@@ -144,8 +152,13 @@ export function LoungeDesk({
       </div>
       <p className="lg-note">
         Saldo kamu {coins} 🪙. Panggilan berhenti otomatis setelah {minutes} menit.
+        {consult?.live && " Koin baru dipotong saat konsultan mengangkat; tidak diangkat berarti gratis."}
       </p>
-      {coins >= price ? (
+      {consult?.live && !consult.open ? (
+        <button type="button" className="mb-order lg-go" disabled>
+          Konsultan sedang tidak di meja
+        </button>
+      ) : coins >= price ? (
         <button
           type="button"
           className="mb-order lg-go"

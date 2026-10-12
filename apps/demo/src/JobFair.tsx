@@ -29,6 +29,8 @@ import {
   LOUNGE,
   loungeBoardSpot,
   loungeSpot,
+  consultAddress,
+  consultantDesk,
   safeImage,
   vipSeatBooth,
   anomalyRewardText,
@@ -249,7 +251,7 @@ export function JobFair() {
   const [aula, setAula] = useState<AulaTab | null>(null);
   const [notifs, setNotifs] = useState(false);
   const [lounge, setLounge] = useState<LoungeView | null>(null);
-  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal }) | null>(null);
+  const [loungeCall, setLoungeCall] = useState<(LoungeCallStart & { name: string; sub: string; color: string; look?: Look; lines: readonly string[]; ring?: RingSignal; payOnAnswer?: boolean }) | null>(null);
   const [lift, setLift] = useState(false);
   const [verify, setVerify] = useState(false);
   const [promo, setPromo] = useState<Promoter | null>(null);
@@ -464,7 +466,7 @@ export function JobFair() {
     }
     if (room?.kind === "konsultasi" && !self.seatId) {
       for (let i = 0; i < (room.consultants ?? []).length && i < LOUNGE.pods.length; i++) {
-        const at = loungeSpot(i, "front");
+        const at = loungeSpot(consultantDesk(room.consultants![i]!, i), "front");
         if (Math.abs(self.x - at.x) < 1.8 && Math.abs(self.y - at.y) < 0.9) return { kind: "consult", index: i };
       }
       const b = loungeBoardSpot();
@@ -1301,11 +1303,51 @@ export function JobFair() {
       .map((x) => ({ memberId: x.memberId, name: x.displayName.replace(/^🌐 /, "") }));
   }
 
+  /** Walk to a lounge consultant's desk and open it. */
+  function goToConsultant(i: number) {
+    const c = room?.consultants?.[i];
+    if (!c) return;
+    const at = loungeSpot(consultantDesk(c, i), "front");
+    goTo(floor.id, at.x, at.y, () => setLounge({ mode: "consult", index: i }));
+  }
+
   /** Pay for a lounge call, then ring the consultant or the other job seeker. */
   function startLoungeCall(c: LoungeCallStart) {
     const who = c.consultant?.name ?? c.peer?.name ?? "";
     const plans = loungePlans();
     const plan = plans.find((p) => p.minutes === c.minutes) ?? plans[0]!;
+    // A real consultant: ring first, and the coins go only once they pick up.
+    if (c.consultant?.live) {
+      setLounge(null);
+      if (!c.consultant.open) return setToast("Konsultan sedang tidak di meja");
+      if (!canCallOtherTabs()) return setToast("Browser ini belum bisa melakukan panggilan");
+      if (me.coins < plan.consultCoins) return setWallet(true);
+      const k = c.consultant;
+      setLoungeCall({
+        ...c,
+        name: k.name,
+        sub: `${k.role}${k.org ? ` · ${k.org}` : ""}`,
+        color: k.color,
+        look: staffLook(k.name, k.color),
+        lines: [],
+        payOnAnswer: true,
+        ring: {
+          type: "ring",
+          callId: newCallId(),
+          to: consultAddress(k.id),
+          appId: "",
+          company: session?.name ?? "Pencari kerja",
+          recruiter: session?.name ?? "Pencari kerja",
+          logo: "",
+          color: "#0f766e",
+          jobTitle: "Lounge Konsultasi",
+          kind: c.kind,
+          from: "seeker",
+          minutes: c.minutes,
+        },
+      });
+      return;
+    }
     setCoinAsk({ price: c.consultant ? plan.consultCoins : plan.coins, what: `${c.kind === "video" ? "video call" : "telepon"} ${c.minutes} menit dengan ${who}`, run: () => placeLoungeCall(c, who) });
   }
 
@@ -1503,7 +1545,7 @@ export function JobFair() {
     ...(room?.kind === "seminar" ? seminarStageExtras(room, currentSlide()) : []),
     ...(room?.kind === "konsultasi"
       ? loungeExtras(room, {
-          consult: session ? (i) => goTo(floor.id, loungeSpot(i, "front").x, loungeSpot(i, "front").y, () => setLounge({ mode: "consult", index: i })) : undefined,
+          consult: session ? (i) => goToConsultant(i) : undefined,
           board: session ? () => goTo(floor.id, loungeBoardSpot().x, loungeBoardSpot().y, () => setLounge({ mode: "info" })) : undefined,
         })
       : []),
@@ -1580,7 +1622,7 @@ export function JobFair() {
                 const st = room?.stalls?.findIndex((x) => stallStaffId(x.id) === id) ?? -1;
                 const pr = fair.fair.promoters.find((x) => promoterId(x.id) === id);
                 const ci = room?.consultants?.findIndex((x) => consultantId(x.id) === id) ?? -1;
-                if (ci >= 0) goTo(floor.id, loungeSpot(ci, "front").x, loungeSpot(ci, "front").y, () => setLounge({ mode: "consult", index: ci }));
+                if (ci >= 0) goToConsultant(ci);
                 else if (b) goToBooth(b);
                 else if (id.startsWith("spg:")) {
                   const vb = fair.booth(id.slice(4));
@@ -2155,9 +2197,12 @@ export function JobFair() {
             lines={loungeCall.lines}
             botNote="Demo: lawan bicara adalah bot. Versi live menyambungkan panggilan sungguhan lewat server."
             limit={loungeCall.minutes * 60}
+            // A real consultant picked up: now the call is paid (nothing is charged for a missed or declined one).
+            onAnswered={loungeCall.payOnAnswer ? () => fair.startLoungeCall("consult", loungeCall.minutes, loungeCall.name) : undefined}
             onEnd={(r) => {
               setLoungeCall(null);
               if (r.answered) setToast(`Panggilan selesai (${Math.floor(r.seconds / 60)}:${String(r.seconds % 60).padStart(2, "0")})`);
+              else if (loungeCall.payOnAnswer && r.result !== "ended") setToast("Konsultan sedang tidak di meja");
             }}
           />
         )}
