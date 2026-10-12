@@ -11,6 +11,10 @@ export interface AulaEvent {
   host: string;
   /** Where, when it is not the Aula stage itself (e.g. "Ruang Seminar · Lantai 5"). */
   place?: string;
+  /** Broadcast from the speaker's browser (default) or from a YouTube/Vimeo link. */
+  streamSource?: "platform" | "link";
+  /** The live stream link (YouTube, Vimeo) played on the Aula's screens while this item is on, when the source is "link". */
+  streamUrl?: string;
   kind: "sambutan" | "talkshow" | "hiburan" | "doorprize" | "info";
 }
 

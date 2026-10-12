@@ -5,6 +5,7 @@ import type { SeminarSession } from "../fair/content";
 import { pullSeminarRegs, seminarRegistrants } from "../fair/seminar-reg";
 import { useStageLive } from "../fair/stage";
 import { fair } from "../useFair";
+import { StreamField, streamLinkError } from "./StreamField";
 
 type Slide = SeminarSession["slides"][number];
 
@@ -73,6 +74,7 @@ export function OrgSeminars({ onToast }: { onToast: (t: string) => void }) {
                   <span className="muted small">
                     {s.speaker}, {s.role} · {s.slides.length} slide · {capacity ? `${count}/${capacity} kursi terdaftar` : `${count} terdaftar`} ·{" "}
                     {fair.seminarCounts.get(s.id) ?? 0} menonton
+                    {s.streamSource === "link" ? (s.streamUrl ? " · siaran lewat YouTube" : " · siaran lewat YouTube, link belum diisi") : ""}
                   </span>
                 </span>
                 <span className="cp-job-tools">
@@ -127,6 +129,8 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
   const [clock, setClock] = useState(s.startAt ? wibClock(s.startAt).replace(".", ":") : "");
   const [minutes, setMinutes] = useState(String(s.minutes ?? SEMINAR_MINUTES.default));
   const [capacity, setCapacity] = useState(s.capacity ? String(s.capacity) : "");
+  const [streamSource, setStreamSource] = useState<"platform" | "link">(s.streamSource === "link" ? "link" : "platform");
+  const [streamUrl, setStreamUrl] = useState(s.streamUrl ?? "");
   const [error, setError] = useState<string | null>(null);
   const [slides, setSlides] = useState(s.slides.map((x) => ({ ...x, pointsText: x.points.join("\n") })));
   const setSlide = (i: number, patch: Partial<Slide & { pointsText: string }>) => setSlides(slides.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -152,8 +156,10 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
           if (!day !== !clock) return setError("Isi tanggal dan jam mulai, atau kosongkan keduanya kalau jadwal belum pasti.");
           const startAt = day && clock ? wibTime(day, clock) : null;
           if (day && startAt === null) return setError("Tanggal atau jam tidak valid.");
+          const linkError = streamSource === "link" ? streamLinkError(streamUrl) : null;
+          if (linkError) return setError(linkError);
           const when = cleanSchedule({ startAt: startAt ?? undefined, minutes: Number(minutes), capacity: capacity ? Number(capacity) : undefined });
-          const { startAt: _a, minutes: _m, capacity: _c, ...rest } = f;
+          const { startAt: _a, minutes: _m, capacity: _c, streamUrl: _s, streamSource: _ss, ...rest } = f;
           onSave({
             ...rest,
             title: f.title.trim(),
@@ -163,6 +169,9 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
             ...(when.startAt !== undefined && { startAt: when.startAt }),
             minutes: when.minutes,
             ...(when.capacity && { capacity: when.capacity }),
+            ...(streamSource === "link" && { streamSource }),
+            // The link is kept while "Platform kita" is chosen, so switching back does not lose it.
+            ...(streamUrl.trim() && !streamLinkError(streamUrl) && { streamUrl: streamUrl.trim() }),
           });
         }}
       >
@@ -210,6 +219,7 @@ function SessionForm({ s, onClose, onSave }: { s: SeminarSession; onClose: () =>
             Kosongkan tanggal dan jam kalau belum pasti: sesi tampil sebagai "Jadwal belum ditentukan" dan belum bisa didaftar. Pendaftar diingatkan H-1 dan 15 menit sebelum mulai.
           </p>
         </fieldset>
+        <StreamField source={streamSource} url={streamUrl} onSource={setStreamSource} onUrl={setStreamUrl} />
         {slides.map((x, i) => (
           <fieldset key={i} className="org-slide cp-span">
             <legend>Slide {i + 1}</legend>

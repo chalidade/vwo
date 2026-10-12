@@ -1,11 +1,13 @@
 import { Mic } from "lucide-react";
-import { cleanSchedule, seminarPhase, sortByStart } from "@vwo/shared";
+import { cleanSchedule, meshAdmit, seminarPhase, sortByStart, streamEmbed } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
 import { type PeerInfo, connectPeer, leaveCall, stopMedia } from "../fair/call";
 import type { SeminarSession } from "../fair/content";
 import { announceLive } from "../fair/seminar-reg";
-import { BOT_CHAT, BOT_NAMES, BOT_QUESTIONS, type StageChat, onStage, sendStage, stageCallId } from "../fair/stage";
+import { BOT_CHAT, BOT_NAMES, BOT_QUESTIONS, type StageChat, enterStageRoom, onStage, sendStage, stageCallId } from "../fair/stage";
+import { StreamPlayer } from "../fair/StreamPlayer";
 import { LIVE } from "../mode";
+import { useRuntimeConfig } from "../runtime-config";
 import { fair, useFair } from "../useFair";
 
 const canShare = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
@@ -62,6 +64,14 @@ export function SpeakerStage() {
   const ev = rundown.find((e) => e.id === eventId) ?? rundown[0];
   const session: SeminarSession =
     venue === "aula" && ev ? { id: `aula-${ev.id}`, title: ev.title, speaker: ev.host, role: "Panggung Aula", slides: [{ title: ev.title, points: [`${ev.start}–${ev.end}`, ev.host], say: "" }] } : picked;
+  // "Siaran lewat": this browser straight to a few viewers (default), or the organiser's YouTube/Vimeo link,
+  // which viewers watch while this page runs chat and Q&A. Starts on what the organiser chose for the item.
+  const item = venue === "aula" ? ev : picked;
+  const stream = streamEmbed(item?.streamUrl);
+  const [source, setSource] = useState<"platform" | "link">(item?.streamSource === "link" ? "link" : "platform");
+  useEffect(() => setSource(item?.streamSource === "link" ? "link" : "platform"), [venue, sessionId, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const embed = source === "link";
+  const cfg = useRuntimeConfig().stage;
   const [live, setLive] = useState(false);
   const [screen, setScreen] = useState<MediaStream | null>(null);
   const [mic, setMic] = useState<MediaStream | null>(null);
@@ -80,13 +90,16 @@ export function SpeakerStage() {
   const peers = useRef(new Map<string, { close(): void }>());
   const out = useRef<MediaStream | null>(null);
   const startedAt = useRef(0);
-  const now = useRef({ live, session, slide, screen, chat, viewers, bots, venue });
-  now.current = { live, session, slide, screen, chat, viewers, bots, venue };
+  const now = useRef({ live, session, slide, screen, chat, viewers, bots, venue, embed, cfg });
+  now.current = { live, session, slide, screen, chat, viewers, bots, venue, embed, cfg };
   const botCrowd = bots ? 14 + (Math.floor(seconds / 20) % 7) : 0;
+  const lastBeat = useRef(0);
+  const helloTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const beat = () => {
     const c = now.current;
     if (!c.live) return;
+    lastBeat.current = Date.now();
     sendStage({
       type: "on",
       sessionId: c.session.id,
@@ -98,6 +111,9 @@ export function SpeakerStage() {
       slide: c.slide,
       viewers: Object.keys(c.viewers).length + (c.bots ? 14 : 0),
       venue: c.venue,
+      embed: c.embed || undefined,
+      full: (!c.embed && peers.current.size >= c.cfg.meshMaxViewers) || undefined,
+      every: c.cfg.beatSec,
     });
   };
 
@@ -120,15 +136,26 @@ export function SpeakerStage() {
     () =>
       onStage((m) => {
         const c = now.current;
-        if (m.type === "hello") beat();
-        else if (m.type === "join" && c.live) {
+        if (m.type === "hello") {
+          // A crowd arriving asks at once: one answer covers them all.
+          if (c.live && !helloTimer.current && Date.now() - lastBeat.current > 3000)
+            helloTimer.current = setTimeout(() => {
+              helloTimer.current = null;
+              beat();
+            }, 1500);
+        } else if (m.type === "join" && c.live) {
+          // With a stream link nobody needs the screen from here; a full mesh sends the rest to the slides.
+          if (c.embed) return;
+          if (!meshAdmit(peers.current.keys(), m.viewerId, c.cfg.meshMaxViewers)) return sendStage({ type: "full", to: m.viewerId });
           setViewers((v) => ({ ...v, [m.viewerId]: m.name }));
           sendStage({ type: "history", to: m.viewerId, chat: c.chat.slice(-50) });
           connect(m.viewerId);
-          beat();
+          // Everyone hears the count with the next beat; only the last free place is told at once.
+          if (peers.current.size >= c.cfg.meshMaxViewers) beat();
         } else if (m.type === "leave") {
+          const wasFull = peers.current.size >= c.cfg.meshMaxViewers;
           peers.current.get(m.viewerId)?.close();
-          peers.current.delete(m.viewerId);
+          if (peers.current.delete(m.viewerId) && wasFull) beat();
           leaveCall(stageCallId(m.viewerId));
           setViewers((v) => {
             const { [m.viewerId]: _, ...rest } = v;
@@ -149,12 +176,14 @@ export function SpeakerStage() {
   useEffect(() => {
     if (!live) return;
     const t = setInterval(() => {
-      beat();
+      if (Date.now() - lastBeat.current >= cfg.beatSec * 1000 - 500) beat();
       setSeconds(Math.round((Date.now() - startedAt.current) / 1000));
-    }, 2000);
+    }, 1000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live]);
+  }, [live, cfg.beatSec]);
+  // Chat, questions and the viewers' requests for the screen come over the room channel.
+  useEffect(() => enterStageRoom(), []);
   useEffect(() => {
     if (!live || !bots) return;
     const t = setInterval(() => {
@@ -167,7 +196,7 @@ export function SpeakerStage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, bots]);
-  useEffect(beat, [slide, sessionId, screen, venue, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(beat, [slide, sessionId, screen, venue, eventId, embed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A new screen or microphone: every viewer reconnects to get it.
   useEffect(() => {
@@ -178,10 +207,20 @@ export function SpeakerStage() {
     sendStage({ type: "restart" });
   }, [screen, mic]);
 
+  // Switching to the stream link: nobody needs the screen from this browser any more.
+  useEffect(() => {
+    if (!embed) return;
+    for (const p of peers.current.values()) p.close();
+    peers.current.clear();
+    setViewers({});
+    setLinks({});
+  }, [embed]);
+
   // Closing the page ends the broadcast.
   useEffect(
     () => () => {
       if (now.current.live) sendStage({ type: "off" });
+      if (helloTimer.current) clearTimeout(helloTimer.current);
       for (const p of peers.current.values()) p.close();
       stopMedia(now.current.screen);
     },
@@ -297,8 +336,24 @@ export function SpeakerStage() {
             </label>
             )}
           </div>
+          <div className="st-pick">
+            <label>
+              Siaran lewat
+              <select value={source} disabled={live} onChange={(e) => setSource(e.target.value === "link" ? "link" : "platform")}>
+                <option value="platform">Platform kita (langsung dari laptop pembicara)</option>
+                <option value="link">YouTube atau Vimeo (link)</option>
+              </select>
+            </label>
+          </div>
+          <p className="muted small st-note">
+            Platform kita cocok untuk penonton sedikit, maksimal {cfg.meshMaxViewers} penonton; penonton lain melihat slide saja. Untuk penonton banyak pilih YouTube: siarkan ke YouTube Live
+            lalu tempel linknya di Panitia, tab {venue === "aula" ? "Aula" : "Seminar"}.
+          </p>
+          {embed && !stream && (
+            <p className="cp-warn">Belum ada link siaran yang valid untuk {venue === "aula" ? "acara" : "sesi"} ini. Isi di Panitia, tab {venue === "aula" ? "Aula" : "Seminar"}; sampai itu penonton melihat "Siaran belum dimulai".</p>
+          )}
           <div className="st-stage">
-            {screen ? <Video stream={screen} /> : <StageSlide session={session} slide={slide} />}
+            {embed && stream ? <StreamPlayer embed={stream} title="Pratinjau link siaran" autoplay={false} /> : screen ? <Video stream={screen} /> : <StageSlide session={session} slide={slide} />}
             <div className="sx-claps" aria-hidden>
               {claps.map((c) => (
                 <span key={c.id} style={{ left: `${c.x}%` }}>
@@ -308,7 +363,7 @@ export function SpeakerStage() {
             </div>
             {screen && <span className="st-tag">Layar kamu dibagikan</span>}
           </div>
-          {!screen && (
+          {!screen && !embed && (
             <div className="mb-nav st-slidenav">
               <button type="button" onClick={() => setSlide(Math.max(0, slide - 1))} disabled={slide === 0} aria-label="Slide sebelumnya">
                 ◀
@@ -321,14 +376,23 @@ export function SpeakerStage() {
               </button>
             </div>
           )}
-          {!screen && <p className="st-say muted small">Catatan pembicara: {session.slides[slide]?.say}</p>}
+          {!screen && !embed && <p className="st-say muted small">Catatan pembicara: {session.slides[slide]?.say}</p>}
+          {embed && stream ? (
+            <p className="muted small st-note">
+              Siarkan dari OBS atau aplikasi YouTube ke link di atas. Penonton di game menonton siaran itu (tanpa batas jumlah); halaman ini untuk membuka sesi, membalas chat, dan menjawab Q&A.
+            </p>
+          ) : null}
           <div className="st-controls">
-            <button type="button" className="st-btn" data-on={screen ? "" : undefined} onClick={() => void shareScreen()}>
-              {screen ? "Stop share" : "Share layar"}
-            </button>
-            <button type="button" className="st-btn" data-on={mic ? "" : undefined} onClick={() => void toggleMic()}>
-              {mic ? "Mic nyala" : "Mic mati"}
-            </button>
+            {!embed && (
+              <>
+                <button type="button" className="st-btn" data-on={screen ? "" : undefined} onClick={() => void shareScreen()}>
+                  {screen ? "Stop share" : "Share layar"}
+                </button>
+                <button type="button" className="st-btn" data-on={mic ? "" : undefined} onClick={() => void toggleMic()}>
+                  {mic ? "Mic nyala" : "Mic mati"}
+                </button>
+              </>
+            )}
             {live ? (
               <button type="button" className="st-btn st-end" onClick={end}>
                 ⏹ Akhiri siaran
@@ -342,7 +406,7 @@ export function SpeakerStage() {
           {warn && <p className="cp-warn">{warn}</p>}
           {LIVE ? (
             <p className="muted small st-note">
-              {viewerCount} penonton. Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
+              {embed ? "Penonton menonton lewat link siaran." : `${viewerCount}/${cfg.meshMaxViewers} penonton langsung.`} Siaran sampai ke semua pengunjung yang duduk di ruang seminar (Lantai 5) atau di Aula (Lantai 1), di perangkat mana pun.
             </p>
           ) : null}
           {viewerCount > 0 && (

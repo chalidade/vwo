@@ -3,7 +3,7 @@ import { type Look, Person } from "@vwo/ui";
 import { cleanSchedule, seminarPhase } from "@vwo/shared";
 import { type SeminarSession, lineMs, liveSeminar, seminarScript } from "./content";
 import { Modal } from "./Modal";
-import { useStageLive } from "./stage";
+import { useStageNow } from "./stage-now";
 import { SeminarSchedule } from "./SeminarSchedule";
 import { StageWatch } from "./StageWatch";
 
@@ -15,6 +15,7 @@ export function SeminarView({
   name,
   speakerLook,
   audience,
+  venue,
   onFinish,
   onClose,
 }: {
@@ -29,6 +30,8 @@ export function SeminarView({
   speakerLook: (speaker: string) => Look;
   /** People in the room, for the viewer count. */
   audience: number;
+  /** The room it is watched from: the seminar room, or the Aula's stage. */
+  venue?: "seminar" | "aula";
   onFinish: (id: string) => void;
   onClose: () => void;
 }) {
@@ -38,7 +41,7 @@ export function SeminarView({
   );
   const [picking, setPicking] = useState(false);
   const [done, setDone] = useState(false);
-  const live = useStageLive();
+  const live = useStageNow(venue);
   const [recorded, setRecorded] = useState(false);
   const watching = useRef<SeminarSession | null>(null);
   const liveSession: SeminarSession | null = live
@@ -65,6 +68,7 @@ export function SeminarView({
         session={liveSession}
         viewerId={viewerId}
         name={name}
+        audience={audience}
         onFinish={() => finishLive(liveSession)}
         onRecorded={() => {
           watching.current = null;
