@@ -48,10 +48,10 @@ describe("DemoJobFair", () => {
     }
     // Sofas in each hall's lounge are seats you can walk to.
     // Every hall has several corners to sit and play: 2 lounges on the ground floor's left half, 3
-    // on the floors above, and 3 more in every right half.
+    // on the floors above, and 3 more in every right half. A big lounge has two pairs of sofas.
     halls.forEach((f, i) => {
       const sofas = f.seats.filter((st) => st.sofa && !st.id.includes("-vip-"));
-      expect(sofas.length, f.id).toBe(i === 0 ? 20 : 24);
+      expect(sofas.length, f.id).toBe(i === 0 ? 24 : 32);
       for (const st of sofas) expect(findPath(f, LIFT_FRONT, st), st.id).not.toBeNull();
       // The VIP lounge chairs are reached from just in front of them.
       for (const st of f.seats.filter((x) => x.id.includes("-vip-"))) expect(findPath(f, LIFT_FRONT, { x: st.x, y: st.y + 0.75 }), st.id).not.toBeNull();

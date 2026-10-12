@@ -2703,3 +2703,18 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .au-edit-link { grid-column: 1 / -1; justify-self: start; font-size: 12px; }
 .au-edit-link[data-bad] { color: #991b1b; }
 .au-edit-row .org-stream { grid-column: 1 / -1; }
+/* ---- ui-polish-2: buttons side by side share one height ---- */
+/* A link drawn as a button is boxed like a <button>: content centred, no underline. A small link
+   button (`small-btn cp-link`) takes the small-button size, the same as the small buttons next to it. */
+a.small-btn, a.cp-link, label.small-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; vertical-align: middle; text-decoration: none; }
+a.small-btn:where(:not(.cp-link)) { border: 2px solid #3b2a20; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; }
+a.small-btn.ghost:where(:not(.cp-link)) { background: var(--surface); color: var(--text); }
+a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
+.app-dash a.cp-link:where(.small-btn) { padding: 6px 12px; font-size: 13px; }
+/* In a game dialog's action row that has a regular button, the small buttons grow to the regular size,
+   and the buttons share the row's width (one under the other when they do not fit on a phone). */
+.mb:not(.app-dash *) .row:has(> button:not(.small-btn)) > :is(.small-btn, a.cp-link) { padding: 7px 12px; font-size: inherit; border-width: 3px; box-shadow: 0 3px 0 #3b2a20; }
+.mb:not(.app-dash *) .row:has(> button:not(.small-btn)):not(:has(> :not(button, a.cp-link, a.small-btn))) > * { flex: 1 1 auto; }
+/* In a row made only of buttons, every button on a line takes the tallest one's height (e.g. an
+   icon-only button next to a labelled one). */
+:is(.row, .iv-actions, .iv-reply, .mb-nav, .mb-foot, .cp-job-tools, .org-card-tools, .inv-actions):not(:has(> :not(button, a.cp-link, a.small-btn, label.small-btn))) > :is(button, a.cp-link, a.small-btn, label.small-btn) { align-self: stretch; }

@@ -762,6 +762,19 @@ export function buildFairRoom(fair: JobFairView, room: FairRoom): FloorView {
   return { id, name: room.name, width: room.width, height: room.height, tables, seats, objects, theme: "hall" };
 }
 
+/** A big lounge on a 12-tile rug: two pairs of sofas facing each other with a plant between each
+ *  pair (the middle two back to back), so the rug is not one long gap between two far-apart sofas. */
+function bigLounge(floor: number, x: number) {
+  return [
+    { floor, spriteKey: "rug-plain", x, y: 16.2, width: 12, height: 3.6, isWalkable: true },
+    ...[0, 6.3].flatMap((dx) => [
+      { floor, spriteKey: "sofa", x: x + dx + 0.3, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "sofa-left", x: x + dx + 4.4, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "plant", x: x + dx + 2.35, y: 16.4, width: 1, height: 1 },
+    ]),
+  ];
+}
+
 export const fairFloorId = (fair: { slug: string }, floor: number) => `${fair.slug}-f${floor + 1}`;
 
 /** The floor index of a floor id built by fairFloorId. */
@@ -941,10 +954,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
     ...[1, 2].flatMap((floor) => [
       { floor, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
-      { floor, spriteKey: "rug-plain", x: 17, y: 16.2, width: 12, height: 3.6, isWalkable: true },
-      { floor, spriteKey: "sofa", x: 17.3, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "sofa-left", x: 27.7, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "plant", x: 22.5, y: 16.4, width: 1, height: 1 },
+      ...bigLounge(floor, 17),
       // Two more corners to rest and play, on either side of the big one.
       ...[1.6, 31.6].flatMap((x) => [
         { floor, spriteKey: "rug-plain", x, y: 16.2, width: 6, height: 3.6, isWalkable: true },
@@ -960,10 +970,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
       { floor, spriteKey: "plant-big", x: 95.6, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant", x: 95.7, y: 13.8, width: 1, height: 1 },
       { floor, spriteKey: "plant", x: 95.7, y: 20.6, width: 1, height: 1 },
-      { floor, spriteKey: "rug-plain", x: 63, y: 16.2, width: 12, height: 3.6, isWalkable: true },
-      { floor, spriteKey: "sofa", x: 63.3, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "sofa-left", x: 73.7, y: 16.6, width: 1, height: 2.4 },
-      { floor, spriteKey: "plant", x: 68.5, y: 16.4, width: 1, height: 1 },
+      ...bigLounge(floor, 63),
       ...[50.6, 82.6].flatMap((x) => [
         { floor, spriteKey: "rug-plain", x, y: 16.2, width: 6, height: 3.6, isWalkable: true },
         { floor, spriteKey: "sofa", x: x + 0.3, y: 16.6, width: 1, height: 2.4 },
