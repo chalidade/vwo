@@ -1,11 +1,24 @@
 // Random anomalies: the schedule and signed tokens, and claims through the coin ledger (what the
 // /api/jobfair/anomaly route does after its session and rate-limit checks).
-import { ANOMALY_CAP_MAX, ANOMALY_GRACE_MS, ANOMALY_LIVE_MS, ANOMALY_SLOT_MS, anomalyDay, anomalySettings } from "@vwo/shared";
+import {
+  ANOMALY_CAP_MAX,
+  ANOMALY_GRACE_MS,
+  ANOMALY_INFO,
+  ANOMALY_KINDS,
+  ANOMALY_LIVE_MS,
+  ANOMALY_RARE_COINS,
+  ANOMALY_SLOT_MS,
+  type AnomalyKind,
+  anomalyDay,
+  anomalyOutAt,
+  anomalySettings,
+  wibHour,
+} from "@vwo/shared";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anomalyAt, anomalyOfSlot, anomalyReward, checkAnomalyClaim, claimAnomaly, coinBalance, createDb, hasCoinKey } from "../src";
+import { anomalyAt, anomalyCollection, anomalyOfSlot, anomalyReward, checkAnomalyClaim, claimAnomaly, coinBalance, createDb, grantCoins, hasCoinKey } from "../src";
 import { users } from "../src/schema";
 
 const SECRET = "test-secret";
@@ -37,6 +50,30 @@ const claimOf = (s: { id: string; floor: number; expiresAt: number; token: strin
 const live = (slot: number) => {
   const s = anomalyOfSlot(SECRET, slot);
   return { s, at: s.startsAt + 1000 };
+};
+/** `n` slots from `from` on whose anomalies are all different kinds (each kind pays once). */
+const distinctSlots = (from: number, n: number, to = from + 240) => {
+  const kinds = new Set<AnomalyKind>();
+  const out: number[] = [];
+  for (let slot = from; slot < to && out.length < n; slot++) {
+    const k = anomalyOfSlot(SECRET, slot).kind;
+    if (!kinds.has(k)) (kinds.add(k), out.push(slot));
+  }
+  expect(out).toHaveLength(n);
+  return out;
+};
+/** The first slot from `from` on with an anomaly of this kind. */
+const slotOf = (kind: AnomalyKind, from: number) => {
+  for (let slot = from; slot < from + 100_000; slot++) if (anomalyOfSlot(SECRET, slot).kind === kind) return slot;
+  throw new Error(`no ${kind}`);
+};
+let n = 0;
+const newSeeker = async () => {
+  const [u] = await db
+    .insert(users)
+    .values({ email: `s${++n}-${Date.now()}@seeker.example`, displayName: "S" })
+    .returning({ id: users.id });
+  return u!.id;
 };
 
 describe("anomaly schedule", () => {
@@ -75,14 +112,58 @@ describe("anomaly schedule", () => {
   });
 
   it("pays a fixed reward per account and anomaly: coins, or a voucher worth one application", () => {
-    expect(anomalyReward(SECRET, "a1", seeker, 5)).toEqual(anomalyReward(SECRET, "a1", seeker, 5));
-    const all = Array.from({ length: 400 }, (_, i) => anomalyReward(SECRET, `a${i}`, seeker, 5));
+    expect(anomalyReward(SECRET, "a1", seeker, "cat", 5)).toEqual(anomalyReward(SECRET, "a1", seeker, "cat", 5));
+    const all = Array.from({ length: 400 }, (_, i) => anomalyReward(SECRET, `a${i}`, seeker, "cat", 5));
     expect(all.some((r) => r.kind === "voucher")).toBe(true);
     expect(all.some((r) => r.kind === "coins")).toBe(true);
     for (const r of all) {
       if (r.kind === "voucher") expect(r.coins).toBe(5);
       else (expect(r.coins).toBeGreaterThanOrEqual(2), expect(r.coins).toBeLessThanOrEqual(4));
     }
+  });
+
+  it("pays more for a rare one, but never past its cap", () => {
+    for (const kind of ["goldcat", "dragon"] as const) {
+      const all = Array.from({ length: 300 }, (_, i) => anomalyReward(SECRET, `a${i}`, seeker, kind, 5));
+      for (const r of all) expect(r.kind === "coins" && r.coins >= ANOMALY_RARE_COINS[0] && r.coins <= ANOMALY_RARE_COINS[1]).toBe(true);
+      expect(new Set(all.map((r) => r.coins)).size).toBeGreaterThan(3);
+    }
+    // Even an organiser's huge application price never makes a common one pay past it.
+    for (const k of ANOMALY_KINDS) for (let i = 0; i < 50; i++) expect(anomalyReward(SECRET, `a${i}`, seeker, k, 5).coins).toBeLessThanOrEqual(ANOMALY_RARE_COINS[1]);
+  });
+});
+
+describe("anomaly kinds", () => {
+  // Two weeks of slots.
+  const slots = Array.from({ length: 240 * 14 }, (_, i) => 30_000 + i);
+  const spawns = slots.map((slot) => anomalyOfSlot(SECRET, slot));
+
+  it("brings every kind out, the same kind for the same slot", () => {
+    expect(new Set(spawns.map((s) => s.kind))).toEqual(new Set(ANOMALY_KINDS));
+    for (const s of spawns.slice(0, 50)) expect(anomalyOfSlot(SECRET, Number(s.id.slice(1))).kind).toBe(s.kind);
+  });
+
+  it("keeps the rare ones rare", () => {
+    const rare = spawns.filter((s) => ANOMALY_INFO[s.kind].rare).length / spawns.length;
+    expect(rare).toBeGreaterThan(0.002);
+    expect(rare).toBeLessThan(0.04);
+    const cats = spawns.filter((s) => s.kind === "cat").length;
+    expect(spawns.filter((s) => s.kind === "goldcat").length * 4).toBeLessThan(cats);
+  });
+
+  it("sends each kind out only at its hours (Jakarta time)", () => {
+    for (const s of spawns) expect(anomalyOutAt(s.kind, s.startsAt), `${s.kind} at ${wibHour(s.startsAt)}`).toBe(true);
+    const hoursOf = (k: AnomalyKind) => new Set(spawns.filter((s) => s.kind === k).map((s) => wibHour(s.startsAt)));
+    for (const h of hoursOf("ghost")) expect(h >= 18 || h < 5).toBe(true);
+    for (const h of hoursOf("rooster")) expect(h >= 5 && h < 10).toBe(true);
+    for (const h of hoursOf("ufo")) expect(h >= 19 || h < 4).toBe(true);
+    expect(hoursOf("ghost").size).toBeGreaterThan(5);
+  });
+
+  it("names a room for the room ones", () => {
+    expect(ANOMALY_INFO.duck.place).toBe("foodcourt");
+    expect(ANOMALY_INFO.mascot.place).toBe("aula");
+    expect(ANOMALY_KINDS.filter((k) => ANOMALY_INFO[k].rare)).toEqual(["goldcat", "dragon"]);
   });
 });
 
@@ -111,6 +192,7 @@ describe("anomaly token", () => {
 
 describe("claiming an anomaly", () => {
   it("pays once into the ledger and refuses the same token again", async () => {
+    const seeker = await newSeeker();
     const { s, at } = live(20_000);
     const before = await coinBalance(db, seeker);
     const r = await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(s), cap: 3, applyCoins: 5, now: at });
@@ -125,7 +207,60 @@ describe("claiming an anomaly", () => {
     expect((await claimAnomaly(db, { secret: SECRET, userId: other, claim: claimOf(s), cap: 3, applyCoins: 5, now: at })).ok).toBe(true);
   });
 
+  it("pays a kind only the first time: the next one of that kind is already in the collection", async () => {
+    const seeker = await newSeeker();
+    const first = live(slotOf("dog", 50_000));
+    const second = live(slotOf("dog", Number(first.s.id.slice(1)) + 241));
+    expect(anomalyDay(Number(second.s.id.slice(1)))).not.toBe(anomalyDay(Number(first.s.id.slice(1))));
+    const r = await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(first.s), cap: 3, applyCoins: 5, now: first.at });
+    expect(r.ok).toBe(true);
+    const paid = await coinBalance(db, seeker);
+    expect(await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(second.s), cap: 3, applyCoins: 5, now: second.at })).toEqual({
+      ok: false,
+      error: "already_collected",
+      kind: "dog",
+    });
+    expect(await coinBalance(db, seeker)).toBe(paid);
+    expect((await anomalyCollection(db, seeker)).map((c) => c.kind)).toEqual(["dog"]);
+  });
+
+  it("counts kinds caught before kinds paid once (old ledger lines) as collected", async () => {
+    const seeker = await newSeeker();
+    // How the old per-day claims were booked: no kind of their own, only the name in the line.
+    await grantCoins(db, { userId: seeker, amount: 3, reason: "Kejutan: Kucing oren", key: `anomaly:${seeker}:2026-01-02:a1` });
+    await grantCoins(db, { userId: seeker, amount: 5, reason: "Voucher lamar dari burung merpati", key: `anomaly:${seeker}:2026-01-03:a2` });
+    // Not an anomaly: never counts.
+    await grantCoins(db, { userId: seeker, amount: 3, reason: "Kejutan: Anak anjing", key: `mission:${seeker}:x` });
+    expect((await anomalyCollection(db, seeker)).map((c) => c.kind)).toEqual(["cat", "pigeon"]);
+    const cat = live(slotOf("cat", 60_000));
+    const before = await coinBalance(db, seeker);
+    expect(await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(cat.s), cap: 3, applyCoins: 5, now: cat.at })).toMatchObject({
+      ok: false,
+      error: "already_collected",
+    });
+    const dog = live(slotOf("dog", 60_000));
+    expect((await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(dog.s), cap: 3, applyCoins: 5, now: dog.at })).ok).toBe(true);
+    expect(await coinBalance(db, seeker)).toBeGreaterThan(before);
+  });
+
+  it("decides the kind and its reward itself: a rare one pays its rare amount whatever the browser says", async () => {
+    const seeker = await newSeeker();
+    const gold = live(slotOf("goldcat", 70_000));
+    // Extra fields (a claimed kind, coins) are not part of a claim; the slot alone says what it was.
+    const forged = { ...claimOf(gold.s), kind: "dragon", coins: 999 } as ReturnType<typeof claimOf>;
+    const r = await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: forged, cap: 3, applyCoins: 5, now: gold.at });
+    expect(r).toMatchObject({ ok: true, spawn: { kind: "goldcat" } });
+    if (r.ok) expect(r.reward.coins).toBeLessThanOrEqual(ANOMALY_RARE_COINS[1]);
+    // A rare one that isn't out now (a later slot's token, made up) doesn't pay.
+    const later = anomalyOfSlot(SECRET, slotOf("dragon", 70_000));
+    expect(await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: { ...claimOf(later), token: gold.s.token }, cap: 3, applyCoins: 5, now: gold.at })).toEqual({
+      ok: false,
+      error: "bad_token",
+    });
+  });
+
   it("refuses an expired anomaly without paying", async () => {
+    const seeker = await newSeeker();
     const { s } = live(20_010);
     const before = await coinBalance(db, seeker);
     expect(await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(s), cap: 3, applyCoins: 5, now: s.expiresAt + ANOMALY_GRACE_MS + 1 })).toEqual({
@@ -137,15 +272,20 @@ describe("claiming an anomaly", () => {
 
   it("stops at the daily cap, also for claims sent at once, and starts again the next day", async () => {
     // 240 slots a day: slots 40_000.. are all on one day, 40_240 is the next.
+    const seeker = await newSeeker();
     const day = Math.ceil(40_000 / 240) * 240;
-    const slots = Array.from({ length: 6 }, (_, i) => day + i * 5);
+    const slots = distinctSlots(day, 6);
     const results = await Promise.all(
       slots.map((slot) => claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(live(slot).s), cap: 3, applyCoins: 5, now: live(slot).at })),
     );
     expect(results.filter((r) => r.ok)).toHaveLength(3);
     expect(results.filter((r) => !r.ok).map((r) => !r.ok && r.error)).toEqual(["daily_cap", "daily_cap", "daily_cap"]);
-    const next = live(day + 240);
-    expect(anomalyDay(day + 240)).not.toBe(anomalyDay(day));
+    // The next day, a kind not among those.
+    const kinds = new Set(slots.map((sl) => anomalyOfSlot(SECRET, sl).kind));
+    let nextSlot = day + 240;
+    while (kinds.has(anomalyOfSlot(SECRET, nextSlot).kind)) nextSlot++;
+    const next = live(nextSlot);
+    expect(anomalyDay(nextSlot)).not.toBe(anomalyDay(day));
     expect((await claimAnomaly(db, { secret: SECRET, userId: seeker, claim: claimOf(next.s), cap: 3, applyCoins: 5, now: next.at })).ok).toBe(true);
   });
 });

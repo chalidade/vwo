@@ -1,4 +1,4 @@
-import { anomalyAt, boothsOf, claimAnomaly, readFairStateKey, readPrices } from "@vwo/db";
+import { anomalyAt, anomalyCollection, boothsOf, claimAnomaly, readFairStateKey, readPrices } from "@vwo/db";
 import { anomalySettings, priceFrom } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -22,8 +22,15 @@ async function settings() {
   return cached.value;
 }
 
-/** The anomaly out right now (the same for everyone), and when to ask again. */
-export async function GET() {
+/** The anomaly out right now (the same for everyone), and when to ask again. With `?mine=1`, the
+ *  signed-in account's collection instead: the kinds it caught and when. */
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.get("mine") === "1") {
+    const user = await currentUser();
+    if (!user) return fail(401, "not_signed_in");
+    if (!(await allow(`anomaly-mine:${user.id}`, 30, 600_000))) return fail(429, "too_many_requests");
+    return NextResponse.json({ caught: await anomalyCollection(db, user.id) }, { headers: { "Cache-Control": "no-store" } });
+  }
   const s = await settings();
   const now = Date.now();
   if (!s.on || !secret()) return NextResponse.json({ on: false, spawn: null, next: now + 5 * 60_000, now }, { headers: { "Cache-Control": "no-store" } });
@@ -52,6 +59,6 @@ export async function POST(req: Request) {
   await liveCoins(user.id);
   const applyCoins = priceFrom(await readPrices(db), "coin.apply");
   const r = await claimAnomaly(db, { secret: secret(), userId: user.id, claim: body.data, cap: s.cap, applyCoins });
-  if (!r.ok) return fail(r.error === "daily_cap" ? 429 : r.error === "bad_token" ? 400 : 409, r.error, { cap: s.cap });
+  if (!r.ok) return fail(r.error === "daily_cap" ? 429 : r.error === "bad_token" ? 400 : 409, r.error, r.kind ? { cap: s.cap, kind: r.kind } : { cap: s.cap });
   return NextResponse.json({ reward: r.reward, kind: r.spawn.kind, ...(await liveCoins(user.id)) });
 }
