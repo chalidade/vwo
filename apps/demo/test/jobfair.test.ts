@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PARK, PARK_MAX_BUILDINGS, lobbyDoorFront } from "@vwo/shared";
+import { LIBRARY_ENTRY, LIBRARY_FRONT, PARK, PARK_MAX_BUILDINGS, lobbyDoorFront } from "@vwo/shared";
 import {
   BOOTH_W,
   COIN_STAND_SPOTS,
@@ -53,9 +53,9 @@ describe("DemoJobFair", () => {
     expect(findPath(fair.floor(me.floorId), fair.fair.spawn, LIFT_FRONT)).not.toBeNull();
     fair.leave(PLAYER_ID);
     // Every floor has the lift in the same corner, reachable from where you step out of it. The park
-    // outside has none: it is reached on foot (see "the park" below).
-    expect(fair.floors.at(-1)!.id).toBe(fair.parkId);
-    for (const f of fair.floors.filter((f) => f.id !== fair.parkId)) {
+    // outside and the library in it have none: they are reached on foot (see "the park" below).
+    expect(fair.floors.map((f) => f.id).slice(-2)).toEqual([fair.parkId, fair.libraryId]);
+    for (const f of fair.floors.filter((f) => f.id !== fair.parkId && f.id !== fair.libraryId)) {
       expect(
         f.objects!.filter((o) => o.type === "elevator"),
         f.id,
@@ -1259,13 +1259,35 @@ describe("the park outside", () => {
     expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: fair.lobbyId, ...door, facing: "back" });
   });
 
+  it("has the library in the park: walk in from the park, back out again, and the librarian is at her desk", () => {
+    const { fair } = setup();
+    expect(fair.stopOf(fair.libraryId)).toMatchObject({ name: "Perpustakaan", emoji: "📚" });
+    expect(fair.levelOf(fair.libraryId)).toBe(-1);
+    expect(fair.stops.some((st) => st.floorId === fair.libraryId)).toBe(false);
+    // The lounge on Lantai 7 is back to its sofas: no bookshelf, no librarian.
+    expect(fair.staff.filter((s) => s.floorId === fair.libraryId).map((s) => s.name)).toContain("Kak Nadia");
+    expect(fair.staff.filter((s) => s.name === "Kak Nadia")).toHaveLength(1);
+    expect(fair.hop(fair.parkId, fair.libraryId)).toEqual({ via: "libIn", at: LIBRARY_FRONT, floorId: fair.libraryId, arrive: LIBRARY_ENTRY });
+    expect(fair.hop(fair.libraryId, fair.parkId)).toEqual({ via: "libOut", at: LIBRARY_ENTRY, floorId: fair.parkId, arrive: LIBRARY_FRONT });
+    // From inside the building: out through the lobby door first, then across the park.
+    expect(fair.hop(fair.lobbyId, fair.libraryId)).toMatchObject({ via: "out", floorId: fair.parkId });
+    // From the library to a hall: back out into the park first.
+    expect(fair.hop(fair.libraryId, fair.lobbyId)).toMatchObject({ via: "libOut", floorId: fair.parkId });
+    fair.join("Sari", false, PLAYER_ID);
+    fair.takeHop(PLAYER_ID, fair.hop(fair.parkId, fair.libraryId));
+    expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: fair.libraryId, ...LIBRARY_ENTRY, facing: "back" });
+    fair.takeHop(PLAYER_ID, fair.hop(fair.libraryId, fair.parkId));
+    expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: fair.parkId, ...LIBRARY_FRONT, facing: "front" });
+  });
+
   it("follows the entrance when the Aula is switched off", () => {
     const { fair } = setup();
     fair.setRoomHidden("aula", true);
     expect(fair.lobbyId).toBe(fairFloorId(fair.fair, 0));
     const lobby = fair.floor(fair.lobbyId);
     expect(lobby.objects!.filter((o) => o.targetFloorId === fair.parkId)).toHaveLength(1);
-    expect(fair.floors.filter((f) => f.objects?.some((o) => o.targetFloorId === fair.parkId))).toHaveLength(1);
+    // The lobby's door, and the library's door back out to the park.
+    expect(fair.floors.filter((f) => f.objects?.some((o) => o.targetFloorId === fair.parkId)).map((f) => f.id)).toEqual([lobby.id, fair.libraryId]);
     expect(findPath(lobby, LIFT_FRONT, lobbyDoorFront(lobby))).not.toBeNull();
   });
 

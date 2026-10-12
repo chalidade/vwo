@@ -1,14 +1,15 @@
 // What the Perpustakaan remembers in this browser: where each book was left (as a character
-// position, so it survives a change of font size), and the reader's font size and colours.
+// position, so it survives a new layout or a smaller screen), and the reader's zoom and colours.
 
 export type ReaderTheme = "light" | "sepia" | "dark";
-export const FONT_SIZES = [15, 17, 19, 22, 25] as const;
+/** Zoom steps over "fit the screen", like a PDF viewer's. The pages themselves never reflow. */
+export const ZOOMS = [1, 1.25, 1.5, 1.75, 2] as const;
 
 export interface ReadingSpot {
   id: number;
   title: string;
   author: string;
-  /** First character of the page last open. */
+  /** First character of the page last open, counted over the book's text. */
   pos: number;
   /** How far through the book, 0 to 100, for the progress bar. */
   pct: number;
@@ -16,7 +17,8 @@ export interface ReadingSpot {
 }
 
 export interface LibraryPrefs {
-  font: number;
+  /** An index into ZOOMS. */
+  zoom: number;
   theme: ReaderTheme;
   books: ReadingSpot[];
 }
@@ -25,14 +27,14 @@ const KEY = "vwo:library";
 /** How many books the "Lanjut baca" list keeps. */
 export const RECENT_MAX = 12;
 
-const DEFAULTS: LibraryPrefs = { font: 1, theme: "sepia", books: [] };
+const DEFAULTS: LibraryPrefs = { zoom: 0, theme: "sepia", books: [] };
 
 /** Read the saved settings, tolerating anything broken or missing. */
 export function parsePrefs(raw: string | null): LibraryPrefs {
   try {
     const d = JSON.parse(raw ?? "null") as Partial<LibraryPrefs> | null;
     if (!d || typeof d !== "object") return { ...DEFAULTS };
-    const font = Number.isInteger(d.font) && d.font! >= 0 && d.font! < FONT_SIZES.length ? d.font! : DEFAULTS.font;
+    const zoom = Number.isInteger(d.zoom) && d.zoom! >= 0 && d.zoom! < ZOOMS.length ? d.zoom! : DEFAULTS.zoom;
     const theme = d.theme === "light" || d.theme === "dark" || d.theme === "sepia" ? d.theme : DEFAULTS.theme;
     const books = (Array.isArray(d.books) ? d.books : [])
       .filter((b): b is ReadingSpot => !!b && Number.isInteger(b.id) && b.id > 0 && typeof b.title === "string" && Number.isFinite(b.pos) && Number.isFinite(b.pct))
@@ -45,7 +47,7 @@ export function parsePrefs(raw: string | null): LibraryPrefs {
         at: Number(b.at) || 0,
       }))
       .slice(0, RECENT_MAX);
-    return { font, theme, books };
+    return { zoom, theme, books };
   } catch {
     return { ...DEFAULTS };
   }
@@ -72,13 +74,5 @@ export function rememberSpot(p: LibraryPrefs, spot: ReadingSpot): LibraryPrefs {
   return { ...p, books: [spot, ...p.books.filter((b) => b.id !== spot.id)].slice(0, RECENT_MAX) };
 }
 
-/** Progress through a book, 0 to 100: the share of pages up to and including the open one. */
-export const percentRead = (page: number, pages: number) => Math.min(100, Math.max(0, Math.round(((page + 1) / Math.max(1, pages)) * 100)));
-
-/** About how many characters fit on one page of the reader, for a page box and font size in pixels. */
-export function charsPerPage(width: number, height: number, fontPx: number) {
-  const perLine = Math.max(16, Math.floor(width / (fontPx * 0.45)));
-  const lines = Math.max(6, Math.floor(height / (fontPx * 1.65)));
-  // Paragraph gaps and short last lines take some room: aim a little under the full box.
-  return Math.max(200, Math.floor(perLine * lines * 0.88));
-}
+/** Progress through a book, 0 to 100, from the character position at the end of the open page. */
+export const percentRead = (end: number, total: number) => Math.min(100, Math.max(0, Math.round((end / Math.max(1, total)) * 100)));

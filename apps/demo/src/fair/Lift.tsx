@@ -9,6 +9,7 @@ export function LiftPanel({
   ticket,
   closed,
   park,
+  library,
   onPick,
   onClose,
 }: {
@@ -22,6 +23,8 @@ export function LiftPanel({
   closed: (floorId: string) => boolean;
   /** The park outside: listed under the floors, reached on foot through the lobby door, not by lift. */
   park?: { id: string; via: string; onPick: () => void };
+  /** The Perpustakaan, a building of its own in the park: on foot through the park too. */
+  library?: { id: string; onPick: () => void };
   onPick: (floorId: string) => void;
   onClose: () => void;
 }) {
@@ -56,6 +59,13 @@ export function LiftPanel({
             <b className="fx-floor-n">🌳</b>
             <span className="fx-floor-label">Taman · di luar gedung</span>
             <span className="fx-floor-tag">{here === park.id ? "Kamu di sini" : `Jalan kaki lewat pintu ${park.via}`}</span>
+          </button>
+        )}
+        {library && (
+          <button type="button" className="fx-floor fx-floor-out" data-here={here === library.id ? "" : undefined} disabled={here === library.id} onClick={library.onPick}>
+            <b className="fx-floor-n">📚</b>
+            <span className="fx-floor-label">Perpustakaan · di taman</span>
+            <span className="fx-floor-tag">{here === library.id ? "Kamu di sini" : "Jalan kaki lewat taman"}</span>
           </button>
         )}
       </div>

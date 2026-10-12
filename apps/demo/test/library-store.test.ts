@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { charsPerPage, FONT_SIZES, parsePrefs, percentRead, RECENT_MAX, rememberSpot } from "../src/fair/library-store";
+import { parsePrefs, percentRead, RECENT_MAX, rememberSpot, ZOOMS } from "../src/fair/library-store";
 
 describe("library prefs", () => {
   it("falls back to defaults on broken or hostile data", () => {
-    expect(parsePrefs(null)).toEqual({ font: 1, theme: "sepia", books: [] });
-    expect(parsePrefs("{not json")).toEqual({ font: 1, theme: "sepia", books: [] });
-    const p = parsePrefs(JSON.stringify({ font: 99, theme: "neon", books: [{ id: "x" }, { id: 4507, title: "T".repeat(500), author: 3, pos: 10, pct: 250, at: 1 }] }));
-    expect(p.font).toBe(1);
+    expect(parsePrefs(null)).toEqual({ zoom: 0, theme: "sepia", books: [] });
+    expect(parsePrefs("{not json")).toEqual({ zoom: 0, theme: "sepia", books: [] });
+    const p = parsePrefs(JSON.stringify({ zoom: 99, theme: "neon", books: [{ id: "x" }, { id: 4507, title: "T".repeat(500), author: 3, pos: 10, pct: 250, at: 1 }] }));
+    expect(p.zoom).toBe(0);
+    expect(parsePrefs(JSON.stringify({ zoom: 2 })).zoom).toBe(2);
+    expect(parsePrefs(JSON.stringify({ zoom: ZOOMS.length })).zoom).toBe(0);
     expect(p.theme).toBe("sepia");
     expect(p.books).toHaveLength(1);
     expect(p.books[0]!.title).toHaveLength(200);
@@ -22,13 +24,11 @@ describe("library prefs", () => {
     expect(p.books.filter((b) => b.id === 5)).toHaveLength(1);
   });
 
-  it("measures progress and page size sensibly", () => {
-    expect(percentRead(0, 1)).toBe(100);
-    expect(percentRead(0, 100)).toBe(1);
-    expect(percentRead(99, 100)).toBe(100);
-    const small = charsPerPage(340, 560, FONT_SIZES[4]);
-    const big = charsPerPage(700, 560, FONT_SIZES[0]);
-    expect(small).toBeGreaterThanOrEqual(200);
-    expect(big).toBeGreaterThan(small * 3);
+  it("measures progress through the book's text", () => {
+    expect(percentRead(0, 1000)).toBe(0);
+    expect(percentRead(10, 1000)).toBe(1);
+    expect(percentRead(1000, 1000)).toBe(100);
+    expect(percentRead(5000, 1000)).toBe(100);
+    expect(percentRead(5, 0)).toBe(100);
   });
 });

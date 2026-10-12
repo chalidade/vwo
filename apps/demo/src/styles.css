@@ -2844,3 +2844,57 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
 
 /* ---- Perpustakaan: search unavailable notice ---- */
 .lib-unavailable { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 2px solid #fdba74; color: #9a3412; font-size: 14px; font-weight: 700; }
+
+/* ---- Perpustakaan in the park: the reading room's rug ---- */
+.lib-rug { border-radius: 14px; background: radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.08) 0 40%, transparent 41%), repeating-linear-gradient(45deg, #7f1d1d 0 12px, #8b2323 12px 24px); border: 6px solid #b45309; box-shadow: inset 0 0 0 4px #fcd34d; opacity: 0.9; }
+
+/* ---- Perpustakaan: the book reader, A5 pages like a printed book or a PDF ---- */
+.lib-reader.lib-book { --paper: #fbf5e6; --paper-ink: #2b2118; --desk: #cdbb99; width: min(1240px, 100%); }
+.lib-reader.lib-book[data-theme="light"] { --paper: #ffffff; --paper-ink: #1b1d21; --desk: #d5d9de; }
+.lib-reader.lib-book[data-theme="dark"] { --paper: #23211e; --paper-ink: #ddd6c8; --desk: #0c0d10; }
+.lib-r-toc { max-width: 220px; min-width: 0; padding: 3px 8px; border-radius: 999px; border: 1.5px solid var(--r-line); background: var(--r-soft); color: var(--r-ink); font-size: 12px; }
+.lib-r-zoom { display: inline-flex; align-items: center; gap: 4px; font: 600 12px system-ui, sans-serif; }
+.lib-r-zoom span { min-width: 40px; text-align: center; }
+.lib-r-zoom button { width: 28px; padding: 3px 0; font-size: 15px; line-height: 1; }
+.lib-stage { position: relative; flex: 1; min-height: 0; display: flex; overflow: auto; margin: 8px -14px 0; padding: 10px; background: var(--desk); overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.lib-stage-note { margin: auto; padding: 14px 18px; border-radius: 10px; background: var(--r-bg); }
+.lib-stage-licence { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 6px; background: var(--paper); color: var(--paper-ink); overflow: auto; }
+.lib-spread-box { position: relative; flex: none; margin: auto; }
+.lib-spread { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.lib-page { position: absolute; top: 0; background: var(--paper); color: var(--paper-ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 22px rgb(0 0 0 / 0.22); }
+.lib-page-l { border-radius: 3px 0 0 3px; background-image: linear-gradient(to left, rgb(0 0 0 / 0.1), transparent 34px); }
+.lib-page-r { border-radius: 0 3px 3px 0; background-image: linear-gradient(to right, rgb(0 0 0 / 0.1), transparent 34px); }
+.lib-page-one { border-radius: 3px; }
+.lib-spine { position: absolute; top: 0; width: 36px; pointer-events: none; background: linear-gradient(to right, transparent, rgb(0 0 0 / 0.07) 48%, rgb(255 255 255 / 0.05) 52%, transparent); }
+.lib-page-head { position: absolute; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; font: italic 11px/1.2 Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif; letter-spacing: 0.04em; opacity: 0.62; }
+.lib-page-foot { position: absolute; left: 0; right: 0; text-align: center; font: 12px/1 Georgia, "Iowan Old Style", "Palatino Linotype", serif; opacity: 0.7; font-variant-numeric: oldstyle-nums; }
+.lib-clip { position: absolute; overflow: hidden; color: var(--paper-ink); }
+.lib-shift { width: 100%; height: 100%; }
+.lib-measure { position: fixed; left: -30000px; top: 0; width: 400px; height: 600px; overflow: hidden; visibility: hidden; pointer-events: none; contain: strict; }
+.lib-flow { column-fill: auto; font: 16px/24px Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Cambria, serif; text-align: justify; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; orphans: 2; widows: 2; font-kerning: normal; font-variant-ligatures: common-ligatures; }
+.lib-flow p { margin: 0; text-indent: 1.4em; }
+.lib-flow > p:first-child, .lib-flow :is(h1, h2, h3, h4, hr, .lib-fig, blockquote, table, ul, ol, pre) + p, .lib-flow p[data-k] { text-indent: 0; }
+.lib-flow p[data-k="c"] { text-align: center; margin: 0.3em 0; }
+.lib-flow p[data-k="v"] { text-align: left; hyphens: manual; -webkit-hyphens: manual; margin: 0.7em 0 0.7em 1.2em; }
+.lib-flow :is(h1, h2, h3, h4) { text-align: center; text-indent: 0; hyphens: manual; -webkit-hyphens: manual; font-weight: normal; break-after: avoid; break-inside: avoid; line-height: 1.3; }
+.lib-flow h1 { font-size: 1.6em; letter-spacing: 0.06em; margin: 2.4em 0 1em; }
+.lib-flow h2 { font-size: 1.22em; letter-spacing: 0.05em; margin: 1.6em 0 1.1em; }
+.lib-flow > :is(h1, h2):first-child { margin-top: 3.2em; }
+.lib-flow h3 { font-size: 1.06em; font-style: italic; margin: 1.2em 0 0.8em; }
+.lib-flow h4 { font-size: 1em; font-variant: small-caps; letter-spacing: 0.05em; margin: 1em 0 0.6em; }
+.lib-flow blockquote { margin: 0.8em 1.2em; font-size: 0.94em; }
+.lib-flow blockquote p:first-child { text-indent: 0; }
+.lib-flow hr { width: 28%; margin: 1.3em auto; border: 0; border-top: 1px solid currentColor; opacity: 0.35; }
+.lib-flow pre { margin: 0.8em 0; white-space: pre-wrap; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; text-align: left; }
+.lib-flow :is(ul, ol) { margin: 0.6em 0; padding-left: 1.6em; text-align: left; }
+.lib-flow table { margin: 0.8em auto; border-collapse: collapse; font-size: 0.85em; line-height: 1.35; text-align: left; hyphens: manual; }
+.lib-flow :is(td, th) { padding: 0.15em 0.5em; vertical-align: top; }
+.lib-flow th { font-weight: bold; border-bottom: 1px solid rgb(0 0 0 / 0.25); }
+.lib-flow .lib-fig { display: block; max-width: 100%; max-height: 456px; width: auto; height: auto; margin: 0.9em auto; object-fit: contain; break-inside: avoid; }
+.lib-reader[data-theme="dark"] .lib-flow .lib-fig { filter: brightness(0.88); }
+.lib-flow-end { height: 0; }
+@media (max-width: 640px) {
+  .lib-stage { margin: 6px -10px 0; padding: 8px; }
+  .lib-r-toc { max-width: 150px; }
+  .lib-reader.lib-book .lib-r-tools { gap: 5px; }
+}

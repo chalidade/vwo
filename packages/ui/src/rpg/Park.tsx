@@ -1,12 +1,13 @@
 "use client";
 // The park outside the building: sky over the hedge, walkways on the grass, trees, benches, lamps, a
 // fountain, the event's own building with its entrance, and the plots for the organiser's next
-// events, drawn under construction with a "Coming soon" banner. Positions come from PARK in the
+// events, drawn under construction with a "Coming soon" banner, and the Perpustakaan. Positions come from PARK in the
 // shared package, so the drawing and what blocks walking always agree.
 import { BENCH_H, BENCH_W, PARK, PIGEON_FLOCKS, type ParkBuilding, type ParkNpc, lobbyDoor, parkBuildingDate } from "@vwo/shared";
 import { memo } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK, LampSprite } from "./Furniture";
+import { libraryBuildingExtra } from "./Library";
 
 const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 const T = 48;
@@ -569,6 +570,8 @@ export function parkExtras(view: {
   plots: { plot: { x: number; y: number; width: number; height: number }; building: ParkBuilding | null }[];
   onEnter?: () => void;
   onPlot?: (i: number) => void;
+  /** Walk to the Perpustakaan's door (and go in). */
+  onLibrary?: () => void;
   /** Walk to the phone box (and use it). */
   onPhone?: () => void;
   /** How dark it is, 0 by day to 1 at night. */
@@ -627,6 +630,7 @@ export function parkExtras(view: {
       node: b ? <SoonBuilding name={b.name} date={parkBuildingDate(b) || undefined} accent={accentOf(b.id)} /> : <EmptyPlot />,
     });
   });
+  out.push(libraryBuildingExtra(view.onLibrary));
   const f = PARK.fountain;
   out.push({ key: "park-fountain", x: f.x, y: f.y + f.height - (f.height + 70 / T), z: f.y + f.height, w: f.width, h: f.height + 2, node: <Fountain /> });
   PARK.beds.forEach((b, i) => out.push({ key: `park-bed-${i}`, x: b.x, y: b.y - 6 / T, z: b.y + b.height, w: b.width, node: <FlowerBed w={b.width * T} h={b.height * T} /> }));

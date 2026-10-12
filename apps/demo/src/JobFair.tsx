@@ -28,7 +28,10 @@ import {
   aulaSpot,
   LOUNGE,
   loungeBoardSpot,
-  atLibrary,
+  atLibraryBooks,
+  atLibraryDoor,
+  atLibraryExit,
+  LIBRARY_FRONT,
   librarySpot,
   loungeSpot,
   consultAddress,
@@ -77,7 +80,7 @@ import {
   seminarStageExtras,
   aulaExtras,
   loungeExtras,
-  libraryExtras,
+  libraryRoomExtras,
   type StageScreen,
   lookFor,
   sponsorExtras,
@@ -187,6 +190,8 @@ type Reach =
   | { kind: "consult"; index: number }
   | { kind: "loungeBoard" }
   | { kind: "library" }
+  | { kind: "libraryIn" }
+  | { kind: "libraryOut" }
   | { kind: "parkOut" }
   | { kind: "parkIn" }
   | { kind: "phone" }
@@ -437,10 +442,12 @@ export function JobFair() {
   const stageLive = useStageNow(room?.kind === "aula" ? "aula" : room?.kind === "seminar" ? "seminar" : undefined);
   /** Outside, in the park: no booths, no lift, the way back in is the event building's door. */
   const park = floor.id === fair.parkId;
+  /** Inside the Perpustakaan in the park: bookcases and reading tables, the door leads back out. */
+  const libRoom = floor.id === fair.libraryId;
   /** The floor everyone comes in on: its door leads out to the park. */
   const lobby = floor.id === fair.lobbyId;
   /** Which hall this is (booths, sponsors and slots are stored per hall), or -1 in a room or the park. */
-  const hall = room || park ? -1 : fairFloorIndex(floor.id);
+  const hall = room || park || libRoom ? -1 : fairFloorIndex(floor.id);
   /** The first hall has the entrance hall's info desk and its own lift signs. */
   const firstHall = hall === 0;
   const stop = fair.stopOf(floor.id);
@@ -453,7 +460,7 @@ export function JobFair() {
   const desk = infoDeskOn(fair.fair, floor.id);
   /** A speaker broadcasts to the room the job seeker is in: its big screen and the corner panel play it. */
   const liveHere = !!stageLive && !!session && ((room?.kind === "aula" && stageLive.venue === "aula") || (room?.kind === "seminar" && stageLive.venue !== "aula"));
-  const place: GuidePlace = park ? "taman" : room ? room.kind : "hall";
+  const place: GuidePlace = park ? "taman" : libRoom ? "perpustakaan" : room ? room.kind : "hall";
   // The first time in a place (after the welcome), say what it is for and how to use it.
   useEffect(() => {
     if (!session || talk || intro || guide) return;
@@ -580,9 +587,12 @@ export function JobFair() {
       }
       const b = loungeBoardSpot();
       if (Math.abs(self.x - b.x) < 1.6 && Math.abs(self.y - b.y) < 0.9) return { kind: "loungeBoard" };
-      if (atLibrary(self.x, self.y)) return { kind: "library" };
     }
     if (self.seatId && room) return { kind: "seated", room };
+    if (libRoom) {
+      if (self.seatId || atLibraryBooks(self.x, self.y)) return { kind: "library" };
+      if (atLibraryExit(self.x, self.y)) return { kind: "libraryOut" };
+    }
     if (room?.kind === "aula")
       for (const tab of ["rundown", "info"] as const) {
         const at = aulaSpot(tab);
@@ -592,6 +602,7 @@ export function JobFair() {
     if (park) {
       if (atParkDoor(self.x, self.y)) return { kind: "parkIn" };
       if (atPhoneBox(self.x, self.y)) return { kind: "phone" };
+      if (atLibraryDoor(self.x, self.y)) return { kind: "libraryIn" };
       const i = plotAt(self.x, self.y);
       const b = i >= 0 ? parkPlots(fair.shownParkBuildings())[i]?.building : null;
       if (b) return { kind: "soon", building: b };
@@ -601,7 +612,7 @@ export function JobFair() {
       const c = fair.fair.coinStand;
       if (Math.abs(self.x - (c.x + COIN_STAND_SPOTS.front.x)) < 2 && self.y > c.y + 2.1 && self.y < c.y + 3.6) return { kind: "coins" };
     }
-    if (!park && Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
+    if (!park && !libRoom && Math.abs(self.x - LIFT_FRONT.x) < 1.7 && Math.abs(self.y - LIFT_FRONT.y) < 1) return { kind: "lift" };
     if (room?.stalls) {
       for (const [i, st] of room.stalls.entries()) {
         const at = stallSpot(stallSlot(st, i), "order");
@@ -617,7 +628,7 @@ export function JobFair() {
     }
     for (const p of promotersHere) if (Math.hypot(self.x - p.x, self.y - (p.y + 1.1)) < 1.1) return { kind: "promoter", promoter: p };
     const d = desk;
-    if (!park && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
+    if (!park && !libRoom && self.x > d.x - 0.4 && self.x < d.x + d.width + 0.4 && self.y > d.y + d.height && self.y < d.y + d.height + 1.3) return { kind: "info" };
     const other = [...fair.visitors.values()]
       .filter((v) => v.memberId !== self.memberId && v.floorId === self.floorId)
       .map((v) => ({ v, d: Math.hypot(v.x - self.x, v.y - self.y) }))
@@ -873,6 +884,8 @@ export function JobFair() {
     else if (r.kind === "consult") setLounge({ mode: "consult", index: r.index });
     else if (r.kind === "loungeBoard") setLounge({ mode: "info" });
     else if (r.kind === "library") setLibrary(true);
+    else if (r.kind === "libraryIn") stepThrough(fair.libraryId);
+    else if (r.kind === "libraryOut") stepThrough(fair.parkId);
     else if (r.kind === "parkOut") stepThrough(fair.parkId);
     else if (r.kind === "parkIn") stepThrough(fair.lobbyId);
     else if (r.kind === "phone") setPhone(true);
@@ -908,7 +921,13 @@ export function JobFair() {
     const h = fair.hop(me.floorId, floorId);
     if (h.via === "lift") return rideTo(h.floorId);
     fair.takeHop(me.memberId, h);
-    setToast(h.via === "out" ? "🌳 Kamu di taman, di luar gedung" : `🏢 Kembali ke dalam · ${fair.stopOf(h.floorId).name}`);
+    setToast(
+      h.via === "out" || h.via === "libOut"
+        ? "🌳 Kamu di taman, di luar gedung"
+        : h.via === "libIn"
+          ? "📚 Selamat datang di Perpustakaan"
+          : `🏢 Kembali ke dalam · ${fair.stopOf(h.floorId).name}`,
+    );
     return true;
   }
 
@@ -990,6 +1009,7 @@ export function JobFair() {
     const r = fair.roomOf(me.floorId);
     const vip = vipSeatBooth(me.seatId);
     if (r) startActivity(r);
+    else if (me.floorId === fair.libraryId) setLibrary(true);
     else if (vip && fair.booth(vip)) talkToRecruiter(fair.booth(vip)!, spgName(vip));
     else setGames(true);
   }
@@ -1563,10 +1583,16 @@ export function JobFair() {
       .map((x) => ({ memberId: x.memberId, name: x.displayName.replace(/^🌐 /, "") }));
   }
 
-  /** In the lounge: walk to the librarian's desk and open the Perpustakaan. */
+  /** Walk to the librarian's desk in the Perpustakaan in the park, from anywhere, and pick a book. */
   function goToLibrary() {
     const spot = librarySpot("front");
-    goTo(floor.id, spot.x, spot.y, () => setLibrary(true));
+    goTo(fair.libraryId, spot.x, spot.y, () => setLibrary(true));
+  }
+
+  /** In the park: walk to the Perpustakaan's door and go in. */
+  function goToLibraryDoor() {
+    if (reachRef.current?.kind === "libraryIn") return stepThrough(fair.libraryId);
+    goTo(fair.parkId, LIBRARY_FRONT.x, LIBRARY_FRONT.y, () => stepThrough(fair.libraryId));
   }
 
   /** Walk to a lounge consultant's desk and open it. */
@@ -1837,13 +1863,16 @@ export function JobFair() {
         rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level },
       }),
     ),
-    ...(park
+    ...(libRoom
+      ? libraryRoomExtras({ books: session ? goToLibrary : undefined })
+      : park
       ? parkExtras({
           eventName: fair.fair.name,
           plots: parkPlots(fair.shownParkBuildings()),
           onEnter: session ? goInside : undefined,
           onPlot: session ? (i) => goTo(fair.parkId, plotFront(i).x, plotFront(i).y) : undefined,
           onPhone: session ? goToPhone : undefined,
+          onLibrary: session ? goToLibraryDoor : undefined,
           dark,
           npcs: parkPeople,
           scared: self ? scaredFlocks(self.x, self.y) : undefined,
@@ -1868,7 +1897,6 @@ export function JobFair() {
           board: session ? () => goTo(floor.id, loungeBoardSpot().x, loungeBoardSpot().y, () => setLounge({ mode: "info" })) : undefined,
         })
       : []),
-    ...(room?.kind === "konsultasi" ? libraryExtras({ open: session ? goToLibrary : undefined }) : []),
     ...(room?.kind === "aula"
       ? aulaExtras(room, aulaScreen(), fair.stops, {
           rundown: session ? () => goTo(floor.id, aulaSpot("rundown").x, aulaSpot("rundown").y, () => setAula("jadwal")) : undefined,
@@ -2149,7 +2177,7 @@ export function JobFair() {
               <span className="rpg-kbd">A</span>
               <span className="rpg-kbd">S</span>
               <span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa ·{" "}
-              {park ? "🏢 pintu gedung membawa ke lobi" : "🛗 ikuti panah ke lift"} · ❓ panduan
+              {park ? "🏢 pintu gedung membawa ke lobi" : libRoom ? "🚪 pintu bawah kembali ke taman" : "🛗 ikuti panah ke lift"} · ❓ panduan
             </div>
           ) : null}
         </div>
@@ -2283,7 +2311,8 @@ export function JobFair() {
           <SofaGames
             onLibrary={() => {
               setGames(false);
-              setLibrary(true);
+              setToast("📚 Menuju Perpustakaan di taman");
+              goToLibrary();
             }}
             left={fair.gameCoinsLeft()}
             logos={fair.fair.booths.map((b) => ({ logo: b.logo, color: b.color }))}
@@ -2457,6 +2486,13 @@ export function JobFair() {
           <LiftPanel
             stops={fair.stops}
             here={floor.id}
+            library={{
+              id: fair.libraryId,
+              onPick: () => {
+                setLift(false);
+                if (!libRoom) goToLibrary();
+              },
+            }}
             park={{
               id: fair.parkId,
               via: fair.stopOf(fair.lobbyId).name,

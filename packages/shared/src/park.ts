@@ -1,7 +1,8 @@
 // The park outside the building: a lawn with paths, trees, benches and a fountain, reached through a
 // door in the lobby. The event's own building stands at the top with its entrance back into the
 // lobby; the plots beside it hold the organiser's next events, drawn under construction with a
-// "Coming soon" banner until they are ready. Coordinates are tiles, like the halls.
+// "Coming soon" banner until they are ready. The Perpustakaan stands on its own on the right, always
+// open, with a door into its reading room. Coordinates are tiles, like the halls.
 import type { FloorView, MapObjectView, SeatView } from "./venue-view";
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -21,6 +22,10 @@ export const PARK = {
   /** Plots for other events' buildings, nearest to the event's own building first. */
   plots: [plot(9.9, 0), plot(37.5, 0), plot(0.8, 0), plot(46.6, 0), plot(0.8, 11.4)],
   fountain: { x: 25.8, y: 12.2, width: 4.4, height: 3.2 },
+  /** The Perpustakaan: a building of its own (not one of the organiser's plots), with its door in
+   *  the middle of the front. */
+  library: { x: 45.4, y: 11.6, width: 8.4, height: 4.6 },
+  libraryDoor: { x: 48.6, width: 2 },
   /** Walkways drawn on the grass (walkable, only looks). */
   paths: [
     { x: 0.4, y: 5.0, width: 55.2, height: 2.2 },
@@ -38,10 +43,7 @@ export const PARK = {
     { x: 19.4, y: 10.4 },
     { x: 36.6, y: 10.4 },
     { x: 42, y: 9.4 },
-    { x: 48, y: 9.0 },
-    { x: 53.2, y: 9.8 },
-    { x: 46.2, y: 14.2 },
-    { x: 52.6, y: 14.6 },
+    { x: 48, y: 8.8 },
     { x: 12, y: 14.4 },
     { x: 2.4, y: 22.8 },
     { x: 11.6, y: 23.2 },
@@ -71,7 +73,6 @@ export const PARK = {
   beds: [
     { x: 22.4, y: 11.2, width: 2.2, height: 1 },
     { x: 31.4, y: 11.2, width: 2.2, height: 1 },
-    { x: 47, y: 11.4, width: 5.4, height: 1.1 },
   ],
   /** The public phone box by the plaza: step in front of it to call a friend. */
   phoneBox: { x: 35, y: 7.4, width: 1.3, height: 0.9 },
@@ -294,6 +295,15 @@ export function lobbyDoorObject(fair: { slug: string }, floorId: string, floor: 
   };
 }
 
+/** Where to stand at the Perpustakaan's door, to go in; and where you come back out. */
+export const LIBRARY_FRONT = { x: PARK.libraryDoor.x + PARK.libraryDoor.width / 2, y: PARK.library.y + PARK.library.height + 0.7 };
+
+/** Standing at the Perpustakaan's door. */
+export function atLibraryDoor(x: number, y: number) {
+  const l = PARK.library;
+  return Math.abs(x - LIBRARY_FRONT.x) < 1.4 && y > l.y + l.height && y < l.y + l.height + 1.5;
+}
+
 /** Where to stand to use the phone box: just in front of its door. */
 export const PHONE_FRONT = { x: PARK.phoneBox.x + PARK.phoneBox.width / 2, y: PARK.phoneBox.y + PARK.phoneBox.height + 0.6 };
 
@@ -308,7 +318,7 @@ export function atPhoneBox(x: number, y: number) {
 export function buildParkFloor(fair: { slug: string }): FloorView {
   const id = parkFloorId(fair);
   const pg = PARK.playground;
-  const blocked: Box[] = [PARK.main, ...PARK.plots, PARK.fountain, ...PARK.beds, PARK.phoneBox, PARK.cart, PARK.bikes, PARK.signboard, pg.slide, pg.swing];
+  const blocked: Box[] = [PARK.main, ...PARK.plots, PARK.library, PARK.fountain, ...PARK.beds, PARK.phoneBox, PARK.cart, PARK.bikes, PARK.signboard, pg.slide, pg.swing];
   for (const t of PARK.trees) blocked.push({ x: t.x - 0.35, y: t.y - 0.45, width: 0.7, height: 0.45 });
   for (const l of PARK.lamps) blocked.push({ x: l.x - 0.2, y: l.y - 0.3, width: 0.4, height: 0.3 });
   // A bench's backrest blocks; its seat is where you sit.

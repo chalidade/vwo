@@ -361,7 +361,8 @@ const END = /^\s*\*{3}\s*END OF (?:THE|THIS) PROJECT GUTENBERG E-?BOOK[^\n]*$/im
 const OLD_END = /^\s*End of (?:the )?Project Gutenberg'?s? .*$/im;
 const OLD_START = /^\s*\*END\*THE SMALL PRINT![^\n]*$/im;
 
-const field = (head: string, name: string) => new RegExp(`^${name}:\\s*(.+)$`, "im").exec(head)?.[1]?.trim().slice(0, 200) ?? "";
+/** A "Name: value" line from Gutenberg's header, such as Title, Author or Language. */
+export const gutenbergField = (head: string, name: string) => new RegExp(`^${name}:\\s*(.+)$`, "im").exec(head)?.[1]?.trim().slice(0, 200) ?? "";
 
 /** Split a Project Gutenberg plain-text file into the book itself and the Gutenberg header and
  *  licence around it. Title, author and language come from the header. */
@@ -379,9 +380,9 @@ export function splitGutenberg(raw: string, id: number): LibraryBook {
   while (paragraphs.length && /^(produced by|e-?text prepared by|transcribed from|this e-?book was produced by)/i.test(paragraphs[0]!)) paragraphs.shift();
   return {
     id,
-    title: field(head, "Title") || `Buku #${id}`,
-    author: field(head, "Author"),
-    language: field(head, "Language"),
+    title: gutenbergField(head, "Title") || `Buku #${id}`,
+    author: gutenbergField(head, "Author"),
+    language: gutenbergField(head, "Language"),
     paragraphs,
     licence: `${head.trim()}\n\n${foot.trim()}`.trim(),
   };

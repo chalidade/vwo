@@ -15,6 +15,16 @@ import {
   fairStops,
   findPath,
   isBlocked,
+  isLibraryFloor,
+  atLibraryBooks,
+  atLibraryDoor,
+  atLibraryExit,
+  buildLibraryFloor,
+  LIBRARY_ENTRY,
+  LIBRARY_FRONT,
+  LIBRARY_ROOM,
+  libraryFloorId,
+  librarySpot,
   isParkFloor,
   LIFT_FRONT,
   lobbyDoorFront,
@@ -61,7 +71,11 @@ describe("the park", () => {
     expect(isParkFloor(fairStops(DEMO_JOB_FAIR)[0]!.floorId)).toBe(false);
     expect(park.width * park.height).toBeLessThanOrEqual(DEMO_JOB_FAIR.width * DEMO_JOB_FAIR.height);
     expect(fairStops(DEMO_JOB_FAIR).some((st) => st.floorId === park.id)).toBe(false);
-    expect(buildJobFairFloors(DEMO_JOB_FAIR).at(-1)!.id).toBe(park.id);
+    expect(
+      buildJobFairFloors(DEMO_JOB_FAIR)
+        .map((f) => f.id)
+        .slice(-2),
+    ).toEqual([park.id, libraryFloorId(DEMO_JOB_FAIR)]);
   });
 
   it("can be walked all over from the building's door: no cell is walled in", () => {
@@ -88,8 +102,8 @@ describe("the park", () => {
     const floors = buildJobFairFloors(DEMO_JOB_FAIR);
     const lobby = floors.find((f) => f.id === entranceFloorId(DEMO_JOB_FAIR))!;
     const doors = floors.flatMap((f) => (f.objects ?? []).filter((o) => o.targetFloorId === park.id).map((o) => ({ f, o })));
-    expect(doors).toHaveLength(1);
-    expect(doors[0]!.f.id).toBe(lobby.id);
+    // One door from the lobby, and one out of the library's reading room.
+    expect(doors.map((d) => d.f.id).sort()).toEqual([lobby.id, libraryFloorId(DEMO_JOB_FAIR)].sort());
     const front = lobbyDoorFront(lobby);
     expect(isBlocked(lobby, front.x, front.y)).toBe(false);
     expect(atLobbyDoor(lobby, front.x, front.y)).toBe(true);
@@ -105,6 +119,54 @@ describe("the park", () => {
     expect(lobby.objects!.some((o) => o.targetFloorId === parkFloorId(noAula))).toBe(true);
     const front = lobbyDoorFront(lobby);
     expect(findPath(lobby, LIFT_FRONT, front)).not.toBeNull();
+  });
+});
+
+describe("the library in the park", () => {
+  const park = buildParkFloor(DEMO_JOB_FAIR);
+  const room = buildLibraryFloor(DEMO_JOB_FAIR);
+
+  it("is a building of its own in the park, not one of the organiser's plots", () => {
+    expect(isBlocked(park, PARK.library.x + PARK.library.width / 2, PARK.library.y + PARK.library.height / 2)).toBe(true);
+    PARK.plots.forEach((_, i) => {
+      const f = plotFront(i);
+      expect(atLibraryDoor(f.x, f.y)).toBe(false);
+    });
+    expect(plotAt(LIBRARY_FRONT.x, LIBRARY_FRONT.y)).toBe(-1);
+  });
+
+  it("has its door reachable from where people come into the park", () => {
+    expect(isBlocked(park, LIBRARY_FRONT.x, LIBRARY_FRONT.y)).toBe(false);
+    expect(atLibraryDoor(LIBRARY_FRONT.x, LIBRARY_FRONT.y)).toBe(true);
+    expect(atLibraryDoor(PARK.arrive.x, PARK.arrive.y)).toBe(false);
+    expect(findPath(park, PARK.arrive, LIBRARY_FRONT)).not.toBeNull();
+  });
+
+  it("has a reading room where the desk, every bookcase, every chair and the way out are reachable", () => {
+    expect(isLibraryFloor(room.id)).toBe(true);
+    expect(isLibraryFloor(park.id)).toBe(false);
+    expect(room.width * room.height).toBeLessThan(park.width * park.height);
+    expect(isBlocked(room, LIBRARY_ENTRY.x, LIBRARY_ENTRY.y)).toBe(false);
+    expect(atLibraryExit(LIBRARY_ENTRY.x, LIBRARY_ENTRY.y)).toBe(true);
+    const front = librarySpot("front");
+    expect(atLibraryBooks(front.x, front.y)).toBe(true);
+    expect(findPath(room, LIBRARY_ENTRY, front)).not.toBeNull();
+    for (const s of [...LIBRARY_ROOM.backShelves, ...LIBRARY_ROOM.sideShelves]) {
+      const at = { x: s.x + s.width / 2, y: s.y + s.height + 0.5 };
+      expect(atLibraryBooks(at.x, at.y)).toBe(true);
+      expect(findPath(room, LIBRARY_ENTRY, at)).not.toBeNull();
+    }
+    expect(room.seats).toHaveLength(LIBRARY_ROOM.tables.length * 4);
+    for (const s of room.seats) expect(findPath(room, LIBRARY_ENTRY, { x: s.x, y: s.y }) ?? findPath(room, LIBRARY_ENTRY, { x: s.x, y: s.y + 0.6 })).not.toBeNull();
+    const { seen, walkable } = reachable(room, LIBRARY_ENTRY);
+    expect(seen.size).toBe(walkable);
+  });
+
+  it("opens back onto the park, right in front of its own door", () => {
+    const door = room.objects!.find((o) => o.type === "door")!;
+    expect(door.targetFloorId).toBe(park.id);
+    expect({ x: door.targetX, y: door.targetY }).toEqual(LIBRARY_FRONT);
+    expect(atLibraryBooks(LIBRARY_ENTRY.x, LIBRARY_ENTRY.y)).toBe(false);
   });
 });
 
