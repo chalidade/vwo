@@ -26,6 +26,9 @@ import { createXenditInvoice, getXenditInvoice, methodName, xenditEnabled } from
 
 export const provider = () => (xenditEnabled() ? "xendit" : "demo");
 
+/** Buying coins with money can be switched off between events: PAYMENTS_OPEN=0 in the environment. */
+export const paymentsOpen = () => process.env.PAYMENTS_OPEN !== "0";
+
 /** The site's own address as the browser sees it; the checkout page sends the buyer back here. */
 export function siteOrigin(req: Request) {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";

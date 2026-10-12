@@ -88,7 +88,11 @@ export function WalletPanel({
               {canClaim ? "Klaim" : "Sudah diklaim hari ini"}
             </button>
           </div>
-          {!atStand ? (
+          {gateway === "closed" ? (
+            <div className="fx-callout">
+              <span>Pembelian koin sedang ditutup di luar masa acara. Koin gratis harian tetap bisa diklaim.</span>
+            </div>
+          ) : !atStand ? (
             <div className="fx-callout">
               <span>
                 Beli koin di <b>meja informasi</b> lantai mana pun, atau di <b>Stand Koin</b>.
