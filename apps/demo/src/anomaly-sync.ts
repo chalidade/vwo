@@ -32,7 +32,8 @@ function place(): AnomalyHere | null {
   if (!spawn) return null;
   const mine = claimed?.id === spawn.id;
   if (!mine && (Date.now() >= spawn.until || done.has(spawn.id))) return null;
-  const floorId = anomalyFloorId(fair.stops, spawn.floor);
+  // Never on a floor the organiser closed for now.
+  const floorId = anomalyFloorId(fair.openStops(), spawn.floor);
   if (!floorId) return null;
   const floor = fair.floor(floorId);
   return {
