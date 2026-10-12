@@ -2204,7 +2204,7 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .org-move-floors { display: grid; gap: 10px; }
 .org-move-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .org-move-price { white-space: nowrap; }
-.org-move-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, auto); grid-auto-flow: column; gap: 6px; }
+.org-move-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .org-move-cell { all: unset; box-sizing: border-box; display: grid; gap: 2px; align-content: center; min-height: 52px; min-width: 0; padding: 6px 8px; border-radius: 10px; border: 1.5px dashed #d4d4d4; background: transparent; color: var(--text); cursor: pointer; font-size: 12px; line-height: 1.25; }
 .org-move-cell[data-state="taken"] { border: 1.5px solid var(--line, #e5e5e5); border-left: 5px solid var(--c, #111); background: #fff; }
 .org-move-cell[data-state="here"] { border: 1.5px solid #111; background: #f4f4f5; cursor: default; }
@@ -2592,3 +2592,10 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 .fx-floor[data-closed] { background: #e5e7eb; color: #6b7280; box-shadow: none; opacity: 0.75; cursor: not-allowed; }
 .fx-floor[data-closed] .fx-floor-n { background: #6b7280; color: #e5e7eb; }
 .fx-floor[data-closed] .fx-floor-tag { color: #374151; font-weight: 800; }
+
+/* Move picker: twelve slots in the hall's six columns; on a phone the right half wraps under the left. */
+.org-move-cell { grid-column: var(--gc); grid-row: var(--gr); }
+@media (max-width: 640px) {
+  .org-move-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .org-move-cell { grid-column: var(--gcm); grid-row: var(--grm); }
+}

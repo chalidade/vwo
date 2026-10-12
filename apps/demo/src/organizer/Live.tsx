@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ApplicationStatus } from "../jobfair-engine";
-import { FloorScene } from "../fair/FloorScene";
+import { type FloorArea, FloorScene } from "../fair/FloorScene";
 import { COMPANY_TITLES, levelOf } from "../fair/content";
 import { Stars } from "../fair/Modal";
 import { fair } from "../useFair";
@@ -23,6 +23,8 @@ export function OrgLive() {
   const booths = fair.fair.booths;
   const [tab, setTab] = useState(0);
   const stop = fair.stops[tab] ?? fair.stops[0]!;
+  // A booth floor is twice as wide as it is tall: the organiser can look at one half up close.
+  const [area, setArea] = useState<FloorArea>("all");
   const visitors = [...fair.visitors.values()];
   const decide = (id: string, status: ApplicationStatus) => fair.setStatus(id, status);
 
@@ -48,8 +50,23 @@ export function OrgLive() {
           </button>
         ))}
       </div>
+      {!stop.roomId && (
+        <div className="floor-tabs org-area" role="tablist" aria-label="Bagian lantai">
+          {(
+            [
+              ["all", "Seluruh lantai"],
+              ["left", "Sisi kiri"],
+              ["right", "Sisi kanan"],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={area === id} data-active={area === id ? "" : undefined} onClick={() => setArea(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="layout2">
-        <FloorScene className="admin-scene" floorId={stop.floorId} />
+        <FloorScene className="admin-scene" floorId={stop.floorId} area={stop.roomId ? "all" : area} />
         <div className="card org-log">
           <h2 className="cp-h2">Riwayat</h2>
           <div className="org-scroll">

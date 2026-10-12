@@ -28,32 +28,12 @@ export function HallWall({
   banner?: boolean;
 }) {
   const bw = Math.min(520, w * 0.5);
-  const flags = Math.ceil(w / 26);
-  const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h }}>
       <div className="rpg-hallwall" style={{ position: "absolute", inset: 0 }} />
       <div className="rpg-hallbase" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: h * 0.18 }} />
       <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
-        {/* Spotlights on the ceiling rail. */}
-        <rect x={0} y={4} width={w} height={6} fill="#334155" />
-        {Array.from({ length: Math.floor(w / 160) }, (_, i) => {
-          const x = 80 + i * 160;
-          return (
-            <g key={i}>
-              <path d={`M${x - 7} 8h14l-3 12h-8Z`} fill="#1f2937" {...ink} strokeWidth={1.4} />
-              <path d={`M${x - 5} 20L${x - 40} ${h}H${x + 40}L${x + 5} 20Z`} fill="#fff7d6" opacity={0.12} />
-            </g>
-          );
-        })}
-        {/* Bunting. */}
-        <path d={`M0 16${Array.from({ length: Math.ceil(w / 130) }, (_, i) => `Q${i * 130 + 65} 32 ${(i + 1) * 130} 16`).join("")}`} fill="none" stroke={INK} strokeWidth={1.4} />
-        {Array.from({ length: flags }, (_, i) => {
-          const x = i * 26 + 10;
-          const t = (x % 130) / 130;
-          const y = 16 + Math.sin(t * Math.PI) * 8;
-          return <path key={i} d={`M${x - 7} ${y}h14l-7 13Z`} fill={colors[i % colors.length]} stroke={INK} strokeWidth={1} />;
-        })}
+        <HallRail w={w} h={h} />
         {/* The event banner. */}
         {banner && (
           // Kept short so it clears the VIP banners and gates of the booths standing right below it.
@@ -78,6 +58,36 @@ export function HallWall({
     </div>
   );
 }
+
+/** Spotlights and bunting along the top of the hall wall. Drawn once per size: a wide hall has a
+ *  couple of hundred flags, and the scene re-renders every frame. */
+const HallRail = memo(function HallRail({ w, h }: { w: number; h: number }) {
+  const flags = Math.ceil(w / 26);
+  const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
+  return (
+    <>
+      {/* Spotlights on the ceiling rail. */}
+      <rect x={0} y={4} width={w} height={6} fill="#334155" />
+      {Array.from({ length: Math.floor(w / 160) }, (_, i) => {
+        const x = 80 + i * 160;
+        return (
+          <g key={i}>
+            <path d={`M${x - 7} 8h14l-3 12h-8Z`} fill="#1f2937" {...ink} strokeWidth={1.4} />
+            <path d={`M${x - 5} 20L${x - 40} ${h}H${x + 40}L${x + 5} 20Z`} fill="#fff7d6" opacity={0.12} />
+          </g>
+        );
+      })}
+      {/* Bunting. */}
+      <path d={`M0 16${Array.from({ length: Math.ceil(w / 130) }, (_, i) => `Q${i * 130 + 65} 32 ${(i + 1) * 130} 16`).join("")}`} fill="none" stroke={INK} strokeWidth={1.4} />
+      {Array.from({ length: flags }, (_, i) => {
+        const x = i * 26 + 10;
+        const t = (x % 130) / 130;
+        const y = 16 + Math.sin(t * Math.PI) * 8;
+        return <path key={i} d={`M${x - 7} ${y}h14l-7 13Z`} fill={colors[i % colors.length]} stroke={INK} strokeWidth={1} />;
+      })}
+    </>
+  );
+});
 
 /** "Didukung oleh" plate with sponsor logos, hung on the hall wall. */
 function SponsorStrip({ sponsors, style }: { sponsors: SponsorView[]; style: CSSProperties }) {

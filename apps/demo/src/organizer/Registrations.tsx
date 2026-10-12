@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { type BoothTier, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
+import { type BoothTier, standSlotIndex, standSlotName, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
 import { coinText, rupiah } from "../fair/company";
-import { BOOTH_SLOTS } from "../jobfair-engine";
 import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
 
@@ -28,8 +27,7 @@ interface Registration {
 }
 
 const STATUS = { paid: "Perlu diverifikasi", unpaid: "Belum bayar", verified: "Terverifikasi", rejected: "Ditolak" } as const;
-const SLOT_NAMES = ["Kiri atas", "Kiri bawah", "Tengah atas", "Tengah bawah", "Kanan atas", "Kanan bawah"];
-const slotName = (x: number, y: number) => SLOT_NAMES[BOOTH_SLOTS.findIndex((s) => s.x === x && s.y === y)] ?? "";
+const slotName = (x: number, y: number) => standSlotName(standSlotIndex(x, y));
 
 async function call<T>(path: string, body?: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {

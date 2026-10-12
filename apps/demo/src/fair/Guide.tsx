@@ -24,7 +24,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Duduk di sofa untuk main mini game berhadiah koin dan membaca artikel karier.",
       "Di stand VIP, duduk di kursi lounge: SPG datang menemani dan bisa ditanya soal lowongan.",
       "Meja informasi ada di tiap lantai: tanya arah, minta diantar, atau beli koin di sana.",
-      "Naik turun lantai lewat lift 🛗 di pojok kanan bawah.",
+      "Naik turun lantai lewat lift 🛗: ikuti panah di lantai.",
     ],
   },
   aula: {
@@ -89,7 +89,7 @@ const FEATURES: { emoji: string; title: string; text: string }[] = [
   { emoji: "🔔", title: "Notifikasi", text: "Status lamaran, chat HR, panggilan, undangan interview, dan kunjungan kantor muncul di lonceng kanan atas." },
   { emoji: "🪙", title: "Koin", text: "Klaim koin gratis harian di dompet, selesaikan misi, atau main mini game. Beli koin di meja informasi atau Stand Koin." },
   { emoji: "🎯", title: "Misi harian", text: "Tiap hari ada misi kecil (kunjungi stand, melamar, ikut seminar). Selesaikan untuk koin bonus." },
-  { emoji: "🛗", title: "Lift", text: "Lift di pojok kanan bawah tiap lantai. Pilih lantai stand atau ruangan (Aula, Seminar, Psikotes, Food Court, Lounge)." },
+  { emoji: "🛗", title: "Lift", text: "Lift di bagian bawah tiap lantai: di tengah lantai booth, di pojok kanan ruangan. Pilih lantai stand atau ruangan (Aula, Seminar, Psikotes, Food Court, Lounge)." },
   { emoji: "ℹ️", title: "Meja informasi", text: "Ada di tiap lantai. Petugasnya bisa mengantarmu ke stand mana pun dan menjual koin." },
 ];
 

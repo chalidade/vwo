@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type BoothTheme, type CompanyBooth, type GateStyle, hasStand, MINI_MAX_OPEN_JOBS, openJobs, UMKM_CORNER } from "@vwo/shared";
+import { type BoothTheme, type CompanyBooth, type GateStyle, hasStand, MINI_MAX_OPEN_JOBS, openJobs, standSlotIndex, standSlotName, UMKM_CORNER } from "@vwo/shared";
 import { BOOTH_THEMES, FLOOR_SLOTS, GATE_STYLES } from "@vwo/ui";
 import { BOOTH_SLOTS } from "../jobfair-engine";
 import { sessionLogin } from "../company/login";
@@ -10,8 +10,14 @@ import { boothMembers, moveStandOnServer, removeBoothMember } from "../server-fa
 import { fair } from "../useFair";
 
 const COLORS = ["#2563eb", "#0ea5e9", "#14b8a6", "#16a34a", "#eab308", "#f97316", "#dc2626", "#db2777", "#9333ea", "#334155"];
-const SLOT_NAMES = ["Kiri atas", "Kiri bawah", "Tengah atas", "Tengah bawah", "Kanan atas", "Kanan bawah"];
-const slotName = (x: number, y: number) => SLOT_NAMES[BOOTH_SLOTS.findIndex((s) => s.x === x && s.y === y)] ?? "";
+const slotName = (x: number, y: number) => standSlotName(standSlotIndex(x, y));
+/** Where slot `slot` sits in the move picker's grid: its column and row in the hall, and on a phone
+ *  the right three columns go under the left three (see .org-move-grid). */
+const slotCell = (slot: number) => {
+  const col = Math.floor(slot / 2);
+  const row = slot % 2;
+  return { ["--gc" as string]: col + 1, ["--gr" as string]: row + 1, ["--gcm" as string]: (col % 3) + 1, ["--grm" as string]: row + 1 + (col < 3 ? 0 : 2) };
+};
 
 /** Where a new booth goes; `mini` adds a mini (UMKM) booth to the floor's Pojok UMKM instead of a slot. */
 type Slot = { floor: number; x: number; y: number; mini?: boolean };
@@ -352,7 +358,7 @@ function moveErrorText(error: string) {
 
 /**
  * Move a stand to another slot, on its floor or another booth floor: a small map of every floor's
- * six slots. A free slot moves the stand there; a taken one swaps the two stands. The booth's
+ * twelve slots, laid out like the hall (six columns, two rows; on a phone the right half wraps below). A free slot moves the stand there; a taken one swaps the two stands. The booth's
  * applicants, promoter, media and VIP SPG go with it, and visitors pay the new floor's entry price.
  */
 function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: () => void; onDone: (text: string) => void }) {
@@ -373,7 +379,7 @@ function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: (
     if ("error" in r) return setError(moveErrorText(r.error));
     // Live: the server's answer is the truth; every visitor's game takes it on its next pull.
     if ("data" in r) fair.setPlacements(r.data.placements);
-    const place = `${fair.fair.floors[to.floor]?.name}, ${SLOT_NAMES[to.slot]?.toLowerCase()}`;
+    const place = `${fair.fair.floors[to.floor]?.name}, ${standSlotName(to.slot).toLowerCase()}`;
     onDone(other ? `Stand ${booth.company} dan ${other.company} bertukar tempat` : `Stand ${booth.company} dipindah ke ${place}`);
   };
   return (
@@ -381,7 +387,7 @@ function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: (
       <div className="card org-move" role="dialog" aria-label={`Pindahkan stand ${booth.company}`} onClick={(e) => e.stopPropagation()}>
         <h2 className="cp-h2">Pindahkan stand {booth.company}</h2>
         <p className="muted small org-move-help">
-          Sekarang di {fair.fair.floors[booth.floor]?.name}, {SLOT_NAMES[here.slot]?.toLowerCase()}. Pilih tempat kosong untuk memindah, atau stand lain untuk bertukar tempat.
+          Sekarang di {fair.fair.floors[booth.floor]?.name}, {standSlotName(here.slot).toLowerCase()}. Pilih tempat kosong untuk memindah, atau stand lain untuk bertukar tempat.
           Pelamar, promotor, video, dan dekorasi ikut pindah.
         </p>
         <div className="org-move-floors">
@@ -408,13 +414,13 @@ function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: (
                         data-state={current ? "here" : b ? "taken" : "free"}
                         data-picked={picked ? "" : undefined}
                         disabled={current || busy}
-                        title={SLOT_NAMES[slot]}
-                        aria-label={`${SLOT_NAMES[slot]}: ${current ? "posisi sekarang" : b ? b.company : "kosong"}`}
-                        style={b ? { ["--c" as string]: b.color } : undefined}
+                        title={standSlotName(slot)}
+                        aria-label={`${standSlotName(slot)}: ${current ? "posisi sekarang" : b ? b.company : "kosong"}`}
+                        style={{ ...(b ? { ["--c" as string]: b.color } : {}), ...slotCell(slot) }}
                         onClick={() => setTo({ floor, slot })}
                       >
                         <span className="org-move-name">{current ? "Di sini" : b ? b.company : "Kosong"}</span>
-                        <span className="org-move-slot">{SLOT_NAMES[slot]}</span>
+                        <span className="org-move-slot">{standSlotName(slot)}</span>
                       </button>
                     );
                   })}
@@ -428,11 +434,11 @@ function MoveStand({ booth, onClose, onDone }: { booth: CompanyBooth; onClose: (
             {other ? (
               <>
                 <ArrowLeftRight size={14} aria-hidden /> {booth.company} dan {other.company} bertukar tempat: {other.company} pindah ke {fair.fair.floors[here.floor]?.name},{" "}
-                {SLOT_NAMES[here.slot]?.toLowerCase()}.
+                {standSlotName(here.slot).toLowerCase()}.
               </>
             ) : (
               <>
-                <MoveRight size={14} aria-hidden /> {booth.company} pindah ke {fair.fair.floors[to.floor]?.name}, {SLOT_NAMES[to.slot]?.toLowerCase()}.
+                <MoveRight size={14} aria-hidden /> {booth.company} pindah ke {fair.fair.floors[to.floor]?.name}, {standSlotName(to.slot).toLowerCase()}.
               </>
             )}
             {to.floor !== here.floor && priceOf(to.floor) !== priceOf(here.floor)

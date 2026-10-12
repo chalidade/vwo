@@ -839,7 +839,9 @@ function company(c: Omit<CompanyBooth, "website" | "email" | "socials" | "faq"> 
 export const DEMO_JOB_FAIR: JobFairView = {
   slug: "jobfair",
   name: "jobfair 2026",
-  width: 46,
+  // Six stand columns (see STAND_COLUMNS) with room for a VIP stand's wings at both ends. The halls
+  // grew to the right from 46 tiles: everything that stood on the old floor stays where it was.
+  width: 97,
   height: 22,
   floors: [
     { name: "Lantai 2", theme: "Teknologi & Keuangan" },
@@ -923,9 +925,7 @@ export const DEMO_JOB_FAIR: JobFairView = {
   decor: [
     // Ground floor: the coin stand on the left of the entrance, a lounge on the right.
     { floor: 0, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
-    { floor: 0, spriteKey: "plant-big", x: 44.6, y: 5.6, width: 1.2, height: 1 },
     { floor: 0, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
-    { floor: 0, spriteKey: "plant", x: 44.7, y: 13.8, width: 1, height: 1 },
     { floor: 0, spriteKey: "rug-plain", x: 29.6, y: 16.2, width: 6, height: 3.6, isWalkable: true },
     { floor: 0, spriteKey: "sofa", x: 29.9, y: 16.6, width: 1, height: 2.4 },
     { floor: 0, spriteKey: "sofa-left", x: 34.3, y: 16.6, width: 1, height: 2.4 },
@@ -937,12 +937,10 @@ export const DEMO_JOB_FAIR: JobFairView = {
     { floor: 0, spriteKey: "plant", x: 12.7, y: 16.4, width: 1, height: 1 },
     { floor: 0, spriteKey: "lamp", x: 17.4, y: 20.4, width: 0.8, height: 0.8 },
     { floor: 0, spriteKey: "lamp", x: 27.4, y: 20.4, width: 0.8, height: 0.8 },
-    // Upper floors: one big lounge in the middle.
+    // Upper floors: one big lounge in the middle of the left half.
     ...[1, 2].flatMap((floor) => [
       { floor, spriteKey: "plant-big", x: 0.2, y: 5.6, width: 1.2, height: 1 },
-      { floor, spriteKey: "plant-big", x: 44.6, y: 5.6, width: 1.2, height: 1 },
       { floor, spriteKey: "plant", x: 0.3, y: 20.6, width: 1, height: 1 },
-      { floor, spriteKey: "plant", x: 44.7, y: 13.8, width: 1, height: 1 },
       { floor, spriteKey: "rug-plain", x: 17, y: 16.2, width: 12, height: 3.6, isWalkable: true },
       { floor, spriteKey: "sofa", x: 17.3, y: 16.6, width: 1, height: 2.4 },
       { floor, spriteKey: "sofa-left", x: 27.7, y: 16.6, width: 1, height: 2.4 },
@@ -955,6 +953,25 @@ export const DEMO_JOB_FAIR: JobFairView = {
         { floor, spriteKey: "plant", x: x + 2.5, y: 16.4, width: 1, height: 1 },
       ]),
       { floor, spriteKey: "lamp", x: 33.6, y: 20.4, width: 0.8, height: 0.8 },
+    ]),
+    // Every floor's right half, past the lift: a big lounge between two corners, lamps, and plants
+    // along the right wall.
+    ...[0, 1, 2].flatMap((floor) => [
+      { floor, spriteKey: "plant-big", x: 95.6, y: 5.6, width: 1.2, height: 1 },
+      { floor, spriteKey: "plant", x: 95.7, y: 13.8, width: 1, height: 1 },
+      { floor, spriteKey: "plant", x: 95.7, y: 20.6, width: 1, height: 1 },
+      { floor, spriteKey: "rug-plain", x: 63, y: 16.2, width: 12, height: 3.6, isWalkable: true },
+      { floor, spriteKey: "sofa", x: 63.3, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "sofa-left", x: 73.7, y: 16.6, width: 1, height: 2.4 },
+      { floor, spriteKey: "plant", x: 68.5, y: 16.4, width: 1, height: 1 },
+      ...[50.6, 82.6].flatMap((x) => [
+        { floor, spriteKey: "rug-plain", x, y: 16.2, width: 6, height: 3.6, isWalkable: true },
+        { floor, spriteKey: "sofa", x: x + 0.3, y: 16.6, width: 1, height: 2.4 },
+        { floor, spriteKey: "sofa-left", x: x + 4.7, y: 16.6, width: 1, height: 2.4 },
+        { floor, spriteKey: "plant", x: x + 2.5, y: 16.4, width: 1, height: 1 },
+      ]),
+      { floor, spriteKey: "lamp", x: 59.4, y: 20.4, width: 0.8, height: 0.8 },
+      { floor, spriteKey: "lamp", x: 78.4, y: 20.4, width: 0.8, height: 0.8 },
     ]),
   ],
 
