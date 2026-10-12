@@ -2523,3 +2523,14 @@ a.small-btn.vr-wa { text-decoration: none; background: #16a34a; color: #fff; bor
 @media (prefers-reduced-motion: reduce) {
   .anom-wander, .anom-face, .anom-tail, .anom-wag, .anom-bob, .anom-peck, .anom-flap, .anom-float, .anom-fly, .anom-hint { animation: none; }
 }
+
+/* ---- floors-soon: the organiser closes a floor for now ("Segera hadir") ---- */
+.fl-act { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.fl-close { display: inline-flex; align-items: center; gap: 6px; }
+.fl-row[data-closed] { background: #f9fafb; border-style: dashed; }
+.fl-row[data-closed] .fl-n { background: #9ca3af; color: #fff; }
+.fl-soon { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; background: #111827; color: #fff; font-size: 11px; font-weight: 700; }
+.fl-note { flex: 1 1 100%; margin: 0; }
+.fx-floor[data-closed] { background: #e5e7eb; color: #6b7280; box-shadow: none; opacity: 0.75; cursor: not-allowed; }
+.fx-floor[data-closed] .fx-floor-n { background: #6b7280; color: #e5e7eb; }
+.fx-floor[data-closed] .fx-floor-tag { color: #374151; font-weight: 800; }

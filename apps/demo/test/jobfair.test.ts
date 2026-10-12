@@ -877,6 +877,90 @@ describe("DemoJobFair", () => {
   });
 });
 
+describe("closed floors (segera hadir)", () => {
+  const setup = () => {
+    const store: { data: FairSaved | null } = { data: null };
+    const storage = { load: () => store.data, save: (d: FairSaved) => (store.data = structuredClone(d)), clear: () => (store.data = null) };
+    return {
+      storage,
+      fair: new DemoJobFair(
+        () => 0.5,
+        () => 1_000_000,
+        DEMO_JOB_FAIR,
+        storage,
+      ),
+    };
+  };
+
+  it("closes a floor, sends everyone on it back to the entrance, and never closes the entrance", () => {
+    const { fair } = setup();
+    const entrance = fair.stops[0]!.floorId;
+    const hall2 = fairFloorId(fair.fair, 1);
+    const seminar = fairRoomFloorId(fair.fair, "seminar");
+    fair.join("Chalid", false, PLAYER_ID);
+    fair.placeAt(PLAYER_ID, hall2, LIFT_FRONT.x, LIFT_FRONT.y);
+    const bot = fair.join("Bot", true);
+    fair.placeAt(bot.memberId, hall2, 5, 5);
+    expect(fair.setFloorClosed(entrance, true)).toBe(false);
+    expect(fair.floorClosed(entrance)).toBe(false);
+    expect(fair.setFloorClosed("nope", true)).toBe(false);
+    expect(fair.setFloorClosed(hall2, true)).toBe(true);
+    expect(fair.setFloorClosed(seminar, true)).toBe(true);
+    expect(fair.floorClosed(hall2)).toBe(true);
+    expect(fair.floorClosed(seminar)).toBe(true);
+    // Still in the lift, in order, just closed.
+    expect(fair.stops.some((st) => st.floorId === hall2)).toBe(true);
+    expect(fair.openStops().map((st) => st.floorId)).not.toContain(hall2);
+    expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: entrance, x: fair.fair.spawn.x, y: fair.fair.spawn.y });
+    expect(fair.visitors.has(bot.memberId)).toBe(false);
+    expect(fair.setFloorClosed(seminar, false)).toBe(true);
+    expect(fair.floorClosed(seminar)).toBe(false);
+  });
+
+  it("keeps bots and room guests off closed floors", () => {
+    const c = clock();
+    const fair = new DemoJobFair(Math.random, c.now);
+    // Leave the entrance and the first booth floor open; close all the rest.
+    const open = new Set([fair.stops[0]!.floorId, fairFloorId(fair.fair, 0)]);
+    const closed = fair.stops.map((st) => st.floorId).filter((id) => !open.has(id));
+    for (const id of closed) fair.setFloorClosed(id, true);
+    const seen = new Set<string>();
+    for (let i = 0; i < 1200; i++) {
+      c.advance(100);
+      fair.tick(100);
+      for (const v of fair.visitors.values()) seen.add(v.floorId);
+    }
+    expect(seen.has(fairFloorId(fair.fair, 0))).toBe(true);
+    for (const id of closed) expect(seen.has(id), id).toBe(false);
+  });
+
+  it("survives a reload and a pull of the organiser's setup, and goes with a removed booth floor", () => {
+    const { fair, storage } = setup();
+    const hall3 = fairFloorId(fair.fair, 2);
+    fair.setFloorClosed(hall3, true);
+    fair.flush();
+    const again = new DemoJobFair(
+      () => 0.5,
+      () => 1_000_000,
+      DEMO_JOB_FAIR,
+      storage,
+    );
+    expect(again.floorClosed(hall3)).toBe(true);
+    // Live: the setup comes from the server as one document.
+    const other = setup().fair;
+    other.applyShared(structuredClone(again.sharedState().org), {});
+    expect(other.floorClosed(hall3)).toBe(true);
+    // A new top booth floor, closed, then taken out: the id is cleared, so a floor added later starts open.
+    expect(again.addHall("Startup")).toBe(true);
+    const top = fairFloorId(again.fair, 3);
+    again.setFloorClosed(top, true);
+    expect(again.removeHall()).toBe(true);
+    expect(again.sharedState().org.closedFloors).toEqual([hall3]);
+    again.addHall("Lagi");
+    expect(again.floorClosed(top)).toBe(false);
+  });
+});
+
 describe("organiser price list", () => {
   it("prices calls, applications, coin packs and company products from the table", async () => {
     const { setPriceTable, cleanPrices, price } = await import("@vwo/shared");

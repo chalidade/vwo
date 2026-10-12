@@ -292,6 +292,8 @@ export interface OrgState {
   hiddenRooms?: string[];
   /** Entry price in coins per floor id, when the organiser changed it. 0 is free. */
   prices?: Record<string, number>;
+  /** Floors (by floor id) the organiser closed for now: still in the lift as "Segera hadir", but nobody can go there. */
+  closedFloors?: string[];
   /** Where the organiser moved stands to, by booth id (see placeStands). Live: the server's
    *  placement document, which only the move route writes, replaces this on every pull. */
   placements?: StandPlacements;
@@ -917,6 +919,7 @@ export class DemoJobFair {
   private loadOrg(org: OrgState | undefined) {
     this.org = org ? migrateOrg(structuredClone(org)) : { removed: [], added: [], layout: 3 };
     this.applyBuilding();
+    this.leaveClosedFloors();
     const before = this.fair.booths.map((b) => b.id).join() + this.fair.sponsors.map((x) => x.id).join();
     const base = [...[...this.original.values()].filter((b) => !this.org.removed.includes(b.id)), ...this.org.added];
     // Where each stand stands: where it was published, added or booked, or where the organiser moved it.
@@ -1071,11 +1074,14 @@ export class DemoJobFair {
   removeHall() {
     if (this.removeHallBlocker()) return false;
     const halls = structuredClone(this.fair.floors).slice(0, -1);
+    const gone = fairFloorId(this.fair, halls.length);
     const prices = { ...this.org.prices };
-    delete prices[fairFloorId(this.fair, halls.length)];
+    delete prices[gone];
     this.rebuild(() => {
       this.org.halls = halls;
       this.org.prices = prices;
+      // A booth floor added later gets this id again: it should start open.
+      if (this.org.closedFloors) this.org.closedFloors = this.org.closedFloors.filter((id) => id !== gone);
     });
     return true;
   }
@@ -1113,6 +1119,43 @@ export class DemoJobFair {
     if (floorId === this.stops[0]?.floorId) return 0;
     const room = this.roomOf(floorId);
     return room ? room.price : (this.org.prices?.[floorId] ?? 0);
+  }
+
+  /** Whether the organiser closed a floor for now ("Segera hadir"). The entrance is always open. */
+  floorClosed(floorId: string) {
+    return floorId !== this.stops[0]?.floorId && !!this.org.closedFloors?.includes(floorId);
+  }
+
+  /** Close a floor for now, or open it again. False when it cannot be closed (the entrance, or no such floor). */
+  setFloorClosed(floorId: string, closed: boolean) {
+    if (closed && (floorId === this.stops[0]?.floorId || !this.stops.some((st) => st.floorId === floorId))) return false;
+    const list = new Set(this.org.closedFloors ?? []);
+    if (closed) list.add(floorId);
+    else list.delete(floorId);
+    this.org.closedFloors = [...list];
+    this.saveOrg();
+    return true;
+  }
+
+  /** The lift stops people can go to now. */
+  openStops() {
+    return this.stops.filter((st) => !this.floorClosed(st.floorId));
+  }
+
+  /** Nobody stays on a closed floor: people go back to the entrance, bots and room guests leave. */
+  private leaveClosedFloors() {
+    if (!this.org.closedFloors?.length || !this.stops.length) return;
+    const entrance = this.stops[0]!.floorId;
+    for (const v of [...this.visitors.values()]) {
+      if (!this.floorClosed(v.floorId)) continue;
+      if (v.isBot) this.leave(v.memberId);
+      // Someone in another tab is moved by their own browser.
+      else if (!v.remote) {
+        const st = this.stopOf(v.floorId);
+        Object.assign(v, { floorId: entrance, x: this.fair.spawn.x, y: this.fair.spawn.y, seatId: null });
+        if (v.memberId === PLAYER_ID) this.notices.push(`🚧 ${st.name} · ${st.label} ditutup sementara, kamu diantar ke pintu masuk`);
+      }
+    }
   }
 
   /** The ticket a floor asks for, or null when it is free. Rooms use their own id, booth floors their floor id. */
@@ -3450,6 +3493,7 @@ export class DemoJobFair {
   /** Rooms fill and empty on their own: people sit down, eat, take tests, and leave. */
   private tickRooms() {
     for (const room of this.fair.rooms) {
+      if (this.floorClosed(fairRoomFloorId(this.fair, room.id))) continue;
       const floor = this.floor(fairRoomFloorId(this.fair, room.id));
       const inRoom = [...this.visitors.values()].filter((v) => v.floorId === floor.id && v.isBot);
       const target = Math.round(floor.seats.length * (room.kind === "seminar" ? 0.5 : room.kind === "psikotes" ? 0.4 : 0.35));
@@ -3481,7 +3525,7 @@ export class DemoJobFair {
     const v = this.join(this.pick(BOT_NAMES), true);
     // Shuffle, keep a few, then visit them floor by floor going up.
     const booths = this.fair.booths
-      .filter(hasStand)
+      .filter((b) => hasStand(b) && !this.floorClosed(this.floorIdOf(b)))
       .sort(() => this.rand() - 0.5)
       .slice(0, 2 + Math.floor(this.rand() * 3))
       .sort((a, b) => a.floor - b.floor);
@@ -3509,12 +3553,19 @@ export class DemoJobFair {
     if (bot.phase === "walking") {
       if (!stop) {
         bot.phase = "leaving";
-        bot.target = { floorId: this.floors[0]!.id, x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
+        const out = this.floorClosed(this.floors[0]!.id) ? this.stops[0]!.floorId : this.floors[0]!.id;
+        bot.target = { floorId: out, x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
         bot.path = null;
         return true;
       }
       if ("sponsorId" in stop) {
-        const sp = this.fair.sponsors.find((x) => x.id === stop.sponsorId)!;
+        const sp = this.fair.sponsors.find((x) => x.id === stop.sponsorId);
+        if (!sp || this.floorClosed(this.floorIdOf(sp))) {
+          bot.plan.shift();
+          bot.target = null;
+          bot.path = null;
+          return true;
+        }
         if (!bot.target) bot.target = { floorId: this.floorIdOf(sp), x: sp.x + SPONSOR_W / 2 + (this.rand() - 0.5) * 0.6, y: sp.y + SPONSOR_H + 0.75 };
         if (this.walk(v, bot, bot.target, step)) return true;
         v.facing = "back";
@@ -3526,8 +3577,8 @@ export class DemoJobFair {
         return true;
       }
       const booth = this.booth(stop.boothId);
-      if (!booth) {
-        // The organiser took this booth out.
+      if (!booth || this.floorClosed(this.floorIdOf(booth))) {
+        // The organiser took this booth out, or closed its floor.
         bot.plan.shift();
         bot.target = null;
         bot.path = null;
