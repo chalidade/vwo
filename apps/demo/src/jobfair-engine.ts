@@ -28,6 +28,7 @@ import {
   setPriceTable,
   loungeBoardSpot,
   loungeSpot,
+  librarySpot,
   consultantDesk,
   loungeConsultants,
   type PublicConsultant,
@@ -961,6 +962,7 @@ export class DemoJobFair {
         if (room.kind === "konsultasi")
           return [
             { ...host, x: loungeBoardSpot().x - 2.2, y: loungeBoardSpot().y },
+            { id: LIBRARIAN_ID, name: LIBRARIAN, boothId: null, floorId, ...librarySpot("librarian"), facing: "front" as Facing },
             ...(room.consultants ?? [])
               .slice(0, LOUNGE.pods.length)
               .map((c, i) => ({ id: consultantId(c.id), name: c.name, boothId: null, floorId, ...loungeSpot(consultantDesk(c, i), "consultant"), facing: "front" as Facing })),
@@ -4231,6 +4233,9 @@ export const remoteId = (peerId: string) => `net:${peerId}`;
 export const recruiterId = (boothId: string) => `rec-${boothId}`;
 
 export const roomStaffId = (roomId: string) => `room-${roomId}`;
+/** The librarian at the Perpustakaan desk in the lounge. */
+export const LIBRARIAN_ID = "librarian";
+export const LIBRARIAN = "Kak Nadia";
 export const stallStaffId = (stallId: string) => `stall-${stallId}`;
 export const consultantId = (id: string) => `consult-${id}`;
 export const promoterId = (id: string) => `npc-${id}`;
