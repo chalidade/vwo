@@ -1,24 +1,31 @@
 import { fairFloorIndex, hasStand, infoDeskOn } from "@vwo/shared";
-import { CafeScene, anomalyExtras, boothExtras, coinStandExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
+import { CafeScene, anomalyExtras, boothExtras, coinStandExtras, emptyBoothExtras, foodStallExtras, infoDeskExtras, liftExtras, lookFor, promoterExtras, psikotesExtras, seminarStageExtras, sponsorExtras } from "@vwo/ui";
 import { staffLook } from "./staff-look";
 import { levelOf } from "./content";
 import { fair } from "../useFair";
 import { startAnomalies, useAnomaly } from "../anomaly-sync";
 import { useEffect } from "react";
 
+/** Which part of a booth floor to show: all of it, or one half (a hall is twice as wide as tall rooms). */
+export type FloorArea = "all" | "left" | "right";
+
 /** One floor of the job fair as everyone on it sees it, without a player: the organiser's live view
- *  and the home page preview. The caller re-renders it (useFair) so people keep walking. */
-export function FloorScene({ floorId, className }: { floorId: string; className?: string }) {
+ *  and the home page preview. The caller re-renders it (useFair) so people keep walking. Rooms are
+ *  always shown whole; `area` picks a half of a booth floor. */
+export function FloorScene({ floorId, className, area = "all" }: { floorId: string; className?: string; area?: FloorArea }) {
   const stop = fair.stopOf(floorId);
   const floor = fair.floor(stop.floorId);
   const room = fair.roomOf(floor.id);
   const hall = fairFloorIndex(floor.id);
+  const half = floor.width / 2;
+  const fitArea = room || area === "all" ? undefined : { x: area === "left" ? 0 : half, width: half };
   const anomaly = useAnomaly();
   useEffect(() => startAnomalies(), []);
   return (
     <CafeScene
       className={className}
       floor={floor}
+      fitArea={fitArea}
       floorName={(id) => fair.stopOf(id).name}
       hallTitle={room ? undefined : fair.hallBanner(hall).title}
       hallSubtitle={room ? undefined : fair.hallBanner(hall).subtitle}
@@ -41,6 +48,8 @@ export function FloorScene({ floorId, className }: { floorId: string; className?
               : seminarStageExtras(room, null)
           : [
               ...fair.fair.booths.filter((b) => b.floor === hall && hasStand(b)).flatMap((b) => boothExtras(b, { rating: { ...fair.companyRating(b.id), level: levelOf(fair.companyXp(b.id)).level } })),
+              // Free slots show as empty stands, so the organiser sees what is still open.
+              ...fair.freeSlots().filter((sl) => sl.floor === hall).flatMap((sl) => emptyBoothExtras(sl)),
               ...fair.fair.sponsors.filter((sp) => sp.floor === hall).map((sp) => sponsorExtras(sp)),
               ...(fair.fair.coinStand.floor === hall ? coinStandExtras(fair.fair.coinStand) : []),
             ]),

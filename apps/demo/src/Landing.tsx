@@ -183,7 +183,7 @@ function LivePreview({ floorId, name, label }: { floorId: string; name: string; 
         <span className="lp-frame-count">{here} orang</span>
       </div>
       <a className="lp-frame-body" href="#/jobfair" aria-label={`Masuk job fair, mulai dari ${label}`}>
-        <FloorScene floorId={floorId} className="lp-scene" />
+        <FloorScene floorId={floorId} className="lp-scene" area="left" />
       </a>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DoorClosed, DoorOpen } from "lucide-react";
-import { fairFloorIndex } from "@vwo/shared";
+import { fairFloorIndex, hasStand, STAND_SLOTS } from "@vwo/shared";
 import { fair, useFair } from "../useFair";
 
 /** The organiser builds the venue: add or take out booth floors, switch rooms off, close a floor for
@@ -19,14 +19,14 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
       <div className="card">
         <h2 className="cp-h2">Lantai gedung</h2>
         <p className="muted small">
-          Urutan dari atas ke bawah seperti tombol lift. Lantai booth berisi 6 tempat stand yang bisa dipesan perusahaan. Isi harga 0 untuk lantai gratis, atau jumlah koin untuk
-          lantai berbayar. Lantai {stops[0]?.level != null ? stops[0].level + 1 : 1} tempat pengunjung datang selalu gratis dan selalu buka.
+          Urutan dari atas ke bawah seperti tombol lift. Lantai booth berisi {STAND_SLOTS.length} tempat stand yang bisa dipesan perusahaan. Isi harga 0 untuk lantai gratis, atau
+          jumlah koin untuk lantai berbayar. Lantai {stops[0]?.level != null ? stops[0].level + 1 : 1} tempat pengunjung datang selalu gratis dan selalu buka.
         </p>
         <p className="muted small">Lantai yang belum dipakai bisa ditutup dulu: tetap terlihat di lift sebagai "Segera hadir", tapi pengunjung tidak bisa ke sana.</p>
         <div className="fl-list">
           {[...stops].reverse().map((st) => {
             const hall = st.roomId ? -1 : fairFloorIndex(st.floorId);
-            const booths = hall >= 0 ? fair.fair.booths.filter((b) => b.floor === hall).length : 0;
+            const booths = hall >= 0 ? fair.fair.booths.filter((b) => b.floor === hall && hasStand(b)).length : 0;
             const price = fair.floorPrice(st.floorId);
             const closed = fair.floorClosed(st.floorId);
             return (
@@ -52,7 +52,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
                   )}
                   <span className="muted small">
                     {closed && <span className="fl-soon">Segera hadir</span>}
-                    {hall >= 0 ? `Lantai booth · ${booths}/6 stand terisi` : "Ruangan"}
+                    {hall >= 0 ? `Lantai booth · ${booths}/${STAND_SLOTS.length} stand terisi` : "Ruangan"}
                   </span>
                 </div>
                 <label className="fl-price">
@@ -134,7 +134,7 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
       <div className="card">
         <h2 className="cp-h2">Tambah lantai booth</h2>
         <p className="muted small">
-          Lantai baru muncul di atas lantai booth teratas, lengkap dengan meja informasi dan 6 tempat stand kosong. Ruangan di atasnya ikut naik satu lantai.
+          Lantai baru muncul di atas lantai booth teratas, lengkap dengan meja informasi dan {STAND_SLOTS.length} tempat stand kosong. Ruangan di atasnya ikut naik satu lantai.
         </p>
         <form
           className="org-row"

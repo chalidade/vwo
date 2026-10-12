@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { STAND_SLOTS, placeStands, planStandMove, standSlotIndex } from "../src";
+import { STAND_SLOTS, placeStands, planStandMove, standSlotIndex, standSlotName } from "../src";
 
 const at = (id: string, floor: number, slot: number, tier = "regular") => ({ id, floor, ...STAND_SLOTS[slot]!, tier });
 const where = (m: Map<string, { floor: number; x: number; y: number }>, id: string) => {
   const s = m.get(id)!;
   return [s.floor, standSlotIndex(s.x, s.y)];
 };
+
+describe("STAND_SLOTS", () => {
+  it("has twelve slots per floor, the first six where the three-column halls had theirs", () => {
+    expect(STAND_SLOTS).toHaveLength(12);
+    expect(STAND_SLOTS.slice(0, 6)).toEqual([3, 20, 37].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y }))));
+    expect(new Set(STAND_SLOTS.map((s) => `${s.x}:${s.y}`)).size).toBe(12);
+    expect(standSlotIndex(88, 9.4)).toBe(11);
+  });
+
+  it("names slots by column and row", () => {
+    expect(standSlotName(0)).toBe("Kolom 1 atas");
+    expect(standSlotName(5)).toBe("Kolom 3 bawah");
+    expect(standSlotName(10)).toBe("Kolom 6 atas");
+    expect(standSlotName(12)).toBe("");
+  });
+});
 
 describe("placeStands", () => {
   it("keeps booths where they were published without moves", () => {
@@ -32,7 +48,7 @@ describe("placeStands", () => {
     expect(where(m, "a")).toEqual([1, 0]);
     expect(where(m, "b")).toEqual([1, 1]);
     // A full floor sends the bumped booth to another floor.
-    const full = [0, 1, 2, 3, 4, 5].map((i) => at(`f${i}`, 0, i));
+    const full = STAND_SLOTS.map((_, i) => at(`f${i}`, 0, i));
     const m2 = placeStands([...full, at("x", 1, 2)], { x: { floor: 0, ...STAND_SLOTS[2]! } }, 2);
     expect(where(m2, "x")).toEqual([0, 2]);
     expect(where(m2, "f2")).toEqual([1, 0]);
@@ -61,11 +77,16 @@ describe("planStandMove", () => {
   it("refuses bad floors and slots, the same slot, unknown and mini booths", () => {
     expect(planStandMove(booths, undefined, "a", { floor: 2, slot: 0 }, 2)).toEqual({ error: "invalid_slot" });
     expect(planStandMove(booths, undefined, "a", { floor: -1, slot: 0 }, 2)).toEqual({ error: "invalid_slot" });
-    expect(planStandMove(booths, undefined, "a", { floor: 0, slot: 6 }, 2)).toEqual({ error: "invalid_slot" });
+    expect(planStandMove(booths, undefined, "a", { floor: 0, slot: 12 }, 2)).toEqual({ error: "invalid_slot" });
     expect(planStandMove(booths, undefined, "a", { floor: 0, slot: 1.5 }, 2)).toEqual({ error: "invalid_slot" });
     expect(planStandMove(booths, undefined, "a", { floor: 0, slot: 0 }, 2)).toEqual({ error: "same_slot" });
     expect(planStandMove(booths, undefined, "zzz", { floor: 0, slot: 1 }, 2)).toEqual({ error: "not_found" });
     expect(planStandMove(booths, undefined, "u", { floor: 0, slot: 1 }, 2)).toEqual({ error: "no_stand" });
+  });
+
+  it("moves a stand onto one of the new right-hand slots", () => {
+    const r = planStandMove(booths, undefined, "a", { floor: 0, slot: 11 }, 2);
+    expect(r).toEqual({ placements: { a: { floor: 0, x: 88, y: 9.4 } }, swapped: null });
   });
 
   it("drops moves of booths that are no longer in the event", () => {

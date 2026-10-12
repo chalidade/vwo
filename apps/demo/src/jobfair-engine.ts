@@ -301,7 +301,8 @@ export interface OrgState {
    *  placement document, which only the move route writes, replaces this on every pull. */
   placements?: StandPlacements;
   /** 2 once positions were saved for the 46-tile halls; older saves used 38-tile halls. 3 once
-   *  promoters' levels follow the floor order with the Aula on Lantai 1. */
+   *  promoters' levels follow the floor order with the Aula on Lantai 1. The halls grew again to six
+   *  stand columns by adding tiles on the right only, so positions saved since layout 2 still hold. */
   layout?: number;
   /** Random anomalies (a cat, fireflies...) on the floors: on or off, and claims per seeker per day. The server reads this too. */
   anomalies?: AnomalySettings;
@@ -433,7 +434,7 @@ export interface PsychConfig {
   pass: number;
 }
 
-/** Where a booth can stand on a hall floor: three columns, two rows. */
+/** Where a booth can stand on a hall floor: six columns, two rows. */
 export const BOOTH_SLOTS = STAND_SLOTS;
 
 /** Paid booth decorations visitors can use, and what happened. */
@@ -769,8 +770,9 @@ export class DemoJobFair {
   private readonly originalHalls: FairFloorInfo[];
   private readonly originalRooms: FairRoom[];
   private readonly originalHallBase: number;
-  /** The organiser's changes. */
-  org: OrgState = { removed: [], added: [] };
+  /** The organiser's changes. Current layout from the start: without it the first save would take
+   *  positions as old 38-tile ones and move them (a stand added on the new right half most of all). */
+  org: OrgState = { removed: [], added: [], layout: 3 };
   /** Live: booths that came from a server booking. */
   private booked = new Set<string>();
   /** Where each stand stands now, by booth id (see loadOrg). */
@@ -2733,7 +2735,7 @@ export class DemoJobFair {
     if (!isBot) {
       const host = this.roomOf(floorId);
       const where = this.fair.floors.length ? `${hallName(this.fair, 0)} sampai ${hallName(this.fair, this.fair.floors.length - 1)}` : "";
-      this.say(host ? roomStaffId(host.id) : "fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${where}. Naik lift di kanan bawah.`, 3600);
+      this.say(host ? roomStaffId(host.id) : "fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${where}. Naik lift: ikuti panah 🛗 di lantai.`, 3600);
     }
     this.emit();
     return v;

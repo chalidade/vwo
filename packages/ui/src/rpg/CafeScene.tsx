@@ -119,6 +119,9 @@ export interface CafeSceneProps {
   emotes?: Record<string, string>;
   /** Tile the camera follows. Without it the whole floor is fitted into view. */
   follow?: { x: number; y: number } | null;
+  /** Without `follow`: fit only this stretch of the floor (tiles from the left) instead of all of it,
+   *  e.g. one half of a wide hall in a small preview. */
+  fitArea?: { x: number; width: number };
   showFreeSeats?: boolean;
   /** A seat within reach: gets a bouncing arrow. */
   highlightSeatId?: string | null;
@@ -174,6 +177,7 @@ export function CafeScene({
   selfMemberId,
   emotes = {},
   follow,
+  fitArea,
   showFreeSeats = false,
   highlightSeatId,
   onSeatClick,
@@ -258,8 +262,11 @@ export function CafeScene({
     camY = prev && k < 1 ? prev.y + (ty - prev.y) * k : ty;
     cam.current = { x: camX, y: camY, floor: floor.id, at: t };
   } else {
-    scale = Math.min(view.w / worldW, view.h / worldH, 1.25);
-    camX = -(view.w / scale - worldW) / 2;
+    // The fitted stretch takes the side wall along when it reaches the floor's edge.
+    const left = fitArea ? (fitArea.x <= 0 ? 0 : px(fitArea.x)) : 0;
+    const right = fitArea ? (fitArea.x + fitArea.width >= floor.width ? worldW : px(fitArea.x + fitArea.width)) : worldW;
+    scale = Math.min(view.w / (right - left), view.h / worldH, 1.25);
+    camX = left - (view.w / scale - (right - left)) / 2;
     camY = -(view.h / scale - worldH) / 2;
     cam.current = null;
   }
@@ -492,7 +499,7 @@ export function CafeScene({
   const viewR = camX + view.w / scale + 2 * TILE;
   const viewT = camY - 6 * TILE;
   const viewB = camY + view.h / scale + 2 * TILE;
-  const onScreen = (e: Ent) => !follow || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
+  const onScreen = (e: Ent) => (!follow && !fitArea) || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
   let shown = ents.filter(onScreen);
   const crowd = shown.filter((e) => people.has(e.key)).length > CROWD;
   // A packed floor draws only the people nearest the player, so a frame costs the same with a

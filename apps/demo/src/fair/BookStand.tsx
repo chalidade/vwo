@@ -5,7 +5,7 @@ import { LIVE } from "../mode";
 import { fair } from "../useFair";
 import { coinText } from "./company";
 import { CoinBalance, TopUp } from "./TopUp";
-import { coinPrice, koinText } from "@vwo/shared";
+import { coinPrice, koinText, standSlotIndex, standSlotName } from "@vwo/shared";
 import { Modal } from "./Modal";
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#334155"];
@@ -41,7 +41,7 @@ export function BookStand({ slot, onClose }: { slot: { floor: number; x: number;
         </div>
       </Modal>
     );
-  const place = `${floorName}, ${slot.y < 5 ? "baris belakang" : "baris depan"} ${slot.x < 10 ? "kiri" : slot.x < 25 ? "tengah" : "kanan"}`;
+  const place = `${floorName}, ${standSlotName(standSlotIndex(slot.x, slot.y)).toLowerCase()}`;
 
   return (
     <Modal title="🏬 Booking stand" onClose={onClose} className="bk">

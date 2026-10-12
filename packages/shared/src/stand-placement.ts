@@ -5,8 +5,21 @@
 // stands on one slot.
 import { hasStand } from "./booth-packages";
 
-/** The slots of a hall floor: three columns, two rows (top row first in each column). */
-export const STAND_SLOTS = [3, 20, 37].flatMap((x) => [0.4, 9.4].map((y) => ({ x, y })));
+/** Where the stand columns of a hall floor stand, left to right, 17 tiles apart so VIP wings and a
+ *  sponsor banner fit between two columns. The halls were three columns wide; the last three were
+ *  added on the right, so slots 0–5 and every stand saved on them stay where they were. */
+export const STAND_COLUMNS = [3, 20, 37, 54, 71, 88];
+/** The two rows of stands: along the back wall, and across the middle of the hall. */
+export const STAND_ROWS = [0.4, 9.4];
+
+/** The slots of a hall floor: six columns, two rows (top row first in each column). */
+export const STAND_SLOTS = STAND_COLUMNS.flatMap((x) => STAND_ROWS.map((y) => ({ x, y })));
+
+/** "Kolom 4 atas": where slot `slot` is, for the organiser's lists. Empty for a slot that isn't one. */
+export const standSlotName = (slot: number) => {
+  const s = STAND_SLOTS[slot];
+  return s ? `Kolom ${STAND_COLUMNS.indexOf(s.x) + 1} ${s.y === STAND_ROWS[0] ? "atas" : "bawah"}` : "";
+};
 
 /** A spot on the hall floors: floor index and slot position. */
 export type StandSpot = { floor: number; x: number; y: number };
@@ -16,7 +29,7 @@ export type StandPlacements = Record<string, StandSpot>;
 
 type Placeable = { id: string; floor: number; x: number; y: number; tier?: string };
 
-/** The slot number (0–5) at a position, or -1 when the position is not a slot. */
+/** The slot number (0–11) at a position, or -1 when the position is not a slot. */
 export const standSlotIndex = (x: number, y: number) => STAND_SLOTS.findIndex((s) => s.x === x && s.y === y);
 
 const spotKey = (s: StandSpot) => `${s.floor}:${s.x}:${s.y}`;

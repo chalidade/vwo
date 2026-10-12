@@ -24,7 +24,7 @@ export function LiftPanel({
 }) {
   return (
     <Modal title="🛗 Lift · pilih lantai" onClose={onClose} className="fx-lift">
-      <p className="sp-summary">{atLift ? "Mau ke lantai berapa?" : "Pilih lantai, nanti kamu diantar ke lift di pojok kanan bawah."}</p>
+      <p className="sp-summary">{atLift ? "Mau ke lantai berapa?" : "Pilih lantai, nanti kamu diantar ke lift."}</p>
       <div className="fx-floors">
         {[...stops].reverse().map((st) => {
           const owe = ticket(st.floorId);

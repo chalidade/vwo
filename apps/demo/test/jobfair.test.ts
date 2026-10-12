@@ -47,10 +47,11 @@ describe("DemoJobFair", () => {
       expect(findPath(fair.floors[sp.floor]!, starts[sp.floor]!, front), sp.id).not.toBeNull();
     }
     // Sofas in each hall's lounge are seats you can walk to.
-    // Every hall has several corners to sit and play: 2 lounges on the ground floor, 3 above.
+    // Every hall has several corners to sit and play: 2 lounges on the ground floor's left half, 3
+    // on the floors above, and 3 more in every right half.
     halls.forEach((f, i) => {
       const sofas = f.seats.filter((st) => st.sofa && !st.id.includes("-vip-"));
-      expect(sofas.length, f.id).toBe(i === 0 ? 8 : 12);
+      expect(sofas.length, f.id).toBe(i === 0 ? 20 : 24);
       for (const st of sofas) expect(findPath(f, LIFT_FRONT, st), st.id).not.toBeNull();
       // The VIP lounge chairs are reached from just in front of them.
       for (const st of f.seats.filter((x) => x.id.includes("-vip-"))) expect(findPath(f, LIFT_FRONT, { x: st.x, y: st.y + 0.75 }), st.id).not.toBeNull();
@@ -877,7 +878,7 @@ describe("DemoJobFair", () => {
     // Rooms above moved up a floor, with their promoters.
     expect(fair.room("foodcourt")?.level).toBe(8);
     if (promo) expect(fair.fair.promoters.find((p) => p.id === promo.id)?.level).toBe(8);
-    expect(fair.freeSlots().filter((sl) => sl.floor === 3)).toHaveLength(6);
+    expect(fair.freeSlots().filter((sl) => sl.floor === 3)).toHaveLength(12);
     // A booth floor with stands cannot go; the new empty one can.
     expect(fair.removeHall()).toBe(true);
     expect(fair.fair.floors).toHaveLength(3);

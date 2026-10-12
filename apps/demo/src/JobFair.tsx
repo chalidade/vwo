@@ -154,8 +154,10 @@ export function spgLook(name: string, color: string): Look {
 }
 
 /** Floor arrows pointing to the lift, laid in the aisles of each kind of floor. */
-const GROUND_SIGNS = [{ x: 13, y: 15.2 }, { x: 23, y: 6.7 }, { x: 32.5, y: 14.8 }];
-const HALL_SIGNS = [{ x: 6, y: 15.2 }, { x: 23, y: 6.7 }, { x: 33.5, y: 14.8 }];
+// The halls' right half, past the lift, has its own arrows pointing back to it.
+const RIGHT_SIGNS = [{ x: 52, y: 14.8 }, { x: 57, y: 6.7 }, { x: 74, y: 14.8 }, { x: 91, y: 6.7 }];
+const GROUND_SIGNS = [{ x: 13, y: 15.2 }, { x: 23, y: 6.7 }, { x: 32.5, y: 14.8 }, ...RIGHT_SIGNS];
+const HALL_SIGNS = [{ x: 6, y: 15.2 }, { x: 23, y: 6.7 }, { x: 33.5, y: 14.8 }, ...RIGHT_SIGNS];
 const ROOM_SIGNS = [{ x: 11, y: 19.6 }, { x: 25, y: 19.6 }];
 
 let savedSession: Session | null = null; // survives switching to the organiser view and back
@@ -675,7 +677,7 @@ export function JobFair() {
       pages: [
         `Halo, ${c.name}! Selamat datang di ${fair.fair.name}.`,
         `Ada ${fair.fair.booths.length} perusahaan dengan ${fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0)} lowongan di ${fair.fair.floors.length} lantai: ${fair.fair.floors.map((f) => `${f.name} ${f.theme}`).join(", ")}.`,
-        `Lift ada di pojok kanan bawah tiap lantai, ikuti tanda 🛗 di lantai. ${fair.stops.filter((st) => st.roomId).map((st) => `${st.name} ${st.label}`).join(", ")}.`,
+        `Lift ada di bagian bawah tiap lantai (di lantai booth letaknya di tengah), ikuti tanda 🛗 di lantai. ${fair.stops.filter((st) => st.roomId).map((st) => `${st.name} ${st.label}`).join(", ")}.`,
         "Kalau bingung, tanya aku saja, nanti aku antar ke stand mana pun.",
         "Berdiri di depan meja stand untuk ngobrol dengan recruiter, atau dekati banner di samping meja untuk lihat lowongan. Tekan E untuk bicara.",
       ],
@@ -1756,7 +1758,7 @@ export function JobFair() {
             </button>
           ) : session && !reach ? (
             <div className="rpg-box hint hint-keys">
-              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 lift di pojok kanan bawah · ❓ panduan
+              <span className="rpg-kbd">W</span><span className="rpg-kbd">A</span><span className="rpg-kbd">S</span><span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa · 🛗 ikuti panah ke lift · ❓ panduan
             </div>
           ) : null}
         </div>
