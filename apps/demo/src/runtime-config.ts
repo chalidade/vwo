@@ -1,42 +1,78 @@
-// Limits the game follows, set by env vars on the server (GET /api/jobfair/config) so the organiser can
-// raise them or switch features off without rebuilding this static bundle. The demo, and the live site
-// while the server can't be reached, use the defaults, which fit the free plans.
+// Limits and switches the live site's server sets through its environment (see
+// docs/deploy/vercel-supabase.md), read from /api/jobfair/config. The game is a static bundle, so
+// it starts on these defaults (sized for a small budget) and takes the server's values when they come;
+// the offline demo keeps the defaults.
 import { STAGE_DEFAULTS, type StageConfig, cleanStageConfig } from "@vwo/shared";
 import { useEffect, useState } from "react";
 import { LIVE } from "./mode";
 
 export interface RuntimeConfig {
+  /** Seconds between pulls of the shared event setup (paused while the tab is hidden). */
+  statePollSec: number;
+  /** Seconds between pulls of a seeker's applications and HR's answers. */
+  applicationsPollSec: number;
+  /** Seconds between pulls of booth visit totals, and between sends of this player's visits. */
+  statsPollSec: number;
+  statsSendSec: number;
+  /** Seconds between pulls of this account's saved progress from other devices, and between saves. */
+  progressPollSec: number;
+  progressPushSec: number;
+  /** Seconds between pulls of booth ratings, the friends list and a booth's applicants (company portal). */
+  reviewsPollSec: number;
+  friendsPollSec: number;
+  portalPollSec: number;
   /** Seminar and Aula broadcasts: mesh cap, heartbeat, chat. */
   stage: StageConfig;
 }
 
-const DEFAULTS: RuntimeConfig = { stage: STAGE_DEFAULTS };
+export const DEFAULT_CONFIG: RuntimeConfig = {
+  statePollSec: 60,
+  applicationsPollSec: 30,
+  statsPollSec: 120,
+  statsSendSec: 30,
+  progressPollSec: 90,
+  progressPushSec: 8,
+  reviewsPollSec: 180,
+  friendsPollSec: 180,
+  portalPollSec: 15,
+  stage: STAGE_DEFAULTS,
+};
 /** Asked again after this long, so a change on the server reaches tabs left open all day. */
 const REFRESH_MS = 5 * 60_000;
 
-let current: RuntimeConfig = DEFAULTS;
+let current: RuntimeConfig = DEFAULT_CONFIG;
 let loading: Promise<RuntimeConfig> | null = null;
 let loadedAt = 0;
 const subs = new Set<(c: RuntimeConfig) => void>();
 
-const clean = (x: unknown): RuntimeConfig => {
-  const c = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
-  return { stage: cleanStageConfig(c.stage) };
-};
+/** The limits in force now (the defaults until the server's have come). */
+export const runtimeConfig = () => current;
+export const runtimeConfigNow = runtimeConfig;
 
-/** The limits now: the defaults until the server answered. */
-export const runtimeConfigNow = () => current;
+/** Only known fields: positive numbers for the intervals, a cleaned stage section; anything else keeps the default. */
+export function mergeConfig(base: RuntimeConfig, got: unknown): RuntimeConfig {
+  const out = { ...base };
+  if (!got || typeof got !== "object") return out;
+  const g = got as Record<string, unknown>;
+  for (const k of Object.keys(base) as (keyof RuntimeConfig)[]) {
+    if (k === "stage") continue;
+    const v = g[k];
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) out[k] = v;
+  }
+  if (g.stage !== undefined) out.stage = cleanStageConfig(g.stage);
+  return out;
+}
 
-/** Fetch the limits (at most once per few minutes); resolves to the defaults when offline or in the demo. */
+/** Fetch the server's limits (live site only, at most once per few minutes). Never fails: offline keeps the defaults. */
 export function loadRuntimeConfig(): Promise<RuntimeConfig> {
   if (!LIVE || typeof fetch === "undefined") return Promise.resolve(current);
   if (loading && Date.now() - loadedAt < REFRESH_MS) return loading;
   loadedAt = Date.now();
   loading = fetch("/api/jobfair/config", { credentials: "same-origin" })
     .then((r) => (r.ok ? r.json() : null))
-    .then((j: unknown) => {
-      if (j) {
-        current = clean(j);
+    .then((d: unknown) => {
+      if (d) {
+        current = mergeConfig(DEFAULT_CONFIG, d);
         for (const fn of subs) fn(current);
       }
       return current;

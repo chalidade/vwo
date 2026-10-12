@@ -233,6 +233,26 @@ describe("live counters", () => {
     expect(await claimMerch(db, { userId: other, boothKey: "toko-kita", stock: 1, day: "2026-10-10" })).toBe("gone");
   });
 
+  it("counts a whole send in one statement, repeated keys included, under the same caps", async () => {
+    const many = Array.from({ length: 40 }, () => ({ key: "visit:satu-kirim", what: "view" as const }));
+    await addStats(db, seeker, "2026-10-11", many);
+    expect((await statTotals(db, ["visit:satu-kirim"]))["visit:satu-kirim"]!.views).toBe(30);
+    // Seven sales on top of four: only six fit under the day's cap of ten, and only their coins count.
+    await addStats(
+      db,
+      seeker,
+      "2026-10-11",
+      Array.from({ length: 4 }, () => ({ key: "stall:soto", what: "sold" as const, coins: 5 })),
+    );
+    await addStats(db, seeker, "2026-10-11", [
+      ...Array.from({ length: 7 }, () => ({ key: "stall:soto", what: "sold" as const, coins: 5 })),
+      { key: "stall:soto", what: "click" as const },
+      { key: "stall:soto", what: "view" as const },
+    ]);
+    expect((await statTotals(db, ["stall:soto"]))["stall:soto"]).toEqual({ views: 1, clicks: 1, sold: 10, coins: 50 });
+    await addStats(db, seeker, "2026-10-11", []);
+  });
+
   it("keeps the live feed newest first", async () => {
     await addEvents(db, seeker, [{ type: "arrive", name: "Sari" }]);
     await addEvents(db, seeker, [{ type: "visit", name: "Sari", company: "TokoKita" }]);

@@ -14,6 +14,7 @@ import { startSharedSync } from "./shared-state";
 import { claimStoredRef } from "./fair/viral";
 import { pullSeminarRegs } from "./fair/seminar-reg";
 import { startConsultSync } from "./consult";
+import { loadRuntimeConfig } from "./runtime-config";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -30,6 +31,8 @@ function useLiveAccount() {
   const [account, setAccount] = useState(currentAccount);
   useEffect(() => {
     if (!LIVE) return;
+    // The server's polling limits; until they come, the defaults.
+    void loadRuntimeConfig();
     const on = () => {
       const a = currentAccount();
       setAccount(a);
@@ -38,7 +41,7 @@ function useLiveAccount() {
       syncPlayer(a);
       if (a) startPaymentSync();
       startReviewSync();
-      startStatsSync(!!a);
+      startStatsSync(!!a, !!a?.fairAdmin || !!a?.booths?.length);
       // Registered seminars feed the game's reminders ("15 menit lagi").
       void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
@@ -50,7 +53,7 @@ function useLiveAccount() {
       syncPlayer(a);
       if (a) startPaymentSync();
       startReviewSync();
-      startStatsSync(!!a);
+      startStatsSync(!!a, !!a?.fairAdmin || !!a?.booths?.length);
       // Registered seminars feed the game's reminders ("15 menit lagi").
       void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));

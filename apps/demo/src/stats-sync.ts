@@ -2,11 +2,15 @@
 // so the organiser and the companies see everyone's numbers, not just this browser's. The game
 // counts at once here, sends what the player did every few seconds, and takes the server's totals.
 import type { FairEvent, StatHit, StatHitTotal } from "./jobfair-engine";
+import { pollVisible } from "./poll";
+import { runtimeConfig } from "./runtime-config";
 import { fair } from "./useFair";
 
 let hits: StatHit[] = [];
 let events: Omit<FairEvent, "at">[] = [];
 let started = false;
+/** Booth accounts and event admins see more than the public totals, so they ask with their session. */
+let personal = false;
 
 const post = (body: unknown, keepalive = false) =>
   fetch("/api/jobfair/stats", { method: "POST", credentials: "same-origin", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -29,7 +33,8 @@ async function send(keepalive = false) {
 /** The server's totals (and, for event admins, the live feed). */
 export async function pullStats() {
   try {
-    const r = await fetch("/api/jobfair/stats", { credentials: "same-origin" });
+    // Everyone else gets the public totals, which the CDN keeps for all.
+    const r = await fetch(personal ? "/api/jobfair/stats" : "/api/jobfair/stats?public=1", { credentials: "same-origin" });
     if (!r.ok) return;
     const d = (await r.json()) as { stats: Record<string, StatHitTotal>; events?: FairEvent[] };
     fair.setStats(d.stats, d.events);
@@ -39,10 +44,14 @@ export async function pullStats() {
 }
 
 /** Start counting with the server. Safe to call again (after signing in): it pulls again. */
-export function startStatsSync(signedIn: boolean) {
-  void pullStats();
-  if (started || !signedIn) return;
+export function startStatsSync(signedIn: boolean, more = false) {
+  personal ||= more;
+  if (started || !signedIn) return void pullStats();
   started = true;
+  pollVisible(
+    () => void pullStats(),
+    () => runtimeConfig().statsPollSec,
+  );
   fair.onStat = (h) => hits.length < 500 && hits.push(h);
   fair.onEvent = (e) => events.length < 50 && events.push(e);
   fair.onMerch = (booth, voucherId) => {
@@ -54,7 +63,14 @@ export function startStatsSync(signedIn: boolean) {
       })
       .catch(() => undefined);
   };
-  window.setInterval(() => void send(), 15_000);
-  window.setInterval(() => document.visibilityState === "visible" && void pullStats(), 30_000);
+  const sendSoon = () => {
+    window.setTimeout(() => {
+      void send();
+      sendSoon();
+    }, runtimeConfig().statsSendSec * 1000);
+  };
+  sendSoon();
   window.addEventListener("pagehide", () => void send(true));
+  // Going to another app may be the last chance for a while: send what is waiting.
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && void send(true));
 }
