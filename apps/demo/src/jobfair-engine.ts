@@ -96,6 +96,17 @@ import {
   placeStands,
   planStandMove,
   cleanStreamUrl,
+  type ParkBuilding,
+  PARK,
+  PARK_MAX_BUILDINGS,
+  cleanParkBuildings,
+  isParkFloor,
+  lobbyDoorFront,
+  parkFloorId,
+  parkPlots,
+  plotAt,
+  plotFront,
+  publicParkBuildings,
 } from "@vwo/shared";
 import {
   CAREER_ARTICLES,
@@ -307,6 +318,9 @@ export interface OrgState {
   layout?: number;
   /** Random anomalies (a cat, fireflies...) on the floors: on or off, and claims per seeker per day. The server reads this too. */
   anomalies?: AnomalySettings;
+  /** Other events' buildings in the park outside, in plot order. Hidden ones are the organiser's alone:
+   *  the server leaves them out of the public setup. */
+  buildings?: ParkBuilding[];
 }
 
 /** How many notifications the demo keeps for each person or company. */
@@ -462,7 +476,35 @@ export interface CompanyInvoice {
 }
 
 /** Booth fields a company may change itself; position, floor and tier belong to the organiser. */
-const EDITABLE = ["company", "tagline", "industry", "logo", "logoImg", "color", "recruiter", "about", "faq", "jobs", "website", "email", "phone", "address", "founded", "employees", "socials", "benefits", "theme", "accessories", "ticker", "vipStyle", "vipHeadline", "callouts", "media", "promoter", "featuredJob"] as const;
+const EDITABLE = [
+  "company",
+  "tagline",
+  "industry",
+  "logo",
+  "logoImg",
+  "color",
+  "recruiter",
+  "about",
+  "faq",
+  "jobs",
+  "website",
+  "email",
+  "phone",
+  "address",
+  "founded",
+  "employees",
+  "socials",
+  "benefits",
+  "theme",
+  "accessories",
+  "ticker",
+  "vipStyle",
+  "vipHeadline",
+  "callouts",
+  "media",
+  "promoter",
+  "featuredJob",
+] as const;
 export type BoothEdit = Partial<Pick<CompanyBooth, (typeof EDITABLE)[number]>>;
 
 export interface FairApplication {
@@ -614,8 +656,17 @@ export interface FairEvent {
   jobTitle?: string;
 }
 
-type Stop = { boothId: string; spot: "talk" | "banner" } | { sponsorId: string };
+type Stop = { boothId: string; spot: "talk" | "banner" } | { sponsorId: string } | { park: true };
 type Goal = Point & { floorId: string };
+
+/** One leg toward another floor: walk to `at`, then come out at `arrive` on `floorId`. The park is
+ *  outside the building: its only way in and out is the lobby door, so the lift never goes there. */
+export interface Hop {
+  via: "lift" | "out" | "in";
+  at: Point;
+  floorId: string;
+  arrive: Point;
+}
 
 /** What the demo keeps between visits (in localStorage in the browser). */
 export interface FairSaved {
@@ -690,7 +741,12 @@ const ROOM_CHATTER: Record<FairRoom["kind"], string[]> = {
   konsultasi: ["Sofanya empuk 😌", "Nunggu giliran konsultasi", "📞 Halo?", "Tadi dapat tips CV bagus", "Ngobrol yuk!", "Pak Hendra baik banget"],
 };
 /** Short exchanges between two job seekers standing or sitting near each other, per kind of floor. */
-export const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
+export const CONVOS: Record<FairRoom["kind"] | "hall" | "taman", string[][]> = {
+  taman: [
+    ["Gedung yang lagi dibangun itu acara apa?", "Katanya job fair berikutnya", "Wah, catat tanggalnya ah 📅"],
+    ["Adem ya di taman", "Iya, istirahat dulu sebelum lamar lagi"],
+    ["Air mancurnya bagus 😍", "Foto dulu yuk!"],
+  ],
   hall: [
     ["Kamu udah lamar ke mana aja?", "Baru dua stand, kamu?", "Aku tiga, semoga ada yang nyangkut 🤞"],
     ["Stand yang VIP itu keren ya", "Iya, ada layar videonya!"],
@@ -730,7 +786,12 @@ export const CONVOS: Record<FairRoom["kind"] | "hall", string[][]> = {
 };
 
 const READING = ["Hmm, menarik...", "Gajinya lumayan!", "Cocok nih sama aku", "Catat dulu 📝", "Wah, banyak lowongan"];
-const CALLOUTS = [(job: string) => `Kami cari ${job}! Mampir yuk!`, () => "Ayo tanya-tanya dulu!", () => "Ada merchandise buat pelamar 🎁", (job: string) => `Lowongan ${job}, langsung apply di sini!`];
+const CALLOUTS = [
+  (job: string) => `Kami cari ${job}! Mampir yuk!`,
+  () => "Ayo tanya-tanya dulu!",
+  () => "Ada merchandise buat pelamar 🎁",
+  (job: string) => `Lowongan ${job}, langsung apply di sini!`,
+];
 
 /** A paid floor: a room or a booth floor the organiser put a price on. */
 export interface FloorPass {
@@ -864,7 +925,9 @@ export class DemoJobFair {
     const old = new Map(this.staff.map((x) => [x.id, x]));
     const promoFloor = (p: Promoter) => this.stops.find((st) => st.level === p.level)?.floorId ?? this.floors[0]!.id;
     const next: FairStaff[] = [
-      ...fair.booths.filter(hasStand).map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
+      ...fair.booths
+        .filter(hasStand)
+        .map((b) => ({ id: recruiterId(b.id), name: b.recruiter, boothId: b.id, floorId: fairFloorId(fair, b.floor), ...boothSpot(b, "recruiter"), facing: "front" as Facing })),
       // An info desk on every floor; the entrance one keeps its old id.
       ...this.stops.map((st): FairStaff => {
         const d = infoDeskOn(fair, st.floorId);
@@ -885,7 +948,14 @@ export class DemoJobFair {
         if (room.kind === "foodcourt")
           return [
             { ...host, x: 3, y: room.height - 2.4 },
-            ...(room.stalls ?? []).map((st, i) => ({ id: stallStaffId(st.id), name: st.vendor, boothId: null, floorId, ...stallSpot(stallSlot(st, i), "vendor"), facing: "front" as Facing })),
+            ...(room.stalls ?? []).map((st, i) => ({
+              id: stallStaffId(st.id),
+              name: st.vendor,
+              boothId: null,
+              floorId,
+              ...stallSpot(stallSlot(st, i), "vendor"),
+              facing: "front" as Facing,
+            })),
           ];
         if (room.kind === "aula") return [{ ...host, x: room.width / 2 - 4, y: 2.3 }];
         if (room.kind === "konsultasi")
@@ -943,7 +1013,8 @@ export class DemoJobFair {
     this.fair.booths.splice(0, this.fair.booths.length, ...booths);
     // Published promoters stand on the published levels: move them with their floor, drop them with it.
     const published = () => {
-      const now = this.levelsByKey(), was = this.publishedLevels();
+      const now = this.levelsByKey(),
+        was = this.publishedLevels();
       return structuredClone(this.originalPromoters).flatMap((p) => {
         const key = [...was].find(([, l]) => l === p.level)?.[0];
         const level = key ? now.get(key) : undefined;
@@ -1201,7 +1272,13 @@ export class DemoJobFair {
     const i = fairFloorIndex(floorId);
     const hall = this.fair.floors[i];
     if (!hall) return null;
-    return { id: floorId, name: `${hallName(this.fair, i)} · ${hall.theme}`, tagline: `Lantai khusus ${hall.theme}`, price: this.floorPrice(floorId), staff: infoDeskOn(this.fair, floorId).staff };
+    return {
+      id: floorId,
+      name: `${hallName(this.fair, i)} · ${hall.theme}`,
+      tagline: `Lantai khusus ${hall.theme}`,
+      price: this.floorPrice(floorId),
+      staff: infoDeskOn(this.fair, floorId).staff,
+    };
   }
 
   // ---- Organiser ----------------------------------------------------------------------
@@ -1228,7 +1305,11 @@ export class DemoJobFair {
     const room = this.fair.rooms.find((r) => r.id === roomId);
     const name = input.name.trim().slice(0, 40);
     if (!room?.stalls || !name || !this.freeStallSlots(room.id).includes(slot)) return null;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "stan";
+    const slug =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "stan";
     let id = `stall-${slug}`;
     for (let n = 2; room.stalls.some((st) => st.id === id); n++) id = `stall-${slug}-${n}`;
     const stall = makeStall(id, slot, input)!;
@@ -1243,7 +1324,10 @@ export class DemoJobFair {
     const room = this.fair.rooms.find((r) => r.stalls?.some((st) => st.id === stallId));
     if (!room?.stalls) return false;
     if (this.rentedStalls.has(stallId) && !this.org.removedStalls?.includes(stallId)) this.org.removedStalls = [...(this.org.removedStalls ?? []), stallId];
-    this.setStalls(room.id, room.stalls.filter((st) => st.id !== stallId));
+    this.setStalls(
+      room.id,
+      room.stalls.filter((st) => st.id !== stallId),
+    );
     return true;
   }
 
@@ -1280,17 +1364,36 @@ export class DemoJobFair {
 
   /** Empty booth places on the hall floors. */
   freeSlots() {
-    return this.fair.floors.flatMap((_, floor) => BOOTH_SLOTS.filter((sl) => !this.fair.booths.some((b) => hasStand(b) && b.floor === floor && b.x === sl.x && b.y === sl.y)).map((sl) => ({ floor, ...sl })));
+    return this.fair.floors.flatMap((_, floor) =>
+      BOOTH_SLOTS.filter((sl) => !this.fair.booths.some((b) => hasStand(b) && b.floor === floor && b.x === sl.x && b.y === sl.y)).map((sl) => ({ floor, ...sl })),
+    );
   }
 
   /** Put a new company in a free slot. A mini (UMKM) booth takes no slot: it is listed in its floor's Pojok UMKM. */
-  addBooth(input: { company: string; industry: string; tagline?: string; color: string; logo?: string; recruiter?: string; email?: string; floor: number; x: number; y: number; tier?: BoothTier }) {
+  addBooth(input: {
+    company: string;
+    industry: string;
+    tagline?: string;
+    color: string;
+    logo?: string;
+    recruiter?: string;
+    email?: string;
+    floor: number;
+    x: number;
+    y: number;
+    tier?: BoothTier;
+  }) {
     const name = input.company.trim();
     const stand = hasStand(input);
     if (!name) return null;
     if (stand && !this.freeSlots().some((sl) => sl.floor === input.floor && sl.x === input.x && sl.y === input.y)) return null;
     if (!stand && !this.fair.floors[input.floor]) return null;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "stand";
+    const slug =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 24) || "stand";
     let id = slug;
     // Ids still named by a stand move are not given out again, so a new booth doesn't inherit an old one's spot.
     for (let n = 2; this.original.has(id) || this.org.added.some((b) => b.id === id) || this.org.placements?.[id]; n++) id = `${slug}-${n}`;
@@ -1299,7 +1402,15 @@ export class DemoJobFair {
       company: name,
       tagline: input.tagline?.trim() || `Bergabung bersama ${name}`,
       industry: input.industry.trim() || "Umum",
-      logo: (input.logo?.trim() || name.split(/\s+/).map((w) => w[0]).join("")).slice(0, 2).toUpperCase(),
+      logo: (
+        input.logo?.trim() ||
+        name
+          .split(/\s+/)
+          .map((w) => w[0])
+          .join("")
+      )
+        .slice(0, 2)
+        .toUpperCase(),
       color: input.color,
       floor: input.floor,
       tier: input.tier ?? "regular",
@@ -1433,13 +1544,45 @@ export class DemoJobFair {
   }
 
   /** A company books an empty stand, pays (demo), and its booth appears on the map with a portal PIN. */
-  bookStand(input: { company: string; industry: string; color: string; contact: string; email: string; tier: BoothTier; method: string; floor: number; x: number; y: number; price?: number }) {
-    const booth = this.addBooth({ company: input.company, industry: input.industry, color: input.color, recruiter: input.contact, email: input.email, floor: input.floor, x: input.x, y: input.y, tier: input.tier });
+  bookStand(input: {
+    company: string;
+    industry: string;
+    color: string;
+    contact: string;
+    email: string;
+    tier: BoothTier;
+    method: string;
+    floor: number;
+    x: number;
+    y: number;
+    price?: number;
+  }) {
+    const booth = this.addBooth({
+      company: input.company,
+      industry: input.industry,
+      color: input.color,
+      recruiter: input.contact,
+      email: input.email,
+      floor: input.floor,
+      x: input.x,
+      y: input.y,
+      tier: input.tier,
+    });
     if (!booth) return null;
     const pin = String(1000 + Math.floor(this.rand() * 9000));
     this.org.pins = { ...this.org.pins, [booth.id]: pin };
     this.org.bookings = [
-      { id: this.newAdId("book"), boothId: booth.id, company: booth.company, contact: input.contact.trim(), email: input.email.trim(), tier: input.tier, price: input.price ?? STAND_PRICES[input.tier], method: input.method, at: this.now() },
+      {
+        id: this.newAdId("book"),
+        boothId: booth.id,
+        company: booth.company,
+        contact: input.contact.trim(),
+        email: input.email.trim(),
+        tier: input.tier,
+        price: input.price ?? STAND_PRICES[input.tier],
+        method: input.method,
+        at: this.now(),
+      },
       ...(this.org.bookings ?? []),
     ];
     this.saveOrg();
@@ -1741,7 +1884,17 @@ export class DemoJobFair {
   }
 
   private giveVoucher(title: string, b: CompanyBooth, terms: string) {
-    const v: Voucher = { id: this.id("vc"), kind: "merchant", title, code: `${b.logo}-${Math.floor(1000 + this.rand() * 9000)}`, terms, outlet: `Stand ${b.company}`, from: b.company, at: this.now(), used: false };
+    const v: Voucher = {
+      id: this.id("vc"),
+      kind: "merchant",
+      title,
+      code: `${b.logo}-${Math.floor(1000 + this.rand() * 9000)}`,
+      terms,
+      outlet: `Stand ${b.company}`,
+      from: b.company,
+      at: this.now(),
+      used: false,
+    };
     this.player.vouchers.unshift(v);
     this.persist();
     this.emit();
@@ -1830,7 +1983,10 @@ export class DemoJobFair {
   /** Companies that bought a walking promoter get one on their booth's floor. */
   private syncCompanyPromoters() {
     const list = this.fair.promoters;
-    const before = list.filter((p) => p.boothId).map((p) => JSON.stringify(p)).join();
+    const before = list
+      .filter((p) => p.boothId)
+      .map((p) => JSON.stringify(p))
+      .join();
     for (let n = list.length - 1; n >= 0; n--) if (list[n]!.boothId) list.splice(n, 1);
     for (const b of this.fair.booths) {
       if (!this.company.get(b.id)?.owned.includes("promoter")) continue;
@@ -1847,7 +2003,14 @@ export class DemoJobFair {
         x: 24,
         y: 13,
         headline: c.headline?.trim() || `${b.company} buka ${jobs.length} lowongan`,
-        offer: c.offer?.trim() || `Kami sedang mencari ${jobs.slice(0, 2).map((j) => j.title).join(" dan ") || "talenta baru"}. ${hasStand(b) ? `Mampir ke stand kami di ${hallName(this.fair, b.floor)} ya!` : `Lihat lowongan kami di ${UMKM_CORNER} ya!`}`,
+        offer:
+          c.offer?.trim() ||
+          `Kami sedang mencari ${
+            jobs
+              .slice(0, 2)
+              .map((j) => j.title)
+              .join(" dan ") || "talenta baru"
+          }. ${hasStand(b) ? `Mampir ke stand kami di ${hallName(this.fair, b.floor)} ya!` : `Lihat lowongan kami di ${UMKM_CORNER} ya!`}`,
         cta: "Lihat lowongan",
         url: b.website ?? "",
         code: c.code?.trim() || undefined,
@@ -1855,9 +2018,15 @@ export class DemoJobFair {
         walks: true,
       });
     }
-    if (before !== list.filter((p) => p.boothId).map((p) => JSON.stringify(p)).join()) this.rebuildStaff();
+    if (
+      before !==
+      list
+        .filter((p) => p.boothId)
+        .map((p) => JSON.stringify(p))
+        .join()
+    )
+      this.rebuildStaff();
   }
-
 
   /** Called after a company changes an application's status here; the live app sends it to the server. */
   onStatusChange: ((a: FairApplication) => void) | null = null;
@@ -1974,9 +2143,19 @@ export class DemoJobFair {
     const seen = before.messages?.length ?? 0;
     for (const m of (after.messages ?? []).slice(seen)) if (m.from === "seeker") this.notify(after.boothId, "chat", `${after.name}: ${m.text.slice(0, 120)}`, after.id);
     if (after.interview?.reply && after.interview.reply !== before.interview?.reply)
-      this.notify(after.boothId, "confirm", after.interview.reply === "hadir" ? `${after.name} konfirmasi hadir interview ${after.jobTitle}` : `${after.name} minta jadwal ulang interview ${after.jobTitle}`, after.id);
+      this.notify(
+        after.boothId,
+        "confirm",
+        after.interview.reply === "hadir" ? `${after.name} konfirmasi hadir interview ${after.jobTitle}` : `${after.name} minta jadwal ulang interview ${after.jobTitle}`,
+        after.id,
+      );
     if (after.visit?.reply && after.visit.reply !== before.visit?.reply)
-      this.notify(after.boothId, "confirm", after.visit.reply === "hadir" ? `${after.name} konfirmasi hadir kunjungan kantor` : `${after.name} minta jadwal ulang kunjungan kantor`, after.id);
+      this.notify(
+        after.boothId,
+        "confirm",
+        after.visit.reply === "hadir" ? `${after.name} konfirmasi hadir kunjungan kantor` : `${after.name} minta jadwal ulang kunjungan kantor`,
+        after.id,
+      );
   }
 
   /** The company changed one of the player's applications in another tab (its portal): say what changed. */
@@ -2159,14 +2338,100 @@ export class DemoJobFair {
     return this.fair.rooms.find((r) => fairRoomFloorId(this.fair, r.id) === floorId);
   }
 
-  /** The building level of a floor: the level its hall or room sits on. */
+  /** The building level of a floor: the level its hall or room sits on. The park is outside: -1. */
   levelOf(floorId: string) {
+    if (isParkFloor(floorId)) return -1;
     return this.roomOf(floorId)?.level ?? hallLevel(this.fair, Math.max(0, fairFloorIndex(floorId)));
   }
 
-  /** The lift stop for a floor id. */
+  /** The lift stop for a floor id; the park, which the lift never goes to, gets a stop of its own. */
   stopOf(floorId: string): FairStop {
+    if (floorId === this.parkId) return this.parkStop();
     return this.stops.find((s) => s.floorId === floorId) ?? this.stops[0]!;
+  }
+
+  // ---- The park outside: reached through the lobby door, with the organiser's next events ----
+
+  get parkId() {
+    return parkFloorId(this.fair);
+  }
+
+  /** The park as a place in lists (the HUD, the organiser's live view). Not a lift stop. */
+  parkStop(): FairStop {
+    return { level: -1, floorId: this.parkId, name: "Taman", label: "Di luar gedung", emoji: "🌳" };
+  }
+
+  /** The floor whose door leads out to the park: the one everyone comes in on. */
+  get lobbyId() {
+    return this.stops[0]?.floorId ?? this.floors[0]!.id;
+  }
+
+  /** Every building in the organiser's list, hidden ones too. */
+  parkBuildings(): ParkBuilding[] {
+    return cleanParkBuildings(this.org.buildings);
+  }
+
+  /** The buildings visitors see in the park, in plot order. */
+  shownParkBuildings(): ParkBuilding[] {
+    return publicParkBuildings(this.org.buildings);
+  }
+
+  /** Add a building, or change one (same id). False without a name, or when every plot is taken. */
+  saveParkBuilding(input: { id?: string; name: string; date?: string; about?: string; status?: ParkBuilding["status"] }) {
+    const list = this.parkBuildings();
+    const i = input.id ? list.findIndex((b) => b.id === input.id) : -1;
+    if (i < 0 && list.length >= PARK_MAX_BUILDINGS) return false;
+    const base =
+      input.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 24) || "gedung";
+    let id = i >= 0 ? list[i]!.id : base;
+    for (let n = 2; i < 0 && list.some((b) => b.id === id); n++) id = `${base}-${n}`;
+    const [next] = cleanParkBuildings([{ ...input, id, status: input.status ?? (i >= 0 ? list[i]!.status : "soon") }]);
+    if (!next) return false;
+    if (i >= 0) list[i] = next;
+    else list.push(next);
+    this.org.buildings = list;
+    this.saveOrg();
+    return true;
+  }
+
+  removeParkBuilding(id: string) {
+    this.org.buildings = this.parkBuildings().filter((b) => b.id !== id);
+    this.saveOrg();
+  }
+
+  /** Move a building one place up or down the list, and so to the next plot. */
+  moveParkBuilding(id: string, by: -1 | 1) {
+    const list = this.parkBuildings();
+    const i = list.findIndex((b) => b.id === id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j]!, list[i]!];
+    this.org.buildings = list;
+    this.saveOrg();
+  }
+
+  /** The next leg from one floor toward another: out through the lobby door, back in through the
+   *  event building's door, or the lift. */
+  hop(from: string, to: string): Hop {
+    const lobby = this.lobbyId;
+    const door = lobbyDoorFront(this.floor(lobby));
+    if (from === this.parkId) return { via: "in", at: PARK.arrive, floorId: lobby, arrive: door };
+    if (to === this.parkId && from === lobby) return { via: "out", at: door, floorId: this.parkId, arrive: PARK.arrive };
+    const floorId = to === this.parkId ? lobby : to;
+    return { via: "lift", at: LIFT_FRONT, floorId, arrive: LIFT_FRONT };
+  }
+
+  /** Take a hop: step through the door (facing the way in) or ride the lift. */
+  takeHop(id: string, h: Hop) {
+    if (h.via === "lift") return this.ride(id, h.floorId);
+    this.changeFloor(id, h.floorId, h.arrive.x, h.arrive.y);
+    const v = this.visitors.get(id);
+    if (v) v.facing = h.via === "out" ? "front" : "back";
   }
 
   /** Ride the lift: step out in front of the lift doors on the chosen floor. */
@@ -2486,9 +2751,30 @@ export class DemoJobFair {
     if (!stall || !deal) return null;
     if (!this.spend(deal.price, `Voucher ${stall.name}: ${deal.title}`)) return null;
     const code = `${stall.id.slice(0, 4).toUpperCase()}-${String(Math.floor(this.rand() * 9000) + 1000)}${String.fromCharCode(65 + (this.seq % 26))}`;
-    const voucher: Voucher = { id: this.id("vc"), kind: "merchant", title: deal.title, code, worth: deal.worth, terms: deal.terms, outlet: `${stall.name} · ${stall.address}`, from: stall.name, at: this.now(), used: false };
+    const voucher: Voucher = {
+      id: this.id("vc"),
+      kind: "merchant",
+      title: deal.title,
+      code,
+      worth: deal.worth,
+      terms: deal.terms,
+      outlet: `${stall.name} · ${stall.address}`,
+      from: stall.name,
+      at: this.now(),
+      used: false,
+    };
     const t = this.pick(FOOD_VOUCHERS.filter((v) => v.kind !== "sponsor"));
-    const bonus: Voucher = { id: this.id("vc"), kind: t.kind, title: t.title, room: t.room, coins: t.coins, code: t.code, from: `Bonus ${stall.name}`, at: this.now(), used: false };
+    const bonus: Voucher = {
+      id: this.id("vc"),
+      kind: t.kind,
+      title: t.title,
+      room: t.room,
+      coins: t.coins,
+      code: t.code,
+      from: `Bonus ${stall.name}`,
+      at: this.now(),
+      used: false,
+    };
     this.player.vouchers.unshift(bonus, voucher);
     this.player.meals++;
     if (bonus.kind === "coins" && bonus.coins) {
@@ -2761,7 +3047,19 @@ export class DemoJobFair {
     const seatId = p.seatId && floor.seats.some((s) => s.id === p.seatId) ? p.seatId : null;
     let v = this.visitors.get(id);
     if (!v) {
-      v = { memberId: id, visitId: id, displayName: `🌐 ${p.name}`, memberType: "host", floorId: floor.id, x: p.x, y: p.y, facing: p.facing, isBot: false, remote: true, arrivedAt: this.now() };
+      v = {
+        memberId: id,
+        visitId: id,
+        displayName: `🌐 ${p.name}`,
+        memberType: "host",
+        floorId: floor.id,
+        x: p.x,
+        y: p.y,
+        facing: p.facing,
+        isBot: false,
+        remote: true,
+        arrivedAt: this.now(),
+      };
       this.visitors.set(id, v);
       this.log({ type: "arrive", name: `${p.name} (online)` });
     }
@@ -2789,7 +3087,11 @@ export class DemoJobFair {
     if (!isBot) {
       const host = this.roomOf(floorId);
       const where = this.fair.floors.length ? `${hallName(this.fair, 0)} sampai ${hallName(this.fair, this.fair.floors.length - 1)}` : "";
-      this.say(host ? roomStaffId(host.id) : "fair-info", `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${where}. Naik lift: ikuti panah 🛗 di lantai.`, 3600);
+      this.say(
+        host ? roomStaffId(host.id) : "fair-info",
+        `Selamat datang, ${name}! Ada ${this.fair.booths.length} perusahaan di ${where}. Naik lift: ikuti panah 🛗 di lantai.`,
+        3600,
+      );
     }
     this.emit();
     return v;
@@ -2850,7 +3152,19 @@ export class DemoJobFair {
     if (!had) {
       const { x, y } = this.fair.spawn;
       const floorId = this.stops[0]?.floorId ?? this.floors[0]!.id;
-      this.visitors.set(PLAYER_ID, { memberId: PLAYER_ID, visitId: PLAYER_ID, displayName: name, memberType: "host", floorId, x, y, facing: "back", isBot: false, arrivedAt: this.now(), verified: !!this.player.verified });
+      this.visitors.set(PLAYER_ID, {
+        memberId: PLAYER_ID,
+        visitId: PLAYER_ID,
+        displayName: name,
+        memberType: "host",
+        floorId,
+        x,
+        y,
+        facing: "back",
+        isBot: false,
+        arrivedAt: this.now(),
+        verified: !!this.player.verified,
+      });
     }
     try {
       return this.apply(PLAYER_ID, input);
@@ -2861,7 +3175,21 @@ export class DemoJobFair {
 
   apply(
     visitorId: string,
-    input: { id?: string; boothId: string; jobId: string; name?: string; email?: string; phone?: string; cvUrl?: string; message?: string; headline?: string; education?: string; skills?: string; city?: string; photo?: string },
+    input: {
+      id?: string;
+      boothId: string;
+      jobId: string;
+      name?: string;
+      email?: string;
+      phone?: string;
+      cvUrl?: string;
+      message?: string;
+      headline?: string;
+      education?: string;
+      skills?: string;
+      city?: string;
+      photo?: string;
+    },
   ) {
     const v = this.visitors.get(visitorId);
     const b = this.booth(input.boothId);
@@ -2926,7 +3254,8 @@ export class DemoJobFair {
       const stars = this.autoRating(a);
       this.rateApplicant(a.id, stars, FEEDBACK[stars - 1]);
       // Bot companies decide by themselves; a company that has opened its portal decides by hand.
-      if (!this.company.has(a.boothId) && (a.status === "Dilihat" || a.status === "Terkirim")) a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
+      if (!this.company.has(a.boothId) && (a.status === "Dilihat" || a.status === "Terkirim"))
+        a.status = stars >= 4 ? "Diundang interview" : stars <= 2 ? "Belum cocok" : "Dilihat";
       a.updatedAt = this.now();
       if (a.visitorId === PLAYER_ID) {
         this.notices.push(`${a.company} memberi kamu ${"★".repeat(stars)} untuk lamaran ${a.jobTitle}`);
@@ -3080,7 +3409,8 @@ export class DemoJobFair {
     inv.paidAt = this.now();
     for (const it of inv.items) if (!st.owned.includes(it.id)) st.owned.push(it.id);
     if (inv.items.some((i) => i.id === "vip") && hasStand(b)) b.tier = "premium";
-    for (const it of inv.items) if (it.id !== "vip" && it.id !== "promoter" && it.id !== FEATURED_PRODUCT_ID && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
+    for (const it of inv.items)
+      if (it.id !== "vip" && it.id !== "promoter" && it.id !== FEATURED_PRODUCT_ID && !(b.accessories ?? []).includes(it.id)) this.toggleAccessory(boothId, it.id);
     this.syncCompanyPromoters();
     this.refreshFloors();
     this.persist();
@@ -3129,7 +3459,12 @@ export class DemoJobFair {
     this.setStatus(a.id, "Diundang interview", true);
     const when = new Date(iv.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
     if (a.visitorId === PLAYER_ID) this.notify(PLAYER_ID, "interview", `${a.company} ${moved ? "mengubah jadwal" : "mengundang"} interview ${a.jobTitle}: ${when}`, a.id);
-    this.messageApplicant(a.id, `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`, true, sentAt);
+    this.messageApplicant(
+      a.id,
+      `Halo ${a.name}, kami mengundang kamu interview ${a.jobTitle} via ${iv.mode} pada ${when}${iv.place ? ` (${iv.place})` : ""}.${iv.note ? ` ${iv.note}` : ""}`,
+      true,
+      sentAt,
+    );
     // Bots answer the invitation by themselves.
     if (a.isBot) this.after(4000 + this.rand() * 4000, () => this.answerInterview(a.id, this.rand() < 0.85 ? "hadir" : "jadwal-ulang"));
   }
@@ -3145,7 +3480,12 @@ export class DemoJobFair {
     this.setStatus(a.id, "Kunjungan kantor", true);
     const when = new Date(v.at).toLocaleString("id-ID", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
     if (a.visitorId === PLAYER_ID) this.notify(PLAYER_ID, "visit", `${a.company} ${moved ? "mengubah jadwal" : "mengundang"} kunjungan kantor: ${when}`, a.id);
-    this.messageApplicant(a.id, `Selamat ${a.name}, kamu lolos interview ${a.jobTitle}! Kami mengundang kamu berkunjung ke kantor pada ${when} di ${a.visit.address}.${a.visit.note ? ` ${a.visit.note}` : ""}`, true, sentAt);
+    this.messageApplicant(
+      a.id,
+      `Selamat ${a.name}, kamu lolos interview ${a.jobTitle}! Kami mengundang kamu berkunjung ke kantor pada ${when} di ${a.visit.address}.${a.visit.note ? ` ${a.visit.note}` : ""}`,
+      true,
+      sentAt,
+    );
     if (a.isBot) this.after(4000 + this.rand() * 4000, () => this.answerVisit(a.id, "hadir"));
   }
 
@@ -3154,7 +3494,10 @@ export class DemoJobFair {
     const a = this.applications.find((x) => x.id === applicationId);
     if (!a?.visit || a.visit.reply === reply) return;
     a.visit.reply = reply;
-    const text = reply === "hadir" ? "Terima kasih, saya konfirmasi hadir di kunjungan kantor." : `Mohon maaf, bisakah jadwal kunjungan kantor diganti?${note.trim() ? ` ${note.trim()}` : ""}`;
+    const text =
+      reply === "hadir"
+        ? "Terima kasih, saya konfirmasi hadir di kunjungan kantor."
+        : `Mohon maaf, bisakah jadwal kunjungan kantor diganti?${note.trim() ? ` ${note.trim()}` : ""}`;
     (a.messages ??= []).push({ at: this.now(), from: "seeker", text });
     this.notify(a.boothId, "confirm", reply === "hadir" ? `${a.name} konfirmasi hadir kunjungan kantor` : `${a.name} minta jadwal ulang kunjungan kantor`, a.id);
     this.touch(a);
@@ -3290,7 +3633,8 @@ export class DemoJobFair {
     for (const a of this.applications) {
       if (a.boothId !== boothId || a.isBot) continue;
       add({ id: `apply:${a.id}`, at: a.at, kind: "apply", text: `${a.name} melamar ${a.jobTitle}`, appId: a.id });
-      for (const m of a.messages ?? []) if (m.from === "seeker") add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.name}: ${m.text.slice(0, 120)}`, appId: a.id });
+      for (const m of a.messages ?? [])
+        if (m.from === "seeker") add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.name}: ${m.text.slice(0, 120)}`, appId: a.id });
       const iv = a.interview;
       if (iv?.reply)
         add({
@@ -3309,7 +3653,9 @@ export class DemoJobFair {
           text: v.reply === "hadir" ? `${a.name} konfirmasi hadir kunjungan kantor` : `${a.name} minta jadwal ulang kunjungan kantor`,
           appId: a.id,
         });
-      for (const c of a.calls ?? []) if (!c.answered) add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `${a.name} tidak mengangkat panggilan ${c.kind === "video" ? "video" : "telepon"}`, appId: a.id });
+      for (const c of a.calls ?? [])
+        if (!c.answered)
+          add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `${a.name} tidak mengangkat panggilan ${c.kind === "video" ? "video" : "telepon"}`, appId: a.id });
     }
     return out.sort((x, y) => y.at - x.at).slice(0, 200);
   }
@@ -3329,14 +3675,32 @@ export class DemoJobFair {
       if (a.visitorId !== PLAYER_ID) continue;
       // Invitations have their own notification; the chat message announcing one is not repeated.
       const announced = new Set([a.interview?.sentAt, a.visit?.sentAt]);
-      for (const m of a.messages ?? []) if (m.from === "company" && !announced.has(m.at)) add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.company}: ${m.text.slice(0, 120)}`, appId: a.id });
-      if (a.interview) add({ id: `interview:${a.id}:${a.interview.at}`, at: a.interview.sentAt ?? a.at, kind: "interview", text: `${a.company} mengundang interview ${a.jobTitle}: ${when(a.interview.at)}`, appId: a.id });
-      if (a.visit) add({ id: `visit:${a.id}:${a.visit.at}`, at: a.visit.sentAt ?? a.at, kind: "visit", text: `${a.company} mengundang kunjungan kantor: ${when(a.visit.at)}`, appId: a.id });
+      for (const m of a.messages ?? [])
+        if (m.from === "company" && !announced.has(m.at)) add({ id: `chat:${a.id}:${m.at}`, at: m.at, kind: "chat", text: `${a.company}: ${m.text.slice(0, 120)}`, appId: a.id });
+      if (a.interview)
+        add({
+          id: `interview:${a.id}:${a.interview.at}`,
+          at: a.interview.sentAt ?? a.at,
+          kind: "interview",
+          text: `${a.company} mengundang interview ${a.jobTitle}: ${when(a.interview.at)}`,
+          appId: a.id,
+        });
+      if (a.visit)
+        add({ id: `visit:${a.id}:${a.visit.at}`, at: a.visit.sentAt ?? a.at, kind: "visit", text: `${a.company} mengundang kunjungan kantor: ${when(a.visit.at)}`, appId: a.id });
       // Invited statuses are told by the invitation itself.
       if (!["Terkirim", "Dilihat", "Diundang interview", "Kunjungan kantor"].includes(a.status))
         add({ id: `status:${a.id}:${a.status}`, at: a.statusAt ?? a.at, kind: "status", text: `${a.company}: lamaran ${a.jobTitle} sekarang "${a.status}"`, appId: a.id });
-      if (a.rating) add({ id: `rating:${a.id}:${a.rating}`, at: a.ratedAt ?? a.at, kind: "rating", text: `${a.company} memberi ${"★".repeat(a.rating)} untuk lamaran ${a.jobTitle}`, appId: a.id });
-      for (const c of a.calls ?? []) if (!c.answered) add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `Panggilan ${c.kind === "video" ? "video" : "telepon"} tak terjawab dari ${a.company}`, appId: a.id });
+      if (a.rating)
+        add({
+          id: `rating:${a.id}:${a.rating}`,
+          at: a.ratedAt ?? a.at,
+          kind: "rating",
+          text: `${a.company} memberi ${"★".repeat(a.rating)} untuk lamaran ${a.jobTitle}`,
+          appId: a.id,
+        });
+      for (const c of a.calls ?? [])
+        if (!c.answered)
+          add({ id: `call:${a.id}:${c.at}`, at: c.at, kind: "call", text: `Panggilan ${c.kind === "video" ? "video" : "telepon"} tak terjawab dari ${a.company}`, appId: a.id });
     }
     return out.sort((x, y) => y.at - x.at).slice(0, 200);
   }
@@ -3428,10 +3792,11 @@ export class DemoJobFair {
       this.flush();
     }
     let changed = false;
-    for (const [id, b] of this.bubbles) if (b.until <= now) {
-      this.bubbles.delete(id);
-      changed = true;
-    }
+    for (const [id, b] of this.bubbles)
+      if (b.until <= now) {
+        this.bubbles.delete(id);
+        changed = true;
+      }
     const due = this.later.filter((l) => l.at <= now);
     if (due.length) {
       this.later = this.later.filter((l) => l.at > now);
@@ -3562,7 +3927,7 @@ export class DemoJobFair {
     if (!near.length) return false;
     const b = this.pick(near);
     const room = this.roomOf(floorId);
-    const lines = this.pick(CONVOS[room?.kind ?? "hall"]);
+    const lines = this.pick(CONVOS[floorId === this.parkId ? "taman" : (room?.kind ?? "hall")]);
     // Face each other when standing; seated people keep facing their table or the stage.
     if (!a.seatId) a.facing = facingFor(b.x - a.x, b.y - a.y, a.facing);
     if (!b.seatId) b.facing = facingFor(a.x - b.x, a.y - b.y, b.facing);
@@ -3590,7 +3955,19 @@ export class DemoJobFair {
         const seat = free.length ? this.pick(free) : null;
         if (seat) {
           const id = this.id("guest");
-          this.visitors.set(id, { memberId: id, visitId: id, displayName: this.pick(BOT_NAMES), memberType: "host", floorId: floor.id, x: seat.x, y: seat.y, seatId: seat.id, facing: "back", isBot: true, arrivedAt: this.now() });
+          this.visitors.set(id, {
+            memberId: id,
+            visitId: id,
+            displayName: this.pick(BOT_NAMES),
+            memberType: "host",
+            floorId: floor.id,
+            x: seat.x,
+            y: seat.y,
+            seatId: seat.id,
+            facing: "back",
+            isBot: true,
+            arrivedAt: this.now(),
+          });
         }
       } else if (inRoom.length && this.rand() < 0.25) {
         const v = this.pick(inRoom);
@@ -3618,6 +3995,8 @@ export class DemoJobFair {
       .slice(0, 2 + Math.floor(this.rand() * 3))
       .sort((a, b) => a.floor - b.floor);
     const plan: Stop[] = booths.map((b) => ({ boothId: b.id, spot: this.rand() < 0.65 ? "talk" : "banner" }) as Stop);
+    // Some take a walk in the park before going home.
+    if (this.rand() < 0.3) plan.push({ park: true });
     if (this.rand() < 0.4) {
       // A sponsor on a floor the bot is visiting anyway.
       const floors = new Set(booths.map((b) => b.floor));
@@ -3644,6 +4023,25 @@ export class DemoJobFair {
         const out = this.floorClosed(this.floors[0]!.id) ? this.stops[0]!.floorId : this.floors[0]!.id;
         bot.target = { floorId: out, x: this.fair.spawn.x + (this.rand() - 0.5), y: this.fair.height - 0.4 };
         bot.path = null;
+        return true;
+      }
+      if ("park" in stop) {
+        // A stroll to a bench or the front of a building, then a look around.
+        if (!bot.target) {
+          const plots = parkPlots(this.shownParkBuildings());
+          const spots = [...plots.flatMap((p, i) => (p.building ? [plotFront(i)] : [])), ...PARK.benches.map((b) => ({ x: b.x + 1, y: b.y + 1.3 })), { x: 28, y: 18.6 }];
+          const at = this.pick(spots);
+          bot.target = { floorId: this.parkId, x: at.x + (this.rand() - 0.5) * 1.2, y: at.y + this.rand() * 0.3 };
+        }
+        if (this.walk(v, bot, bot.target, step)) return true;
+        const plot = plotAt(v.x, v.y);
+        const b = plot >= 0 ? parkPlots(this.shownParkBuildings())[plot]?.building : null;
+        v.facing = b ? "back" : "front";
+        bot.target = null;
+        bot.phase = "reading";
+        bot.until = now + 3000 + this.rand() * 3000;
+        if (b)
+          this.after(600, () => this.visitors.has(v.memberId) && this.say(v.memberId, this.pick([`${b.name}, coming soon!`, "Wah, ada acara baru 📅", "Kapan dibuka ya?"]), 2200));
         return true;
       }
       if ("sponsorId" in stop) {
@@ -3789,18 +4187,21 @@ export class DemoJobFair {
         if (v.memberId === PLAYER_ID) this.say(s.id, `Halo ${v.displayName}! ${p.headline} 🎁 Tap aku ya!`, 6000);
         else {
           this.say(s.id, `Halo kak! ${p.headline}`, 3000);
-          this.after(2000, () => this.visitors.has(v.memberId) && this.say(v.memberId, this.pick(["Wah boleh juga!", "Simpan kodenya ah", "Nanti aku cek ya", "Makasih kak!"]), 2000));
+          this.after(
+            2000,
+            () => this.visitors.has(v.memberId) && this.say(v.memberId, this.pick(["Wah boleh juga!", "Simpan kodenya ah", "Nanti aku cek ya", "Makasih kak!"]), 2000),
+          );
         }
       } else w.until = now + 1200 + this.rand() * 2500;
     }
     return moved;
   }
 
-  /** One step toward `goal`, riding the lift when it is on another floor. False once arrived. */
+  /** One step toward `goal`, by lift or the park door when it is on another floor. False once arrived. */
   private walk(v: FairVisitor, route: { path: Point[] | null }, goal: Goal, step: number): boolean {
     const floor = this.floor(v.floorId);
-    const viaLift = v.floorId !== goal.floorId;
-    const legEnd = viaLift ? LIFT_FRONT : goal;
+    const leg = v.floorId !== goal.floorId ? this.hop(v.floorId, goal.floorId) : null;
+    const legEnd = leg ? leg.at : goal;
     if (!route.path) route.path = findPath(floor, v, legEnd) ?? [legEnd];
     let next = route.path[0];
     while (next && Math.hypot(next.x - v.x, next.y - v.y) < 0.05) {
@@ -3809,10 +4210,10 @@ export class DemoJobFair {
     }
     if (!next) {
       route.path = null;
-      if (!viaLift) return false;
-      v.floorId = goal.floorId;
-      v.x = LIFT_FRONT.x;
-      v.y = LIFT_FRONT.y;
+      if (!leg) return false;
+      v.floorId = leg.floorId;
+      v.x = leg.arrive.x;
+      v.y = leg.arrive.y;
       return true;
     }
     const dx = next.x - v.x;
@@ -3855,7 +4256,22 @@ const FEEDBACK = [
 ];
 
 function freshPlayer(): PlayerState {
-  return { coins: price("coin.start"), txns: [{ at: 0, amount: price("coin.start"), reason: "Koin sambutan" }], vouchers: [], tickets: [], xp: 0, psych: [], seminars: [], dailyOn: null, meals: 0, verified: false, streak: 0, daily: undefined, read: [], roadmap: {} };
+  return {
+    coins: price("coin.start"),
+    txns: [{ at: 0, amount: price("coin.start"), reason: "Koin sambutan" }],
+    vouchers: [],
+    tickets: [],
+    xp: 0,
+    psych: [],
+    seminars: [],
+    dailyOn: null,
+    meals: 0,
+    verified: false,
+    streak: 0,
+    daily: undefined,
+    read: [],
+    roadmap: {},
+  };
 }
 
 /** Reviews a company had before today, made up from its id so every visitor sees the same. */
@@ -3867,11 +4283,19 @@ export function seededReviews(boothId: string) {
   return { count, sum: Math.round(count * average) };
 }
 
-
 /** The nearest walkable spot to (x, y): straight in front (below) first, then rings around it. */
 export function freeSpotNear(floor: FloorView, x: number, y: number) {
   for (let d = 0.25; d <= 3; d += 0.25) {
-    for (const [dx, dy] of [[0, 1], [-0.7, 0.7], [0.7, 0.7], [-1, 0], [1, 0], [0, -1], [-0.7, -0.7], [0.7, -0.7]] as const) {
+    for (const [dx, dy] of [
+      [0, 1],
+      [-0.7, 0.7],
+      [0.7, 0.7],
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [-0.7, -0.7],
+      [0.7, -0.7],
+    ] as const) {
       const p = { x: x + dx * d, y: y + dy * d };
       if (!isBlocked(floor, p.x, p.y)) return p;
     }

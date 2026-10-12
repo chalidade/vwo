@@ -8,6 +8,7 @@ export function LiftPanel({
   atLift,
   ticket,
   closed,
+  park,
   onPick,
   onClose,
 }: {
@@ -19,6 +20,8 @@ export function LiftPanel({
   ticket: (floorId: string) => number | null;
   /** Floors the organiser closed for now: listed, but nobody rides there. */
   closed: (floorId: string) => boolean;
+  /** The park outside: listed under the floors, reached on foot through the lobby door, not by lift. */
+  park?: { id: string; via: string; onPick: () => void };
   onPick: (floorId: string) => void;
   onClose: () => void;
 }) {
@@ -48,6 +51,13 @@ export function LiftPanel({
             </button>
           );
         })}
+        {park && (
+          <button type="button" className="fx-floor fx-floor-out" data-here={here === park.id ? "" : undefined} disabled={here === park.id} onClick={park.onPick}>
+            <b className="fx-floor-n">🌳</b>
+            <span className="fx-floor-label">Taman · di luar gedung</span>
+            <span className="fx-floor-tag">{here === park.id ? "Kamu di sini" : `Jalan kaki lewat pintu ${park.via}`}</span>
+          </button>
+        )}
       </div>
     </Modal>
   );

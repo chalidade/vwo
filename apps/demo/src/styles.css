@@ -2729,3 +2729,20 @@ a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
 .st-link p { margin: 0; }
 .st-link-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .st-tag.st-tag-draft { background: #b45309; }
+/* ---- outdoor-park: the park outside, its "coming soon" card, the organiser's park tab ---- */
+.park-card { display: grid; gap: 4px; width: min(360px, 100%); padding: 10px 14px; text-align: left; font-size: 13px; }
+.park-card-tag { justify-self: start; padding: 1px 8px; border-radius: 999px; background: #facc15; color: #422006; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; }
+.park-card-name { font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+.park-card-date { font-weight: 700; color: #92400e; }
+.park-card-about { margin: 0; overflow-wrap: anywhere; }
+.park-card-note { color: var(--muted); font-size: 12px; }
+.org-park-scene { height: 420px; }
+.park-row .fl-main { min-width: 0; }
+.park-row-about { display: block; overflow-wrap: anywhere; }
+.park-row .fl-act { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.fx-floor-out .fx-floor-n { background: #15803d; color: #fff; }
+@media (max-width: 640px) {
+  .org-park-scene { height: 260px; }
+  .park-card { padding: 8px 12px; font-size: 12px; }
+  .park-card-name { font-size: 15px; }
+}

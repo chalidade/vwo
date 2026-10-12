@@ -340,3 +340,38 @@ describe("pictures out of the setup", () => {
     expect(restoreMedia(doc, { old: BIG })).toEqual({ a: [{ logo: BIG }], b: SMALL, c: "hello" });
   });
 });
+
+describe("the park's buildings in the setup", () => {
+  const buildings = [
+    { id: "kampus-2027", name: "Job Fair Kampus", date: "Maret 2027", about: "Khusus fresh graduate", status: "soon" },
+    { id: "rahasia", name: "Rapat sponsor", about: "Belum diumumkan ke publik", status: "hidden" },
+  ];
+  const withPark = () => rows().map((r) => (r.key === "org" ? { ...r, data: { ...r.data, buildings } } : r));
+
+  it("shows every visitor only the buildings on show, and the organiser all of them", async () => {
+    db.readFairState.mockResolvedValue(withPark());
+    const text = await (await state.GET(get("/api/jobfair/state"))).text();
+    expect(text).not.toContain("Rapat sponsor");
+    expect(text).not.toContain("Belum diumumkan");
+    expect(JSON.parse(text).org.buildings).toEqual([buildings[0]]);
+    user.current = admin;
+    expect((await (await mine.GET()).json()).org.buildings).toEqual(buildings);
+  });
+
+  it("is cleaned when the organiser saves: trimmed, capped, no markup in ids", async () => {
+    user.current = admin;
+    const many = Array.from({ length: 9 }, (_, i) => ({ id: i === 0 ? "<x>" : `g${i}`, name: ` Gedung ${i} `, about: "a".repeat(900), extra: "drop" }));
+    expect((await state.PUT(put("/api/jobfair/state", { key: "org", data: { removed: [], added: [], buildings: many } }))).status).toBe(200);
+    const saved = db.writeFairState.mock.calls[0]![0] as { data: { buildings: Record<string, unknown>[] } };
+    expect(saved.data.buildings).toHaveLength(5);
+    expect(saved.data.buildings[0]).toEqual({ id: "g1", name: "Gedung 1", about: "a".repeat(200), status: "soon" });
+    expect((await state.PUT(put("/api/jobfair/state", { key: "org", data: { removed: [], added: [], buildings: "nope" } }))).status).toBe(200);
+    expect((db.writeFairState.mock.calls[1]![0] as { data: { buildings: unknown } }).data.buildings).toEqual([]);
+  });
+
+  it("can't be changed by anyone but an event admin", async () => {
+    user.current = hr;
+    expect((await state.PUT(put("/api/jobfair/state", { key: "org", data: { removed: [], added: [], buildings } }))).status).toBe(403);
+    expect(db.writeFairState).not.toHaveBeenCalled();
+  });
+});

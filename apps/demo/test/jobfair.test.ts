@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { BOOTH_W, COIN_STAND_SPOTS, DEMO_JOB_FAIR, openJobs, boothFrame, LIFT_FRONT, SPONSOR_H, SPONSOR_W, boothSpot, fairRoomFloorId, findPath, isBlocked, stallSpot } from "@vwo/shared";
-import { APPLY_COST, DAILY_COINS, GAME_DAILY_CAP, MISSIONS_BONUS, SEMINARS, START_COINS, VERIFY_COST, levelOf, seminarScript, todaysMissions, CAREER_ARTICLES, stepKey } from "../src/fair/content";
+import { PARK, PARK_MAX_BUILDINGS, lobbyDoorFront } from "@vwo/shared";
+import {
+  BOOTH_W,
+  COIN_STAND_SPOTS,
+  DEMO_JOB_FAIR,
+  openJobs,
+  boothFrame,
+  LIFT_FRONT,
+  SPONSOR_H,
+  SPONSOR_W,
+  boothSpot,
+  fairRoomFloorId,
+  findPath,
+  isBlocked,
+  stallSpot,
+} from "@vwo/shared";
+import {
+  APPLY_COST,
+  DAILY_COINS,
+  GAME_DAILY_CAP,
+  MISSIONS_BONUS,
+  SEMINARS,
+  START_COINS,
+  VERIFY_COST,
+  levelOf,
+  seminarScript,
+  todaysMissions,
+  CAREER_ARTICLES,
+  stepKey,
+} from "../src/fair/content";
 import { AULA, makeStall, fairFloorId, infoDeskOn, STALL_SLOTS, stallSlot, LOUNGE, LOUNGE_PLANS, aulaSpot, fairStops, loungeSpot, safeImage } from "@vwo/shared";
 import { BOOTH_SLOTS, CONVOS, DEFAULT_RUNDOWN, DemoJobFair, type FairSaved, PLAYER_ID, aulaNow, consultantId, migrateHallX, promoterId, recruiterId } from "../src/jobfair-engine";
 import { VIP_PRODUCT, matchScore } from "../src/fair/company";
@@ -24,10 +52,18 @@ describe("DemoJobFair", () => {
     expect(me.floorId).toBe(fairRoomFloorId(fair.fair, "aula"));
     expect(findPath(fair.floor(me.floorId), fair.fair.spawn, LIFT_FRONT)).not.toBeNull();
     fair.leave(PLAYER_ID);
-    // Every floor has the lift in the same corner, reachable from where you step out of it.
-    for (const f of fair.floors) {
-      expect(f.objects!.filter((o) => o.type === "elevator"), f.id).toHaveLength(1);
-      expect(f.objects!.some((o) => o.type === "stairs"), f.id).toBe(false);
+    // Every floor has the lift in the same corner, reachable from where you step out of it. The park
+    // outside has none: it is reached on foot (see "the park" below).
+    expect(fair.floors.at(-1)!.id).toBe(fair.parkId);
+    for (const f of fair.floors.filter((f) => f.id !== fair.parkId)) {
+      expect(
+        f.objects!.filter((o) => o.type === "elevator"),
+        f.id,
+      ).toHaveLength(1);
+      expect(
+        f.objects!.some((o) => o.type === "stairs"),
+        f.id,
+      ).toBe(false);
       expect(isBlocked(f, LIFT_FRONT.x, LIFT_FRONT.y), f.id).toBe(false);
     }
     expect(findPath(halls[0]!, fair.fair.spawn, LIFT_FRONT)).not.toBeNull();
@@ -110,15 +146,21 @@ describe("DemoJobFair", () => {
   it("fills all floors with bots who visit booths, apply, and leave", () => {
     const c = clock();
     let seed = 7;
-    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const fair = new DemoJobFair(rand, c.now);
     let maxVisitors = 0;
+    let inPark = 0;
     for (let i = 0; i < 60 * 60 * 6; i++) {
       c.advance(50);
       fair.tick(50);
       maxVisitors = Math.max(maxVisitors, fair.visitors.size);
-      for (const v of fair.visitors.values()) expect(isBlocked(fair.floor(v.floorId), v.x, v.y, 0.25)).toBe(false);
+      for (const v of fair.visitors.values()) {
+        expect(isBlocked(fair.floor(v.floorId), v.x, v.y, 0.25)).toBe(false);
+        if (v.floorId === fair.parkId) inPark++;
+      }
     }
+    // Some take a walk in the park, out through the lobby door and back.
+    expect(inPark).toBeGreaterThan(0);
     expect(maxVisitors).toBeGreaterThan(3);
     expect([...fair.visits.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(10);
     expect(fair.applications.length).toBeGreaterThan(0);
@@ -167,7 +209,13 @@ describe("DemoJobFair", () => {
     const fair = new DemoJobFair(() => 0.9, c.now);
     fair.join("Chalid", false, PLAYER_ID);
     fair.recordPsych({ score: 12, total: 12, grade: "Sangat baik", sections: {} });
-    const a = fair.apply(PLAYER_ID, { boothId: "data-raya", jobId: "dr-da", cvUrl: "https://cv.example", phone: "0812", message: "Saya suka data dan sudah membuat beberapa dashboard." })!;
+    const a = fair.apply(PLAYER_ID, {
+      boothId: "data-raya",
+      jobId: "dr-da",
+      cvUrl: "https://cv.example",
+      phone: "0812",
+      message: "Saya suka data dan sudah membuat beberapa dashboard.",
+    })!;
     expect(a.psych).toBe(100);
     for (let i = 0; i < 30; i++) {
       c.advance(1000);
@@ -244,7 +292,14 @@ describe("DemoJobFair", () => {
   it("scripts every seminar slide point by point", () => {
     for (const s of SEMINARS) {
       const lines = seminarScript(s);
-      s.slides.forEach((sl, i) => expect(lines.filter((l) => l.slide === i && l.reveal > 0).map((l) => l.reveal).slice(0, sl.points.length)).toEqual(sl.points.map((_, k) => k + 1)));
+      s.slides.forEach((sl, i) =>
+        expect(
+          lines
+            .filter((l) => l.slide === i && l.reveal > 0)
+            .map((l) => l.reveal)
+            .slice(0, sl.points.length),
+        ).toEqual(sl.points.map((_, k) => k + 1)),
+      );
       expect(lines.at(-1)!.text).toContain("Terima kasih");
     }
   });
@@ -297,7 +352,10 @@ describe("DemoJobFair", () => {
       expect(a.roadmap.map((st) => st.level)).toEqual(["Pemula", "Menengah", "Mahir", "Ahli"]);
       expect(a.sections.length).toBeGreaterThan(0);
       // Every article points to at least one open job at the fair.
-      expect(DEMO_JOB_FAIR.booths.some((b) => b.jobs.some((j) => a.keywords.some((k) => j.title.toLowerCase().includes(k)))), a.id).toBe(true);
+      expect(
+        DEMO_JOB_FAIR.booths.some((b) => b.jobs.some((j) => a.keywords.some((k) => j.title.toLowerCase().includes(k)))),
+        a.id,
+      ).toBe(true);
     }
     const xp0 = fair.player.xp;
     expect(fair.readArticle("barista")).toBe(true);
@@ -599,7 +657,17 @@ describe("DemoJobFair", () => {
     const gone = fair.fair.booths.find((x) => x.floor === 0)!;
     const org = { removed: [gone.id], added: [] };
     const booth = { ...structuredClone(gone), id: "kopi-nusa", company: "Kopi Nusa" };
-    const booking = { id: "book-1", boothId: "kopi-nusa", company: "Kopi Nusa", contact: "Dewi", email: "hr@kopinusa.example", tier: "regular" as const, price: 7_500_000, method: "QRIS", at: 1 };
+    const booking = {
+      id: "book-1",
+      boothId: "kopi-nusa",
+      company: "Kopi Nusa",
+      contact: "Dewi",
+      email: "hr@kopinusa.example",
+      tier: "regular" as const,
+      price: 7_500_000,
+      method: "QRIS",
+      at: 1,
+    };
     // A visitor gets only the booth.
     fair.applyShared(org, {}, [{ booth }]);
     expect(fair.booth("kopi-nusa")?.company).toBe("Kopi Nusa");
@@ -653,7 +721,12 @@ describe("DemoJobFair", () => {
 
     // A regular booth gets the gate as an add-on, with the organiser's video and gate settings.
     const id = fair.fair.booths[0]!.id;
-    fair.configureBooth(id, { tier: "regular", theme: "wood", accessories: ["gapura", "tv", "plant"], media: { videoUrl: "https://video.example/a.mp4", gate: "balon", gateText: "Ayo masuk" } });
+    fair.configureBooth(id, {
+      tier: "regular",
+      theme: "wood",
+      accessories: ["gapura", "tv", "plant"],
+      media: { videoUrl: "https://video.example/a.mp4", gate: "balon", gateText: "Ayo masuk" },
+    });
     const b = fair.booth(id)!;
     expect(boothFrame(b).width).toBe(BOOTH_W);
     expect(isBlocked(fair.floors[b.floor]!, b.x + 0.25, b.y + 3.35)).toBe(true);
@@ -665,7 +738,14 @@ describe("DemoJobFair", () => {
     again.setHallBanner("Bursa Kerja Kota", ["Lantai 1 · Teknologi"]);
     expect(again.hallBanner(0)).toEqual({ title: "Bursa Kerja Kota", subtitle: "Lantai 1 · Teknologi" });
     expect(again.hallBanner(1).subtitle).toBe(again.floors[1]!.name);
-    expect([b2.tier, b2.theme, [...b2.accessories!].sort(), b2.media?.gate, b2.media?.gateText, b2.media?.videoUrl]).toEqual(["regular", "wood", ["gapura", "plant", "tv"], "balon", "Ayo masuk", "https://video.example/a.mp4"]);
+    expect([b2.tier, b2.theme, [...b2.accessories!].sort(), b2.media?.gate, b2.media?.gateText, b2.media?.videoUrl]).toEqual([
+      "regular",
+      "wood",
+      ["gapura", "plant", "tv"],
+      "balon",
+      "Ayo masuk",
+      "https://video.example/a.mp4",
+    ]);
     expect(isBlocked(again.floors[b2.floor]!, b2.x + 0.25, b2.y + 3.35)).toBe(true);
   });
 
@@ -729,12 +809,17 @@ describe("DemoJobFair", () => {
     expect(aulaNow(DEFAULT_RUNDOWN, at(20, 0))).toMatchObject({ current: null, next: null, over: true });
 
     // The organiser writes its own rundown: bad rows are dropped, times are sorted.
-    expect(fair.saveRundown([
-      { id: "b", start: "10:00", end: "10.30", title: "Talkshow", host: "HR", kind: "talkshow" },
-      { id: "a", start: "09.00", end: "09.15", title: " Sambutan Walikota ", host: "Walikota", kind: "sambutan" },
-      { id: "x", start: "9", end: "", title: "Rusak", host: "", kind: "info" },
-    ])).toBe(2);
-    expect(fair.rundown().map((e) => [e.start, e.title])).toEqual([["09.00", "Sambutan Walikota"], ["10.00", "Talkshow"]]);
+    expect(
+      fair.saveRundown([
+        { id: "b", start: "10:00", end: "10.30", title: "Talkshow", host: "HR", kind: "talkshow" },
+        { id: "a", start: "09.00", end: "09.15", title: " Sambutan Walikota ", host: "Walikota", kind: "sambutan" },
+        { id: "x", start: "9", end: "", title: "Rusak", host: "", kind: "info" },
+      ]),
+    ).toBe(2);
+    expect(fair.rundown().map((e) => [e.start, e.title])).toEqual([
+      ["09.00", "Sambutan Walikota"],
+      ["10.00", "Talkshow"],
+    ]);
     fair.resetRundown();
     expect(fair.rundown()).toBe(DEFAULT_RUNDOWN);
   });
@@ -755,7 +840,12 @@ describe("DemoJobFair", () => {
       },
     };
     const storage = { load: () => stored, save: (d: FairSaved) => (stored = d), clear: () => (stored = null) };
-    const fair = new DemoJobFair(() => 0.5, () => 0, DEMO_JOB_FAIR, storage);
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => 0,
+      DEMO_JOB_FAIR,
+      storage,
+    );
     expect(fair.booth("baru")).toMatchObject({ x: 3, y: 0.4 });
     expect(fair.fair.sponsors.map((sp) => sp.x)).toEqual(DEMO_JOB_FAIR.sponsors.map((sp) => sp.x));
     // Level 3 was the Aula's old floor in the oldest saves, which became the food court, now on Lantai 8.
@@ -770,7 +860,15 @@ describe("DemoJobFair", () => {
     expect(fair.foodCourt()!.stalls!.map((st) => st.id)).toContain("rent-abc");
     expect(fair.freeStallSlots()).toEqual([12, 14]);
     // A second rental claiming a taken slot is not drawn on top of it.
-    fair.applyShared(null, {}, [], [{ roomId: "foodcourt", stall }, { roomId: "foodcourt", stall: { ...stall, id: "rent-def" } }]);
+    fair.applyShared(
+      null,
+      {},
+      [],
+      [
+        { roomId: "foodcourt", stall },
+        { roomId: "foodcourt", stall: { ...stall, id: "rent-def" } },
+      ],
+    );
     expect(fair.foodCourt()!.stalls!.filter((st) => st.slot === 13)).toHaveLength(1);
     // Taken out by the organiser: it stays out when the server sends it again.
     expect(fair.removeStall("rent-abc")).toBe(true);
@@ -898,18 +996,36 @@ describe("DemoJobFair", () => {
       const floor = fair.floor(st.floorId);
       expect(isBlocked(floor, d.x + d.width / 2, d.y + d.height / 2), st.floorId).toBe(true);
       expect(findPath(floor, LIFT_FRONT, { x: d.x + d.width / 2, y: d.y + d.height + 0.6 }), st.floorId).not.toBeNull();
-      expect(fair.staff.some((x) => x.floorId === st.floorId && x.name === d.staff), st.floorId).toBe(true);
+      expect(
+        fair.staff.some((x) => x.floorId === st.floorId && x.name === d.staff),
+        st.floorId,
+      ).toBe(true);
     }
   });
 
   it("lets the organiser add and remove booth floors, switch rooms off, and charge for a floor", () => {
     const store: { data: FairSaved | null } = { data: null };
     const storage = { load: () => store.data, save: (d: FairSaved) => (store.data = structuredClone(d)), clear: () => (store.data = null) };
-    const fair = new DemoJobFair(() => 0.5, () => 1_000_000, DEMO_JOB_FAIR, storage);
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => 1_000_000,
+      DEMO_JOB_FAIR,
+      storage,
+    );
     fair.join("Chalid", false, PLAYER_ID);
     const promo = fair.fair.promoters.find((p) => !p.walks && p.level === 7)!;
     expect(fair.addHall("Startup & UMKM")).toBe(true);
-    expect(fair.stops.map((s) => s.label)).toEqual(["Aula Utama", "Teknologi & Keuangan", "Kreatif, Kuliner & Ritel", "Industri, Energi & Kesehatan", "Startup & UMKM", "Ruang Seminar", "Ruang Psikotes", "Lounge Konsultasi", "Food Court"]);
+    expect(fair.stops.map((s) => s.label)).toEqual([
+      "Aula Utama",
+      "Teknologi & Keuangan",
+      "Kreatif, Kuliner & Ritel",
+      "Industri, Energi & Kesehatan",
+      "Startup & UMKM",
+      "Ruang Seminar",
+      "Ruang Psikotes",
+      "Lounge Konsultasi",
+      "Food Court",
+    ]);
     expect(fair.stops[4]).toMatchObject({ name: "Lantai 5", floorId: fairFloorId(fair.fair, 3) });
     // Rooms above moved up a floor, with their promoters.
     expect(fair.room("foodcourt")?.level).toBe(8);
@@ -939,7 +1055,12 @@ describe("DemoJobFair", () => {
     expect(fair.passFor(fairRoomFloorId(fair.fair, "seminar"))).toBeNull();
     // All of it survives a reload.
     fair.flush();
-    const again = new DemoJobFair(() => 0.5, () => 1_000_000, DEMO_JOB_FAIR, storage);
+    const again = new DemoJobFair(
+      () => 0.5,
+      () => 1_000_000,
+      DEMO_JOB_FAIR,
+      storage,
+    );
     expect(again.stops.map((s) => s.roomId ?? "hall")).toEqual(["aula", "hall", "hall", "hall", "seminar", "konsultasi", "foodcourt"]);
     expect(again.floorPrice(hall3)).toBe(15);
     again.setRoomHidden("psikotes", false);
@@ -1036,7 +1157,7 @@ describe("organiser price list", () => {
     const { setPriceTable, cleanPrices, price } = await import("@vwo/shared");
     const { VIP_PRODUCT, ACCESSORY_PRODUCTS } = await import("../src/fair/company");
     const { STAND_PRICES, loungePlans } = await import("../src/jobfair-engine");
-    expect(cleanPrices({ "coin.apply": 7.4, "nope": 3, "stand.regular": -5, "pack.koin-50": "x" })).toEqual({ "coin.apply": 7, "stand.regular": 0 });
+    expect(cleanPrices({ "coin.apply": 7.4, nope: 3, "stand.regular": -5, "pack.koin-50": "x" })).toEqual({ "coin.apply": 7, "stand.regular": 0 });
     const fair = new DemoJobFair(() => 0.5);
     fair.applyPrices({ "coin.apply": 9, "call.10": 12, "pack.koin-50": 15_000, "product.vip": 3_000_000, "product.tv": 0, "stand.premium": 20_000_000 });
     expect(price("coin.apply")).toBe(9);
@@ -1097,5 +1218,96 @@ describe("organiser price list", () => {
     expect(fair.setFeaturedJob(b.id, "nope")).toBe(false);
     expect(fair.setFeaturedJob(b.id, null)).toBe(true);
     expect(openJobs(fair.booth(b.id)!)[0]!.id).toBe(b.jobs[0]!.id);
+  });
+});
+
+describe("the park outside", () => {
+  const setup = () => {
+    const store: { data: FairSaved | null } = { data: null };
+    const storage = { load: () => store.data, save: (d: FairSaved) => (store.data = structuredClone(d)), clear: () => (store.data = null) };
+    return {
+      storage,
+      fair: new DemoJobFair(
+        () => 0.5,
+        () => 1_000_000,
+        DEMO_JOB_FAIR,
+        storage,
+      ),
+    };
+  };
+
+  it("is a floor of its own, outside the lift, with the lobby door as the only way in and out", () => {
+    const { fair } = setup();
+    expect(fair.floor(fair.parkId).id).toBe(fair.parkId);
+    expect(fair.stops.some((st) => st.floorId === fair.parkId)).toBe(false);
+    expect(fair.stopOf(fair.parkId)).toMatchObject({ name: "Taman", emoji: "🌳" });
+    expect(fair.levelOf(fair.parkId)).toBe(-1);
+    expect(fair.lobbyId).toBe(fairRoomFloorId(fair.fair, "aula"));
+    // New visitors still come in on the lobby, not in the park.
+    expect(fair.join("Sari", false, PLAYER_ID).floorId).toBe(fair.lobbyId);
+    const lobby = fair.floor(fair.lobbyId);
+    const door = lobbyDoorFront(lobby);
+    expect(fair.hop(fair.lobbyId, fair.parkId)).toEqual({ via: "out", at: door, floorId: fair.parkId, arrive: PARK.arrive });
+    expect(fair.hop(fair.parkId, fairFloorId(fair.fair, 2))).toEqual({ via: "in", at: PARK.arrive, floorId: fair.lobbyId, arrive: door });
+    // From an upper floor: the lift down to the lobby first, then out of the door.
+    const down = fair.hop(fairFloorId(fair.fair, 2), fair.parkId);
+    expect(down).toMatchObject({ via: "lift", floorId: fair.lobbyId });
+    expect(findPath(lobby, down.arrive, door)).not.toBeNull();
+    fair.takeHop(PLAYER_ID, fair.hop(fair.lobbyId, fair.parkId));
+    expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: fair.parkId, x: PARK.arrive.x, y: PARK.arrive.y, facing: "front" });
+    fair.takeHop(PLAYER_ID, fair.hop(fair.parkId, fair.lobbyId));
+    expect(fair.visitors.get(PLAYER_ID)).toMatchObject({ floorId: fair.lobbyId, ...door, facing: "back" });
+  });
+
+  it("follows the entrance when the Aula is switched off", () => {
+    const { fair } = setup();
+    fair.setRoomHidden("aula", true);
+    expect(fair.lobbyId).toBe(fairFloorId(fair.fair, 0));
+    const lobby = fair.floor(fair.lobbyId);
+    expect(lobby.objects!.filter((o) => o.targetFloorId === fair.parkId)).toHaveLength(1);
+    expect(fair.floors.filter((f) => f.objects?.some((o) => o.targetFloorId === fair.parkId))).toHaveLength(1);
+    expect(findPath(lobby, LIFT_FRONT, lobbyDoorFront(lobby))).not.toBeNull();
+  });
+
+  it("keeps the organiser's buildings: one per plot, hidden ones off the map, and they survive a reload and a pull", () => {
+    const { fair, storage } = setup();
+    expect(fair.saveParkBuilding({ name: "Job Fair Kampus 2027", date: "Maret 2027", about: "Khusus fresh graduate" })).toBe(true);
+    expect(fair.saveParkBuilding({ name: "Job Fair Kampus 2027" })).toBe(true);
+    expect(fair.saveParkBuilding({ name: "Rapat sponsor", status: "hidden" })).toBe(true);
+    expect(fair.saveParkBuilding({ name: "   " })).toBe(false);
+    const ids = fair.parkBuildings().map((b) => b.id);
+    expect(ids).toEqual(["job-fair-kampus-2027", "job-fair-kampus-2027-2", "rapat-sponsor"]);
+    expect(fair.shownParkBuildings().map((b) => b.id)).toEqual(ids.slice(0, 2));
+    while (fair.parkBuildings().length < PARK_MAX_BUILDINGS) fair.saveParkBuilding({ name: "Lagi" });
+    expect(fair.saveParkBuilding({ name: "Kebanyakan" })).toBe(false);
+    // Editing keeps the id and the place; moving changes the plot.
+    expect(fair.saveParkBuilding({ id: ids[1], name: "Career Day", status: "soon" })).toBe(true);
+    expect(fair.parkBuildings()[1]).toMatchObject({ id: ids[1], name: "Career Day" });
+    fair.moveParkBuilding(ids[1]!, -1);
+    expect(fair.parkBuildings()[0]!.id).toBe(ids[1]);
+    fair.removeParkBuilding(ids[0]!);
+    expect(fair.parkBuildings()).toHaveLength(PARK_MAX_BUILDINGS - 1);
+    fair.flush();
+    const again = new DemoJobFair(
+      () => 0.5,
+      () => 1_000_000,
+      DEMO_JOB_FAIR,
+      storage,
+    );
+    expect(again.parkBuildings()).toEqual(fair.parkBuildings());
+    // Live: what the server sends visitors has no hidden ones, and junk is cleaned on the way in.
+    const other = setup().fair;
+    other.applyShared(
+      {
+        removed: [],
+        added: [],
+        buildings: [
+          { id: "x", name: "<b>Pameran</b>", status: "soon" },
+          { id: "bad id", name: "?" },
+        ] as never,
+      },
+      {},
+    );
+    expect(other.shownParkBuildings()).toEqual([{ id: "x", name: "<b>Pameran</b>", status: "soon" }]);
   });
 });

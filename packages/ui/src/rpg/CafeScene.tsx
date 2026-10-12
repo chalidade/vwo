@@ -27,6 +27,7 @@ import {
 } from "./Furniture";
 import { CrowdMode, Figure } from "./FlatPerson";
 import { HallWall } from "./JobFair";
+import { ParkSky } from "./Park";
 import { type Look, lookFor } from "./Person";
 
 /** Pixels per tile. */
@@ -34,7 +35,7 @@ export const TILE = 48;
 const EDGE = 14;
 
 function wallTiles(floor: FloorView) {
-  return floor.theme === "rooftop" ? 2.2 : floor.theme === "hall" ? 3.6 : 2.6;
+  return floor.theme === "rooftop" ? 2.2 : floor.theme === "hall" ? 3.6 : floor.theme === "park" ? 2.4 : 2.6;
 }
 
 /** Which side of its table a chair stands on. Chairs without a table count as "n", or "s" when they face the back wall. */
@@ -70,6 +71,10 @@ export interface SceneExtra {
   ground?: boolean;
   onClick?: () => void;
   title?: string;
+  /** How far the drawing reaches right and down, in tiles, when it is wider or taller than a booth:
+   *  it stays drawn while any of it is on screen, not only its top-left corner. */
+  w?: number;
+  h?: number;
 }
 
 /** Staff and other characters that are not customers (no seat, not counted inside). */
@@ -157,6 +162,8 @@ interface Ent {
   z: number;
   x: number;
   y: number;
+  w?: number;
+  h?: number;
   node: ReactNode;
   onClick?: () => void;
   title?: string;
@@ -352,7 +359,14 @@ export function CafeScene({
           break;
         case "sofa":
         case "sofa-left": {
-          const node = o.spriteKey === "sofa-left" ? <div style={{ transform: "scaleX(-1)" }}><SofaSprite w={w} h={h} /></div> : <SofaSprite w={w} h={h} />;
+          const node =
+            o.spriteKey === "sofa-left" ? (
+              <div style={{ transform: "scaleX(-1)" }}>
+                <SofaSprite w={w} h={h} />
+              </div>
+            ) : (
+              <SofaSprite w={w} h={h} />
+            );
           // A sofa you can sit on lies under the people on it.
           if (o.isWalkable) ground.push({ key: o.id, z: 1, x: px(o.x), y: py(o.y), node });
           else ents.push({ key: o.id, z: base, x: px(o.x), y: py(o.y), node });
@@ -370,7 +384,7 @@ export function CafeScene({
   }
 
   for (const e of extras) {
-    const ent = { ...e, x: px(e.x), y: py(e.y), z: e.ground ? 0 : py(e.z) };
+    const ent = { ...e, x: px(e.x), y: py(e.y), z: e.ground ? 0 : py(e.z), w: e.w && e.w * TILE, h: e.h && e.h * TILE };
     (e.ground ? ground : ents).push(ent);
   }
 
@@ -410,7 +424,8 @@ export function CafeScene({
       ents.push({ key: s.id, z: py(s.y) - 2, x, y, node: <ChairSprite side={side} part={side === "s" ? "seat" : "all"} />, onClick: click, title });
       if (side === "s") ents.push({ key: `${s.id}-back`, z: py(s.y) + 2, x, y, node: <ChairSprite side="s" part="back" /> });
     }
-    if (showFreeSeats && free) ground.push({ key: `${s.id}-ring`, z: 2, x: px(s.x) - 20, y: py(s.y) - 14, node: <div className="rpg-seat-ring" style={{ width: 40, height: 28 }} /> });
+    if (showFreeSeats && free)
+      ground.push({ key: `${s.id}-ring`, z: 2, x: px(s.x) - 20, y: py(s.y) - 14, node: <div className="rpg-seat-ring" style={{ width: 40, height: 28 }} /> });
     if (highlightSeatId === s.id) ents.push({ key: `${s.id}-arrow`, z: 1e6, x: px(s.x) - 9, y: py(s.y) - 52, node: <div className="rpg-arrow" /> });
   }
 
@@ -505,7 +520,7 @@ export function CafeScene({
   const viewR = camX + view.w / scale + 2 * TILE;
   const viewT = camY - 6 * TILE;
   const viewB = camY + view.h / scale + 2 * TILE;
-  const onScreen = (e: Ent) => (!follow && !fitArea) || (e.x >= viewL && e.x <= viewR && e.y >= viewT && e.y <= viewB);
+  const onScreen = (e: Ent) => (!follow && !fitArea) || (e.x + (e.w ?? 0) >= viewL && e.x <= viewR && e.y + (e.h ?? 0) >= viewT && e.y <= viewB);
   let shown = ents.filter(onScreen);
   const crowd = shown.filter((e) => people.has(e.key)).length > CROWD;
   // A packed floor draws only the people nearest the player, so a frame costs the same with a
@@ -528,7 +543,7 @@ export function CafeScene({
   const counter = floor.theme === "indoor" || !floor.theme ? floor.objects?.find((o) => o.type === "counter") : undefined;
   const board = counter ? { w: 176, h: Math.round(wall * 0.5), x: px(counter.x + counter.width / 2) - 88, y: Math.round(wall * 0.1) } : null;
   const windows: number[] = [];
-  if (floor.theme !== "rooftop" && floor.theme !== "hall") {
+  if (floor.theme !== "rooftop" && floor.theme !== "hall" && floor.theme !== "park") {
     const tall = (floor.objects ?? []).filter((o) => o.y < 1.5 && o.spriteKey !== "rug" && o.type !== "spawn_point");
     for (let x = 2.5; x < floor.width - 1; x += 3.6) {
       if (!tall.some((o) => x > o.x - 1.2 && x < o.x + o.width + 1.2)) windows.push(px(x));
@@ -540,7 +555,7 @@ export function CafeScene({
     return { x: ((clientX - r.left) / scale + camX - ox) / TILE, y: ((clientY - r.top) / scale + camY - oy) / TILE };
   };
 
-  const edgeColor = floor.theme === "rooftop" ? "#9ca3af" : undefined;
+  const edgeColor = floor.theme === "rooftop" ? "#9ca3af" : floor.theme === "park" ? "#3f6212" : undefined;
 
   return (
     <div
@@ -575,15 +590,20 @@ export function CafeScene({
         if (pinch.current.size < 2) pinchStart.current = null;
       }}
     >
-      <div
-        className="rpg-world"
-        style={{ width: worldW, height: worldH, transform: `translate3d(${-camX * scale}px, ${-camY * scale}px, 0) scale(${scale})` }}
-        aria-hidden
-      >
+      <div className="rpg-world" style={{ width: worldW, height: worldH, transform: `translate3d(${-camX * scale}px, ${-camY * scale}px, 0) scale(${scale})` }} aria-hidden>
         {floor.theme === "rooftop" ? (
           <RooftopEdge w={worldW} h={wall} />
+        ) : floor.theme === "park" ? (
+          <ParkSky w={worldW} h={wall} />
         ) : floor.theme === "hall" ? (
-          <HallWall w={worldW} h={wall} title={hallTitle ?? floor.name} subtitle={hallSubtitle ?? (hallTitle ? floor.name : undefined)} sponsors={hallSponsors} banner={hallBanner} />
+          <HallWall
+            w={worldW}
+            h={wall}
+            title={hallTitle ?? floor.name}
+            subtitle={hallSubtitle ?? (hallTitle ? floor.name : undefined)}
+            sponsors={hallSponsors}
+            banner={hallBanner}
+          />
         ) : (
           <IndoorWall w={worldW} h={wall} windows={windows} />
         )}
@@ -600,15 +620,29 @@ export function CafeScene({
           </div>
         )}
         <div
-          className={floor.theme === "rooftop" ? "rpg-floor-deck" : floor.theme === "hall" ? "rpg-floor-hall" : "rpg-floor-wood"}
+          className={floor.theme === "rooftop" ? "rpg-floor-deck" : floor.theme === "hall" ? "rpg-floor-hall" : floor.theme === "park" ? "rpg-floor-grass" : "rpg-floor-wood"}
           style={{ position: "absolute", left: ox, top: oy, width: floor.width * TILE, height: floor.height * TILE }}
         />
         <div style={{ position: "absolute", left: ox, top: oy, width: floor.width * TILE, height: 14, background: "linear-gradient(rgb(0 0 0 / 0.28), transparent)" }} />
-        <div className="rpg-wall-edge" style={{ position: "absolute", left: 0, top: oy - (floor.theme === "rooftop" ? 0 : 0), width: EDGE, height: worldH - oy, background: edgeColor }} />
+        <div
+          className="rpg-wall-edge"
+          style={{ position: "absolute", left: 0, top: oy - (floor.theme === "rooftop" ? 0 : 0), width: EDGE, height: worldH - oy, background: edgeColor }}
+        />
         <div className="rpg-wall-edge" style={{ position: "absolute", right: 0, top: oy, width: EDGE, height: worldH - oy, background: edgeColor }} />
         <div className="rpg-wall-edge" style={{ position: "absolute", left: 0, bottom: 0, width: worldW, height: EDGE, background: edgeColor }} />
         {doors.map((d) => (
-          <div key={d.id} style={{ position: "absolute", left: px(d.x), top: worldH - EDGE, width: d.width * TILE, height: EDGE, background: "#fef3c7", boxShadow: "inset 0 4px 0 rgb(0 0 0 / 0.25)" }} />
+          <div
+            key={d.id}
+            style={{
+              position: "absolute",
+              left: px(d.x),
+              top: worldH - EDGE,
+              width: d.width * TILE,
+              height: EDGE,
+              background: "#fef3c7",
+              boxShadow: "inset 0 4px 0 rgb(0 0 0 / 0.25)",
+            }}
+          />
         ))}
 
         {ground.filter(onScreen).map((e) => (

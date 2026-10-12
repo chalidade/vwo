@@ -10,8 +10,8 @@ export interface PlaceGuide {
   steps: string[];
 }
 
-/** The booth floors and each kind of room. */
-export type GuidePlace = "hall" | FairRoomKind;
+/** The booth floors, each kind of room, and the park outside. */
+export type GuidePlace = "hall" | FairRoomKind | "taman";
 
 export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
   hall: {
@@ -68,6 +68,17 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
       "Punya usaha kuliner? Ketuk stan kosong untuk mengajukan stan ke panitia.",
     ],
   },
+  taman: {
+    emoji: "🌳",
+    title: "Taman",
+    intro: "Taman di luar gedung: jalan-jalan santai dan lihat gedung acara berikutnya.",
+    steps: [
+      "Gedung di tengah adalah acara ini: masuk lewat pintunya untuk kembali ke lobi.",
+      "Gedung yang masih dibangun adalah acara berikutnya. Dekati untuk melihat nama dan tanggalnya.",
+      "Duduk di bangku taman untuk main mini game berhadiah koin.",
+      "Taman tidak bisa dicapai dengan lift: keluar lewat pintu taman di lobi.",
+    ],
+  },
   konsultasi: {
     emoji: "📞",
     title: "Lounge Konsultasi",
@@ -82,14 +93,35 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
 
 /** How everything works, by topic: the guide's other tab. */
 const FEATURES: { emoji: string; title: string; text: string }[] = [
-  { emoji: "🚶", title: "Bergerak", text: "Pakai W A S D atau tombol panah, atau ketuk lantai untuk berjalan ke sana. Ketuk orang, meja, atau benda untuk langsung menuju dan berinteraksi." },
+  {
+    emoji: "🚶",
+    title: "Bergerak",
+    text: "Pakai W A S D atau tombol panah, atau ketuk lantai untuk berjalan ke sana. Ketuk orang, meja, atau benda untuk langsung menuju dan berinteraksi.",
+  },
   { emoji: "💬", title: "Bicara dan berinteraksi", text: "Saat ada sesuatu di dekatmu, muncul tombol petunjuk di bawah layar. Tekan E atau ketuk tombol itu." },
-  { emoji: "🛋️", title: "Sofa", text: "Sofa bisa diduduki: dekati sofa sampai muncul petunjuk “Duduk”, lalu tekan E atau ketuk sofanya. Sambil duduk kamu bisa main mini game berhadiah koin dan membaca artikel karier." },
-  { emoji: "📨", title: "Melamar kerja", text: "Buka banner lowongan di samping meja stand, pilih posisi, lalu kirim lamaran. Melamar memakai koin; pantau statusnya di menu 📋 Lamaran." },
+  {
+    emoji: "🛋️",
+    title: "Sofa",
+    text: "Sofa bisa diduduki: dekati sofa sampai muncul petunjuk “Duduk”, lalu tekan E atau ketuk sofanya. Sambil duduk kamu bisa main mini game berhadiah koin dan membaca artikel karier.",
+  },
+  {
+    emoji: "📨",
+    title: "Melamar kerja",
+    text: "Buka banner lowongan di samping meja stand, pilih posisi, lalu kirim lamaran. Melamar memakai koin; pantau statusnya di menu 📋 Lamaran.",
+  },
   { emoji: "🔔", title: "Notifikasi", text: "Status lamaran, chat HR, panggilan, undangan interview, dan kunjungan kantor muncul di lonceng kanan atas." },
   { emoji: "🪙", title: "Koin", text: "Klaim koin gratis harian di dompet, selesaikan misi, atau main mini game. Beli koin di meja informasi atau Stand Koin." },
   { emoji: "🎯", title: "Misi harian", text: "Tiap hari ada misi kecil (kunjungi stand, melamar, ikut seminar). Selesaikan untuk koin bonus." },
-  { emoji: "🛗", title: "Lift", text: "Lift di bagian bawah tiap lantai: di tengah lantai booth, di pojok kanan ruangan. Pilih lantai stand atau ruangan (Aula, Seminar, Psikotes, Food Court, Lounge)." },
+  {
+    emoji: "🛗",
+    title: "Lift",
+    text: "Lift di bagian bawah tiap lantai: di tengah lantai booth, di pojok kanan ruangan. Pilih lantai stand atau ruangan (Aula, Seminar, Psikotes, Food Court, Lounge).",
+  },
+  {
+    emoji: "🌳",
+    title: "Taman",
+    text: "Keluar lewat pintu taman di lobi untuk jalan-jalan di luar gedung dan melihat gedung acara berikutnya. Masuk lagi lewat pintu gedung acara ini.",
+  },
   { emoji: "ℹ️", title: "Meja informasi", text: "Ada di tiap lantai. Petugasnya bisa mengantarmu ke stand mana pun dan menjual koin." },
 ];
 
@@ -216,6 +248,10 @@ export function reachHint(kind: string): string | null {
       return "📞 Konsultasi dengan konsultan";
     case "loungeBoard":
       return "📞 Lihat tarif telepon";
+    case "parkOut":
+      return "🌳 Keluar ke taman";
+    case "parkIn":
+      return "🏢 Masuk ke gedung";
     default:
       return null;
   }

@@ -1,5 +1,5 @@
 import { readFairState, readFairStateKey, readPrices, writeFairState } from "@vwo/db";
-import { cleanPrices } from "@vwo/shared";
+import { cleanParkBuildings, cleanPrices } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { guardCompanyDoc } from "@/lib/company-doc";
 import { db } from "@/lib/db";
@@ -68,6 +68,8 @@ export async function PUT(req: Request) {
     const { announcement: _a, announcements: _b, ...rest } = data as Doc;
     const stored = (await readFairStateKey(db, "org"))?.data as Doc | undefined;
     data = stored?.announcement ? { ...rest, announcement: stored.announcement } : rest;
+    // The park's buildings are shown to every visitor: names, dates and notes kept to size, at most one per plot.
+    if ("buildings" in (data as Doc)) data = { ...(data as Doc), buildings: cleanParkBuildings((data as Doc).buildings) };
   }
   await writeFairState(db, { key: body.key, data, userId: user.id });
   return NextResponse.json({ ok: true });

@@ -6,7 +6,19 @@ import { parseWire } from "../src/live";
 const floor = fairFloorId(DEMO_JOB_FAIR, 0);
 const known = (id: string) => id === floor;
 const wire = (extra: object = {}) =>
-  JSON.stringify({ v: 1, id: "abc123", name: "Sari", look: { skin: "#f1c27d", style: "long", glasses: true }, floorId: floor, x: 10, y: 12, facing: "front", seatId: null, say: null, ...extra });
+  JSON.stringify({
+    v: 1,
+    id: "abc123",
+    name: "Sari",
+    look: { skin: "#f1c27d", style: "long", glasses: true },
+    floorId: floor,
+    x: 10,
+    y: 12,
+    facing: "front",
+    seatId: null,
+    say: null,
+    ...extra,
+  });
 
 describe("live channel", () => {
   it("accepts a well-formed player and rejects junk from the public broker", () => {
@@ -23,6 +35,16 @@ describe("live channel", () => {
     // Odd look values are dropped rather than drawn.
     expect(parseWire(wire({ look: { skin: "url(javascript:x)", hair: "#000" } }), known)!.look).toEqual({ hair: "#000" });
     expect(parseWire(wire({ name: "x".repeat(50) }), known)!.name).toHaveLength(20);
+  });
+
+  it("knows the park outside as a floor of its own, benches included", () => {
+    const fair = new DemoJobFair(() => 0.5);
+    const knownHere = (id: string) => fair.floors.some((f) => f.id === id);
+    const bench = fair.floor(fair.parkId).seats[0]!;
+    const p = parseWire(wire({ floorId: fair.parkId, x: 20, y: 8, seatId: bench.id }), knownHere)!;
+    expect(p.floorId).toBe(fair.parkId);
+    fair.upsertRemote(p);
+    expect(fair.visitors.get(remoteId("abc123"))).toMatchObject({ floorId: fair.parkId, seatId: bench.id });
   });
 
   it("mirrors remote players as visitors and removes them when they leave", () => {
@@ -65,7 +87,10 @@ describe("live company inbox and notes", () => {
   });
 
   it("works the booth's notifications out from its applications, with read marks that only grow", () => {
-    const fair = new DemoJobFair(() => 0.5, () => 10_000);
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => 10_000,
+    );
     fair.serverInbox = true;
     const marks: unknown[] = [];
     fair.onBoothRead = (_b, read) => marks.push(read);
@@ -74,7 +99,14 @@ describe("live company inbox and notes", () => {
     fair.mergeServer([app()], false);
     expect(fair.notifsFor(booth.id).map((n) => n.id)).toEqual(["apply:11111111-1111-1111-1111-111111111111"]);
     fair.mergeServer(
-      [app({ updatedAt: 3000, messages: [{ at: 2000, from: "seeker", text: "Halo" }], interview: { at: 9000, mode: "Online", reply: "hadir", repliedAt: 2500 }, calls: [{ at: 2200, kind: "video", answered: false, seconds: 0 }] })],
+      [
+        app({
+          updatedAt: 3000,
+          messages: [{ at: 2000, from: "seeker", text: "Halo" }],
+          interview: { at: 9000, mode: "Online", reply: "hadir", repliedAt: 2500 },
+          calls: [{ at: 2200, kind: "video", answered: false, seconds: 0 }],
+        }),
+      ],
       false,
     );
     expect(fair.notifsFor(booth.id).map((n) => n.kind)).toEqual(["confirm", "call", "chat", "apply"]);
@@ -90,7 +122,10 @@ describe("live company inbox and notes", () => {
   });
 
   it("works the job seeker's notifications from HR out from their applications, read marks saved with the account", () => {
-    const fair = new DemoJobFair(() => 0.5, () => 100_000);
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => 100_000,
+    );
     fair.serverInbox = true;
     fair.mergeServer([app()], true);
     expect(fair.notifsFor(PLAYER_ID)).toEqual([]);
@@ -130,7 +165,10 @@ describe("live company inbox and notes", () => {
 
   it("lets people delete notifications, and drops the ones older than a week by themselves", () => {
     let t = 100_000;
-    const fair = new DemoJobFair(() => 0.5, () => t);
+    const fair = new DemoJobFair(
+      () => 0.5,
+      () => t,
+    );
     fair.serverInbox = true;
     const marks: unknown[] = [];
     fair.onBoothRead = (_b, read) => marks.push(read);
@@ -207,7 +245,11 @@ describe("live counters", () => {
     fair.visit("someone-else", booth.id);
     expect(hits).toEqual([{ key: `visit:${booth.id}`, what: "view" }]);
     expect(events).toEqual(["arrive", "visit"]);
-    fair.setStats({ [`visit:${booth.id}`]: { views: 12, clicks: 0, sold: 0, coins: 0 }, "seminar:s1": { views: 4, clicks: 0, sold: 0, coins: 0 }, "stall:bakso": { views: 3, clicks: 1, sold: 2, coins: 16 } });
+    fair.setStats({
+      [`visit:${booth.id}`]: { views: 12, clicks: 0, sold: 0, coins: 0 },
+      "seminar:s1": { views: 4, clicks: 0, sold: 0, coins: 0 },
+      "stall:bakso": { views: 3, clicks: 1, sold: 2, coins: 16 },
+    });
     expect(fair.visits.get(booth.id)).toBe(12);
     expect(fair.seminarCounts.get("s1")).toBe(4);
     expect(fair.ads.get("stall:bakso")).toEqual({ views: 3, clicks: 1, sold: 2, coins: 16 });
