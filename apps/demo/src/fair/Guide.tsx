@@ -89,6 +89,7 @@ export const PLACE_GUIDE: Record<GuidePlace, PlaceGuide> = {
     steps: [
       "Datangi meja pustakawan atau rak buku, lalu tekan E (atau ketuk) untuk memilih buku.",
       "Duduk di kursi meja baca untuk membuka buku dengan tenang.",
+      "Bukunya tampil seperti buku cetak: dua halaman berdampingan di laptop, satu halaman di HP. Geser atau tekan panah untuk membalik halaman, − dan + untuk zoom, Daftar isi untuk pindah bab.",
       "Halaman terakhir yang kamu baca tersimpan. Lanjutkan dari tab Lanjut baca.",
       "Buku berbahasa Indonesia ada di tab Buku Indonesia, dibuka di situs resminya.",
       "Keluar lewat pintu di bawah untuk kembali ke taman.",

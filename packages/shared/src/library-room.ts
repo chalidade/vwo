@@ -76,7 +76,16 @@ export function buildLibraryFloor(fair: { slug: string }): FloorView {
     targetX: null,
     targetY: null,
   }));
-  objects.push({ id: `${id}-door`, type: "door", ...L.door, spriteKey: null, isWalkable: true, targetFloorId: parkFloorId(fair), targetX: LIBRARY_FRONT.x, targetY: LIBRARY_FRONT.y });
+  objects.push({
+    id: `${id}-door`,
+    type: "door",
+    ...L.door,
+    spriteKey: null,
+    isWalkable: true,
+    targetFloorId: parkFloorId(fair),
+    targetX: LIBRARY_FRONT.x,
+    targetY: LIBRARY_FRONT.y,
+  });
   for (const [k, o] of [
     ["plant-a", { x: 0.3, y: L.height - 1.4, width: 1.2, height: 1 }],
     ["plant-b", { x: L.width - 1.5, y: L.height - 1.4, width: 1.2, height: 1 }],

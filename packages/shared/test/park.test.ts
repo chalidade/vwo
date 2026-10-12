@@ -71,7 +71,11 @@ describe("the park", () => {
     expect(isParkFloor(fairStops(DEMO_JOB_FAIR)[0]!.floorId)).toBe(false);
     expect(park.width * park.height).toBeLessThanOrEqual(DEMO_JOB_FAIR.width * DEMO_JOB_FAIR.height);
     expect(fairStops(DEMO_JOB_FAIR).some((st) => st.floorId === park.id)).toBe(false);
-    expect(buildJobFairFloors(DEMO_JOB_FAIR).map((f) => f.id).slice(-2)).toEqual([park.id, libraryFloorId(DEMO_JOB_FAIR)]);
+    expect(
+      buildJobFairFloors(DEMO_JOB_FAIR)
+        .map((f) => f.id)
+        .slice(-2),
+    ).toEqual([park.id, libraryFloorId(DEMO_JOB_FAIR)]);
   });
 
   it("can be walked all over from the building's door: no cell is walled in", () => {

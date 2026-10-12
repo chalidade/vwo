@@ -1,19 +1,26 @@
 import "server-only";
 import {
+  bookImageType,
+  gutenbergHtmlUrl,
+  gutenbergImageUrl,
   gutenbergOpdsSearchUrl,
   gutenbergTextUrl,
   gutendexSearchUrl,
+  LIBRARY_HTML_MAX,
+  LIBRARY_IMAGE_MAX,
   LIBRARY_SEARCH_MAX,
   LIBRARY_TEXT_MAX,
-  type LibraryBook,
+  type LibraryBookOut,
   libraryHits,
   libraryUrlOk,
   opdsHits,
   splitGutenberg,
+  textBlocks,
 } from "@vwo/shared";
+import { htmlBook } from "./library-html";
 
 // The Perpustakaan's upstream: Project Gutenberg texts, and searches on Gutendex with Project
-// Gutenberg's own OPDS search as the fallback, fetched one at a time
+// Gutenberg's own OPDS search as the fallback, and pictures from a book's HTML edition, fetched one at a time
 // on demand and kept for a day (here, and by the CDN in front). Every fetch, and every redirect it
 // follows, must stay on the allowlisted hosts; answers are size-capped and time-limited.
 
@@ -59,7 +66,7 @@ class Memo<T> {
   }
 }
 
-const books = new Memo<LibraryBook>(30);
+const books = new Memo<LibraryBookOut>(30);
 const searches = new Memo<ReturnType<typeof libraryHits>>(200);
 
 /** For tests: forget everything cached. */
@@ -72,6 +79,12 @@ export function clearLibraryCache() {
 /** GET an allowlisted URL as text, following at most three redirects that stay on the allowlist,
  *  refusing anything over `max` bytes. */
 export async function fetchCapped(url: string, max: number, timeoutMs = TIMEOUT_MS): Promise<string> {
+  const { bytes } = await fetchBytes(url, max, timeoutMs);
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/** fetchCapped's bytes, with the content type upstream gave. */
+export async function fetchBytes(url: string, max: number, timeoutMs = TIMEOUT_MS): Promise<{ bytes: Uint8Array; type: string }> {
   let at = url;
   for (let hop = 0; hop < 4; hop++) {
     if (!libraryUrlOk(at)) throw new LibraryError("upstream");
@@ -79,7 +92,7 @@ export async function fetchCapped(url: string, max: number, timeoutMs = TIMEOUT_
     try {
       res = await fetch(at, {
         redirect: "manual",
-        headers: { "User-Agent": UA, Accept: "text/plain, application/json, application/atom+xml" },
+        headers: { "User-Agent": UA, Accept: "text/plain, text/html, application/json, application/atom+xml, image/*" },
         signal: AbortSignal.timeout(timeoutMs),
         cache: "no-store",
       });
@@ -124,21 +137,41 @@ export async function fetchCapped(url: string, max: number, timeoutMs = TIMEOUT_
       all.set(c, off);
       off += c.byteLength;
     }
-    return new TextDecoder("utf-8").decode(all);
+    return { bytes: all, type: res.headers.get("content-type") ?? "" };
   }
   throw new LibraryError("upstream");
 }
 
-/** One book's text, without Gutenberg's header and footer (kept apart as the licence). */
-export async function loadBook(id: number): Promise<LibraryBook> {
+/** One book, without Gutenberg's header and footer (kept apart as the licence): from its HTML
+ *  edition, cleaned down to a few tags, so it keeps its chapters, italics and pictures; from the plain
+ *  text when there is no HTML edition or it is too big or unusable. */
+export async function loadBook(id: number): Promise<LibraryBookOut> {
   const key = String(id);
   const hit = books.get(key);
   if (hit) return hit;
-  const text = await fetchCapped(gutenbergTextUrl(id), LIBRARY_TEXT_MAX);
-  const book = splitGutenberg(text, id);
-  if (!book.paragraphs.length) throw new LibraryError("not_found");
+  let book: LibraryBookOut | null = null;
+  try {
+    const html = await fetchCapped(gutenbergHtmlUrl(id), LIBRARY_HTML_MAX);
+    book = { id, ...htmlBook(html, id), format: "html" };
+  } catch {
+    // No HTML edition, too big, or nothing usable in it: the plain text below.
+  }
+  if (!book) {
+    const text = await fetchCapped(gutenbergTextUrl(id), LIBRARY_TEXT_MAX);
+    const { paragraphs, ...rest } = splitGutenberg(text, id);
+    if (!paragraphs.length) throw new LibraryError("not_found");
+    book = { ...rest, format: "text", blocks: textBlocks(paragraphs) };
+  }
   books.set(key, book);
   return book;
+}
+
+/** A picture from a book's HTML edition. Only jpg, png and gif, under the size cap, and only when
+ *  upstream says it is an image; the type we answer with comes from the file name. */
+export async function loadImage(id: number, file: string): Promise<{ bytes: Uint8Array; type: string }> {
+  const { bytes, type } = await fetchBytes(gutenbergImageUrl(id, file), LIBRARY_IMAGE_MAX);
+  if (!/^image\/(?:jpeg|png|gif)\b/i.test(type)) throw new LibraryError("upstream");
+  return { bytes, type: bookImageType(file) };
 }
 
 let gutendexDownUntil = 0;
