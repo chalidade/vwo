@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { DoorClosed, DoorOpen } from "lucide-react";
 import { fairFloorIndex } from "@vwo/shared";
 import { fair, useFair } from "../useFair";
 
-/** The organiser builds the venue: add or take out booth floors, switch rooms off, and set which
- *  floors are free and which cost coins to enter. */
+/** The organiser builds the venue: add or take out booth floors, switch rooms off, close a floor for
+ *  now ("Segera hadir"), and set which floors are free and which cost coins to enter. */
 export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
   useFair();
   const [theme, setTheme] = useState("");
@@ -18,15 +19,18 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
       <div className="card">
         <h2 className="cp-h2">Lantai gedung</h2>
         <p className="muted small">
-          Urutan dari atas ke bawah seperti tombol lift. Lantai booth berisi 6 tempat stand yang bisa dipesan perusahaan. Isi harga 0 untuk lantai gratis, atau jumlah koin untuk lantai berbayar. Lantai {stops[0]?.level != null ? stops[0].level + 1 : 1} tempat pengunjung datang selalu gratis.
+          Urutan dari atas ke bawah seperti tombol lift. Lantai booth berisi 6 tempat stand yang bisa dipesan perusahaan. Isi harga 0 untuk lantai gratis, atau jumlah koin untuk
+          lantai berbayar. Lantai {stops[0]?.level != null ? stops[0].level + 1 : 1} tempat pengunjung datang selalu gratis dan selalu buka.
         </p>
+        <p className="muted small">Lantai yang belum dipakai bisa ditutup dulu: tetap terlihat di lift sebagai "Segera hadir", tapi pengunjung tidak bisa ke sana.</p>
         <div className="fl-list">
           {[...stops].reverse().map((st) => {
             const hall = st.roomId ? -1 : fairFloorIndex(st.floorId);
             const booths = hall >= 0 ? fair.fair.booths.filter((b) => b.floor === hall).length : 0;
             const price = fair.floorPrice(st.floorId);
+            const closed = fair.floorClosed(st.floorId);
             return (
-              <div key={st.floorId} className="fl-row">
+              <div key={st.floorId} className="fl-row" data-closed={closed ? "" : undefined}>
                 <b className="fl-n">{st.level + 1}</b>
                 <div className="fl-main">
                   {hall >= 0 ? (
@@ -46,7 +50,10 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
                       {st.emoji} {st.label}
                     </span>
                   )}
-                  <span className="muted small">{hall >= 0 ? `Lantai booth · ${booths}/6 stand terisi` : "Ruangan"}</span>
+                  <span className="muted small">
+                    {closed && <span className="fl-soon">Segera hadir</span>}
+                    {hall >= 0 ? `Lantai booth · ${booths}/6 stand terisi` : "Ruangan"}
+                  </span>
                 </div>
                 <label className="fl-price">
                   {st.floorId === entrance ? (
@@ -74,35 +81,49 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
                   )}
                 </label>
                 <div className="fl-act">
-                  {st.roomId ? (
-                    st.floorId !== entrance && (
-                      <button
-                        type="button"
-                        className="small-btn ghost"
-                        onClick={() => {
-                          fair.setRoomHidden(st.roomId!, true);
-                          onToast(`${st.label} dinonaktifkan`);
-                        }}
-                      >
-                        Nonaktifkan
-                      </button>
-                    )
-                  ) : (
-                    hall === topHall && (
-                      <button
-                        type="button"
-                        className="small-btn ghost"
-                        disabled={!!blocker}
-                        title={blocker ?? undefined}
-                        onClick={() => {
-                          if (fair.removeHall()) onToast(`${st.name} dihapus`);
-                        }}
-                      >
-                        Hapus lantai
-                      </button>
-                    )
+                  {st.floorId !== entrance && (
+                    <button
+                      type="button"
+                      className="small-btn ghost fl-close"
+                      aria-pressed={closed}
+                      onClick={() => {
+                        if (fair.setFloorClosed(st.floorId, !closed)) onToast(closed ? `${st.name} dibuka lagi` : `${st.name} ditutup · segera hadir`);
+                      }}
+                    >
+                      {closed ? <DoorOpen size={14} aria-hidden /> : <DoorClosed size={14} aria-hidden />}
+                      {closed ? "Buka lagi" : "Tutup · Segera hadir"}
+                    </button>
                   )}
+                  {st.roomId
+                    ? st.floorId !== entrance && (
+                        <button
+                          type="button"
+                          className="small-btn ghost"
+                          onClick={() => {
+                            fair.setRoomHidden(st.roomId!, true);
+                            onToast(`${st.label} dinonaktifkan`);
+                          }}
+                        >
+                          Nonaktifkan
+                        </button>
+                      )
+                    : hall === topHall && (
+                        <button
+                          type="button"
+                          className="small-btn ghost"
+                          disabled={!!blocker}
+                          title={blocker ?? undefined}
+                          onClick={() => {
+                            if (fair.removeHall()) onToast(`${st.name} dihapus`);
+                          }}
+                        >
+                          Hapus lantai
+                        </button>
+                      )}
                 </div>
+                {closed && booths > 0 && (
+                  <p className="fl-note muted small">{booths} stand di lantai ini tidak bisa dikunjungi selama ditutup. Perusahaan tetap bisa memesan stand di sini.</p>
+                )}
               </div>
             );
           })}
@@ -112,7 +133,9 @@ export function OrgFloors({ onToast }: { onToast: (t: string) => void }) {
 
       <div className="card">
         <h2 className="cp-h2">Tambah lantai booth</h2>
-        <p className="muted small">Lantai baru muncul di atas lantai booth teratas, lengkap dengan meja informasi dan 6 tempat stand kosong. Ruangan di atasnya ikut naik satu lantai.</p>
+        <p className="muted small">
+          Lantai baru muncul di atas lantai booth teratas, lengkap dengan meja informasi dan 6 tempat stand kosong. Ruangan di atasnya ikut naik satu lantai.
+        </p>
         <form
           className="org-row"
           onSubmit={(e) => {

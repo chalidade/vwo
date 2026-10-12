@@ -389,6 +389,7 @@ export function JobFair() {
       if (busy.current) return;
       mark(follow.memberId, 1_500);
       if (t.floorId !== me.floorId) {
+        if (closedFloor(t.floorId)) return setFollow(null);
         const into = fair.passFor(t.floorId);
         if (into && !fair.hasTicket(into.id)) {
           setFollow(null);
@@ -649,7 +650,9 @@ export function JobFair() {
     const who = account?.email ?? "guest";
     // Back where they left off: same floor, same spot (if it is still free to stand on).
     const spot = loadSpot(who);
-    if (spot && fair.floors.some((f) => f.id === spot.floorId) && !isBlocked(fair.floor(spot.floorId), spot.x, spot.y)) fair.placeAt(v.memberId, spot.floorId, spot.x, spot.y);
+    // A floor the organiser closed since then: start at the entrance instead.
+    const back = spot && fair.floors.some((f) => f.id === spot.floorId) && !fair.floorClosed(spot.floorId);
+    if (spot && back && !isBlocked(fair.floor(spot.floorId), spot.x, spot.y)) fair.placeAt(v.memberId, spot.floorId, spot.x, spot.y);
     setInside(who, true);
     if (!profile.name || (!profile.email && account)) updateProfile({ ...profile, name: profile.name || account?.name || c.name, email: profile.email || account?.email || "" });
     counted.current.clear();
@@ -722,7 +725,7 @@ export function JobFair() {
   /** Take the lift to a floor; a premium floor asks for a ticket first. False when not riding. */
   function rideTo(floorId: string) {
     const s = savedSession;
-    if (!s) return false;
+    if (!s || closedFloor(floorId)) return false;
     const into = fair.passFor(floorId);
     if (into && !fair.hasTicket(into.id)) {
       askTicket(into, () => pickFloor(floorId));
@@ -738,7 +741,7 @@ export function JobFair() {
   function pickFloor(floorId: string) {
     setLift(false);
     const me = savedSession && fair.visitors.get(savedSession.visitorId);
-    if (!me || floorId === me.floorId) return;
+    if (!me || floorId === me.floorId || closedFloor(floorId)) return;
     const into = fair.passFor(floorId);
     if (into && !fair.hasTicket(into.id)) {
       askTicket(into, () => pickFloor(floorId));
@@ -787,7 +790,7 @@ export function JobFair() {
     // A mini (UMKM) booth has no stand to walk to: its vacancies open straight away.
     if (!hasStand(b)) return setBoard({ boothId: b.id });
     const me = session && fair.visitors.get(session.visitorId);
-    if (!me) return;
+    if (!me || closedFloor(fair.floorIdOf(b))) return;
     // A stand on a paid floor (the organiser may have moved it there) asks for that floor's ticket first.
     const into = fair.passFor(fair.floorIdOf(b));
     if (into && me.floorId !== fair.floorIdOf(b) && !fair.hasTicket(into.id)) return askTicket(into, () => goToBooth(b));
@@ -803,9 +806,19 @@ export function JobFair() {
 
   /** Walk to a spot, from anywhere, and do `then` on arrival. */
   function goTo(floorId: string, x: number, y: number, then?: () => void) {
-    if (!savedSession || !fair.visitors.get(savedSession.visitorId)) return;
+    if (!savedSession || !fair.visitors.get(savedSession.visitorId) || closedFloor(floorId)) return;
     goal.current = { floorId, x, y, then };
     planRoute();
+  }
+
+  /** The one check for every way to another floor (lift, booth list, follow, ping, resume...): a floor
+   *  the organiser closed for now says "segera hadir" and nobody goes. True when closed. */
+  function closedFloor(floorId: string) {
+    const me = savedSession && fair.visitors.get(savedSession.visitorId);
+    if (!fair.floorClosed(floorId) || me?.floorId === floorId) return false;
+    const st = fair.stopOf(floorId);
+    setToast(`🚧 ${st.name} · ${st.label} segera hadir`);
+    return true;
   }
 
   /** Walk to the lift and open its panel there. */
@@ -1051,8 +1064,9 @@ export function JobFair() {
           const count = r ? "" : `${fair.fair.booths.filter((b) => b.floor === i && hasStand(b)).length} stand`;
           return {
             label: `${st.emoji} ${st.label}`,
-            hint: [`Lt ${st.level + 1}`, count, price ? `${price} koin` : ""].filter(Boolean).join(" · "),
+            hint: fair.floorClosed(st.floorId) ? `Lt ${st.level + 1} · Segera hadir` : [`Lt ${st.level + 1}`, count, price ? `${price} koin` : ""].filter(Boolean).join(" · "),
             onPick: () => {
+              if (closedFloor(st.floorId)) return setTalk(null);
               if (!r) return setTalk(floorChoice(i));
               setTalk(null);
               goToRoom(r);
@@ -1200,7 +1214,7 @@ export function JobFair() {
   /** Walk up to someone, on whatever floor they are. */
   function walkToPerson(memberId: string) {
     const t = fair.visitors.get(memberId);
-    if (!t) return;
+    if (!t || closedFloor(t.floorId)) return;
     const into = fair.passFor(t.floorId);
     const me = session && fair.visitors.get(session.visitorId);
     if (into && me?.floorId !== t.floorId && !fair.hasTicket(into.id)) {
@@ -1232,7 +1246,7 @@ export function JobFair() {
         speaker: v.displayName,
         pages: [`Ajak ${name} ke lantai mana?`],
         choices: [
-          ...fair.stops.map((st) => ({ label: `🛗 ${st.name}`, hint: st.label, onPick: ping({ key: "floor", floorId: st.floorId }) })),
+          ...fair.openStops().map((st) => ({ label: `🛗 ${st.name}`, hint: st.label, onPick: ping({ key: "floor", floorId: st.floorId }) })),
           { label: "Kembali", onPick: () => talkToVisitor(memberId) },
         ],
       });
@@ -2038,6 +2052,7 @@ export function JobFair() {
               const pass = fair.passFor(floorId);
               return pass && !fair.hasTicket(pass.id) ? pass.price : null;
             }}
+            closed={(floorId) => fair.floorClosed(floorId)}
             onPick={pickFloor}
             onClose={() => setLift(false)}
           />
