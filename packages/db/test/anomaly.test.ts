@@ -12,6 +12,7 @@ import {
   anomalyDay,
   anomalyOutAt,
   anomalySettings,
+  dayPhase,
   wibHour,
 } from "@vwo/shared";
 import { sql } from "drizzle-orm";
@@ -158,6 +159,40 @@ describe("anomaly kinds", () => {
     for (const h of hoursOf("rooster")) expect(h >= 5 && h < 10).toBe(true);
     for (const h of hoursOf("ufo")) expect(h >= 19 || h < 4).toBe(true);
     expect(hoursOf("ghost").size).toBeGreaterThan(5);
+  });
+
+  it("keeps the park's day ones to the day and its night ones (the ghosts) to the night, for their whole stay", () => {
+    const park = ANOMALY_KINDS.filter((k) => ANOMALY_INFO[k].place === "park");
+    expect(park.length).toBeGreaterThanOrEqual(7);
+    expect(park.filter((k) => ANOMALY_INFO[k].phase === "night")).toEqual(expect.arrayContaining(["kunti", "pocong", "lamp", "eyes"]));
+    for (const s of spawns) {
+      const phase = ANOMALY_INFO[s.kind].phase;
+      if (!phase) continue;
+      expect(dayPhase(s.startsAt), `${s.kind} starts`).toBe(phase);
+      expect(dayPhase(s.expiresAt), `${s.kind} leaves`).toBe(phase);
+    }
+    for (const k of park)
+      expect(
+        spawns.some((s) => s.kind === k),
+        k,
+      ).toBe(true);
+  });
+
+  it("refuses a night one claimed in the day, even inside the grace seconds", () => {
+    // Look for a ghost that came out just after 18.30 WIB (night), claimed a moment early at dusk.
+    let found = false;
+    for (let n = 0; n < 400 && !found; n++) {
+      const secret = `phase-${n}`;
+      for (let day = 0; day < 60 && !found; day++) {
+        const nightFall = Date.UTC(2026, 9, 1 + day, 11, 30); // 18.30 WIB
+        const s = anomalyOfSlot(secret, Math.floor(nightFall / ANOMALY_SLOT_MS));
+        if (ANOMALY_INFO[s.kind].phase !== "night" || s.startsAt - nightFall > ANOMALY_GRACE_MS - 2000) continue;
+        found = true;
+        expect(checkAnomalyClaim(secret, claimOf(s), nightFall - 1000)).toEqual({ ok: false, error: "not_now" });
+        expect(checkAnomalyClaim(secret, claimOf(s), s.startsAt + 1000)).toMatchObject({ ok: true });
+      }
+    }
+    expect(found).toBe(true);
   });
 
   it("names a room for the room ones", () => {

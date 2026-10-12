@@ -3,6 +3,8 @@
 // coins or a "voucher lamar" (the coins for one application); the two rare ones (a golden cat and a
 // little dragon) give more. The server decides when and where each one appears (from the clock and a
 // secret, so every visitor sees the same one), which kind it is and what it pays; the game only draws it.
+// The park outside has its own: a squirrel or a kite by day, and at night its ghosts.
+import { dayPhase } from "./park-life";
 
 /** New kinds go at the end: the order is the order of the organiser's list and the collection. */
 export const ANOMALY_KINDS = [
@@ -22,11 +24,18 @@ export const ANOMALY_KINDS = [
   "mascot",
   "goldcat",
   "dragon",
+  "squirrel",
+  "kite",
+  "fountaincat",
+  "kunti",
+  "pocong",
+  "lamp",
+  "eyes",
 ] as const;
 export type AnomalyKind = (typeof ANOMALY_KINDS)[number];
 
-/** Where a kind may turn up: anywhere, or only in one room. */
-export type AnomalyPlace = "foodcourt" | "aula";
+/** Where a kind may turn up: anywhere, or only in one room, or only in the park outside. */
+export type AnomalyPlace = "foodcourt" | "aula" | "park";
 
 export interface AnomalyInfo {
   name: string;
@@ -36,7 +45,9 @@ export interface AnomalyInfo {
   weight: number;
   /** Only between these hours, Jakarta time (WIB); `from` > `to` runs past midnight. */
   hours?: readonly [from: number, to: number];
-  /** Only in this room (on its floor). */
+  /** Only by day (06.00–17.30 WIB) or only at night (18.30–05.00), as the park's sky shows it. */
+  phase?: "day" | "night";
+  /** Only in this room (on its floor), or only in the park. */
   place?: AnomalyPlace;
   /** What the toast says after catching it. */
   line: string;
@@ -59,6 +70,13 @@ export const ANOMALY_INFO: Record<AnomalyKind, AnomalyInfo> = {
   mascot: { name: "Si Jobi", weight: 12, place: "aula", line: "Maskot jobfair kasih tos. Semangat!" },
   goldcat: { name: "Kucing emas", rare: true, weight: 1, line: "Langka banget! Kucing pembawa hoki ini jarang muncul." },
   dragon: { name: "Naga kecil", rare: true, weight: 1, line: "Legenda itu nyata! Naga kecil memberimu harta." },
+  squirrel: { name: "Tupai maling roti", weight: 7, phase: "day", place: "park", line: "Rotinya sudah digondol, tapi dia balikin koin." },
+  kite: { name: "Layangan nyangkut", weight: 6, phase: "day", place: "park", line: "Layangannya selamat, pemiliknya kasih hadiah." },
+  fountaincat: { name: "Kucing di air mancur", weight: 6, phase: "day", place: "park", line: "Kucing kok main air? Dia senang kamu datang." },
+  kunti: { name: "Mbak Kunti", weight: 6, phase: "night", place: "park", line: "Hihihi... ternyata dia cuma mau titip salam." },
+  pocong: { name: "Pocong loncat", weight: 6, phase: "night", place: "park", line: "Boing boing! Pocongnya pamit pulang, capek loncat." },
+  lamp: { name: "Lampu kedip sendiri", weight: 5, phase: "night", place: "park", line: "Ditepuk sekali, lampunya nyala lagi. Aman!" },
+  eyes: { name: "Mata di semak", weight: 6, phase: "night", place: "park", line: "Cuma kucing yang malu-malu. Fiuh!" },
 };
 
 export const ANOMALY_NAMES = Object.fromEntries(ANOMALY_KINDS.map((k) => [k, ANOMALY_INFO[k].name])) as Record<AnomalyKind, string>;
@@ -68,17 +86,20 @@ export const isAnomalyKind = (k: unknown): k is AnomalyKind => typeof k === "str
 /** The hour in Jakarta (WIB, UTC+7) at a moment. */
 export const wibHour = (at: number) => new Date(at + 7 * 3_600_000).getUTCHours();
 
-/** Whether a kind may come out at this moment. */
+/** Whether a kind may come out at this moment: inside its hours, and by day or at night as it wants. */
 export function anomalyOutAt(kind: AnomalyKind, at: number) {
-  const h = ANOMALY_INFO[kind].hours;
+  const info = ANOMALY_INFO[kind];
+  if (info.phase && dayPhase(at) !== info.phase) return false;
+  const h = info.hours;
   if (!h) return true;
   const now = wibHour(at);
   return h[0] <= h[1] ? now >= h[0] && now < h[1] : now >= h[0] || now < h[1];
 }
 
-/** The kind of an anomaly starting at `at`, from a roll in [0, 1): weighted among the kinds out then. */
-export function pickAnomalyKind(roll: number, at: number): AnomalyKind {
-  const open = ANOMALY_KINDS.filter((k) => anomalyOutAt(k, at));
+/** The kind of an anomaly out from `at` (until `until`, when given), from a roll in [0, 1): weighted
+ *  among the kinds out for all of that time, so a night one never stays into the morning. */
+export function pickAnomalyKind(roll: number, at: number, until?: number): AnomalyKind {
+  const open = ANOMALY_KINDS.filter((k) => anomalyOutAt(k, at) && (until === undefined || anomalyOutAt(k, until)));
   const total = open.reduce((n, k) => n + ANOMALY_INFO[k].weight, 0);
   let left = Math.min(Math.max(roll, 0), 0.999999) * total;
   for (const k of open) {

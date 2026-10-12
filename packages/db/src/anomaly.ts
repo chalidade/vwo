@@ -4,6 +4,7 @@
 // kind fills that spot in the collection), and a few per day.
 import {
   ANOMALY_GRACE_MS,
+  ANOMALY_INFO,
   ANOMALY_KINDS,
   ANOMALY_LIVE_MS,
   ANOMALY_SLOT_MS,
@@ -16,6 +17,7 @@ import {
   anomalyReason,
   anomalyRewardOf,
   anomalySlot,
+  dayPhase,
   isAnomalyKind,
   pickAnomalyKind,
 } from "@vwo/shared";
@@ -34,7 +36,8 @@ export function anomalyOfSlot(secret: string, slot: number): AnomalySpawn {
   const expiresAt = startsAt + ANOMALY_LIVE_MS;
   const id = anomalyId(slot);
   const floor = h.readUInt32BE(4);
-  const kind = pickAnomalyKind(h.readUInt16BE(8) / 0x10000, startsAt);
+  // Out for its whole stay: a night one never starts just before the morning.
+  const kind = pickAnomalyKind(h.readUInt16BE(8) / 0x10000, startsAt, expiresAt);
   return { id, kind, floor, seed: h.readUInt32BE(12), startsAt, expiresAt, token: anomalyToken(secret, id, floor, expiresAt) };
 }
 
@@ -55,8 +58,14 @@ export interface AnomalyClaim {
   token: string;
 }
 
-/** Whether a claim names an anomaly this server handed out, and it is still around. */
-export function checkAnomalyClaim(secret: string, c: AnomalyClaim, now: number): { ok: true; spawn: AnomalySpawn } | { ok: false; error: "bad_token" | "expired" | "not_yet" } {
+/** Whether a claim names an anomaly this server handed out, and it is still around. One that only
+ *  comes by day or at night is only caught then, by the server's clock: a ghost can't be caught in
+ *  daylight, even in the grace seconds around its stay. */
+export function checkAnomalyClaim(
+  secret: string,
+  c: AnomalyClaim,
+  now: number,
+): { ok: true; spawn: AnomalySpawn } | { ok: false; error: "bad_token" | "expired" | "not_yet" | "not_now" } {
   const slot = anomalySlot(c.id);
   if (slot === null) return { ok: false, error: "bad_token" };
   const spawn = anomalyOfSlot(secret, slot);
@@ -65,6 +74,8 @@ export function checkAnomalyClaim(secret: string, c: AnomalyClaim, now: number):
   if (spawn.floor !== c.floor || spawn.expiresAt !== c.exp || want.length !== got.length || !timingSafeEqual(want, got)) return { ok: false, error: "bad_token" };
   if (now > spawn.expiresAt + ANOMALY_GRACE_MS) return { ok: false, error: "expired" };
   if (now < spawn.startsAt - ANOMALY_GRACE_MS) return { ok: false, error: "not_yet" };
+  const phase = ANOMALY_INFO[spawn.kind].phase;
+  if (phase && dayPhase(now) !== phase) return { ok: false, error: "not_now" };
   return { ok: true, spawn };
 }
 
@@ -81,7 +92,7 @@ const esc = (s: string) => s.replace(/[\\%_]/g, "\\$&");
 
 export type AnomalyClaimResult =
   | { ok: true; reward: AnomalyReward; spawn: AnomalySpawn }
-  | { ok: false; error: "bad_token" | "expired" | "not_yet" | "already_claimed" | "already_collected" | "daily_cap"; kind?: AnomalyKind };
+  | { ok: false; error: "bad_token" | "expired" | "not_yet" | "not_now" | "already_claimed" | "already_collected" | "daily_cap"; kind?: AnomalyKind };
 
 /** The kind a paid catch was: its `ref_id` since kinds pay once, or (catches from before that) the
  *  name in its ledger line. */

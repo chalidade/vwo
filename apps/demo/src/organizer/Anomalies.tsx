@@ -1,4 +1,4 @@
-import { Clock, MapPin, Minus, Plus, Sparkles } from "lucide-react";
+import { Clock, MapPin, Minus, Moon, Plus, Sparkles, Sun } from "lucide-react";
 import { ANOMALY_CAP_MAX, ANOMALY_INFO, ANOMALY_KINDS, ANOMALY_LIVE_MS, ANOMALY_RARE_COINS, ANOMALY_SLOT_MS, price } from "@vwo/shared";
 import { fair, useFair } from "../useFair";
 
@@ -41,7 +41,14 @@ export function OrgAnomalies({ onToast }: { onToast: (t: string) => void }) {
                 {info.place && (
                   <>
                     {" · "}
-                    <MapPin size={12} aria-hidden /> {info.place === "foodcourt" ? "Food Court" : "Aula"}
+                    <MapPin size={12} aria-hidden /> {info.place === "foodcourt" ? "Food Court" : info.place === "park" ? "Taman" : "Aula"}
+                  </>
+                )}
+                {info.phase && (
+                  <>
+                    {" · "}
+                    {info.phase === "night" ? <Moon size={12} aria-hidden /> : <Sun size={12} aria-hidden />}{" "}
+                    {info.phase === "night" ? "Malam (18.30–05.00 WIB)" : "Siang (06.00–17.30 WIB)"}
                   </>
                 )}
               </span>

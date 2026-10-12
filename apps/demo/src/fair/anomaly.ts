@@ -1,14 +1,43 @@
 // Where a random anomaly (a cat, fireflies...) shows up: the server picks a floor number and a
 // seed; every visitor turns them into the same floor and the same walkable spot here.
-import { ANOMALY_KINDS, type AnomalyInfo, type AnomalyKind, type AnomalyPlace, type FairStop, type FloorView, isBlocked } from "@vwo/shared";
+import { ANOMALY_KINDS, type AnomalyInfo, type AnomalyKind, type AnomalyPlace, type FairStop, type FloorView, PARK, isBlocked } from "@vwo/shared";
 
 /** How far the sprite strolls left and right of its spot, in tiles. */
 export const WANDER = 0.8;
 
 /** The stops a kind may turn up on: all of them, or only the floor of its room (the bebek karet in the
- *  food court, Si Jobi in the Aula). */
-export const anomalyStops = (stops: readonly FairStop[], place: AnomalyPlace | undefined, roomKind: (roomId: string) => string | undefined) =>
-  place ? stops.filter((st) => st.roomId !== undefined && roomKind(st.roomId) === place) : stops;
+ *  food court, Si Jobi in the Aula), or the park outside for the park's own. */
+export const anomalyStops = (stops: readonly FairStop[], place: AnomalyPlace | undefined, roomKind: (roomId: string) => string | undefined, park?: FairStop) =>
+  place === "park" ? (park ? [park] : []) : place ? stops.filter((st) => st.roomId !== undefined && roomKind(st.roomId) === place) : stops;
+
+/**
+ * Where a park anomaly shows up, from the seed: the ghost and the kite in a tree, the pocong by a lamp
+ * (it hops to the next one), the flickering lamp on its lamp, the cat on the fountain's rim, the squirrel
+ * by a bench; the eyes in the bushes anywhere on the lawn. The same for everyone.
+ */
+export function parkAnomalySpot(kind: AnomalyKind, floor: FloorView, seed: number) {
+  const pick = <T>(list: readonly T[]) => list[(seed >>> 0) % list.length]!;
+  switch (kind) {
+    case "kunti":
+    case "kite": {
+      const t = pick(PARK.trees);
+      return { x: t.x, y: t.y + 0.05 };
+    }
+    case "pocong":
+    case "lamp": {
+      const l = pick(PARK.lamps);
+      return kind === "lamp" ? { x: l.x, y: l.y + 0.05 } : { x: l.x + 0.9, y: l.y + 0.7 };
+    }
+    case "fountaincat":
+      return { x: PARK.fountain.x + PARK.fountain.width * (0.3 + ((seed >>> 0) % 5) * 0.1), y: PARK.fountain.y + PARK.fountain.height + 0.05 };
+    case "squirrel": {
+      const b = pick(PARK.benches);
+      return { x: b.x + 1, y: b.y + 1.15 };
+    }
+    default:
+      return anomalySpot(floor, seed);
+  }
+}
 
 /** The floor an anomaly is on: one of the lift's stops, halls and rooms alike. */
 export const anomalyFloorId = (stops: readonly FairStop[], pick: number) => (stops.length ? stops[pick % stops.length]!.floorId : null);
@@ -55,6 +84,7 @@ export function mergeCaught(lists: readonly (readonly Caught[])[]): Map<AnomalyK
 
 /** "Petunjuk: 05.00–10.00 WIB" or "Petunjuk: di food court": where to look for a kind not caught yet. */
 export function anomalyHint(info: AnomalyInfo) {
+  if (info.place === "park") return info.phase === "night" ? "Petunjuk: malam hari di taman" : "Petunjuk: siang hari di taman";
   if (info.place) return info.place === "foodcourt" ? "Petunjuk: di food court" : "Petunjuk: di Aula";
   if (info.hours) {
     const [from, to] = info.hours;

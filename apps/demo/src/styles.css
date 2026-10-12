@@ -2746,3 +2746,39 @@ a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
   .park-card { padding: 8px 12px; font-size: 12px; }
   .park-card-name { font-size: 15px; }
 }
+
+/* ---- Park life: the park's own anomalies (a kite or a ghost in a tree, a pocong hopping by the
+   lamps, a lamp flickering, eyes in a bush), the phone box picker, and the organiser's date range. */
+.anom[data-still] .anom-wander { animation: none; }
+.anom-hop { animation: anom-hop 0.8s cubic-bezier(0.3, 0, 0.5, 1) infinite; }
+@keyframes anom-hop { 0%, 100% { transform: translateY(0) scaleY(0.94); } 45% { transform: translateY(-12px) scaleY(1.04); } }
+.anom-hop-shadow { animation: anom-hop-shadow 0.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes anom-hop-shadow { 45% { transform: scale(0.6); opacity: 0.1; } }
+.anom-flicker { animation: anom-flicker 1.9s steps(1) infinite; }
+@keyframes anom-flicker { 0%, 100% { opacity: 1; } 12% { opacity: 0.15; } 18% { opacity: 0.9; } 22% { opacity: 0.1; } 40% { opacity: 1; } 71% { opacity: 0.25; } 76% { opacity: 1; } }
+.anom-rustle { animation: anom-rustle 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes anom-rustle { 0%, 70%, 100% { transform: none; } 78% { transform: rotate(-3deg); } 86% { transform: rotate(3deg); } }
+.anom-eyes { animation: anom-eyes 3.2s steps(1) infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes anom-eyes { 0%, 100% { transform: none; } 90% { transform: scaleY(0.1); } 94% { transform: none; } }
+.anom-halo { animation: anom-halo 3s ease-in-out infinite; }
+@keyframes anom-halo { 50% { opacity: 0.08; } }
+.anom-swing { animation: anom-swing 1.2s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+@keyframes anom-swing { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+.anom-string { animation: anom-string 2.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+@keyframes anom-string { to { transform: rotate(5deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .anom-hop, .anom-hop-shadow, .anom-flicker, .anom-rustle, .anom-eyes, .anom-halo, .anom-swing, .anom-string { animation: none; }
+}
+.org-range { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.org-range legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 4px; font-size: 13px; }
+.org-range label { min-width: 0; }
+.org-range input[type="date"] { width: 100%; min-width: 0; box-sizing: border-box; }
+.org-range-note { grid-column: 1 / -1; }
+.org-range-note[data-error] { color: var(--text); font-weight: 600; }
+.org-range-clear { justify-self: start; grid-column: 1 / -1; }
+@media (max-width: 420px) { .org-range { grid-template-columns: minmax(0, 1fr); } }
+.pb-list { max-height: min(40vh, 280px); overflow-y: auto; }
+.pb-list li[data-off] { opacity: 0.6; }
+.pb-list .fr-acts button:disabled { opacity: 0.7; cursor: not-allowed; }
+.pb-empty { display: grid; gap: 8px; }
+.pb-off { font-weight: 700; }

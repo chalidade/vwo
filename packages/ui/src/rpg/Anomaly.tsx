@@ -13,6 +13,7 @@ const CAT_COATS = {
   cat: { fur: "#f59e0b", face: "#fbbf24", stripe: "#c2410c", eye: INK },
   blackcat: { fur: "#27272a", face: "#3f3f46", stripe: undefined, eye: "#facc15" },
   goldcat: { fur: "#eab308", face: "#fde047", stripe: "#a16207", eye: INK },
+  fountaincat: { fur: "#d4d4d8", face: "#f4f4f5", stripe: "#71717a", eye: INK },
 } as const;
 
 function catOf(coat: keyof typeof CAT_COATS) {
@@ -314,7 +315,131 @@ function Dragon() {
   );
 }
 
-const SPRITES: Record<AnomalyKind, { node: () => ReactElement; w: number; h: number; turns: boolean }> = {
+// ---- The park's own: a squirrel and a kite by day, a cat on the fountain; at night the ghosts.
+
+function Squirrel() {
+  return (
+    <svg width={40} height={34} viewBox="0 0 40 34" style={{ display: "block", overflow: "visible" }}>
+      <path className="anom-tail" d="M12 28C2 28 0 16 6 8c4-5 11-4 12 2-5 0-8 3-7 8 1 4 3 6 1 10Z" fill="#b45309" {...ink} />
+      <path d="M8 12c2-2 5-2 6 0" fill="none" stroke="#fcd34d" strokeWidth={1.6} strokeLinecap="round" />
+      <ellipse cx={21} cy={25} rx={8} ry={7} fill="#c2410c" {...ink} />
+      <ellipse cx={22} cy={27} rx={4} ry={4} fill="#fed7aa" />
+      <path d="M16 32h4M23 32h4" stroke={INK} strokeWidth={2.6} strokeLinecap="round" />
+      <g className="anom-bob">
+        <path d="M24 9l1-5 3 4Z" fill="#c2410c" {...ink} strokeWidth={1.4} />
+        <circle cx={27} cy={14} r={6} fill="#c2410c" {...ink} />
+        <circle cx={29} cy={13} r={1.2} fill={INK} />
+        <circle cx={32.6} cy={15.4} r={1} fill={INK} />
+        {/* The stolen sandwich. */}
+        <path d="M28 20l9-3 1 6Z" fill="#fde68a" {...ink} strokeWidth={1.4} />
+        <path d="M29.5 20.4l7.5-2.4" stroke="#16a34a" strokeWidth={1.6} />
+        <path d="M30 22.2l7.6-1.4" stroke="#ef4444" strokeWidth={1.2} />
+      </g>
+    </svg>
+  );
+}
+
+/** A kite caught in a tree's crown, its string hanging down. Stands at the trunk's foot. */
+function Kite() {
+  return (
+    <svg width={56} height={130} viewBox="0 0 56 130" style={{ display: "block", overflow: "visible" }}>
+      <path className="anom-string" d="M28 40c-6 14 8 22 0 36s6 20 2 34" fill="none" stroke="#f8fafc" strokeWidth={1.4} />
+      <g className="anom-rock">
+        <path d="M28 2l16 20-16 20-16-20Z" fill="#ef4444" {...ink} />
+        <path d="M28 2v40M12 22h32" stroke={INK} strokeWidth={1.6} />
+        <path d="M28 2l16 20H28Z" fill="#facc15" opacity={0.9} />
+        <path d="M28 42l-16-20h16Z" fill="#facc15" opacity={0.9} />
+        <path d="M28 42c-2 6 2 8 0 12" fill="none" stroke={INK} strokeWidth={1.2} />
+        <path d="M24 48l4 4 4-4M24 56l4 4 4-4" fill="none" stroke="#2563eb" strokeWidth={2.4} strokeLinejoin="round" />
+      </g>
+      {/* Two leaves in front of it: it really is stuck. */}
+      <ellipse cx={14} cy={36} rx={8} ry={5} fill="#38a169" {...ink} strokeWidth={1.6} />
+      <ellipse cx={42} cy={8} rx={7} ry={4.5} fill="#48bb78" {...ink} strokeWidth={1.6} />
+    </svg>
+  );
+}
+
+/** Mbak Kunti: a cheerful lady in white sitting on a branch, long hair, legs swinging. Stands at the
+ *  trunk's foot; the figure is up in the crown. */
+function Kunti() {
+  return (
+    <svg width={48} height={130} viewBox="0 0 48 130" style={{ display: "block", overflow: "visible" }}>
+      <ellipse cx={24} cy={36} rx={30} ry={34} fill="#f8fafc" opacity={0.22} className="anom-halo" />
+      <path d="M2 60c12-4 30-4 44 2" fill="none" stroke="#7c4a2a" strokeWidth={6} strokeLinecap="round" />
+      <g className="anom-float">
+        <path d="M14 22c-4 10-4 26-2 36h24c2-10 2-26-2-36Z" fill="#f8fafc" opacity={0.95} {...ink} />
+        <path className="anom-swing" d="M19 58l-1 10M29 58l1 10" stroke={INK} strokeWidth={4} strokeLinecap="round" />
+        <path className="anom-swing" d="M19 58l-1 10M29 58l1 10" stroke="#f1f5f9" strokeWidth={2} strokeLinecap="round" />
+        <path d="M12 16c-2 12-3 26 0 38 2-8 3-20 4-30ZM36 16c2 12 3 26 0 38-2-8-3-20-4-30Z" fill="#111827" />
+        <circle cx={24} cy={15} r={10} fill="#f1f5f9" {...ink} />
+        <path d="M14 14c0-8 4-12 10-12s10 4 10 12c-4-4-6-5-10-5s-6 1-10 5Z" fill="#111827" />
+        <circle cx={20.5} cy={16} r={1.4} fill={INK} />
+        <circle cx={27.5} cy={16} r={1.4} fill={INK} />
+        <path d="M21 20c2 2 4 2 6 0" fill="none" stroke="#e11d48" strokeWidth={1.4} strokeLinecap="round" />
+        <ellipse cx={18} cy={19} rx={1.8} ry={1} fill="#fda4af" />
+        <ellipse cx={30} cy={19} rx={1.8} ry={1} fill="#fda4af" />
+      </g>
+    </svg>
+  );
+}
+
+/** A pocong, wrapped and tied, hopping along: more silly than scary. */
+function Pocong() {
+  return (
+    <svg width={30} height={56} viewBox="0 0 30 56" style={{ display: "block", overflow: "visible" }}>
+      <ellipse className="anom-hop-shadow" cx={15} cy={54} rx={9} ry={2} fill="black" opacity={0.2} />
+      <g className="anom-hop">
+        <path d="M11 8c-3-4-1-7 4-5 5-2 7 1 4 5Z" fill="#f8fafc" {...ink} strokeWidth={1.6} />
+        <path d="M5 20c0-8 4-12 10-12s10 4 10 12v24c0 4-4 8-10 8S5 48 5 44Z" fill="#f8fafc" {...ink} />
+        <path d="M6 30c6 2 12 2 18 0M6 40c6 2 12 2 18 0" fill="none" stroke="#cbd5e1" strokeWidth={1.4} />
+        <path d="M11 50l4-3 4 3" fill="none" stroke={INK} strokeWidth={1.4} strokeLinejoin="round" />
+        <ellipse cx={15} cy={19} rx={6} ry={6.5} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1.2} />
+        <circle cx={12.8} cy={18.4} r={1.2} fill={INK} />
+        <circle cx={17.2} cy={18.4} r={1.2} fill={INK} />
+        <path d="M13.5 22c1 0.8 2 0.8 3 0" fill="none" stroke={INK} strokeWidth={1.1} strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+/** A park lamp flickering on its own: drawn over the lamp it stands on (the same size as LampSprite). */
+function FlickerLamp() {
+  return (
+    <svg width={40} height={96} viewBox="0 0 40 96" style={{ display: "block", overflow: "visible" }}>
+      <g className="anom-flicker">
+        <circle cx={20} cy={14} r={30} fill="#fef08a" opacity={0.55} />
+        <circle cx={20} cy={14} r={12} fill="#fffbeb" />
+        <path d="M8 22l5-16h14l5 16Z" fill="#fde047" {...ink} />
+      </g>
+      <path d="M34 4l4-4M37 10h5M2 4l-4-4M3 10h-5" stroke="#fde047" strokeWidth={2} strokeLinecap="round" className="anom-blink" />
+    </svg>
+  );
+}
+
+/** Two glowing eyes in a bush, blinking now and then. */
+function BushEyes() {
+  return (
+    <svg width={50} height={36} viewBox="0 0 50 36" style={{ display: "block", overflow: "visible" }}>
+      <ellipse cx={25} cy={34} rx={22} ry={3} fill="black" opacity={0.2} />
+      <g className="anom-rustle">
+        <circle cx={12} cy={22} r={11} fill="#166534" {...ink} />
+        <circle cx={38} cy={22} r={11} fill="#166534" {...ink} />
+        <circle cx={25} cy={15} r={13} fill="#15803d" {...ink} />
+        <path d="M4 33h42" stroke={INK} strokeWidth={2} />
+      </g>
+      <g className="anom-eyes">
+        <ellipse cx={20} cy={17} rx={3.4} ry={2.6} fill="#fde047" />
+        <ellipse cx={30} cy={17} rx={3.4} ry={2.6} fill="#fde047" />
+        <ellipse cx={20} cy={17} rx={1} ry={2.2} fill={INK} />
+        <ellipse cx={30} cy={17} rx={1} ry={2.2} fill={INK} />
+      </g>
+    </svg>
+  );
+}
+
+/** How each kind is drawn. `still` ones keep to their spot (in a tree, on a lamp); `iconH` crops a
+ *  tall drawing to its top for the lists. */
+const SPRITES: Record<AnomalyKind, { node: () => ReactElement; w: number; h: number; turns: boolean; still?: boolean; iconH?: number }> = {
   cat: { node: catOf("cat"), w: 44, h: 38, turns: true },
   dog: { node: Dog, w: 46, h: 40, turns: true },
   pigeon: { node: Pigeon, w: 40, h: 36, turns: true },
@@ -331,6 +456,13 @@ const SPRITES: Record<AnomalyKind, { node: () => ReactElement; w: number; h: num
   mascot: { node: Mascot, w: 40, h: 46, turns: false },
   goldcat: { node: catOf("goldcat"), w: 44, h: 38, turns: true },
   dragon: { node: Dragon, w: 50, h: 44, turns: true },
+  squirrel: { node: Squirrel, w: 40, h: 34, turns: true },
+  kite: { node: Kite, w: 56, h: 130, turns: false, still: true, iconH: 62 },
+  fountaincat: { node: catOf("fountaincat"), w: 44, h: 38, turns: false, still: true },
+  kunti: { node: Kunti, w: 48, h: 130, turns: false, still: true, iconH: 70 },
+  pocong: { node: Pocong, w: 30, h: 56, turns: false },
+  lamp: { node: FlickerLamp, w: 40, h: 96, turns: false, still: true, iconH: 50 },
+  eyes: { node: BushEyes, w: 50, h: 36, turns: false, still: true },
 };
 
 /** Twinkling stars around a rare one. */
@@ -364,7 +496,7 @@ export function AnomalyIcon({ kind }: { kind: AnomalyKind }) {
   const s = SPRITES[kind];
   const Node = s.node;
   return (
-    <div className="anom-icon" style={{ width: s.w, height: s.h }}>
+    <div className="anom-icon" style={{ width: s.w, height: s.iconH ?? s.h, overflow: s.iconH ? "hidden" : undefined }}>
       <Node />
     </div>
   );
@@ -375,7 +507,13 @@ export function AnomalySprite({ kind, claimed, rare }: { kind: AnomalyKind; clai
   const s = SPRITES[kind];
   const Node = s.node;
   return (
-    <div className="anom" data-claimed={claimed !== undefined ? "" : undefined} data-rare={rare ? "" : undefined} style={{ width: s.w, height: s.h }}>
+    <div
+      className="anom"
+      data-claimed={claimed !== undefined ? "" : undefined}
+      data-rare={rare ? "" : undefined}
+      data-still={s.still ? "" : undefined}
+      style={{ width: s.w, height: s.h }}
+    >
       <div className="anom-wander">
         <div className={s.turns ? "anom-face" : undefined}>
           <Node />
