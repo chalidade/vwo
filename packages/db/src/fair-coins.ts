@@ -3,7 +3,7 @@
 import { and, desc, eq, like, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { coinLedger, fairPlayers } from "./jobfair-schema";
-import { coinBalance, grantCoins } from "./jobfair";
+import { grantCoins } from "./jobfair";
 import { users } from "./schema";
 
 export interface CoinState {
@@ -59,19 +59,30 @@ export async function ensureCoinOpening(db: Db, userId: string, welcome: number)
   }
 }
 
+/** Balance, blue check and entry count in one pass over the account's rows, plus the newest 50: two queries. */
 export async function coinState(db: Db, userId: string): Promise<CoinState> {
-  const [balance, verified, rows, [count]] = await Promise.all([
-    coinBalance(db, userId),
-    hasCoinKey(db, `verified:${userId}`),
+  const [[sum], rows] = await Promise.all([
+    db
+      .select({
+        balance: sql<string | null>`sum(${coinLedger.delta})`,
+        n: sql<number>`count(*)::int`,
+        verified: sql<boolean | null>`bool_or(${coinLedger.idempotencyKey} = ${`verified:${userId}`})`,
+      })
+      .from(coinLedger)
+      .where(eq(coinLedger.userId, userId)),
     db
       .select({ at: coinLedger.createdAt, amount: coinLedger.delta, reason: coinLedger.reason })
       .from(coinLedger)
       .where(eq(coinLedger.userId, userId))
       .orderBy(desc(coinLedger.createdAt))
       .limit(50),
-    db.select({ n: sql<number>`count(*)::int` }).from(coinLedger).where(eq(coinLedger.userId, userId)),
   ]);
-  return { balance, verified, seq: count?.n ?? 0, txns: rows.filter((r) => !r.reason.includes("sebelum buku koin")).map((r) => ({ at: r.at.getTime(), amount: r.amount, reason: r.reason })) };
+  return {
+    balance: Number(sum?.balance ?? 0),
+    verified: !!sum?.verified,
+    seq: sum?.n ?? 0,
+    txns: rows.filter((r) => !r.reason.includes("sebelum buku koin")).map((r) => ({ at: r.at.getTime(), amount: r.amount, reason: r.reason })),
+  };
 }
 
 /** Days in a row (ending yesterday) on which the free daily coins were claimed. */

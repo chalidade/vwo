@@ -190,7 +190,8 @@ export const coinLedger = pgTable(
     idempotencyKey: text("idempotency_key").notNull().unique(),
     createdAt: createdAt(),
   },
-  (t) => [index("coin_ledger_user_idx").on(t.userId), check("coin_ledger_delta_nonzero", sql`${t.delta} <> 0`)],
+  // An account's newest entries (the wallet's history) and its sum both start from (user_id, created_at).
+  (t) => [index("coin_ledger_user_time_idx").on(t.userId, t.createdAt), check("coin_ledger_delta_nonzero", sql`${t.delta} <> 0`)],
 );
 
 // ---------------------------------------------------------------- seminars, tests, calls

@@ -1,11 +1,19 @@
 import "server-only";
-import { coinState, ensureCoinOpening, readPrices } from "@vwo/db";
+import { coinState, ensureCoinOpening, hasCoinKey, readPrices } from "@vwo/db";
 import { priceFrom } from "@vwo/shared";
 import { db } from "./db";
 
-/** The account's coins as the ledger has them, opening the ledger on first use. */
+/** Accounts whose ledger this instance already saw opened: an opening entry is never taken back. */
+const opened = new Set<string>();
+
+/** The account's coins as the ledger has them, opening the ledger on first use (checked once per instance). */
 export async function liveCoins(userId: string) {
-  await ensureCoinOpening(db, userId, priceFrom(await readPrices(db), "coin.start"));
+  if (!opened.has(userId)) {
+    // The price list is only needed for a ledger that isn't open yet.
+    if (!(await hasCoinKey(db, `opening:${userId}`))) await ensureCoinOpening(db, userId, priceFrom(await readPrices(db), "coin.start"));
+    if (opened.size >= 20_000) opened.clear();
+    opened.add(userId);
+  }
   return coinState(db, userId);
 }
 

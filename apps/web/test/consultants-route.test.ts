@@ -142,7 +142,7 @@ describe("the public setup", () => {
       { key: `consultant:${placed.id}`, data: placed, updatedAt: new Date(1) },
       { key: "consultcfg", data: { botsOff: ["hr-hendra"] }, updatedAt: new Date(2) },
     ]);
-    const body = await (await state.GET()).json();
+    const body = await (await state.GET(new Request("https://jobfair.co.id/api/jobfair/state"))).json();
     expect(body.consultants).toEqual([{ id: placed.id, desk: 2, via: "slot", open: true, profile: { ...profile, bio: "Halo" } }]);
     expect(body.consultBotsOff).toEqual(["hr-hendra"]);
     const text = JSON.stringify(body);

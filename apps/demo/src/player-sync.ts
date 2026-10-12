@@ -6,6 +6,8 @@ import { type Character, loadCharacter, saveCharacter } from "./CharacterCreator
 import type { PlayerProgress } from "./jobfair-engine";
 import { loadProfile, saveProfile, type SeekerProfile } from "./profile";
 import { coinsPending } from "./coin-sync";
+import { pollVisible } from "./poll";
+import { runtimeConfig } from "./runtime-config";
 import { fair } from "./useFair";
 
 interface Saved extends Partial<PlayerProgress> {
@@ -14,8 +16,6 @@ interface Saved extends Partial<PlayerProgress> {
 }
 
 const OWNER_KEY = "vwo:player-owner";
-const PUSH_MS = 4_000;
-const PULL_MS = 45_000;
 
 let stop: (() => void) | null = null;
 let syncedFor: string | null = null;
@@ -139,18 +139,28 @@ export function syncPlayer(account: Account | null) {
     }
   };
 
-  const onVisible = () => {
-    if (document.visibilityState === "visible") void pull();
-    else void push();
-  };
+  // Leaving the tab saves at once; coming back pulls (pollVisible).
+  const onVisible = () => document.visibilityState === "hidden" && void push();
   void pull(true);
-  const pushTimer = setInterval(() => void push(), PUSH_MS);
-  const pullTimer = setInterval(() => document.visibilityState === "visible" && void pull(), PULL_MS);
+  // Saves only go up when something changed, at most every PROGRESS_PUSH_SEC.
+  let pushTimer: ReturnType<typeof setTimeout>;
+  const pushSoon = () => {
+    pushTimer = setTimeout(() => {
+      void push();
+      if (!gone) pushSoon();
+    }, runtimeConfig().progressPushSec * 1000);
+  };
+  pushSoon();
+  const stopPull = pollVisible(
+    () => void pull(),
+    () => runtimeConfig().progressPollSec,
+    { now: false },
+  );
   document.addEventListener("visibilitychange", onVisible);
   stop = () => {
     gone = true;
-    clearInterval(pushTimer);
-    clearInterval(pullTimer);
+    clearTimeout(pushTimer);
+    stopPull();
     document.removeEventListener("visibilitychange", onVisible);
   };
 }

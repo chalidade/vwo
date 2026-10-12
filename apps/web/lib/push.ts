@@ -3,6 +3,8 @@ import { dropPushEndpoint, pushSubscriptionsOf } from "@vwo/db";
 import { after } from "next/server";
 import webpush from "web-push";
 import { db } from "./db";
+import { inBatches } from "./batches";
+import { pushBatch } from "./limits";
 
 /**
  * Notifications on the phone or computer outside the app (Web Push). Needs a VAPID key pair in the
@@ -50,12 +52,11 @@ export async function sendPush(userIds: string[], msg: PushMessage) {
   try {
     const subs = await pushSubscriptionsOf(db, ids);
     const payload = JSON.stringify({ title: msg.title.slice(0, 80), body: msg.body.slice(0, 180), url: msg.url ?? "/", tag: msg.tag });
-    await Promise.all(
-      subs.map((s) =>
-        webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "normal", timeout: 8000 }).catch(async (e: { statusCode?: number }) => {
-          if (e.statusCode === 404 || e.statusCode === 410) await dropPushEndpoint(db, s.endpoint);
-        }),
-      ),
+    // A seminar with a thousand registrants is a thousand requests: a batch at a time, not all at once.
+    await inBatches(subs, pushBatch(), (s) =>
+      webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600, urgency: "normal", timeout: 8000 }).catch(async (e: { statusCode?: number }) => {
+        if (e.statusCode === 404 || e.statusCode === 410) await dropPushEndpoint(db, s.endpoint);
+      }),
     );
   } catch (e) {
     console.warn("push failed", (e as Error).message);
