@@ -7,6 +7,7 @@ import { BENCH_H, BENCH_W, PARK, PIGEON_FLOCKS, type ParkBuilding, type ParkNpc,
 import { memo } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK, LampSprite } from "./Furniture";
+import { FOUNTAIN_BOX, Fountain } from "./Fountain";
 import { libraryBuildingExtra } from "./Library";
 
 const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
@@ -274,41 +275,6 @@ const BenchSprite = memo(function BenchSprite() {
       <rect x={2} y={12} width={w - 4} height={10} rx={3} fill="#a16207" {...ink} strokeWidth={1.6} />
       <rect x={0} y={26} width={w} height={14} rx={4} fill="#ca8a04" {...ink} strokeWidth={1.8} />
       <path d={`M6 31H${w - 6}`} stroke="#fde68a" strokeWidth={1.6} opacity={0.6} />
-    </svg>
-  );
-});
-
-/** The fountain in the plaza: a stone basin, a bowl on a column, and water. */
-const Fountain = memo(function Fountain() {
-  const W = PARK.fountain.width * T;
-  const H = PARK.fountain.height * T + 70;
-  const by = H - PARK.fountain.height * T * 0.5;
-  return (
-    <svg width={W} height={H} style={{ display: "block", overflow: "visible" }}>
-      <ellipse cx={W / 2} cy={H - 6} rx={W / 2} ry={12} fill="black" opacity={0.18} />
-      <ellipse cx={W / 2} cy={by + 10} rx={W / 2 - 2} ry={PARK.fountain.height * T * 0.42} fill="#cbd5e1" {...ink} />
-      <ellipse cx={W / 2} cy={by + 4} rx={W / 2 - 16} ry={PARK.fountain.height * T * 0.32} fill="#38bdf8" stroke="#0369a1" strokeWidth={2} />
-      <ellipse className="park-ripple" cx={W / 2} cy={by + 6} rx={W / 4} ry={12} fill="none" stroke="#e0f2fe" strokeWidth={2} />
-      {/* Two ducks paddling round the basin, and an orange koi under the water. */}
-      <path className="park-koi" d={`M${W / 2 - 50} ${by + 18}c6-5 14-5 20 0-6 5-14 5-20 0l-6-4v8Z`} fill="#fb923c" opacity={0.8} />
-      {[0, 1].map((i) => (
-        <g key={i} className="park-duck" style={{ animationDelay: `-${i * 5}s` }}>
-          <g transform={`translate(${W / 2 - 64 + i * 92}, ${by - 6 + i * 16})`}>
-            <path d="M0 10c0-5 4-7 9-7h7c5 0 8 3 7 8-1 3-4 5-9 5H8c-4 0-8-2-8-6Z" fill={i ? "#f8fafc" : "#fde047"} {...ink} strokeWidth={1.6} />
-            <circle cx={18} cy={2} r={5} fill={i ? "#f8fafc" : "#fde047"} {...ink} strokeWidth={1.6} />
-            <circle cx={19.5} cy={1} r={1} fill={INK} />
-            <path d="M22.5 2.5l4 1-4 1.5Z" fill="#f97316" stroke={INK} strokeWidth={1} />
-          </g>
-        </g>
-      ))}
-      <rect x={W / 2 - 9} y={by - 70} width={18} height={74} fill="#e2e8f0" {...ink} />
-      <ellipse cx={W / 2} cy={by - 70} rx={40} ry={11} fill="#e2e8f0" {...ink} />
-      <ellipse cx={W / 2} cy={by - 72} rx={30} ry={6} fill="#7dd3fc" />
-      <g className="park-water" fill="none" stroke="#bae6fd" strokeWidth={3} strokeLinecap="round">
-        <path d={`M${W / 2} ${by - 76}q-30 -40 -56 30`} />
-        <path d={`M${W / 2} ${by - 76}q30 -40 56 30`} />
-        <path d={`M${W / 2} ${by - 76}V${by - 112}`} />
-      </g>
     </svg>
   );
 });
@@ -632,7 +598,7 @@ export function parkExtras(view: {
   });
   out.push(libraryBuildingExtra(view.onLibrary));
   const f = PARK.fountain;
-  out.push({ key: "park-fountain", x: f.x, y: f.y + f.height - (f.height + 70 / T), z: f.y + f.height, w: f.width, h: f.height + 2, node: <Fountain /> });
+  out.push({ key: "park-fountain", x: f.x, y: f.y - FOUNTAIN_BOX.above, z: f.y + f.height, w: FOUNTAIN_BOX.w, h: FOUNTAIN_BOX.h, node: <Fountain night={night} /> });
   PARK.beds.forEach((b, i) => out.push({ key: `park-bed-${i}`, x: b.x, y: b.y - 6 / T, z: b.y + b.height, w: b.width, node: <FlowerBed w={b.width * T} h={b.height * T} /> }));
   PARK.trees.forEach((t, i) => out.push({ key: `park-tree-${i}`, x: t.x - 55 / T, y: t.y - 146 / T, z: t.y, node: <TreeSprite seed={i} /> }));
   // Under whoever sits on it.
@@ -685,6 +651,17 @@ export function parkLights(view: { dark: number; npcs?: readonly ParkNpc[] }): S
   if (view.dark <= 0) return [];
   const out: SceneExtra[] = [];
   const o = view.dark;
+  // The fountain's lights under the water, and the jet catching them.
+  const f = PARK.fountain;
+  out.push({
+    key: "park-fountain-glow",
+    x: f.x,
+    y: f.y - FOUNTAIN_BOX.above,
+    z: 0,
+    w: FOUNTAIN_BOX.w,
+    h: FOUNTAIN_BOX.h,
+    node: <div className="pf-nightglow" style={{ width: FOUNTAIN_BOX.w * T, height: FOUNTAIN_BOX.h * T, opacity: o, ["--pool-y" as string]: `${FOUNTAIN_BOX.poolY * 100}%` }} />,
+  });
   PARK.lamps.forEach((l, i) => {
     out.push({ key: `park-pool-${i}`, x: l.x - 1.6, y: l.y - 0.6, z: 0, w: 3.2, h: 1.6, node: <div className="park-pool" style={{ opacity: o }} /> });
     out.push({ key: `park-glow-${i}`, x: l.x - 1.4, y: l.y - 92 / T + 14 / T - 1.4, z: 0, w: 2.8, h: 2.8, node: <div className="park-lampglow" style={{ opacity: o }} /> });

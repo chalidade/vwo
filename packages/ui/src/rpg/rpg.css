@@ -1314,13 +1314,9 @@
 .park-path { box-sizing: border-box; border-radius: 10px; background: #e7d3a8; background-image: radial-gradient(circle at 8px 8px, rgb(120 53 15 / 0.18) 2px, transparent 3px); background-size: 24px 24px; border: 3px solid #c8a76a; }
 .park-plaza { box-sizing: border-box; border-radius: 50%; background: #e7d3a8; background-image: repeating-radial-gradient(circle at center, transparent 0 22px, rgb(120 53 15 / 0.12) 22px 24px); border: 3px solid #c8a76a; }
 .park-sign { width: auto; white-space: nowrap; background: rgb(134 239 172 / 0.7); border-color: #15803d; color: #14532d; }
-.park-water { animation: park-water 1.6s ease-in-out infinite; }
-@keyframes park-water { 50% { opacity: 0.55; transform: translateY(2px); } }
-.park-ripple { transform-box: fill-box; transform-origin: center; animation: park-ripple 2.4s ease-out infinite; }
-@keyframes park-ripple { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
 .park-flag { transform-box: fill-box; transform-origin: left center; animation: park-flag 2.2s ease-in-out infinite; }
 @keyframes park-flag { 50% { transform: scaleX(0.86) skewY(4deg); } }
-@media (prefers-reduced-motion: reduce) { .park-water, .park-ripple, .park-flag { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .park-flag { animation: none; } }
 
 /* ---- The park comes alive: day and night, ducks, pigeons, butterflies, the playground, fireflies.
    Everything moves with transform and opacity only, and the night is one flat tint over the floor. */
@@ -1330,10 +1326,6 @@
 @keyframes park-twinkle { 50% { opacity: 0.25; } }
 .rpg-sprite[data-small] .pg-flip { scale: 0.74; transform-origin: 50% 100%; }
 .rpg-sprite[data-small] .rpg-name { font-size: 9px; }
-.park-duck { animation: park-duck 10s ease-in-out infinite; }
-@keyframes park-duck { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(26px) translateY(4px); } }
-.park-koi { animation: park-koi 7s ease-in-out infinite; }
-@keyframes park-koi { 0%, 100% { transform: translateX(0); opacity: 0.8; } 50% { transform: translateX(70px); opacity: 0.4; } }
 .park-swing { animation: park-swing 2.4s ease-in-out infinite alternate; }
 @keyframes park-swing { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 .park-pigeons { position: relative; width: 92px; height: 40px; }
@@ -1350,5 +1342,58 @@
 @keyframes park-firefly { 0%, 100% { transform: translate(0, 0); filter: brightness(1); } 25% { transform: translate(14px, -10px); filter: brightness(0.4); } 50% { transform: translate(4px, -22px); } 75% { transform: translate(-12px, -8px); filter: brightness(0.5); } }
 .park-torch { width: 68px; height: 48px; border-radius: 50%; background: radial-gradient(closest-side, rgb(254 249 195 / 0.55), transparent); pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
-  .park-twinkle, .park-duck, .park-koi, .park-swing, .park-pigeon, .park-flutter, .park-bfly, .park-firefly { animation: none; }
+  .park-twinkle, .park-swing, .park-pigeon, .park-flutter, .park-bfly, .park-firefly { animation: none; }
 }
+
+/* ---- The fountain: a stone pool, two bowls spilling over, a jet and four arcs, ripples and light on
+   the water, koi under it and ducks paddling round the column (Fountain.tsx). Only transform, opacity
+   and dash offsets move; the ducks' depth flips at the two ends of their loop, beside the column. */
+.pf { position: relative; isolation: isolate; }
+.pf-layer { position: absolute; left: 0; top: 0; display: block; overflow: visible; z-index: 0; }
+.pf-top { z-index: 2; }
+.pf-flow { animation: pf-flow 0.8s linear infinite; }
+.pf-flow path { animation: inherit; }
+@keyframes pf-flow { to { stroke-dashoffset: -44; } }
+.pf-ring { transform-box: fill-box; transform-origin: center; animation: pf-ring 1.6s ease-out infinite; }
+@keyframes pf-ring { from { transform: scale(0.35); opacity: 0.9; } to { transform: scale(1.25); opacity: 0; } }
+.pf-glint { animation: pf-glint 3.6s ease-in-out infinite; }
+@keyframes pf-glint { 0%, 100% { opacity: 0; } 50% { opacity: 0.9; } }
+.pf-caustics path { animation: pf-caustic 5s ease-in-out infinite alternate; }
+@keyframes pf-caustic { from { transform: translateX(-10px); opacity: 0.35; } to { transform: translateX(10px); opacity: 1; } }
+.pf-drop { transform-box: fill-box; transform-origin: center; animation: pf-drop 0.9s ease-out infinite; }
+@keyframes pf-drop { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 50% { transform: translateY(-7px); } 100% { transform: translateY(0); opacity: 0; } }
+.pf-mist { transform-box: fill-box; transform-origin: center; animation: pf-mist 4s ease-in-out infinite alternate; }
+@keyframes pf-mist { from { opacity: 0.35; transform: scale(0.94); } to { opacity: 0.8; transform: scale(1.06); } }
+.pf-glow { animation: pf-pulse 4s ease-in-out infinite alternate; }
+@keyframes pf-pulse { from { opacity: 0.6; } to { opacity: 1; } }
+.pf-koi { position: absolute; left: 0; top: 0; z-index: 0; opacity: 0.75; offset-rotate: auto; animation: pf-swim 18s linear infinite; pointer-events: none; }
+@keyframes pf-swim { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+.pf-tail { transform-box: fill-box; transform-origin: right center; animation: pf-tail 0.45s ease-in-out infinite alternate; }
+@keyframes pf-tail { from { transform: rotate(-20deg); } to { transform: rotate(20deg); } }
+.pf-duck { position: absolute; z-index: 3; width: 0; height: 0; animation: pf-dz var(--p) steps(1, end) var(--d) infinite; pointer-events: none; }
+@keyframes pf-dz { 0% { z-index: 3; } 50%, 100% { z-index: 1; } }
+.pf-dx { animation: pf-dx var(--half) cubic-bezier(0.37, 0, 0.63, 1) var(--d) infinite alternate; }
+@keyframes pf-dx { from { transform: translateX(calc(var(--ax) * -1)); } to { transform: translateX(var(--ax)); } }
+.pf-dy { animation: pf-dy var(--half) cubic-bezier(0.37, 0, 0.63, 1) var(--dy) infinite alternate; }
+@keyframes pf-dy { from { transform: translateY(calc(var(--ay) * -1)); } to { transform: translateY(var(--ay)); } }
+.pf-face { animation: pf-face var(--p) ease-in-out var(--d) infinite; }
+@keyframes pf-face { 0% { transform: scaleX(0.05); } 5%, 45% { transform: scaleX(1); } 50% { transform: scaleX(-0.05); } 55%, 95% { transform: scaleX(-1); } 100% { transform: scaleX(0.05); } }
+.pf-bob { animation: pf-bob 2.2s ease-in-out infinite alternate; }
+@keyframes pf-bob { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-1.6px) rotate(3deg); } }
+.pf-bob[data-small] svg { transform: scale(0.6); transform-origin: 15px 21px; }
+.pf-wake { transform-box: fill-box; transform-origin: center; animation: pf-wake 1.4s ease-out infinite; }
+@keyframes pf-wake { from { transform: scale(0.8); opacity: 0.8; } to { transform: scale(1.2); opacity: 0.15; } }
+.pf-nightglow { pointer-events: none; background: radial-gradient(ellipse 46% 20% at 50% var(--pool-y), rgb(165 243 252 / 0.5), transparent 75%), radial-gradient(ellipse 16% 30% at 50% 22%, rgb(224 242 254 / 0.35), transparent 75%); }
+@media (prefers-reduced-motion: reduce) {
+  .pf-flow, .pf-flow path, .pf-ring, .pf-glint, .pf-caustics path, .pf-drop, .pf-mist, .pf-glow, .pf-koi, .pf-tail, .pf-duck, .pf-dx, .pf-dy, .pf-face, .pf-bob, .pf-wake { animation: none; }
+  .pf-dx { transform: translateX(var(--rx)); }
+  .pf-dy { transform: translateY(var(--ry)); }
+}
+
+/* ---- The reading room's people: a page turning now and then, a laptop's glow, a mug steaming. */
+.lib-page { transform-box: fill-box; transform-origin: left center; animation: lib-page 7s ease-in-out infinite; }
+@keyframes lib-page { 0%, 82% { transform: scaleX(1); } 92% { transform: scaleX(-1); opacity: 1; } 96%, 100% { transform: scaleX(-1); opacity: 0; } }
+.lib-screen { animation: pf-pulse 2.6s ease-in-out infinite alternate; }
+.lib-steam { animation: lib-steam 2.4s ease-in-out infinite; }
+@keyframes lib-steam { 0%, 100% { opacity: 0; transform: translateY(1px); } 50% { opacity: 0.9; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .lib-page, .lib-screen, .lib-steam { animation: none; } }

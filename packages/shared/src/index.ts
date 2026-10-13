@@ -7,6 +7,7 @@ export * from "./menu";
 export * from "./jobfair";
 export * from "./park";
 export * from "./library-room";
+export * from "./library-life";
 export * from "./booth-packages";
 export * from "./auth";
 export * from "./fair-api";
