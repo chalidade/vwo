@@ -1,4 +1,4 @@
-import { type ParkBuilding, type ParkNpc, parkBuildingDate } from "@vwo/shared";
+import { type LibraryNpc, type ParkBuilding, type ParkNpc, parkBuildingDate } from "@vwo/shared";
 import { type Look, lookFor } from "@vwo/ui";
 
 /** How one of the park's people looks, from what they are doing: running gear, the vendor's straw
@@ -20,6 +20,22 @@ export function parkNpcLook(n: ParkNpc, night: boolean): Look {
       return { ...base, hair: "#e5e7eb", style: "bun", outfit: "dress", hat: undefined, glasses: true };
     default:
       return base;
+  }
+}
+
+/** How one of the reading room's people looks: a student in a hoodie, a child in a tee, readers in
+ *  their everyday clothes, some with glasses. */
+export function libraryNpcLook(n: LibraryNpc): Look {
+  const base = { ...lookFor(n.id), backpack: undefined, prop: undefined, cane: false };
+  switch (n.activity) {
+    case "laptop":
+      return { ...base, outfit: "hoodie", hat: undefined, glasses: true };
+    case "kid":
+      return { ...base, outfit: "tee", shorts: true, hat: undefined, mustache: false, glasses: false };
+    case "browse":
+      return { ...base, outfit: "dress", hat: undefined, glasses: true };
+    default:
+      return { ...base, hat: undefined };
   }
 }
 

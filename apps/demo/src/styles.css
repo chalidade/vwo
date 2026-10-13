@@ -2898,3 +2898,12 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
   .lib-r-toc { max-width: 150px; }
   .lib-reader.lib-book .lib-r-tools { gap: 5px; }
 }
+
+/* ---- Keys hint on the bottom row: on a desktop the "W A S D jalan · E bicara ..." line sits beside the
+   menu (Profil ... Keluar), on the same row, instead of floating over the floor. Phones never show it. */
+.game-fair .hud-bottom:has(> .hint-keys) {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  min-height: calc(var(--fair-nav, 64px) - 12px - env(safe-area-inset-bottom));
+  align-items: center;
+  padding-left: calc(var(--fair-nav-right, 0px) + 12px);
+}

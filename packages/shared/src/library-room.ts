@@ -31,6 +31,8 @@ export const LIBRARY_ROOM = {
     { x: 8.4, y: 9.4, width: 3.2, height: 1.1 },
     { x: 14.4, y: 9.4, width: 3.2, height: 1.1 },
   ],
+  /** A beanbag in the corner by the children's books. */
+  beanbag: { x: 2.3, y: 11.2, width: 1.4, height: 0.8 },
   /** The door out to the park, in the bottom wall. */
   door: { x: 12, y: 13, width: 2, height: 1 },
 } as const;
@@ -46,6 +48,15 @@ export function librarySpot(spot: "librarian" | "front") {
   const d = LIBRARY_ROOM.desk;
   return spot === "librarian" ? { x: d.x + d.width / 2, y: d.y - 0.55 } : { x: d.x + d.width / 2, y: d.y + d.height + 0.7 };
 }
+
+/** A chair at a reading table: 0 and 1 along the top (facing down at the table), 2 and 3 along the bottom. */
+export function librarySeat(table: number, k: 0 | 1 | 2 | 3) {
+  const t = LIBRARY_ROOM.tables[table]!;
+  return { x: k % 2 ? t.x + t.width - 0.8 : t.x + 0.8, y: k < 2 ? t.y - 0.35 : t.y + t.height + 0.35 };
+}
+
+/** A chair's id on the reading room's floor. */
+export const librarySeatId = (floorId: string, table: number, k: 0 | 1 | 2 | 3) => `${floorId}-meja${table + 1}-${"ABCD"[k]}`;
 
 const shelves = (): readonly Box[] => [...LIBRARY_ROOM.backShelves, ...LIBRARY_ROOM.sideShelves];
 
@@ -66,7 +77,7 @@ export function atLibraryExit(x: number, y: number) {
 export function buildLibraryFloor(fair: { slug: string }): FloorView {
   const id = libraryFloorId(fair);
   const L = LIBRARY_ROOM;
-  const objects: MapObjectView[] = [...shelves(), L.desk].map((b, i) => ({
+  const objects: MapObjectView[] = [...shelves(), L.desk, L.beanbag].map((b, i) => ({
     id: `${id}-obj-${i}`,
     type: "blocked",
     ...b,
@@ -96,12 +107,9 @@ export function buildLibraryFloor(fair: { slug: string }): FloorView {
   L.tables.forEach((t, i) => {
     const table: TableView = { id: `${id}-meja${i + 1}`, label: `Meja ${i + 1}`, shape: "rect", ...t, rotation: 0 };
     tables.push(table);
-    [
-      [t.x + 0.8, t.y - 0.35],
-      [t.x + t.width - 0.8, t.y - 0.35],
-      [t.x + 0.8, t.y + t.height + 0.35],
-      [t.x + t.width - 0.8, t.y + t.height + 0.35],
-    ].forEach(([x, y], k) => seats.push({ id: `${table.id}-${"ABCD"[k]}`, label: `Meja ${i + 1}${"ABCD"[k]}`, tableId: table.id, x: x!, y: y!, isActive: true }));
+    ([0, 1, 2, 3] as const).forEach((k) =>
+      seats.push({ id: librarySeatId(id, i, k), label: `Meja ${i + 1}${"ABCD"[k]}`, tableId: table.id, ...librarySeat(i, k), isActive: true }),
+    );
   });
   return { id, name: "Perpustakaan", width: L.width, height: L.height, tables, seats, objects, theme: "indoor" };
 }

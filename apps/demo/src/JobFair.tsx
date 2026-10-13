@@ -46,6 +46,11 @@ import {
   atPhoneBox,
   darkness,
   parkNpcHello,
+  libraryNpcHello,
+  libraryNpcSeats,
+  libraryNpcsAt,
+  librarySeatId,
+  type LibraryNpc,
   parkNpcSeats,
   parkNpcsAt,
   scaredFlocks,
@@ -80,6 +85,7 @@ import {
   seminarStageExtras,
   aulaExtras,
   loungeExtras,
+  libraryNpcExtras,
   libraryRoomExtras,
   type StageScreen,
   lookFor,
@@ -121,7 +127,7 @@ import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, loadRelay, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
-import { ParkCard, parkNpcLook } from "./fair/Park";
+import { ParkCard, libraryNpcLook, parkNpcLook } from "./fair/Park";
 import { PhoneBox } from "./fair/PhoneBox";
 import { phoneBook } from "./fair/phone-book";
 import { parkNow } from "./fair/park-clock";
@@ -284,11 +290,18 @@ export function JobFair() {
   // home-indicator inset): the action button sits above it and the camera keeps the floor's last row clear.
   const navRef = useRef<HTMLDivElement>(null);
   const [navSpace, setNavSpace] = useState(0);
+  /** How far the tab bar reaches from the left edge: on a desktop the keys hint sits beside it. */
+  const [navRight, setNavRight] = useState(0);
   useEffect(() => {
     const nav = navRef.current;
     const game = nav?.parentElement;
     if (!nav || !game) return setNavSpace(0);
-    const measure = () => setNavSpace(Math.ceil(game.getBoundingClientRect().bottom - nav.getBoundingClientRect().top));
+    const measure = () => {
+      const g = game.getBoundingClientRect();
+      const n = nav.getBoundingClientRect();
+      setNavSpace(Math.ceil(g.bottom - n.top));
+      setNavRight(Math.ceil(n.right - g.left));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(nav);
@@ -479,8 +492,14 @@ export function JobFair() {
   const benchSeatId = (bench: number, side: 0 | 1) => `${fair.parkId}-bench${bench + 1}-${"AB"[side]}`;
   const visitorSeats = fair.occupiedSeats();
   const parkPeople: ParkNpc[] = park ? parkNpcsAt(parkAt, (b, side) => visitorSeats.has(benchSeatId(b, side))) : [];
-  /** Seats taken: by visitors, and in the park the bench seats its people sit on. */
-  const occupied = park ? new Set([...visitorSeats, ...parkNpcSeats(parkAt).map(([b, side]) => benchSeatId(b, side))]) : visitorSeats;
+  // The reading room's people, from the clock too.
+  const libPeople: LibraryNpc[] = libRoom ? libraryNpcsAt(Date.now(), (t, k) => visitorSeats.has(librarySeatId(floor.id, t, k))) : [];
+  /** Seats taken: by visitors, in the park the bench seats its people sit on, in the library their chairs. */
+  const occupied = park
+    ? new Set([...visitorSeats, ...parkNpcSeats(parkAt).map(([b, side]) => benchSeatId(b, side))])
+    : libRoom
+      ? new Set([...visitorSeats, ...libraryNpcSeats().map(([t, k]) => librarySeatId(floor.id, t, k))])
+      : visitorSeats;
   const mine = session ? fair.applications.filter((a) => a.visitorId === session.visitorId) : [];
   const appliedIds = new Set(mine.map((a) => a.jobId));
 
@@ -986,7 +1005,12 @@ export function JobFair() {
     const me = session && fair.visitors.get(session.visitorId);
     if (!me || busy.current) return;
     if (followRef.current) setFollow(null);
-    const taken = me.floorId === fair.parkId ? new Set([...fair.occupiedSeats(), ...parkNpcSeats(parkNow()).map(([b, side]) => benchSeatId(b, side))]) : fair.occupiedSeats();
+    const taken =
+      me.floorId === fair.parkId
+        ? new Set([...fair.occupiedSeats(), ...parkNpcSeats(parkNow()).map(([b, side]) => benchSeatId(b, side))])
+        : me.floorId === fair.libraryId
+          ? new Set([...fair.occupiedSeats(), ...libraryNpcSeats().map(([t, k]) => librarySeatId(me.floorId, t, k))])
+          : fair.occupiedSeats();
     const seat = fair
       .floor(me.floorId)
       .seats.filter((st) => !taken.has(st.id) || st.id === me.seatId)
@@ -1864,24 +1888,24 @@ export function JobFair() {
       }),
     ),
     ...(libRoom
-      ? libraryRoomExtras({ books: session ? goToLibrary : undefined })
+      ? [...libraryRoomExtras({ books: session ? goToLibrary : undefined }), ...libraryNpcExtras(libPeople)]
       : park
-      ? parkExtras({
-          eventName: fair.fair.name,
-          plots: parkPlots(fair.shownParkBuildings()),
-          onEnter: session ? goInside : undefined,
-          onPlot: session ? (i) => goTo(fair.parkId, plotFront(i).x, plotFront(i).y) : undefined,
-          onPhone: session ? goToPhone : undefined,
-          onLibrary: session ? goToLibraryDoor : undefined,
-          dark,
-          npcs: parkPeople,
-          scared: self ? scaredFlocks(self.x, self.y) : undefined,
-        })
-      : [
-          ...infoDeskExtras(desk, session ? goToInfo : undefined),
-          ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
-          ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
-        ]),
+        ? parkExtras({
+            eventName: fair.fair.name,
+            plots: parkPlots(fair.shownParkBuildings()),
+            onEnter: session ? goInside : undefined,
+            onPlot: session ? (i) => goTo(fair.parkId, plotFront(i).x, plotFront(i).y) : undefined,
+            onPhone: session ? goToPhone : undefined,
+            onLibrary: session ? goToLibraryDoor : undefined,
+            dark,
+            npcs: parkPeople,
+            scared: self ? scaredFlocks(self.x, self.y) : undefined,
+          })
+        : [
+            ...infoDeskExtras(desk, session ? goToInfo : undefined),
+            ...liftExtras(stop.name, fair.stops, session ? goToLift : undefined),
+            ...liftSignExtras(room ? ROOM_SIGNS : firstHall ? GROUND_SIGNS : HALL_SIGNS, session ? goToLift : undefined),
+          ]),
     ...(lobby ? parkDoorExtras(floor, session ? goToPark : undefined) : []),
     ...sponsors.map((sp) => sponsorExtras(sp, () => openSponsor(sp))),
     ...(coinHere ? coinStandExtras(fair.fair.coinStand, session ? goToCoinStand : undefined) : []),
@@ -1933,10 +1957,13 @@ export function JobFair() {
       moving: n.moving,
       look: parkNpcLook(n, dark > 0.5),
     });
+  // The reading room's people, the same way.
+  for (const n of libPeople)
+    npcs.push({ id: n.id, name: n.name, floorId: floor.id, x: n.x, y: n.y, facing: n.facing, seated: n.seated, small: n.small, moving: n.moving, look: libraryNpcLook(n) });
   // Only who is on the floor in view: people elsewhere cost nothing to draw.
   const avatars: AvatarState[] = [...fair.visitors.values()].filter((v) => v.floorId === floor.id);
   const bubbles = {
-    ...Object.fromEntries(parkPeople.flatMap((n) => (n.say ? [[n.id, n.say]] : []))),
+    ...Object.fromEntries([...parkPeople, ...libPeople].flatMap((n) => (n.say ? [[n.id, n.say]] : []))),
     ...Object.fromEntries([...fair.bubbles].map(([id, b]) => [id, b.text])),
   };
   const lookOf = (a: AvatarState) =>
@@ -1949,7 +1976,7 @@ export function JobFair() {
   const totalJobs = fair.fair.booths.reduce((n, b) => n + openJobs(b).length, 0);
 
   return (
-    <div className="game game-fair" style={navSpace ? { ["--fair-nav" as string]: `${navSpace}px` } : undefined}>
+    <div className="game game-fair" style={navSpace ? { ["--fair-nav" as string]: `${navSpace}px`, ["--fair-nav-right" as string]: `${navRight}px` } : undefined}>
       <CafeScene
         className="game-scene"
         hudBottom={session ? Math.max(72, navSpace) + 52 : 0}
@@ -1992,6 +2019,7 @@ export function JobFair() {
                 const pr = fair.fair.promoters.find((x) => promoterId(x.id) === id);
                 const ci = room?.consultants?.findIndex((x) => consultantId(x.id) === id) ?? -1;
                 if (id.startsWith("park:")) fair.say(id, parkNpcHello(id, parkNow()), 3000);
+                else if (id.startsWith("lib:")) fair.say(id, libraryNpcHello(id, Date.now()), 3000);
                 else if (ci >= 0) goToConsultant(ci);
                 else if (id === LIBRARIAN_ID) goToLibrary();
                 else if (b) goToBooth(b);

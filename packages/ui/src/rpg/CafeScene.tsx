@@ -523,7 +523,10 @@ export function CafeScene({
     });
   }
 
-  ents.sort((a, b) => a.z - b.z);
+  // Depth is each one's place after sorting by base y, given as its z-index. The elements stay in the
+  // order they were added: re-ordering them as people walk past would make React move a tree or the
+  // fountain in the page, and a moved element restarts its CSS animations (the ducks kept jumping back).
+  const depth = new Map([...ents].sort((a, b) => a.z - b.z).map((e, i) => [e.key, i]));
 
   // Draw only what is on screen (plus a margin for wide things that start off it): on a phone most
   // of a hall is outside the view, and every drawn sprite costs style, layout and paint each frame.
@@ -678,7 +681,7 @@ export function CafeScene({
               title={e.title}
               onPointerDown={e.onClick ? (ev) => ev.stopPropagation() : undefined}
               onClick={e.onClick}
-              style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: 10 + Math.round(e.z), cursor: e.onClick ? "pointer" : undefined }}
+              style={{ transform: `translate(${e.x}px, ${e.y}px)`, zIndex: 10 + (depth.get(e.key) ?? 0), cursor: e.onClick ? "pointer" : undefined }}
             >
               {e.node}
             </div>

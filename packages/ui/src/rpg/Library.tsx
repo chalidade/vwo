@@ -1,7 +1,8 @@
 "use client";
 // Drawings for the Perpustakaan: its building in the park (columns, a pediment, steps up to the door,
-// windows full of books) and its reading room (bookcases, the librarian's desk, a sign on the wall).
-import { LIBRARY_ROOM, LIBRARY_SHELVES, PARK } from "@vwo/shared";
+// windows full of books) and its reading room (bookcases, the librarian's desk, a sign on the wall,
+// a beanbag), and what the reading room's people have with them (an open book, a laptop).
+import { LIBRARY_ROOM, LIBRARY_SHELVES, type LibraryNpc, PARK } from "@vwo/shared";
 import { memo } from "react";
 import type { SceneExtra } from "./CafeScene";
 import { INK } from "./Furniture";
@@ -157,6 +158,14 @@ export function libraryRoomExtras(on: { books?: () => void } = {}): SceneExtra[]
       ),
     },
     {
+      key: "lib-beanbag",
+      x: L.beanbag.x - 0.1,
+      y: L.beanbag.y + L.beanbag.height - 54 / T,
+      // Under whoever sits in it.
+      z: L.beanbag.y + 0.4,
+      node: <Beanbag />,
+    },
+    {
       key: "lib-rug",
       x: 7.6,
       y: 4.9,
@@ -191,4 +200,96 @@ export function libraryRoomExtras(on: { books?: () => void } = {}): SceneExtra[]
       ),
     },
   ];
+}
+
+/** A round beanbag, slumped a little. */
+const Beanbag = memo(function Beanbag() {
+  const w = (LIBRARY_ROOM.beanbag.width + 0.2) * T;
+  return (
+    <svg width={w} height={54} style={{ display: "block", overflow: "visible" }}>
+      <ellipse cx={w / 2} cy={50} rx={w / 2 - 2} ry={5} fill="black" opacity={0.18} />
+      <path d={`M6 46C0 30 10 8 ${w / 2} 8S${w} 30 ${w - 6} 46C${w - 20} 54 20 54 6 46Z`} fill="#0d9488" {...ink} />
+      <path d={`M16 40C20 30 ${w / 2 - 8} 24 ${w / 2} 28C${w / 2 + 8} 24 ${w - 20} 30 ${w - 16} 40`} fill="none" stroke="#134e4a" strokeWidth={1.6} opacity={0.6} />
+      <ellipse cx={w / 2 - 12} cy={18} rx={9} ry={4} fill="#5eead4" opacity={0.6} />
+    </svg>
+  );
+});
+
+/** An open book lying on a table, a page turning every few seconds. */
+function OpenBook({ seed }: { seed: number }) {
+  const cover = SPINES[seed % SPINES.length];
+  return (
+    <svg width={34} height={18} viewBox="0 0 34 18" style={{ display: "block", overflow: "visible" }}>
+      <path d="M1 4l16 2 16-2v12l-16 2-16-2Z" fill={cover} stroke={INK} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M3 3l14 2v11L3 14Z" fill="#fffbeb" stroke={INK} strokeWidth={0.9} strokeLinejoin="round" />
+      <path d="M17 5l14-2v11l-14 2Z" fill="#fffbeb" stroke={INK} strokeWidth={0.9} strokeLinejoin="round" />
+      <path d="M6 7h8M6 9.5h8M6 12h6M20 7h8M20 9.5h8M20 12h6" stroke="#94a3b8" strokeWidth={0.8} />
+      <path
+        className="lib-page"
+        d="M17 5l13-1.8v10.6L17 16Z"
+        fill="#fff"
+        stroke={INK}
+        strokeWidth={0.8}
+        strokeLinejoin="round"
+        style={{ animationDelay: `-${(seed * 2.3) % 7}s` }}
+      />
+    </svg>
+  );
+}
+
+/** A laptop seen from behind its lid, with a mug beside it. */
+function Laptop() {
+  return (
+    <svg width={44} height={26} viewBox="0 0 44 26" style={{ display: "block", overflow: "visible" }}>
+      <path d="M2 22h28l-2 3H4Z" fill="#cbd5e1" stroke={INK} strokeWidth={1.1} strokeLinejoin="round" />
+      <rect x={4} y={3} width={24} height={19} rx={2} fill="#94a3b8" stroke={INK} strokeWidth={1.3} />
+      <circle cx={16} cy={12} r={2.6} fill="#e2e8f0" />
+      <rect className="lib-screen" x={5} y={2} width={22} height={2} rx={1} fill="#bae6fd" opacity={0.8} />
+      <path d="M33 14h7v9a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2Z" fill="#f97316" stroke={INK} strokeWidth={1.1} />
+      <path d="M40 16h1.5a2 2 0 0 1 0 4H40" fill="none" stroke={INK} strokeWidth={1.1} />
+      <path className="lib-steam" d="M35 11q-1.5-2 0-4M38 11q1.5-2 0-4" fill="none" stroke="#cbd5e1" strokeWidth={1.1} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A picture book held open, for the child. */
+function PictureBook() {
+  return (
+    <svg width={22} height={14} viewBox="0 0 22 14" style={{ display: "block", overflow: "visible" }}>
+      <path d="M1 2l10 2 10-2v10l-10 2-10-2Z" fill="#fde047" stroke={INK} strokeWidth={1.1} strokeLinejoin="round" />
+      <circle cx={6} cy={7} r={2} fill="#f97316" />
+      <path d="M13 9l2.5-4 2.5 4Z" fill="#22c55e" />
+    </svg>
+  );
+}
+
+/** The reading table someone sits at, and whether on its far (top) side. */
+function tableBy(n: LibraryNpc) {
+  for (const t of LIBRARY_ROOM.tables) {
+    if (n.x < t.x || n.x > t.x + t.width) continue;
+    if (Math.abs(n.y - t.y) < 0.6) return { t, top: true };
+    if (Math.abs(n.y - (t.y + t.height)) < 0.6) return { t, top: false };
+  }
+  return null;
+}
+
+/** What the reading room's people have with them: books open on the table, a laptop, a picture book. */
+export function libraryNpcExtras(npcs: readonly LibraryNpc[]): SceneExtra[] {
+  const out: SceneExtra[] = [];
+  npcs.forEach((n, i) => {
+    const at = n.seated ? tableBy(n) : null;
+    if (at && (n.activity === "read" || n.activity === "laptop")) {
+      const { t, top } = at;
+      const y = top ? t.y + 0.12 : t.y + t.height - (n.activity === "laptop" ? 0.62 : 0.5);
+      out.push({
+        key: `${n.id}-prop`,
+        x: n.x - (n.activity === "laptop" ? 16 : 17) / T,
+        y,
+        z: t.y + t.height + 0.02,
+        node: n.activity === "laptop" ? <Laptop /> : <OpenBook seed={i + 2} />,
+      });
+    }
+    if (n.activity === "kid" && n.seated) out.push({ key: `${n.id}-prop`, x: n.x - 11 / T, y: n.y - 0.62, z: n.y + 0.05, node: <PictureBook /> });
+  });
+  return out;
 }
