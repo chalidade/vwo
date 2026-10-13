@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getLiveSnapshot, schema } from "@vwo/db";
 import { db } from "@/lib/db";
+import { venuePagesOn } from "@/lib/venues";
 
 export const dynamic = "force-dynamic";
 
 // TODO(auth): only super_admin and venue members should see this.
 export default async function AdminHome() {
+  if (!venuePagesOn()) notFound();
   const venues = await db.select().from(schema.venues).orderBy(schema.venues.name);
   const rows = await Promise.all(venues.map(async (v) => ({ venue: v, live: await getLiveSnapshot(db, v.id) })));
   return (

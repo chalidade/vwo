@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { isFairAdmin, isOwnerAdmin } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { appUrl, sendMail } from "@/lib/mail";
+import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,10 @@ const schema = z
   .object({
     email: z.string().trim().toLowerCase().email().max(200),
     role: z.enum(["seeker", "company", "organizer"]),
-    boothKey: z.string().regex(/^[\w-]{1,80}$/).nullish(),
+    boothKey: z
+      .string()
+      .regex(/^[\w-]{1,80}$/)
+      .nullish(),
     note: z.string().trim().max(200).nullish(),
     invite: z.boolean().optional(),
   })
@@ -31,6 +35,8 @@ export async function POST(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
   if (!isFairAdmin(user)) return fail(403, "not_allowed");
+  // Each invite is an email from our domain: a cap keeps a panitia tester's account from becoming a mailer.
+  if (!(await allow(`early-access:${user!.id}`, 60, 3_600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, schema);
   if ("error" in body) return body.error;
   const { email, role, boothKey, note, invite } = body.data;
@@ -42,9 +48,13 @@ export async function POST(req: Request) {
       role === "organizer"
         ? `Kamu bisa mencoba jobfair sebagai panitia: atur acara, stand, harga, dan verifikasi perusahaan.\n\nMasuk dengan akun Google ${email} di ${appUrl()}/masuk-panitia`
         : role === "company"
-        ? `Kamu bisa mencoba portal perusahaan untuk stand "${boothKey}": kelola booth, lowongan, dan pelamar.\n\nMasuk dengan akun Google ${email} di ${appUrl()}/masuk-perusahaan`
-        : `Kamu bisa mencoba job fair sebagai pencari kerja: jelajahi stand, lamar lowongan, ikut seminar.\n\nMasuk dengan akun Google ${email} di ${appUrl()}/masuk`;
-    await sendMail(email, "Undangan early access jobfair.co.id", `Halo,\n\nKamu diundang mencoba jobfair.co.id sebelum dibuka untuk umum.\n${how}\n\nAplikasi ini belum rilis, jadi mohon tidak dibagikan dulu. Kabari kami kalau menemukan masalah.\n\nSalam,\nPanitia jobfair`).catch(() => undefined);
+          ? `Kamu bisa mencoba portal perusahaan untuk stand "${boothKey}": kelola booth, lowongan, dan pelamar.\n\nMasuk dengan akun Google ${email} di ${appUrl()}/masuk-perusahaan`
+          : `Kamu bisa mencoba job fair sebagai pencari kerja: jelajahi stand, lamar lowongan, ikut seminar.\n\nMasuk dengan akun Google ${email} di ${appUrl()}/masuk`;
+    await sendMail(
+      email,
+      "Undangan early access jobfair.co.id",
+      `Halo,\n\nKamu diundang mencoba jobfair.co.id sebelum dibuka untuk umum.\n${how}\n\nAplikasi ini belum rilis, jadi mohon tidak dibagikan dulu. Kabari kami kalau menemukan masalah.\n\nSalam,\nPanitia jobfair`,
+    ).catch(() => undefined);
   }
   return NextResponse.json({ ok: true, tester: { email: row.email, role: row.role, boothKey: row.boothKey, note: row.note, since: row.createdAt.getTime() } });
 }

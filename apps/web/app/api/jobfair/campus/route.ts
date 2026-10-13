@@ -2,7 +2,8 @@ import { campusBoard } from "@vwo/db";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-export const revalidate = 300;
+// Read on request and kept by the CDN, never prerendered: a build must not need the database.
+export const dynamic = "force-dynamic";
 
 /** Campuses ranked by their students' XP at the fair: names and sums only, the same for everyone. */
 export async function GET() {

@@ -9,6 +9,7 @@ import {
   LEAD_STATUS_LABEL,
   LEAD_STATUSES,
   leadOpen,
+  safeUrl,
   standSlotIndex,
   standSlotName,
   telLink,
@@ -140,8 +141,8 @@ function LeadRow({ lead: l, onChange, onToast }: { lead: Lead; onChange: (l: Lea
           <a className="small-btn ghost cp-link" href={`mailto:${l.email}`}>
             <Mail size={14} aria-hidden /> {l.email}
           </a>
-          {l.website && (
-            <a className="small-btn ghost cp-link" href={l.website} target="_blank" rel="noopener noreferrer">
+          {safeUrl(l.website) && (
+            <a className="small-btn ghost cp-link" href={safeUrl(l.website)} target="_blank" rel="noopener noreferrer">
               <Globe size={14} aria-hidden /> Website
             </a>
           )}

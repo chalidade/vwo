@@ -20,6 +20,7 @@ import {
 } from "@vwo/shared";
 import { type Caught, anomalyFloorId, anomalySpot, anomalyStops, mergeCaught, parkAnomalySpot } from "./fair/anomaly";
 import { parkNow } from "./fair/park-clock";
+import { currentAccount } from "./account";
 import { LIVE } from "./mode";
 import { fair } from "./useFair";
 
@@ -213,7 +214,8 @@ const collectionChanged = () => {
 
 /** Ask the server for this account's collection (live only). */
 export async function loadAnomalyCollection() {
-  if (!LIVE) return;
+  // Signed out (the sign-in screen), the server has no collection to give: don't ask for a 401.
+  if (!LIVE || !currentAccount()) return;
   try {
     const r = await fetch("/api/jobfair/anomaly?mine=1", { credentials: "same-origin" });
     if (!r.ok) return;

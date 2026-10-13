@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type BoothTier, standSlotIndex, standSlotName, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
+import { type BoothTier, safeUrl, standSlotIndex, standSlotName, TIER_LABEL, UMKM_CORNER } from "@vwo/shared";
 import { coinText, rupiah } from "../fair/company";
 import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
@@ -32,7 +32,12 @@ const slotName = (x: number, y: number) => standSlotName(standSlotIndex(x, y));
 
 async function call<T>(path: string, body?: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {
-    const r = await fetch(path, body === undefined ? { credentials: "same-origin" } : { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await fetch(
+      path,
+      body === undefined
+        ? { credentials: "same-origin" }
+        : { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    );
     const d = (await r.json().catch(() => ({}))) as T & { error?: string };
     return r.ok ? { ok: true, data: d } : { ok: false, error: d.error ?? `http_${r.status}` };
   } catch {
@@ -45,7 +50,8 @@ export function OrgRegistrations({ onToast }: { onToast: (t: string) => void }) 
   useFair();
   const [list, setList] = useState<Registration[] | null>(null);
   const [error, setError] = useState("");
-  const load = () => void call<{ registrations: Registration[] }>("/api/jobfair/registrations").then((r) => (r.ok ? setList(r.data.registrations) : setError("Daftar pendaftaran gagal dimuat.")));
+  const load = () =>
+    void call<{ registrations: Registration[] }>("/api/jobfair/registrations").then((r) => (r.ok ? setList(r.data.registrations) : setError("Daftar pendaftaran gagal dimuat.")));
   useEffect(() => {
     if (LIVE) load();
   }, []);
@@ -61,7 +67,8 @@ export function OrgRegistrations({ onToast }: { onToast: (t: string) => void }) 
         <div className="card">
           <h2 className="cp-h2">Riwayat pendaftaran</h2>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Pendaftaran berbayar dari alur lama, dan stand yang sudah dibuat dari formulir. Pendaftaran yang sudah dibayar tetap bisa diverifikasi di sini: pilih tempat stand lalu verifikasi, booth langsung berdiri dan perusahaan menerima kode dan PIN lewat email.
+            Pendaftaran berbayar dari alur lama, dan stand yang sudah dibuat dari formulir. Pendaftaran yang sudah dibayar tetap bisa diverifikasi di sini: pilih tempat stand lalu
+            verifikasi, booth langsung berdiri dan perusahaan menerima kode dan PIN lewat email.
           </p>
           {error && <p className="bk-err">{error}</p>}
           {list &&
@@ -98,19 +105,22 @@ function Row({ r, onDone }: { r: Registration; onDone: (t: string) => void }) {
   const pick = free[slot];
   return (
     <li style={{ display: "block" }}>
-      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {TIER_LABEL[r.tier as BoothTier] ?? TIER_LABEL.regular} · {r.price ? `${coinText(r.price)} (≈ ${rupiah(r.price)})` : "lewat formulir"}
+      <b style={{ color: r.color }}>■</b> <b>{r.company}</b> · {TIER_LABEL[r.tier as BoothTier] ?? TIER_LABEL.regular} ·{" "}
+      {r.price ? `${coinText(r.price)} (≈ ${rupiah(r.price)})` : "lewat formulir"}
       {r.method && <span className="muted small"> · dibayar via {r.method}</span>}
       <div className="muted small">
-        {r.industry} · {r.city} · {r.website ? (
-          <a href={r.website} target="_blank" rel="noopener noreferrer">
+        {r.industry} · {r.city} ·{" "}
+        {safeUrl(r.website) ? (
+          <a href={safeUrl(r.website)} target="_blank" rel="noopener noreferrer">
             {r.website}
           </a>
         ) : (
-          "tanpa website"
+          r.website || "tanpa website"
         )}
       </div>
       <div className="muted small">
-        PIC {r.contactName} ({r.contactRole}) · {r.email} · {r.phone} · daftar {new Date(r.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+        PIC {r.contactName} ({r.contactRole}) · {r.email} · {r.phone} · daftar{" "}
+        {new Date(r.createdAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
       </div>
       {r.status === "verified" && (
         <div className="small">
