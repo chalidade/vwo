@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { getVenueBySlug, getVenueLayout } from "@vwo/db";
 import { db } from "@/lib/db";
+import { venuePagesOn } from "@/lib/venues";
 import { LiveView } from "./LiveView";
 
 export const dynamic = "force-dynamic";
 
 export default async function VenueAdmin({ params }: { params: Promise<{ slug: string }> }) {
+  if (!venuePagesOn()) notFound();
   const { slug } = await params;
   const venue = await getVenueBySlug(db, slug);
   if (!venue) notFound();

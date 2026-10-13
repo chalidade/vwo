@@ -40,6 +40,7 @@ export async function DELETE(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
+  if (!(await allow(`push-drop:${user.id}`, 20, 3_600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, unsubscribe);
   if ("error" in body) return body.error;
   await deletePushSubscription(db, { userId: user.id, endpoint: body.data.endpoint });

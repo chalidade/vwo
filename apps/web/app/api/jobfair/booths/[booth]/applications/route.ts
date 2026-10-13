@@ -7,6 +7,7 @@ import { notifyBoothHook } from "@/lib/ats-hook";
 import { applicationOut, canManageBooth } from "@/lib/fair";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { pushTo } from "@/lib/push";
+import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +35,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ booth:
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
   if (!(await canManageBooth(user, booth))) return fail(403, "not_allowed");
+  if (!(await allow(`app-status:${user.id}`, 300, 600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, patchSchema);
   if ("error" in body) return body.error;
   const b = body.data;
   const before = "notes" in b ? null : await fairApplicationById(db, b.id);
-  const ok = "notes" in b ? await setFairApplicationNotes(db, { id: b.id, boothKey: booth, notes: b.notes }) : await setFairApplicationStatus(db, { id: b.id, boothKey: booth, status: b.status });
+  const ok =
+    "notes" in b
+      ? await setFairApplicationNotes(db, { id: b.id, boothKey: booth, notes: b.notes })
+      : await setFairApplicationStatus(db, { id: b.id, boothKey: booth, status: b.status });
   if (!ok) return fail(404, "not_found");
   if (!("notes" in b)) {
     // Tell the applicant on their phone, even with the app closed.
@@ -46,7 +51,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ booth:
     const d = (row?.data ?? {}) as { company?: string; jobTitle?: string };
     // The company's ATS hears about real moves only, not the same status saved twice.
     if (row && before && before.boothKey === booth && before.status !== row.status) notifyBoothHook(booth, "application.status_changed", row, { previousStatus: before.status });
-    if (row) pushTo([row.userId], { title: `📋 ${d.company ?? "Lamaranmu"}`, body: `Lamaran ${d.jobTitle ?? ""} sekarang "${b.status}"`, url: "/play/#/jobfair", tag: `app-${row.id}` });
+    if (row)
+      pushTo([row.userId], { title: `📋 ${d.company ?? "Lamaranmu"}`, body: `Lamaran ${d.jobTitle ?? ""} sekarang "${b.status}"`, url: "/play/#/jobfair", tag: `app-${row.id}` });
   }
   return NextResponse.json({ ok: true });
 }

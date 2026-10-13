@@ -31,7 +31,12 @@ export async function POST(req: Request) {
   if (state === "self") return fail(400, "self");
   const other = await userIdByTag(db, body.data.tag);
   if (other)
-    pushTo([other.id], state === "friend" ? { title: "🤝 Teman baru", body: `${user.name} menerima pertemanan`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` } : { title: "⭐ Ajakan berteman", body: `${user.name} ingin berteman denganmu di job fair`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` });
+    pushTo(
+      [other.id],
+      state === "friend"
+        ? { title: "🤝 Teman baru", body: `${user.name} menerima pertemanan`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` }
+        : { title: "⭐ Ajakan berteman", body: `${user.name} ingin berteman denganmu di job fair`, url: "/play/#/jobfair", tag: `friend-${user.fairTag}` },
+    );
   return NextResponse.json({ ok: true, state });
 }
 
@@ -40,6 +45,7 @@ export async function DELETE(req: Request) {
   if (!sameOrigin(req)) return fail(403, "bad_origin");
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
+  if (!(await allow(`friend-drop:${user.id}`, 60, 3_600_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, schema);
   if ("error" in body) return body.error;
   await removeFriend(db, user.id, body.data.tag);

@@ -30,10 +30,7 @@ export function AccountGate({ onIn }: { onIn: (a: Account) => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r =
-        mode === "login"
-          ? await login(email, password)
-          : await register({ name, email, password, acceptTerms: terms, website, captcha: captcha.token ?? undefined });
+      const r = mode === "login" ? await login(email, password) : await register({ name, email, password, acceptTerms: terms, website, captcha: captcha.token ?? undefined });
       if (!r.ok) captcha.reset();
       if (r.ok) onIn(r.account);
       else setError(r.error);
@@ -215,8 +212,9 @@ function useAuthConfig() {
   const [cfg, setCfg] = useState<{ google: boolean; password: boolean } | null>(LIVE ? null : { google: false, password: true });
   useEffect(() => {
     if (!LIVE) return;
-    void fetch("/api/auth/config")
-      .then((r) => (r.ok ? r.json() : null))
+    // A server error or a slow answer is not "login switched off": show the usual Google sign-in, as when offline.
+    void fetch("/api/auth/config", { signal: AbortSignal.timeout(8_000) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`config ${r.status}`))))
       .then((c: { google?: boolean; password?: boolean } | null) => setCfg({ google: c?.google === true, password: c?.password === true }))
       .catch(() => setCfg({ google: true, password: false }));
   }, []);

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { boothPin, samePin } from "@/lib/booth-pins";
 import { db } from "@/lib/db";
-import { fail, readBody, sameOrigin } from "@/lib/http";
+import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
 
@@ -18,6 +18,9 @@ export async function POST(req: Request) {
   if (!(await allow(`claim:${user.id}`, 6, 900_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, claimSchema);
   if ("error" in body) return body.error;
+  // Many throwaway accounts must not add up to enough guesses either: a cap per address and per booth.
+  // A booth's real team claims a handful of times, so its cap is never in their way.
+  if (!(await allow(`claim-ip:${clientIp(req)}`, 30, 900_000)) || !(await allow(`claim-booth:${body.data.boothId}`, 20, 3_600_000))) return fail(429, "too_many_requests");
   const pin = await boothPin(body.data.boothId);
   if (!pin) return fail(409, "no_pin");
   if (!samePin(pin, body.data.pin)) return fail(403, "wrong_pin");

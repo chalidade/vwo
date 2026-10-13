@@ -1,5 +1,5 @@
 import { createRegistration, myRegistrations, readPrices } from "@vwo/db";
-import { priceFrom } from "@vwo/shared";
+import { cleanWebsite, priceFrom } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -14,12 +14,27 @@ const schema = z.object({
   company: text(2, 60),
   industry: text(2, 60),
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
-  website: z.string().trim().max(120).url().or(z.literal("")),
+  // http(s) only: the organiser's panel shows it as a link, so javascript: or data: must never get in.
+  website: z
+    .string()
+    .trim()
+    .max(120)
+    .transform((v, ctx) => {
+      const out = cleanWebsite(v);
+      if (out === null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid_url" });
+        return z.NEVER;
+      }
+      return out;
+    }),
   city: text(2, 60),
   contactName: text(2, 60),
   contactRole: text(2, 60),
   email: z.string().trim().email().max(120),
-  phone: z.string().trim().regex(/^\+?[0-9 -]{8,20}$/),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 -]{8,20}$/),
   tier: z.enum(["mini", "regular", "premium"]),
   /** Hidden field: people leave it empty, bots fill it in. */
   website2: z.string().max(0).optional(),
