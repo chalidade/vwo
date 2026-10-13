@@ -2204,7 +2204,7 @@ export function JobFair() {
               <span className="rpg-kbd">W</span>
               <span className="rpg-kbd">A</span>
               <span className="rpg-kbd">S</span>
-              <span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · klik orang atau meja untuk menyapa ·{" "}
+              <span className="rpg-kbd">D</span> jalan · <span className="rpg-kbd">E</span> bicara · <span className="hint-extra">klik orang atau meja untuk menyapa · </span>
               {park ? "🏢 pintu gedung membawa ke lobi" : libRoom ? "🚪 pintu bawah kembali ke taman" : "🛗 ikuti panah ke lift"} · ❓ panduan
             </div>
           ) : null}

@@ -2907,3 +2907,7 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
   align-items: center;
   padding-left: calc(var(--fair-nav-right, 0px) + 12px);
 }
+/* Narrower desktops (with room to spare for wider system fonts): the shorter hint fits on that row. */
+@media (max-width: 1365px) {
+  .game-fair .hint-keys .hint-extra { display: none; }
+}
