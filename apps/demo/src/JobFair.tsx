@@ -142,6 +142,7 @@ import { Library } from "./fair/Library";
 import { FriendsPanel, type FriendOnline } from "./fair/Friends";
 import { addFriend, friendOf, loadFriends, myTag, removeFriend, useFriends } from "./fair/friends";
 import { MissionsPanel } from "./fair/Missions";
+import { type MapPlace, MapPanel } from "./fair/Map";
 import { PromoCard } from "./fair/Promo";
 import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
 import { useStageFeed } from "./fair/stage";
@@ -353,6 +354,7 @@ export function JobFair() {
   const [games, setGames] = useState(false);
   const [library, setLibrary] = useState(false);
   const [missions, setMissions] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [ring, setRing] = useState<RingSignal | null>(null);
   const [live, setLive] = useState<{ status: LiveStatus; peers: number }>({ status: "connecting", peers: 0 });
   /** How players on other devices look, by their visitor id here. */
@@ -436,6 +438,7 @@ export function JobFair() {
     games ||
     library ||
     missions ||
+    mapOpen ||
     inviteId ||
     aula ||
     notifs ||
@@ -2249,6 +2252,10 @@ export function JobFair() {
                 <span className="tab-txt">Misi</span>
                 {fair.claimable() + (fair.canClaimDaily() ? 1 : 0) > 0 && <span className="menu-dot">{fair.claimable() + (fair.canClaimDaily() ? 1 : 0)}</span>}
               </button>
+              <button type="button" className="menu-btn" onClick={() => setMapOpen(true)} title="Peta: denah tiap lantai dan lowongan per perusahaan">
+                <span className="tab-ico">🗺️</span>
+                <span className="tab-txt">Peta</span>
+              </button>
               <button type="button" className="menu-btn coin-btn" onClick={() => setWallet(true)} title="Dompet koin dan voucher">
                 <span className="tab-ico">🪙</span>
                 <span className="tab-txt">{me.coins}</span>
@@ -2405,6 +2412,35 @@ export function JobFair() {
               setRing(null);
               setToast(r.answered ? `Panggilan dengan ${ring.company} selesai` : r.result === "declined" ? "Panggilan ditolak" : `Panggilan tak terjawab dari ${ring.company}`);
             }}
+          />
+        )}
+
+        {session && mapOpen && (
+          <MapPanel
+            fair={fair.fair}
+            floorOf={(id) => fair.floor(id)}
+            places={[...fair.stops, fair.parkStop(), fair.libraryStop()].map(
+              (st): MapPlace => ({ ...st, hall: st.roomId || st.level < 0 ? -1 : fairFloorIndex(st.floorId), closed: fair.floorClosed(st.floorId) }),
+            )}
+            parkBuildings={fair.shownParkBuildings()}
+            here={self ? { floorId: self.floorId, x: self.x, y: self.y, facing: self.facing } : null}
+            onWalk={(b) => {
+              setMapOpen(false);
+              goToBooth(b);
+              setToast(`🚶 Menuju stand ${b.company}`);
+            }}
+            onOpenJob={(boothId, jobId) => {
+              const b = fair.booth(boothId);
+              setMapOpen(false);
+              if (b) setBoard({ boothId, jobId, about: !jobId && !openJobs(b).length });
+            }}
+            onGoPlace={(p) => {
+              setMapOpen(false);
+              if (p.floorId === fair.parkId) goToPark();
+              else if (p.floorId === fair.libraryId) goToLibraryDoor();
+              else pickFloor(p.floorId);
+            }}
+            onClose={() => setMapOpen(false)}
           />
         )}
 
