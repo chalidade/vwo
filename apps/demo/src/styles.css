@@ -2911,3 +2911,106 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
 @media (max-width: 1365px) {
   .game-fair .hint-keys .hint-extra { display: none; }
 }
+
+/* ---- Peta (the job seeker's map): floor tabs, the plan of a floor drawn from its layout, and the
+   companies on it with their vacancies. A hall's plan keeps at least 8px a tile and scrolls sideways
+   inside its box on a phone; the page itself never scrolls sideways. */
+.mp { width: min(1120px, 100%); }
+.mp .mb-page { display: grid; gap: 8px; align-content: start; }
+.mp-floors { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
+.mp-floors button { flex: none; display: grid; gap: 1px; justify-items: start; padding: 4px 10px; border-radius: 10px; border: 2px solid var(--rpg-box-line, #3b2a20); background: #fff; color: var(--text); text-align: left; box-shadow: 0 2px 0 #3b2a20; cursor: pointer; }
+.mp-floors button[data-active] { background: #23345c; color: #fff; }
+.mp-floors button[data-closed] { background: #e7e2dc; color: #8a7f75; box-shadow: none; }
+.mp-floors button[data-closed][data-active] { background: #6b6460; color: #f3efe9; }
+.mp-floors button[data-dim]:not([data-active]) { opacity: 0.55; }
+.mp-floor-name { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 13px; white-space: nowrap; }
+.mp-floor-sub { font-size: 11px; opacity: 0.8; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.mp-you-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 2px #fff; }
+.mp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; font-size: 14px; }
+.mp-head > span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-here-tag, .mp-closed-tag { padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 800; background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
+.mp-closed-tag { background: #f1ede8; color: #6b6460; border-color: #d6cfc6; }
+.mp-plan { flex: none; min-height: min-content; overflow-x: auto; overflow-y: hidden; border-radius: 10px; border: 2px solid #3b2a20; background: #efe6da; scrollbar-width: thin; overscroll-behavior-x: contain; }
+.mp-plan[data-hall] { position: sticky; top: -10px; z-index: 2; box-shadow: 0 4px 10px rgb(59 42 32 / 0.18); }
+.mp-svg { display: block; width: 100%; height: auto; max-height: min(52vh, 460px); font-family: system-ui, sans-serif; user-select: none; }
+.mp-floor { fill: #faf6ef; stroke: #3b2a20; stroke-width: 0.25; }
+.mp-park .mp-floor { fill: #bfe3a5; }
+.mp-k { fill: #cbbfb1; }
+.mp-k-rug { fill: #f1dcc4; }
+.mp-k-decor { fill: #9cc58a; }
+.mp-k-table { fill: #c9a27e; }
+.mp-k-lift { fill: #64748b; }
+.mp-k-door { fill: #f59e0b; }
+.mp-k-desk { fill: #23345c; }
+.mp-k-stage { fill: #9f1239; }
+.mp-k-stall { fill: #ea580c; opacity: 0.85; }
+.mp-k-building { fill: #b45309; }
+.mp-k-soon { fill: #e5e7eb; stroke: #9ca3af; stroke-width: 0.15; stroke-dasharray: 0.5 0.3; }
+.mp-k-water { fill: #7dd3fc; }
+.mp-k-path { fill: #ead9b8; }
+.mp-k-shelf { fill: #92400e; }
+.mp-k-coins { fill: #eab308; }
+.mp-k-sponsor { fill: #94a3b8; }
+.mp-k-seat { fill: #b08968; }
+.mp-label { fill: #fff; font-weight: 800; text-anchor: middle; dominant-baseline: central; pointer-events: none; paint-order: stroke; stroke: rgb(0 0 0 / 0.35); stroke-width: 0.12; }
+.mp-label-rug, .mp-label-path, .mp-label-soon, .mp-label-water { fill: #5b4636; stroke: none; }
+.mp-booth { cursor: pointer; outline: none; }
+.mp-booth-box { fill: color-mix(in srgb, var(--c) 22%, #fff); stroke: var(--c); stroke-width: 0.18; }
+.mp-booth:hover .mp-booth-box, .mp-booth:focus-visible .mp-booth-box { fill: color-mix(in srgb, var(--c) 34%, #fff); }
+.mp-booth[data-active] .mp-booth-box { stroke: #f59e0b; stroke-width: 0.4; animation: mp-pulse 1.2s ease-in-out infinite; }
+.mp-booth[data-dim] { opacity: 0.3; }
+.mp-booth-logo { fill: var(--c); stroke: #fff; stroke-width: 0.12; }
+.mp-booth-logo-t { fill: #fff; font-weight: 900; text-anchor: middle; dominant-baseline: central; }
+.mp-booth-name { fill: #2b1e19; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.mp-badge rect { fill: #16a34a; stroke: #fff; stroke-width: 0.1; }
+.mp-badge[data-zero] rect { fill: #9ca3af; }
+.mp-badge text { fill: #fff; font-weight: 900; text-anchor: middle; dominant-baseline: central; }
+.mp-you { pointer-events: none; }
+.mp-you-ring { fill: rgb(34 197 94 / 0.25); stroke: #16a34a; stroke-width: 0.12; animation: mp-ring 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.mp-you-dot-svg { fill: #16a34a; stroke: #fff; stroke-width: 0.15; }
+.mp-you path { fill: #fff; }
+.mp-you text { fill: #14532d; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 0.25; }
+.mp-closed rect { fill: rgb(120 113 108 / 0.55); }
+.mp-closed text { fill: #fff; font-weight: 900; text-anchor: middle; dominant-baseline: central; }
+.mp-plan[data-closed] .mp-svg > g:first-child { filter: grayscale(1); }
+@keyframes mp-pulse {
+  50% { stroke-width: 0.7; }
+}
+@keyframes mp-ring {
+  from { transform: scale(0.7); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-booth[data-active] .mp-booth-box, .mp-you-ring { animation: none; }
+}
+.mp-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-tools input { flex: 1 1 220px; min-width: 0; padding: 7px 10px; border-radius: 10px; border: 2px solid #ead2bd; background: #fff; font-size: 14px; color: var(--text); }
+.mp-tools select { flex: 0 1 220px; min-width: 0; padding: 7px 8px; border-radius: 10px; border: 2px solid #ead2bd; background: #fff; font-size: 13px; color: var(--text); }
+.mp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 8px; align-items: start; }
+.mp-list > li { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: #fff; border: 2px solid #ead2bd; border-left: 6px solid var(--c); }
+.mp-list > li[data-active] { border-color: #f59e0b; border-left-color: var(--c); background: #fffbeb; }
+.mp-co { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: var(--text); text-align: left; box-shadow: none; cursor: pointer; }
+.mp-logo { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--c); color: #fff; font-weight: 900; font-size: 13px; }
+.mp-logo img { width: 100%; height: 100%; object-fit: cover; }
+.mp-co-main { display: grid; min-width: 0; }
+.mp-co-main b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-count { padding: 2px 8px; border-radius: 99px; background: #dcfce7; color: #166534; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.mp-count[data-zero] { background: #f1ede8; color: #7a6a5c; }
+.mp-jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mp-jobs button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 8px; border: 1.5px solid #ead2bd; background: #fdf8f2; color: var(--text); font-size: 13px; text-align: left; box-shadow: none; cursor: pointer; }
+.mp-jobs button[data-active] { border-color: #f59e0b; background: #fef3c7; }
+.mp-jobs button > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.mp-type { flex: none; font-size: 11px; color: var(--muted); }
+.mp-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-acts .mb-order { padding: 5px 12px; font-size: 13px; }
+.mp-see { padding: 5px 12px; border-radius: 8px; border: 2px solid #3b2a20; background: #fff; color: var(--text); font-size: 13px; font-weight: 700; box-shadow: 0 2px 0 #3b2a20; cursor: pointer; }
+.mp-empty { margin: 4px 0; font-size: 13px; }
+@media (max-width: 640px) {
+  .mp { padding: 10px 10px 8px; }
+  .mp .mb-page { padding: 8px; }
+  .mp-plan[data-hall] { top: -8px; }
+  .mp-list > li { padding: 6px; gap: 4px; }
+  .mp-jobs button { padding: 4px 8px; }
+  .mp-floors button { padding: 3px 8px; }
+  .mp-floor-sub { max-width: 110px; }
+}
