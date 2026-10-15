@@ -176,7 +176,8 @@ describe("the public form against scripts", () => {
       { data: form },
       { data: form, form: "v1.nope" },
       { ...(await sealed(form, page(4, 500))) },
-      { ...(await sealed(form, t)), pow: "0" },
+      // An answer that does not hash to the token's zeros (a fixed "0" would pass one time in 16).
+      { ...(await sealed(form, t)), pow: [...Array(200).keys()].map(String).find((n) => !antibot.validPow(t, n, 4)) },
       { ...(await sealed(form)), website2: "http://spam" },
       { ...(await sealed({ ...form, fullName: "Murah www.spam.ru" })) },
     ];
