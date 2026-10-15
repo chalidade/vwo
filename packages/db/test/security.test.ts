@@ -35,8 +35,8 @@ describe("public API lock", () => {
     expect(open.map((r) => r.relname)).toEqual([]);
   });
 
-  it("leaves the anon role unable to read users or coins", async () => {
-    for (const table of ["users", "sessions", "coin_ledger", "rate_limits"]) {
+  it("leaves the anon role unable to read users, coins or pre-registrations", async () => {
+    for (const table of ["users", "sessions", "coin_ledger", "rate_limits", "prereg_events", "prereg_registrations"]) {
       const exists = await db.execute(sql`select to_regclass(${"public." + table}) as t`);
       expect(exists[0]?.t, table).toBeTruthy();
       const [row] = await db.execute<{ ok: boolean }>(sql`select has_table_privilege('anon', ${"public." + table}, 'select') as ok`);

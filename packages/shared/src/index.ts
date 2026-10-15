@@ -31,3 +31,4 @@ export * from "./stage-stream";
 export * from "./park-life";
 export * from "./library";
 export * from "./library-book";
+export * from "./prereg";

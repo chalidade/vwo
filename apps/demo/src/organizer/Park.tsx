@@ -1,7 +1,8 @@
 import { ArrowDown, ArrowUp, CalendarDays, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PARK_MAX_BUILDINGS, PARK_MAX_RANGE_DAYS, type ParkBuilding, cleanDay, formatDateRange, parkBuildingDate, readTypedDate } from "@vwo/shared";
 import { FloorScene } from "../fair/FloorScene";
+import { LIVE } from "../mode";
 import { fair, useFair } from "../useFair";
 
 /** The organiser's park outside the building: the other events shown as buildings under construction,
@@ -136,6 +137,8 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
   const error = dateRangeError(start, end);
   const [about, setAbout] = useState(building?.about ?? "");
   const [status, setStatus] = useState<ParkBuilding["status"]>(building?.status ?? "soon");
+  const [regSlug, setRegSlug] = useState(building?.regSlug ?? "");
+  const events = usePreregEvents();
   return (
     <form
       className="card cp-form"
@@ -143,7 +146,8 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
         e.preventDefault();
         if (!name.trim() || error) return;
         // A picked range replaces the old typed date; without one the old text stays.
-        onSave(start ? { name, startDate: start, endDate: end && end !== start ? end : undefined, about, status } : { name, date: legacy, about, status });
+        const link = regSlug ? { regSlug } : {};
+        onSave(start ? { name, startDate: start, endDate: end && end !== start ? end : undefined, about, status, ...link } : { name, date: legacy, about, status, ...link });
       }}
     >
       <h2 className="cp-h2 cp-span" style={{ margin: 0 }}>
@@ -209,6 +213,21 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
           <option value="hidden">Disembunyikan</option>
         </select>
       </label>
+      {LIVE && (
+        <label>
+          Tombol &quot;Daftar event&quot;
+          <select value={regSlug} onChange={(e) => setRegSlug(e.target.value)}>
+            <option value="">Tidak ada</option>
+            {regSlug && !events.some((x) => x.slug === regSlug) && <option value={regSlug}>/daftar/{regSlug}</option>}
+            {events.map((x) => (
+              <option key={x.slug} value={x.slug}>
+                {x.name} · /daftar/{x.slug}
+              </option>
+            ))}
+          </select>
+          <small className="muted">Pengunjung yang mendekat bisa membuka pendaftaran pelamar event ini (dari tab Pra-registrasi).</small>
+        </label>
+      )}
       <div className="cp-span row">
         <button type="button" className="ghost" onClick={onClose}>
           Batal
@@ -219,4 +238,21 @@ function BuildingForm({ building, onSave, onClose }: { building?: ParkBuilding; 
       </div>
     </form>
   );
+}
+
+/** The pre-registration events (tab Pra-registrasi), to link a park building to one. Live site only. */
+function usePreregEvents() {
+  const [events, setEvents] = useState<{ slug: string; name: string }[]>([]);
+  useEffect(() => {
+    if (!LIVE) return;
+    let gone = false;
+    fetch("/api/jobfair/prereg-events", { credentials: "same-origin" })
+      .then((r) => (r.ok ? (r.json() as Promise<{ events: { slug: string; name: string }[] }>) : null))
+      .then((d) => !gone && d && setEvents(d.events.map((e) => ({ slug: e.slug, name: e.name }))))
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  }, []);
+  return events;
 }

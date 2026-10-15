@@ -1,4 +1,9 @@
+import { openPreregEvents } from "@vwo/db";
+import { db } from "@/lib/db";
+import { publicEvent } from "@/lib/prereg";
+import { EventList } from "./daftar/EventList";
 import "./soon.css";
+import "./daftar/daftar.css";
 
 export const metadata = {
   title: "jobfair · Segera hadir",
@@ -10,9 +15,11 @@ const NOTES: Record<string, string> = {
   gagal: "Masuk dengan Google gagal. Coba lagi.",
 };
 
-/** jobfair.co.id before launch: what is coming, a way in for companies, and a quiet door for the team. */
+/** jobfair.co.id before launch: what is coming, events job seekers can sign up for now, a way in for companies, and a quiet door for the team. */
 export default async function ComingSoon({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const q = await searchParams;
+  // Sign-ups spread over the weeks before launch, so launch day isn't everyone registering at once. A database hiccup just hides the list.
+  const events = (await openPreregEvents(db).catch(() => [])).map((r) => publicEvent(r.event, r.count));
   const note = NOTES[q.akses ?? ""] ?? (q.login ? NOTES.gagal : null);
   return (
     <div className="cs">
@@ -39,7 +46,12 @@ export default async function ComingSoon({ searchParams }: { searchParams: Promi
               Jelajahi aula pameran, mampir ke stand perusahaan, ngobrol langsung dengan recruiter, ikut seminar, dan kirim lamaran dari HP. Kami sedang menyiapkan pembukaannya.
             </p>
             <div className="cs-cta cs-rise d3">
-              <a className="cs-btn primary" href="/daftar-perusahaan">
+              {events.length > 0 && (
+                <a className="cs-btn primary" href={events.length === 1 ? `/daftar/${events[0]!.slug}` : "#event"}>
+                  Daftar sebagai pelamar →
+                </a>
+              )}
+              <a className={events.length ? "cs-btn ghost" : "cs-btn primary"} href="/daftar-perusahaan">
                 Daftarkan perusahaan →
               </a>
               <a className="cs-btn ghost" href="/masuk-perusahaan">
@@ -80,6 +92,16 @@ export default async function ComingSoon({ searchParams }: { searchParams: Promi
             </div>
           </div>
         </section>
+
+        {events.length > 0 && (
+          <section id="event" className="cs-events">
+            <h2>Pendaftaran pelamar dibuka</h2>
+            <p className="cs-sub" style={{ margin: "8px 0 0", fontSize: 15 }}>
+              Daftar sekarang dan simpan kodenya. Saat acara dibuka, cukup masuk dengan akun Google yang sama: datamu sudah terpasang, tidak perlu daftar ulang.
+            </p>
+            <EventList events={events} />
+          </section>
+        )}
 
         <footer className="cs-foot">
           <span>© {new Date().getFullYear()} jobfair.co.id</span>

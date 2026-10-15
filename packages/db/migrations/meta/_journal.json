@@ -169,6 +169,13 @@
       "when": 1791784663742,
       "tag": "0023_coin_ledger_user_time",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792050288049,
+      "tag": "0024_prereg_events",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import { AnomalyCollection } from "./fair/AnomalyCollection";
 import { useAnomalyCollection } from "./anomaly-sync";
 import { ViralTab } from "./fair/Viral";
 import { RegionPicker, SkillPicker } from "./pickers";
+import { PreregJoined } from "./fair/Prereg";
 
 export type SeekerTab = "profile" | "match" | "seminar" | "invite" | "applications" | "stamps" | "anomalies";
 
@@ -274,6 +275,7 @@ export function SeekerPanel({
                   {saved && <span className="jb-applied">✓ Tersimpan</span>}
                 </div>
               </form>
+              {LIVE && account && <PreregJoined />}
               {account && onSignOut && (
                 <div className="sp-reset">
                   <span className="sp-muted">Masuk sebagai {account}</span>

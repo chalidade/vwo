@@ -1,4 +1,4 @@
-import { createSession, googleSignIn, sessionUser } from "@vwo/db";
+import { createSession, googleSignIn, linkPreregistrations, sessionUser } from "@vwo/db";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -24,6 +24,8 @@ export async function GET(req: Request) {
   const person = await finishGoogle(req, code, verifier).catch(() => null);
   if (!person) return clear(done(false));
   const { userId } = await googleSignIn(db, person);
+  // Pre-registered with this Google email: join those events and fill the empty profile fields. Never in the way of signing in.
+  await linkPreregistrations(db, { id: userId, email: person.email }).catch(() => undefined);
   const session = await createSession(db, userId, req.headers.get("user-agent"));
   const user = await sessionUser(db, session.token);
   const res = done(true, launched() || (await mayPreview(user)));

@@ -159,7 +159,7 @@ import { RentStall } from "./fair/RentStall";
 import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
 import { AulaBoard, type AulaTab } from "./fair/Aula";
 import { useReminderAlerts } from "./fair/reminders";
-import { type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
+import { PROFILE_EVENT, type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
 import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
 import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
@@ -257,6 +257,12 @@ export function JobFair() {
   const [panel, setPanel] = useState<SeekerTab | null>(null);
   const [sponsor, setSponsor] = useState<SponsorView | null>(null);
   const [profile, setProfile] = useState<SeekerProfile>(loadProfile);
+  // Live site: the account's saved profile came from the server (first load, another device, a pre-registration).
+  useEffect(() => {
+    const on = () => setProfile(loadProfile());
+    window.addEventListener(PROFILE_EVENT, on);
+    return () => window.removeEventListener(PROFILE_EVENT, on);
+  }, []);
   const [account, setAccount] = useState<Account | null>(currentAccount);
   // Live site: the session cookie may have expired or been signed out on another device.
   useEffect(() => {
@@ -856,7 +862,9 @@ export function JobFair() {
     const back = spot && fair.floors.some((f) => f.id === spot.floorId) && !fair.floorClosed(spot.floorId);
     if (spot && back && !isBlocked(fair.floor(spot.floorId), spot.x, spot.y)) fair.placeAt(v.memberId, spot.floorId, spot.x, spot.y);
     setInside(who, true);
-    if (!profile.name || (!profile.email && account)) updateProfile({ ...profile, name: profile.name || account?.name || c.name, email: profile.email || account?.email || "" });
+    // Read fresh: the server's copy (a pre-registration, another device) may have arrived after this page opened.
+    const saved = loadProfile();
+    if (!saved.name || (!saved.email && account)) updateProfile({ ...saved, name: saved.name || account?.name || c.name, email: saved.email || account?.email || "" });
     counted.current.clear();
     setSession({ visitorId: v.memberId, name: c.name, look: c.look });
     // The long tour is for the first visit; after that a short hello is enough.

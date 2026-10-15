@@ -11,6 +11,7 @@ import { OrgPark } from "./organizer/Park";
 import { OrgPrices } from "./organizer/Prices";
 import { OrgPsych } from "./organizer/Psych";
 import { OrgEarlyAccess } from "./organizer/EarlyAccess";
+import { OrgEvents } from "./organizer/Events";
 import { OrgRegistrations } from "./organizer/Registrations";
 import { OrgReports } from "./organizer/Reports";
 import { OrgSeminars } from "./organizer/Seminars";
@@ -18,6 +19,7 @@ import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
 import {
   BadgeDollarSign,
+  CalendarCheck,
   FileText,
   Brain,
   Building2,
@@ -46,6 +48,7 @@ const TABS = [
   ["booths", Store, "Stand"],
   ["registrations", ClipboardList, "Pendaftaran"],
   ["early", FlaskConical, "Early access"],
+  ["events", CalendarCheck, "Pra-registrasi"],
   ["ads", Megaphone, "Iklan & pendapatan"],
   ["prices", BadgeDollarSign, "Harga & koin"],
   ["invoices", FileText, "Invoice & pajak"],
@@ -58,7 +61,7 @@ const TABS = [
 ] as const;
 type OrgTab = (typeof TABS)[number][0];
 const GROUPS: { label: string; ids: OrgTab[] }[] = [
-  { label: "Pantau", ids: ["live", "registrations", "early"] },
+  { label: "Pantau", ids: ["live", "registrations", "events", "early"] },
   { label: "Acara", ids: ["floors", "park", "booths", "aula", "seminar", "psych", "food", "consult", "reports"] },
   { label: "Bisnis", ids: ["ads", "prices", "invoices"] },
 ];
@@ -149,6 +152,7 @@ export function JobFairAdmin({ tab: fromRoute }: { tab?: string }) {
         {tab === "booths" && <OrgBooths onToast={setToast} />}
         {tab === "registrations" && <OrgRegistrations onToast={setToast} />}
         {tab === "early" && <OrgEarlyAccess onToast={setToast} />}
+        {tab === "events" && <OrgEvents onToast={setToast} />}
         {tab === "ads" && <OrgAds onToast={setToast} />}
         {tab === "prices" && <OrgPrices onToast={setToast} />}
         {tab === "invoices" && <OrgInvoices onToast={setToast} />}

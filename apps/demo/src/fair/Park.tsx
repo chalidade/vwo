@@ -1,5 +1,6 @@
 import { type LibraryNpc, type ParkBuilding, type ParkNpc, parkBuildingDate } from "@vwo/shared";
 import { type Look, lookFor } from "@vwo/ui";
+import { LIVE } from "../mode";
 
 /** How one of the park's people looks, from what they are doing: running gear, the vendor's straw
  *  hat, the guard's uniform, the neighbourhood watch in peci and batik. */
@@ -48,6 +49,11 @@ export function ParkCard({ building: b }: { building: ParkBuilding }) {
       {parkBuildingDate(b) && <span className="park-card-date">📅 {parkBuildingDate(b)}</span>}
       {b.about && <p className="park-card-about">{b.about}</p>}
       <span className="park-card-note">Gedung ini masih dibangun, belum bisa dimasuki. Nantikan acaranya!</span>
+      {LIVE && b.regSlug && (
+        <a className="park-card-join" href={`/daftar/${b.regSlug}`} target="_blank" rel="noopener">
+          📝 Daftar event ini →
+        </a>
+      )}
     </div>
   );
 }

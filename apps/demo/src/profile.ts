@@ -25,6 +25,8 @@ export interface SeekerProfile {
 }
 
 const KEY = "vwo:jobseeker";
+/** Fired on window when the server's copy of the profile replaced this browser's. */
+export const PROFILE_EVENT = "vwo:profile-synced";
 const key = () => accountKey(KEY);
 
 export const EMPTY_PROFILE: SeekerProfile = { name: "", headline: "", email: "", phone: "", city: "", education: "", skills: "", cvUrl: "" };
