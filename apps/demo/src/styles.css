@@ -2736,6 +2736,8 @@ a.small-btn.cp-link { padding: 2px 8px; font-size: 12px; }
 .park-card-date { font-weight: 700; color: #92400e; }
 .park-card-about { margin: 0; overflow-wrap: anywhere; }
 .park-card-note { color: var(--muted); font-size: 12px; }
+.park-card-join { justify-self: start; margin-top: 4px; padding: 6px 12px; border-radius: 10px; background: #facc15; color: #422006; font-weight: 800; text-decoration: none; box-shadow: 0 2px 0 #a16207; }
+.park-card-join:hover { background: #fde047; }
 .org-park-scene { height: 420px; }
 .park-row .fl-main { min-width: 0; }
 .park-row-about { display: block; overflow-wrap: anywhere; }
@@ -3063,3 +3065,57 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
 .mp-booth-box[data-solid] { fill: var(--c); stroke: rgb(0 0 0 / 0.25); }
 .mp-booth[data-active] .mp-booth-box[data-solid] { stroke: #f59e0b; }
 .mp-label[data-out] { fill: #3b2a20; stroke: #faf6ef; stroke-width: 0.5; }
+
+/* Organiser: job seeker pre-registration events and their registrants. */
+.pe-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.pe-list > li { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.pe-list > li[data-active] { border-color: #111827; box-shadow: 0 0 0 1px #111827 inset; }
+.pe-thumb { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; display: block; }
+.pe-thumb-empty { background: repeating-linear-gradient(45deg, #f3f4f6 0 6px, #e5e7eb 6px 12px); }
+.pe-main { display: grid; gap: 3px; min-width: 0; }
+.pe-main b { overflow-wrap: anywhere; }
+.pe-link { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
+.pe-link a { display: inline-flex; align-items: center; gap: 4px; overflow-wrap: anywhere; color: inherit; }
+.pe-side { display: grid; gap: 6px; justify-items: end; }
+.pe-state { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #f9fafb; }
+.pe-state[data-s="open"] { background: #111827; color: #fff; border-color: #111827; }
+.pe-count { font-size: 18px; }
+.pe-count small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pe-form label { align-content: start; }
+.pe-banner { display: grid; gap: 8px; justify-items: start; }
+.pe-banner-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.pe-banner img { width: 100%; max-width: 420px; max-height: 160px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.cp-form label.pe-file { position: relative; display: inline-flex; align-items: center; gap: 6px; overflow: hidden; cursor: pointer; color: inherit; font-size: 13px; }
+.pe-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.cp-form label.pe-check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; align-self: end; padding-bottom: 8px; }
+.cp-form label.pe-check > input { width: 18px; height: 18px; flex: none; }
+.pe-search { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.pe-search input { flex: 1; border: 0; outline: 0; box-shadow: none; padding: 9px 0; background: transparent; min-width: 0; }
+.pe-table tbody tr.pe-row { cursor: pointer; }
+.pe-table tbody tr.pe-row:hover, .pe-table tbody tr.pe-row[data-open] { background: #f9fafb; }
+.pe-code { font-family: ui-monospace, monospace; font-weight: 700; white-space: nowrap; }
+.pe-linked { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #111827; color: #fff; white-space: nowrap; }
+.pe-detail td { background: #f9fafb; }
+.pe-detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 10px; font-size: 13px; }
+.pe-detail dt { color: var(--muted); font-weight: 700; }
+.pe-detail dd { margin: 0; overflow-wrap: anywhere; white-space: normal; }
+.pe-pre { white-space: pre-wrap !important; }
+@media (max-width: 640px) {
+  .pe-list > li { grid-template-columns: 44px minmax(0, 1fr); }
+  .pe-thumb { width: 44px; height: 44px; }
+  .pe-side { grid-column: 1 / -1; justify-items: start; grid-template-columns: auto auto; align-items: center; }
+  .pe-side > .org-row { grid-column: 1 / -1; }
+}
+
+/* The bag: events joined by pre-registering, and "Punya kode?". */
+.sp-prereg { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #d6b896; display: grid; gap: 6px; font-size: 13px; }
+.sp-prereg .sp-h3 { margin: 0; }
+.sp-prereg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sp-prereg-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 6px 8px; border-radius: 8px; background: #fff; border: 2px solid #ead2bd; }
+.sp-prereg-list li .sp-muted { grid-column: 1; }
+.sp-prereg-list code { grid-column: 2; grid-row: 1 / 3; align-self: center; font-weight: 800; }
+.sp-link { justify-self: start; padding: 0; background: none; border: 0; box-shadow: none; color: #9a3412; font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.sp-prereg-form { display: flex; gap: 6px; }
+.sp-prereg-form input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; text-transform: uppercase; }
+.sp-ok { margin: 0; color: #15803d; font-weight: 700; }
+.sp-err { margin: 0; color: #b91c1c; }

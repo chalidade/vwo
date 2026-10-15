@@ -7,6 +7,7 @@ import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
 import { startCoinSync } from "./coin-sync";
 import { startPaymentSync } from "./payments";
 import { syncPlayer } from "./player-sync";
+import { preregWelcome } from "./prereg";
 import { startPriceSync } from "./prices-sync";
 import { startReviewSync } from "./review-sync";
 import { startStatsSync } from "./stats-sync";
@@ -45,6 +46,7 @@ function useLiveAccount() {
       // Registered seminars feed the game's reminders ("15 menit lagi").
       void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
+      void preregWelcome(a).then((msg) => msg && fair.notices.push(msg));
     };
     window.addEventListener(ACCOUNT_EVENT, on);
     void checkSession().then((a) => {
@@ -57,6 +59,7 @@ function useLiveAccount() {
       // Registered seminars feed the game's reminders ("15 menit lagi").
       void pullSeminarRegs(true);
       void claimStoredRef(a).then((msg) => msg && fair.notices.push(msg));
+      void preregWelcome(a).then((msg) => msg && fair.notices.push(msg));
     });
     return () => window.removeEventListener(ACCOUNT_EVENT, on);
   }, []);

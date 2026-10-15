@@ -583,3 +583,65 @@ export const fairBoothHooks = pgTable("fair_booth_hooks", {
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * An event job seekers can sign up for before it opens (jobfair.co.id/daftar/<slug>), so launch day
+ * isn't everyone registering at once. Run from the organiser hub; only its public fields reach visitors.
+ */
+export const preregEvents = pgTable(
+  "prereg_events",
+  {
+    id: id(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    /** First and last day, "YYYY-MM-DD"; a one-day event has no end. */
+    startDate: text("start_date"),
+    endDate: text("end_date"),
+    /** A city and venue, or "Online". */
+    location: text("location").notNull().default("Online"),
+    about: text("about"),
+    /** A small JPEG data URL, made on the organiser's device like logos are. */
+    banner: text("banner"),
+    /** Most sign-ups taken; none means no limit. */
+    capacity: integer("capacity"),
+    /** The organiser opens and closes the form by hand; the deadline closes it on its own. */
+    open: boolean("open").notNull().default(false),
+    deadline: ts("deadline"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("prereg_events_slug_uq").on(t.slug), check("prereg_events_capacity_ck", sql`${t.capacity} is null or ${t.capacity} > 0`)],
+);
+
+/**
+ * One job seeker's sign-up for one event, by the Google email they will sign in with. The code is
+ * what they keep; with the email it lets them see or change what they sent. When an account with that
+ * (Google-verified) email signs in, the sign-up is linked to it and fills the empty parts of its profile.
+ */
+export const preregRegistrations = pgTable(
+  "prereg_registrations",
+  {
+    id: id(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => preregEvents.id, { onDelete: "cascade" }),
+    /** Lowercased and trimmed. */
+    email: text("email").notNull(),
+    code: text("code").notNull(),
+    /** The form as sent (see @vwo/shared prereg.ts). */
+    data: jsonb("data").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    linkedAt: ts("linked_at"),
+    /** When the account was told its sign-up data is in, so the welcome shows once. */
+    welcomedAt: ts("welcomed_at"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("prereg_registrations_once_uq").on(t.eventId, t.email),
+    uniqueIndex("prereg_registrations_code_uq").on(t.code),
+    index("prereg_registrations_email_idx").on(t.email),
+    index("prereg_registrations_user_idx").on(t.userId),
+  ],
+);

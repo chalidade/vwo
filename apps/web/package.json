@@ -17,6 +17,7 @@
     "drizzle-orm": "^0.45.2",
     "htmlparser2": "10.1.0",
     "next": "^15.0.0",
+    "qrcode-generator": "2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
@@ -25,11 +26,11 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
-    "@vwo/demo": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/web-push": "3.6.4",
+    "@vwo/demo": "workspace:*",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

@@ -4,7 +4,7 @@
 import type { Account } from "./account";
 import { type Character, loadCharacter, saveCharacter } from "./CharacterCreator";
 import type { PlayerProgress } from "./jobfair-engine";
-import { loadProfile, saveProfile, type SeekerProfile } from "./profile";
+import { PROFILE_EVENT, loadProfile, saveProfile, type SeekerProfile } from "./profile";
 import { coinsPending } from "./coin-sync";
 import { pollVisible } from "./poll";
 import { runtimeConfig } from "./runtime-config";
@@ -18,6 +18,8 @@ interface Saved extends Partial<PlayerProgress> {
 const OWNER_KEY = "vwo:player-owner";
 
 let stop: (() => void) | null = null;
+/** Ask the server for this account's copy now (after the server itself changed it). */
+let pullNow: (() => void) | null = null;
 let syncedFor: string | null = null;
 /** The signed-in account's saved progress has been loaded (so coins added now are not overwritten). */
 let ready = false;
@@ -56,9 +58,15 @@ function ledger(c: Ledger | undefined) {
 
 function adopt(d: Saved | null) {
   fair.loadProgress(d?.player ? { player: d.player, stamps: d.stamps ?? [], inbox: d.inbox ?? [] } : null);
-  if (d?.profile) saveProfile(d.profile);
+  if (d?.profile) {
+    saveProfile(d.profile);
+    window.dispatchEvent(new Event(PROFILE_EVENT));
+  }
   if (d?.character) saveCharacter(d.character);
 }
+
+/** Fetch the saved progress now, e.g. after a pre-registration filled the profile on the server. */
+export const refreshPlayer = () => pullNow?.();
 
 /** Keep the signed-in account's progress in step with the server; null stops it (signed out). */
 export function syncPlayer(account: Account | null) {
@@ -95,8 +103,9 @@ export function syncPlayer(account: Account | null) {
         waiting.splice(0).forEach((fn) => fn());
         return;
       }
-      // Another device saved; take it unless this one has changes of its own waiting to go up.
-      if (d.rev !== rev && JSON.stringify(snapshot()) === sent && d.data) {
+      // Another device saved; take it unless this one has changes of its own waiting to go up. With
+      // nothing saved before (rev 0) the server's copy wins, as the first save would find anyway.
+      if (d.rev !== rev && (rev === 0 || JSON.stringify(snapshot()) === sent) && d.data) {
         adopt(d.data);
         rev = d.rev;
         sent = JSON.stringify(snapshot());
@@ -142,6 +151,7 @@ export function syncPlayer(account: Account | null) {
   // Leaving the tab saves at once; coming back pulls (pollVisible).
   const onVisible = () => document.visibilityState === "hidden" && void push();
   void pull(true);
+  pullNow = () => void pull();
   // Saves only go up when something changed, at most every PROGRESS_PUSH_SEC.
   let pushTimer: ReturnType<typeof setTimeout>;
   const pushSoon = () => {
@@ -159,6 +169,7 @@ export function syncPlayer(account: Account | null) {
   document.addEventListener("visibilitychange", onVisible);
   stop = () => {
     gone = true;
+    pullNow = null;
     clearTimeout(pushTimer);
     stopPull();
     document.removeEventListener("visibilitychange", onVisible);

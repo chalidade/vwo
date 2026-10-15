@@ -108,6 +108,8 @@ export interface ParkBuilding {
   date?: string;
   /** A line or two about it, shown when someone walks up. */
   about?: string;
+  /** The event's job seeker pre-registration (jobfair.co.id/daftar/<slug>), for a "Daftar event" button. */
+  regSlug?: string;
   status: "soon" | "hidden";
 }
 
@@ -140,7 +142,16 @@ export function cleanParkBuildings(raw: unknown): ParkBuilding[] {
     // A picked range replaces the old typed date.
     const date = range ? "" : text(b.date, 40);
     const about = text(b.about, 200);
-    out.push({ id, name, ...(range ?? {}), ...(date ? { date } : {}), ...(about ? { about } : {}), status: b.status === "hidden" ? "hidden" : "soon" });
+    const regSlug = typeof b.regSlug === "string" && /^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/.test(b.regSlug) ? b.regSlug : "";
+    out.push({
+      id,
+      name,
+      ...(range ?? {}),
+      ...(date ? { date } : {}),
+      ...(about ? { about } : {}),
+      ...(regSlug ? { regSlug } : {}),
+      status: b.status === "hidden" ? "hidden" : "soon",
+    });
   }
   return out;
 }

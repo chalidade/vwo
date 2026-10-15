@@ -33,7 +33,9 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      sent once however often it runs.
    - `APP_URL`: domain used in email links (defaults to the production `.vercel.app` URL)
    - `TURNSTILE_SECRET_KEY` and `VITE_TURNSTILE_SITE_KEY` (Cloudflare Turnstile, free): human
-     check on sign-up. Off while unset; sign-up also has a hidden honeypot field.
+     check on sign-up. Off while unset; sign-up also has a hidden honeypot field. The job seeker
+     pre-registration form (/daftar/<slug>) uses it too when both the secret and a site key are set
+     (`TURNSTILE_SITE_KEY`, or the same `VITE_TURNSTILE_SITE_KEY` read at runtime).
    - optional `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`: a TURN relay for calls
      between networks where direct WebRTC fails (public STUN is used either way)
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: "Masuk dengan Google". Google Cloud Console →
@@ -96,6 +98,8 @@ own reviews) is never cached. Big inline pictures (logos) are served from
 - `PORTAL_POLL_SEC`: seconds between pulls of a booth's applicants in the company portal; default 15 (was 8); lower to 8 when HR teams chat live.
 - `GOOGLE_RATE_PER_IP`: Google sign-ins started per address per 10 minutes; default 300 (was 30); raise for a big venue or campus behind one Wi-Fi address.
 - `GOOGLE_RATE_PER_DEVICE`: the same per address and browser; default 30; rarely needs changing.
+- `PREREG_RATE_PER_IP`: pre-registration sign-ups and changes per address per hour; default 30; raise when a campus registers together from one Wi-Fi.
+- `PREREG_MAIL_PER_DAY`: pre-registration confirmation emails per day for all sign-ups together; default 60, leaving room on Resend's free 100/day; 0 turns them off (the code is always on screen).
 - `PUSH_BATCH`: phone notifications sent at once (seminar pushes, reminders); default 50; raise to 100 when the functions have time to spare.
 - `REMINDER_BUDGET_SEC`: how long one `/api/cron/reminders` run works before it stops and answers `more: true`; default 45. Accounts are marked before they are sent, so calling it again (e.g. cron-job.org every 5 minutes from 06.00 to 07.00 WIB) carries on with the rest and never sends twice.
 
