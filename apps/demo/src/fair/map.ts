@@ -196,3 +196,37 @@ export const mapCategories = (booths: CompanyBooth[]) => [...new Set(booths.map(
 
 /** Where a point of the plan lands in the plan drawn `px` wide (for scrolling a stand into view). */
 export const planScrollFor = (plan: Pick<FloorPlan, "width">, x: number, px: number, view: number) => Math.max(0, Math.min(px - view, (x / plan.width) * px - view / 2));
+
+// ---- Phones: the plan fits the screen's width, so marks are sized in pixels, not tiles ----
+
+/** Pixels per tile when the plan (with its half-tile margin each side) fills `box` pixels across, zoomed in `zoom` times. */
+export const planPxPerTile = (planWidth: number, box: number, zoom = 1) => (box > 0 ? (box * zoom) / (planWidth + 1) : 0);
+
+/** Sizes of the marks on the plan, in tiles. Without `px` (a desktop, where the plan is drawn big
+ *  enough) the fixed sizes. At `px` pixels a tile (a phone, the whole floor across the screen) labels
+ *  stay at least 7px, "Kamu di sini" at least 6px across, and when a stand's name would be too small
+ *  to read the stand is drawn compact: a block in its colour with its initials, the rest in its card. */
+export function markSizes(px?: number) {
+  const full = { logoR: 0.8, logoFont: 0.72, badgeFont: 0.75, nameFont: 0.88, you: 1, labelMin: 0, compact: false };
+  if (!px) return full;
+  const labelMin = 7 / px;
+  if (full.nameFont * px >= 8) return { ...full, labelMin };
+  return { ...full, compact: true, you: Math.max(1, 6 / (0.62 * px)), labelMin };
+}
+
+/** How far a stand's tap area reaches past its footprint, in tiles, so it is at least `min` pixels each way. */
+export function hitPad(px: number | undefined, w: number, h: number, min = 32) {
+  if (!px) return { dx: 0, dy: 0 };
+  return { dx: Math.max(0, (min / px - w) / 2), dy: Math.max(0, (min / px - h) / 2) };
+}
+
+/** A floor's short name for the phone's chip row: "L2 · 18" for a hall (18 vacancies open, or 18
+ *  matches while searching), "L1 Aula Utama", "Taman", "Perpus". */
+export function placeChip(p: { name: string; label: string; hall: number }, n: number) {
+  const level = /^Lantai (\d+)$/.exec(p.name);
+  const short = level ? `L${level[1]}` : p.name === "Perpustakaan" ? "Perpus" : p.name;
+  if (p.hall >= 0) return `${short} · ${n}`;
+  if (!level) return short;
+  const label = p.label.replace(/^Ruang\s+/i, "");
+  return `${short} ${label.length > 10 ? label.split(/\s+/)[0] : label}`;
+}

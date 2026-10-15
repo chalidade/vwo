@@ -13,7 +13,7 @@ import {
   parkFloorId,
 } from "@vwo/shared";
 import { describe, expect, it } from "vitest";
-import { companiesOn, filterCompanies, floorPlan, mapCategories, planScrollFor } from "../src/fair/map";
+import { companiesOn, filterCompanies, floorPlan, hitPad, mapCategories, markSizes, placeChip, planPxPerTile, planScrollFor } from "../src/fair/map";
 
 const fair = DEMO_JOB_FAIR;
 const floors = buildJobFairFloors(fair);
@@ -143,5 +143,43 @@ describe("plan scrolling", () => {
     expect(planScrollFor({ width: 100 }, 50, 1000, 400)).toBe(300);
     expect(planScrollFor({ width: 100 }, 2, 1000, 400)).toBe(0);
     expect(planScrollFor({ width: 100 }, 99, 1000, 400)).toBe(600);
+  });
+});
+
+describe("phone plan", () => {
+  it("fits the whole floor across the screen, zoomed in steps", () => {
+    expect(planPxPerTile(97, 340)).toBeCloseTo(340 / 98);
+    expect(planPxPerTile(97, 340, 2)).toBeCloseTo(680 / 98);
+    expect(planPxPerTile(46, 0)).toBe(0);
+  });
+
+  it("keeps the desktop sizes without a pixel scale or when the plan is big enough", () => {
+    expect(markSizes()).toMatchObject({ compact: false, nameFont: 0.88, labelMin: 0, you: 1 });
+    expect(markSizes(11)).toMatchObject({ compact: false, nameFont: 0.88 });
+    expect(markSizes(11).labelMin).toBeCloseTo(7 / 11);
+  });
+
+  it("draws stands compact and keeps labels and the player readable on a fitted phone plan", () => {
+    const s = markSizes(3.5);
+    expect(s.compact).toBe(true);
+    expect(s.labelMin * 3.5).toBeCloseTo(7);
+    expect(0.62 * s.you * 3.5).toBeCloseTo(6);
+  });
+
+  it("widens a small stand's tap area to at least 32px", () => {
+    const pad = hitPad(3.5, 6, 3.6);
+    expect((6 + 2 * pad.dx) * 3.5).toBeCloseTo(32);
+    expect((3.6 + 2 * pad.dy) * 3.5).toBeCloseTo(32);
+    expect(hitPad(20, 6, 3.6)).toEqual({ dx: 0, dy: 0 });
+    expect(hitPad(undefined, 6, 3.6)).toEqual({ dx: 0, dy: 0 });
+  });
+
+  it("names the floors short for the chip row", () => {
+    expect(placeChip({ name: "Lantai 2", label: "Teknologi & Keuangan", hall: 0 }, 18)).toBe("L2 · 18");
+    expect(placeChip({ name: "Lantai 1", label: "Aula Utama", hall: -1 }, 0)).toBe("L1 Aula Utama");
+    expect(placeChip({ name: "Lantai 5", label: "Ruang Seminar", hall: -1 }, 0)).toBe("L5 Seminar");
+    expect(placeChip({ name: "Lantai 7", label: "Lounge Konsultasi", hall: -1 }, 0)).toBe("L7 Lounge");
+    expect(placeChip({ name: "Taman", label: "Di luar gedung", hall: -1 }, 0)).toBe("Taman");
+    expect(placeChip({ name: "Perpustakaan", label: "Di taman", hall: -1 }, 0)).toBe("Perpus");
   });
 });
