@@ -53,7 +53,7 @@ const boothApps = await import("../app/api/jobfair/booths/[booth]/applications/r
 const req = (path: string, method: string, body?: unknown, headers: Record<string, string> = {}) =>
   new Request(`https://jobfair.co.id${path}`, {
     method,
-    headers: { origin: "https://jobfair.co.id", host: "jobfair.co.id", "content-type": "application/json", ...headers },
+    headers: { origin: "https://jobfair.co.id", host: "jobfair.co.id", "content-type": "application/json", "user-agent": "Mozilla/5.0 (Linux; Android 14) Chrome/130", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 

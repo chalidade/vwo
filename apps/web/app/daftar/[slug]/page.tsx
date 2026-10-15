@@ -1,8 +1,9 @@
-import { preregEventBySlug } from "@vwo/db";
+import { holdUntil, preregEventBySlug } from "@vwo/db";
 import { REGIONS, isPreregSlug } from "@vwo/shared";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { preregCaptchaOn, publicEvent, turnstileSiteKey } from "@/lib/prereg";
+import { issueFormToken, powBits, powSlowBits } from "@/lib/antibot";
+import { preregCaptchaOn, preregForm, warnIfUnprotected, preregRequireCaptcha, preregSlowKey, publicEvent, turnstileSiteKey } from "@/lib/prereg";
 import { PreregForm } from "../PreregForm";
 import "../../soon.css";
 import "../daftar.css";
@@ -28,6 +29,12 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   if (!found) notFound();
   const e = publicEvent(found.event, found.count);
   const cities = REGIONS.flatMap(([, list]) => list);
+  const captcha = preregCaptchaOn();
+  warnIfUnprotected();
+  // The form's signed token; without Turnstile it also asks the browser for a proof of work, harder in slow mode.
+  const bits = captcha ? 0 : (await holdUntil(db, preregSlowKey(found.event.id))) ? powSlowBits() : powBits();
+  const token = issueFormToken(preregForm(e.slug), bits);
+  const paused = preregRequireCaptcha() && !captcha;
   return (
     <div className="cs">
       <div className="cs-glow a" />
@@ -62,7 +69,12 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             {STATE_NOTE[e.state]} Sudah mendaftar? Kamu tetap bisa melihat kodemu di bawah.
           </p>
         )}
-        <PreregForm event={e} siteKey={preregCaptchaOn() ? turnstileSiteKey() : ""} cities={cities} />
+        {paused && e.state === "open" && (
+          <p className="cs-note" style={{ marginTop: 18 }}>
+            Formulir pendaftaran sedang disiapkan panitia. Coba lagi beberapa saat lagi. Sudah mendaftar? Kamu tetap bisa melihat kodemu di bawah.
+          </p>
+        )}
+        <PreregForm event={paused ? { ...e, state: "closed" } : e} siteKey={captcha ? turnstileSiteKey() : ""} cities={cities} formToken={token} />
       </div>
     </div>
   );

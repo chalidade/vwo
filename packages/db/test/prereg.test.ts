@@ -9,6 +9,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   claimPrereg,
   createDb,
+  deletePreregs,
+  holdUntil,
+  preregByCode,
+  preregFormData,
+  preregSignals,
+  setHold,
   createPreregEvent,
   deletePreregEvent,
   findPrereg,
@@ -236,5 +242,49 @@ describe("linking on sign-in", () => {
     expect((moved as { data: { email: string } }).data.email).toBe("sari@gmail.com");
     const u = await account("sari@gmail.com");
     expect((await linkPreregistrations(db, u)).linked).toBe(1);
+  });
+});
+
+describe("bot checks' state", () => {
+  it("keeps what was kept about the first sending through a change, and finds the inbox by its hash", async () => {
+    const e = await event();
+    const made = await submitPrereg(db, { eventId: e.id, data: form(), code: null, signals: { ib: "net1", ek: "inbox1", ft: 95 } });
+    if (made.status !== "created") throw new Error(made.status);
+    const changed = await submitPrereg(db, { eventId: e.id, data: form({ city: "Kota Cimahi" }), code: made.code, signals: { ib: "net2", ek: "inbox1", ft: 4 } });
+    if (changed.status !== "updated") throw new Error(changed.status);
+    expect(preregSignals(changed.registration.data)).toEqual({ ib: "net1", ek: "inbox1", ft: 95 });
+    expect(preregFormData(changed.registration.data)).not.toHaveProperty("_sig");
+    expect(preregFormData(changed.registration.data).city).toBe("Kota Cimahi");
+    // Another spelling of the same inbox makes no second sign-up, even when many are sent at once.
+    const twins = await Promise.all(
+      ["s.ari@gmail.com", "sari+1@gmail.com", "sa.ri@gmail.com"].map((email) => submitPrereg(db, { eventId: e.id, data: form({ email }), code: null, signals: { ek: "inbox1" } })),
+    );
+    expect(twins.map((t) => t.status)).toEqual(["same_inbox", "same_inbox", "same_inbox"]);
+    expect(await preregRegistrants(db, e.id)).toHaveLength(1);
+    expect((await submitPrereg(db, { eventId: e.id, data: form({ email: "budi@gmail.com" }), code: null, signals: { ek: "other" } })).status).toBe("created");
+    expect((await preregByCode(db, e.id, made.code))?.email).toBe("sari@gmail.com");
+  });
+
+  it("deletes many sign-ups of one event only", async () => {
+    const e = await event();
+    const other = await event();
+    const ids: string[] = [];
+    for (const email of ["a@gmail.com", "b@gmail.com"]) {
+      const r = await submitPrereg(db, { eventId: e.id, data: form({ email }), code: null });
+      if (r.status === "created") ids.push(r.registration.id);
+    }
+    const keep = await submitPrereg(db, { eventId: other.id, data: form(), code: null });
+    if (keep.status !== "created") throw new Error(keep.status);
+    expect(await deletePreregs(db, e.id, [...ids, keep.registration.id])).toBe(2);
+    expect(await preregRegistrants(db, other.id)).toHaveLength(1);
+  });
+
+  it("holds a key until its end, keeping a later end", async () => {
+    expect(await holdUntil(db, "prereg:slow:x")).toBeNull();
+    await setHold(db, "prereg:slow:x", 60_000);
+    const first = await holdUntil(db, "prereg:slow:x");
+    expect(first!.getTime()).toBeGreaterThan(Date.now());
+    await setHold(db, "prereg:slow:x", 1_000);
+    expect((await holdUntil(db, "prereg:slow:x"))!.getTime()).toBe(first!.getTime());
   });
 });

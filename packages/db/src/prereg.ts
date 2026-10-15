@@ -2,7 +2,7 @@
 // code, and linking sign-ups to the account that signs in with the same Google email. Contact details
 // leave this file only for event admins (the organiser hub) or for the person holding both the email
 // and the code. The form and its mapping onto the profile are in @vwo/shared prereg.ts.
-import { type PreregData, type PreregEventData, fillEmptyProfile, newPreregCode, preregDates, preregSlug, preregState, profileFromPrereg } from "@vwo/shared";
+import { type PreregData, type PreregEventData, type SignupSignals, fillEmptyProfile, newPreregCode, preregDates, preregSlug, preregState, profileFromPrereg } from "@vwo/shared";
 import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import type { Db } from "./client";
@@ -13,6 +13,18 @@ export type PreregRegistrationRow = typeof preregRegistrations.$inferSelect;
 
 /** A unique index refused the write (drizzle wraps the driver's error). */
 const uniqueClash = (e: unknown) => [e, (e as { cause?: unknown })?.cause].some((x) => (x as { code?: string })?.code === "23505");
+
+/** The form as sent, with what the bot checks kept about it under "_sig" (never shown back to the sender). */
+const withSignals = (data: PreregData, signals: SignupSignals | undefined) => (signals ? { ...data, _sig: signals } : data);
+
+/** The form without "_sig". */
+export function preregFormData(data: unknown): PreregData {
+  const { _sig: _s, ...rest } = (data ?? {}) as PreregData & { _sig?: unknown };
+  return rest as PreregData;
+}
+
+/** What the bot checks kept about a sign-up, if anything. */
+export const preregSignals = (data: unknown): SignupSignals | null => (data as { _sig?: SignupSignals } | null)?._sig ?? null;
 
 const count = sql<number>`count(${preregRegistrations.id})::int`;
 
@@ -110,6 +122,8 @@ export type PreregSubmit =
   | { status: "created" | "updated"; code: string; registration: PreregRegistrationRow }
   /** This email signed up before and no matching code came with it: nothing changed. */
   | { status: "exists" }
+  /** The same inbox signed up under another spelling (s.a.r.i@gmail.com, sari+1@gmail.com): nothing changed. */
+  | { status: "same_inbox"; registration: PreregRegistrationRow }
   | { status: "closed" | "deadline" | "full" | "no_event" };
 
 /**
@@ -118,7 +132,7 @@ export type PreregSubmit =
  * enough to overwrite (or read) what they sent. The event row is locked so the capacity holds when
  * many send at once.
  */
-export async function submitPrereg(db: Db, input: { eventId: string; data: PreregData; code: string | null }, now = Date.now()): Promise<PreregSubmit> {
+export async function submitPrereg(db: Db, input: { eventId: string; data: PreregData; code: string | null; signals?: SignupSignals }, now = Date.now()): Promise<PreregSubmit> {
   return db.transaction(async (tx) => {
     const [event] = await tx.select().from(preregEvents).where(eq(preregEvents.id, input.eventId)).for("update");
     if (!event) return { status: "no_event" };
@@ -134,10 +148,20 @@ export async function submitPrereg(db: Db, input: { eventId: string; data: Prere
       if (state !== "open") return { status: state };
       const [row] = await tx
         .update(preregRegistrations)
-        .set({ data: input.data, updatedAt: new Date(now) })
+        // What was kept about the first sending stays with the sign-up.
+        .set({ data: withSignals(input.data, (mine.data as { _sig?: SignupSignals })?._sig ?? input.signals), updatedAt: new Date(now) })
         .where(eq(preregRegistrations.id, mine.id))
         .returning();
       return { status: "updated", code: mine.code, registration: row! };
+    }
+    // Under the event's lock, so a hundred spellings sent at once still make one sign-up.
+    if (input.signals?.ek && !input.code) {
+      const [twin] = await tx
+        .select()
+        .from(preregRegistrations)
+        .where(and(eq(preregRegistrations.eventId, event.id), sql`${preregRegistrations.data} -> '_sig' ->> 'ek' = ${input.signals.ek}`))
+        .limit(1);
+      if (twin) return { status: "same_inbox", registration: twin };
     }
     const [{ n } = { n: 0 }] = await tx
       .select({ n: sql<number>`count(*)::int` })
@@ -148,7 +172,11 @@ export async function submitPrereg(db: Db, input: { eventId: string; data: Prere
     // A clash of two random codes is all but impossible; try again if it ever happens.
     for (let i = 0; i < 5; i++) {
       const code = newPreregCode((k) => randomBytes(k));
-      const [row] = await tx.insert(preregRegistrations).values({ eventId: event.id, email, code, data: input.data }).onConflictDoNothing().returning();
+      const [row] = await tx
+        .insert(preregRegistrations)
+        .values({ eventId: event.id, email, code, data: withSignals(input.data, input.signals) })
+        .onConflictDoNothing()
+        .returning();
       if (row) return { status: "created", code, registration: row };
     }
     throw new Error("no free code");
@@ -267,7 +295,7 @@ export async function linkPreregistrations(db: Db, user: { id: string; email: st
     const filled = await fillProfile(
       tx as unknown as Db,
       user.id,
-      rows.map((r) => r.data as PreregData),
+      rows.map((r) => preregFormData(r.data)),
     );
     return { linked: rows.length, filled };
   });

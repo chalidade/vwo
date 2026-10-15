@@ -3119,3 +3119,12 @@ button.lib-book:active { transform: translateY(1px); box-shadow: none; }
 .sp-prereg-form input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; text-transform: uppercase; }
 .sp-ok { margin: 0; color: #15803d; font-weight: 700; }
 .sp-err { margin: 0; color: #b91c1c; }
+
+/* Pre-registration anti-bot: the missing-Turnstile banner, slow mode, and suspicious sign-ups. */
+.pe-alert { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; font-weight: 700; font-size: 13px; }
+.pe-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: #f9fafb; border: 1px solid var(--line); font-size: 13px; }
+.pe-notice > svg, .pe-alert > svg { flex: none; }
+.pe-state[data-s="slow"] { background: #fff; border-color: #b91c1c; color: #b91c1c; }
+.pe-suspect { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid #b91c1c; color: #b91c1c; white-space: nowrap; vertical-align: 1px; }
+.pe-bulk { flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.pe-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

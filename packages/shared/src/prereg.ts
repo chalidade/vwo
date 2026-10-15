@@ -110,8 +110,11 @@ export const preregRequest = z.object({
   data: preregInput,
   code: z.string().max(40).optional(),
   captcha: z.string().max(4000).optional(),
-  /** Hidden field: people leave it empty, bots fill it in. */
-  website2: z.string().max(0).optional(),
+  /** The signed token the page was given, and the browser's proof of work for it (see antibot.ts). */
+  form: z.string().max(300).optional(),
+  pow: z.string().max(12).optional(),
+  /** Hidden field: people leave it empty, bots fill it in. Any value is taken, so the answer can't tell a bot why it failed. */
+  website2: z.string().max(200).optional(),
 });
 
 /** Looking up one's own sign-up: both the email and the code, never one alone. */

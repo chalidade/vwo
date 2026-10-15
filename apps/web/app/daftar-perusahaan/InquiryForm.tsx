@@ -30,6 +30,8 @@ const ERRORS: Record<string, string> = {
   too_many_requests: "Terlalu banyak formulir dari akun ini hari ini. Coba lagi besok.",
   not_signed_in: "Sesi login habis. Muat ulang halaman lalu masuk lagi.",
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+  verify_failed: "Formulir gagal diverifikasi, coba lagi.",
+  email_rejected: "Email ini tidak bisa dipakai. Gunakan email kantor yang aktif.",
 };
 
 const date = (t: number) => new Date(t).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });

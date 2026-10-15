@@ -3,6 +3,7 @@ import { boothLeadInput, newLead, stallLeadInput } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { screenForm } from "@/lib/antibot";
 import { db } from "@/lib/db";
 import { isFairAdmin } from "@/lib/fair";
 import { fail, readSizedBody, sameOrigin } from "@/lib/http";
@@ -30,6 +31,15 @@ export async function POST(req: Request) {
   const body = await readSizedBody(req, schema, 4_000);
   if ("error" in body) return body.error;
   if (!(await allow(`lead:${user.id}`, 5, 86_400_000))) return fail(429, "too_many_requests");
+  const d = body.data.data as Record<string, unknown>;
+  const str = (k: string) => (typeof d[k] === "string" ? (d[k] as string) : undefined);
+  const refused = await screenForm(req, "lead", {
+    email: str("email"),
+    // Company names may be web addresses (Blibli.com), so they are checked like free text.
+    names: { contactName: str("contactName"), city: str("city") },
+    others: { name: str("company") ?? str("business"), industry: str("industry"), contactRole: str("contactRole"), sells: str("sells"), note: str("note") },
+  });
+  if (refused) return refused;
   const lead = newLead(randomUUID(), user.id, body.data, Date.now());
   const out = await createLead(db, lead);
   if ("error" in out) return fail(409, out.error);

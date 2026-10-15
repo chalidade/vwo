@@ -50,7 +50,7 @@ const state = await import("../app/api/jobfair/state/route");
 const req = (path: string, method: string, body?: unknown, origin = "https://jobfair.co.id") =>
   new Request(`https://jobfair.co.id${path}`, {
     method,
-    headers: { origin, host: "jobfair.co.id", "content-type": "application/json" },
+    headers: { origin, host: "jobfair.co.id", "content-type": "application/json", "user-agent": "Mozilla/5.0 (Linux; Android 14) Chrome/130" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
