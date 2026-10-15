@@ -2,6 +2,7 @@ import { createRegistration, myRegistrations, readPrices } from "@vwo/db";
 import { cleanWebsite, priceFrom } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { screenForm } from "@/lib/antibot";
 import { db } from "@/lib/db";
 import { fail, readBody, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
@@ -56,6 +57,9 @@ export async function POST(req: Request) {
   if (!(await allow(`register-company:${user.id}`, 5, 86_400_000))) return fail(429, "too_many_requests");
   const body = await readBody(req, schema);
   if ("error" in body) return body.error;
+  const { company, contactName, city, industry, contactRole, email } = body.data;
+  const refused = await screenForm(req, "register-company", { email, names: { contactName, city }, others: { company, industry, contactRole } });
+  if (refused) return refused;
   const open = (await myRegistrations(db, user.id)).filter((r) => r.status === "unpaid" || r.status === "paid");
   if (open.length >= 2) return fail(409, "too_many_open");
   const { website2: _h, ...input } = body.data;

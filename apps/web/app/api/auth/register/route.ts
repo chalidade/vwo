@@ -1,6 +1,7 @@
 import { EmailTakenError, createSession, sessionUser, register } from "@vwo/db";
 import { registerSchema } from "@vwo/shared";
 import { NextResponse } from "next/server";
+import { screenForm } from "@/lib/antibot";
 import { db } from "@/lib/db";
 import { passwordLogin } from "@/lib/auth-options";
 import { clientIp, fail, readBody, sameOrigin } from "@/lib/http";
@@ -19,7 +20,9 @@ export async function POST(req: Request) {
   if ("error" in body) return body.error;
   const { email, password, name, website, captcha } = body.data;
   // A filled hidden field or a failed Turnstile check means a script, not a person.
-  if (website || !(await isHuman(captcha, ip))) return fail(400, "not_human");
+  if (website || !(await isHuman(captcha, ip, { host: req.headers.get("x-forwarded-host") ?? req.headers.get("host") }))) return fail(400, "not_human");
+  const refused = await screenForm(req, "register", { email, names: { name } }, 50);
+  if (refused) return refused;
   try {
     const { userId, verifyToken } = await register(db, { email, password, name });
     const session = await createSession(db, userId, req.headers.get("user-agent"));

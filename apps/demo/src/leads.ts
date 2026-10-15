@@ -17,6 +17,8 @@ export const LEAD_ERRORS: Record<string, string> = {
   too_many_requests: "Terlalu banyak formulir dari akun ini hari ini. Coba lagi besok.",
   not_signed_in: "Masuk dulu ke job fair, lalu isi formulir lagi.",
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
+  verify_failed: "Formulir gagal diverifikasi, coba lagi.",
+  email_rejected: "Email ini tidak bisa dipakai. Gunakan email kantor yang aktif.",
   not_open: "Permintaan ini sudah selesai atau ditolak.",
   fulfilled: "Stand atau stan sudah dibuat untuk permintaan ini; statusnya tetap Selesai.",
   slot_taken: "Tempat ini baru saja terisi. Pilih tempat lain.",

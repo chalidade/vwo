@@ -1,5 +1,5 @@
 import "server-only";
-import type { PreregEventRow, PreregRegistrationRow } from "@vwo/db";
+import { type PreregEventRow, type PreregRegistrationRow, preregFormData } from "@vwo/db";
 import { type PreregData, type PublicPreregEvent, preregDate, preregState, safeImage } from "@vwo/shared";
 import { envInt } from "./limits";
 import { appUrl, mailEnabled, sendMail } from "./mail";
@@ -10,6 +10,37 @@ export const turnstileSiteKey = () => process.env.TURNSTILE_SITE_KEY || process.
 
 /** The form asks for Turnstile only when both keys are set, so a missing site key can't lock everyone out. */
 export const preregCaptchaOn = () => !!process.env.TURNSTILE_SECRET_KEY && !!turnstileSiteKey();
+
+/** Refuse sign-ups while Turnstile is not set up, instead of falling back to the proof of work (PREREG_REQUIRE_CAPTCHA=1). */
+export const preregRequireCaptcha = () => process.env.PREREG_REQUIRE_CAPTCHA === "1";
+
+/**
+ * The organiser is warned (a red banner) when the live site takes sign-ups without Turnstile: the
+ * proof of work and the other checks still run, but Turnstile is the strongest one and costs nothing.
+ */
+export const preregCaptchaWarning = () => process.env.NODE_ENV === "production" && !preregCaptchaOn();
+
+let warned = false;
+/** Say so once in the server log too, the first time a form is shown on an instance. */
+export function warnIfUnprotected() {
+  if (warned || !preregCaptchaWarning()) return;
+  warned = true;
+  console.warn("[antibot] Turnstile is not set up: public sign-up forms rely on the proof of work. Set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY.");
+}
+
+/** The name of an event's form in its token and Turnstile's action for it. */
+export const preregForm = (slug: string) => `prereg:${slug}`;
+export const PREREG_ACTION = "prereg";
+
+/**
+ * Sign-ups to one event in 10 minutes before it goes into slow mode for half an hour: a harder proof
+ * of work (Turnstile, when on, stays as it is) and a notice for the organiser.
+ */
+export const preregEventBurst = () => envInt("PREREG_EVENT_BURST", 300, 5, 1_000_000);
+export const PREREG_SLOW_MS = 30 * 60_000;
+export const preregSlowKey = (eventId: string) => `prereg:slow:${eventId}`;
+/** Sign-ups per hour from one network (/24 or /64), on top of the per-address limit. */
+export const preregRatePerNet = () => envInt("PREREG_RATE_PER_NET", 120, 1, 100_000);
 
 /** Sign-ups and changes from one address per hour (a campus shares one), and lookups per 10 minutes. */
 export const preregRatePerIp = () => envInt("PREREG_RATE_PER_IP", 30, 1, 10_000);
@@ -31,7 +62,7 @@ export function publicEvent(e: PreregEventRow, count: number, now = Date.now()):
 
 /** One's own sign-up, as shown back to the person holding its email and code. */
 export function ownRegistration(r: PreregRegistrationRow, e: PreregEventRow) {
-  return { code: r.code, event: { slug: e.slug, name: e.name, date: preregDate(e), location: e.location }, data: r.data as PreregData, at: r.createdAt.getTime() };
+  return { code: r.code, event: { slug: e.slug, name: e.name, date: preregDate(e), location: e.location }, data: preregFormData(r.data), at: r.createdAt.getTime() };
 }
 
 /**

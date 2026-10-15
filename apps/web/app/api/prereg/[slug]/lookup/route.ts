@@ -1,5 +1,5 @@
-import { findPrereg, preregEventBySlug } from "@vwo/db";
-import { isPreregSlug, normalizePreregCode, preregLookup } from "@vwo/shared";
+import { findPrereg, preregByCode, preregEventBySlug } from "@vwo/db";
+import { emailKey, isPreregSlug, normalizePreregCode, preregLookup } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { clientIp, fail, readSizedBody, sameOrigin } from "@/lib/http";
@@ -23,7 +23,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (!(await allow(`prereg-lookup:email:${body.data.email}`, 8, 600_000))) return fail(429, "too_many_requests");
   const code = normalizePreregCode(body.data.code);
   const found = isPreregSlug(slug) && code ? await preregEventBySlug(db, slug) : null;
-  const row = found && code ? await findPrereg(db, found.event.id, body.data.email, code) : null;
+  let row = found && code ? await findPrereg(db, found.event.id, body.data.email, code) : null;
+  // The same Gmail inbox written another way (dots, +tag) is the same person: the code still has to match.
+  if (found && code && !row) {
+    const byCode = await preregByCode(db, found.event.id, code);
+    if (byCode && emailKey(byCode.email) === emailKey(body.data.email)) row = byCode;
+  }
   if (!found || !row) return fail(404, "not_found");
   return NextResponse.json({ registration: ownRegistration(row, found.event) }, { headers: { "Cache-Control": "no-store" } });
 }

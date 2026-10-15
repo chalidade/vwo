@@ -36,6 +36,13 @@ Supabase Free. For the event everything moves to one DigitalOcean droplet (`depl
      check on sign-up. Off while unset; sign-up also has a hidden honeypot field. The job seeker
      pre-registration form (/daftar/<slug>) uses it too when both the secret and a site key are set
      (`TURNSTILE_SITE_KEY`, or the same `VITE_TURNSTILE_SITE_KEY` read at runtime).
+     Get both keys at dash.cloudflare.com → Turnstile → Add widget (free, no domain on Cloudflare
+     needed): add `jobfair.co.id` (and any preview domain) as hostnames, mode "Managed". An answer
+     is accepted only from those hosts, for its own form, and within 5 minutes; list more hosts in
+     `TURNSTILE_HOSTNAMES` (comma separated). While the keys are missing on the live site the
+     organiser's Pra-registrasi tab shows a red banner and the form falls back to a proof of work.
+   - optional `PREREG_REQUIRE_CAPTCHA=1`: refuse pre-registrations while Turnstile is not set up
+     (the form says it is being prepared) instead of falling back to the proof of work.
    - optional `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`: a TURN relay for calls
      between networks where direct WebRTC fails (public STUN is used either way)
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: "Masuk dengan Google". Google Cloud Console →
@@ -100,6 +107,9 @@ own reviews) is never cached. Big inline pictures (logos) are served from
 - `GOOGLE_RATE_PER_DEVICE`: the same per address and browser; default 30; rarely needs changing.
 - `PREREG_RATE_PER_IP`: pre-registration sign-ups and changes per address per hour; default 30; raise when a campus registers together from one Wi-Fi.
 - `PREREG_MAIL_PER_DAY`: pre-registration confirmation emails per day for all sign-ups together; default 60, leaving room on Resend's free 100/day; 0 turns them off (the code is always on screen).
+- `PREREG_RATE_PER_NET`: pre-registration sign-ups per hour from one network (/24 for IPv4, /64 for IPv6), on top of the per-address limit; default 120.
+- `PREREG_EVENT_BURST`: sign-ups to one event in 10 minutes before it goes into slow mode for 30 minutes (a harder proof of work without Turnstile, and a notice in the organiser's Pra-registrasi tab); default 300.
+- `PREREG_POW_BITS`, `PREREG_POW_SLOW_BITS`: proof-of-work difficulty when Turnstile is off (about 2^bits hashes, worked out in the background while the person types); defaults 13 (well under a second on a mid-range phone) and 16 in slow mode.
 - `PUSH_BATCH`: phone notifications sent at once (seminar pushes, reminders); default 50; raise to 100 when the functions have time to spare.
 - `REMINDER_BUDGET_SEC`: how long one `/api/cron/reminders` run works before it stops and answers `more: true`; default 45. Accounts are marked before they are sent, so calling it again (e.g. cron-job.org every 5 minutes from 06.00 to 07.00 WIB) carries on with the rest and never sends twice.
 

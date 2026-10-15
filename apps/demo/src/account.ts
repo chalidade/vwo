@@ -107,6 +107,8 @@ const SERVER_ERRORS: Record<string, string> = {
   too_many_requests: "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.",
   bad_origin: "Permintaan ditolak. Muat ulang halaman lalu coba lagi.",
   not_human: "Pemeriksaan keamanan gagal. Muat ulang halaman lalu coba lagi.",
+  verify_failed: "Pendaftaran gagal diverifikasi, coba lagi.",
+  email_rejected: "Email ini tidak bisa dipakai. Gunakan email yang aktif.",
 };
 
 async function api(path: string, body?: unknown): Promise<{ status: number; data: Record<string, unknown> }> {

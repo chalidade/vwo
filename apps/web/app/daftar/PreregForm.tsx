@@ -2,11 +2,14 @@
 
 import { EDUCATION_LEVELS, PREREG_AGES, PREREG_FIELDS, PREREG_JOB_TYPES, PREREG_MAX_FIELDS, PREREG_STATUSES, type PreregData, type PublicPreregEvent, isGmail } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
+import { useFormGuard } from "../useFormGuard";
 import { PreregCard, type OwnRegistration } from "./PreregCard";
 
 const ERRORS: Record<string, string> = {
-  invalid_input: "Periksa lagi isian yang ditandai: email, nomor WhatsApp, dan link (http/https) harus benar.",
+  invalid_input: "Periksa lagi isian: email, nomor WhatsApp (08… atau +62…), dan link (http/https) harus benar.",
   not_human: "Verifikasi keamanan belum selesai. Tunggu tanda centang lalu kirim lagi.",
+  verify_failed: "Pendaftaran gagal diverifikasi, coba lagi.",
+  email_rejected: "Email ini tidak bisa dipakai. Gunakan email akun Google (Gmail) kamu.",
   too_many_requests: "Terlalu banyak percobaan dari jaringan ini. Coba lagi beberapa saat lagi.",
   too_large: "Isian terlalu panjang. Persingkat ringkasan pengalaman.",
   closed: "Pendaftaran event ini sedang ditutup panitia.",
@@ -55,18 +58,18 @@ const EMPTY: Form = {
 
 const fromData = (d: PreregData): Form => ({ ...EMPTY, ...d, consent: false });
 
-async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T; status: number } | { ok: false; error: string; resent?: boolean }> {
+async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T; status: number; form?: string } | { ok: false; error: string; resent?: boolean; form?: string }> {
   try {
     const r = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const d = (await r.json().catch(() => ({}))) as T & { error?: string; resent?: boolean };
-    return r.ok ? { ok: true, data: d, status: r.status } : { ok: false, error: d.error ?? `http_${r.status}`, resent: d.resent };
+    const d = (await r.json().catch(() => ({}))) as T & { error?: string; resent?: boolean; form?: string };
+    return r.ok ? { ok: true, data: d, status: r.status, form: d.form } : { ok: false, error: d.error ?? `http_${r.status}`, resent: d.resent, form: d.form };
   } catch {
     return { ok: false, error: "offline" };
   }
 }
 
 /** The pre-registration form, the "sudah daftar?" lookup by email and code, and the card to keep. */
-export function PreregForm({ event, siteKey, cities }: { event: PublicPreregEvent; siteKey: string; cities: string[] }) {
+export function PreregForm({ event, siteKey, cities, formToken }: { event: PublicPreregEvent; siteKey: string; cities: string[]; formToken: string }) {
   const open = event.state === "open";
   const [mode, setMode] = useState<"form" | "lookup" | "done">(open ? "form" : "lookup");
   const [f, setF] = useState<Form>(EMPTY);
@@ -79,6 +82,7 @@ export function PreregForm({ event, siteKey, cities }: { event: PublicPreregEven
   const [done, setDone] = useState<{ reg: OwnRegistration; mailed: boolean; updated: boolean } | null>(null);
   const [look, setLook] = useState({ email: "", code: "" });
   const captcha = useTurnstile(mode === "form" && open ? siteKey : "");
+  const guard = useFormGuard(formToken);
   const set =
     <K extends keyof Form>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => (
@@ -103,10 +107,12 @@ export function PreregForm({ event, siteKey, cities }: { event: PublicPreregEven
       data: f,
       ...(code ? { code } : {}),
       ...(captcha.token ? { captcha: captcha.token } : {}),
+      ...(await guard.fields()),
       website2: hp,
     });
     setBusy(false);
     captcha.reset();
+    guard.renew(r.form);
     if (r.ok) {
       setDone({ reg: r.data.registration, mailed: r.data.mailed, updated: r.data.status === "updated" });
       setMode("done");
@@ -391,7 +397,14 @@ function useTurnstile(siteKey: string) {
     const w = window as { turnstile?: Turnstile };
     const mount = () => {
       if (gone || !w.turnstile || !ref.current) return;
-      widget.current = w.turnstile.render(ref.current, { sitekey: siteKey, language: "id", theme: "dark", callback: setToken, "expired-callback": () => setToken(null) });
+      widget.current = w.turnstile.render(ref.current, {
+        sitekey: siteKey,
+        action: "prereg",
+        language: "id",
+        theme: "dark",
+        callback: setToken,
+        "expired-callback": () => setToken(null),
+      });
     };
     if (w.turnstile) mount();
     else {

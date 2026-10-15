@@ -30,3 +30,4 @@ export * from "./anomaly";
 export * from "./consultants";
 export * from "./leads";
 export * from "./prereg";
+export * from "./antibot";

@@ -1,6 +1,6 @@
-import { CalendarDays, Copy, Download, ExternalLink, ImagePlus, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
+import { CalendarDays, Copy, Download, ExternalLink, ImagePlus, Pencil, Plus, RefreshCw, Search, ShieldAlert, Trash2, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { type PreregData, type PreregState, formatDateRange, preregSlug } from "@vwo/shared";
+import { type PreregData, type PreregState, SUSPECT_LABELS, type SuspectReason, formatDateRange, preregSlug } from "@vwo/shared";
 import { LIVE } from "../mode";
 import { readImageFile } from "../imageFile";
 import { dateRangeError } from "./Park";
@@ -21,6 +21,8 @@ interface PreregEvent {
   count: number;
   state: PreregState;
   createdAt: number;
+  /** Slow mode (too many sign-ups at once) until then. */
+  slowUntil: number | null;
 }
 
 interface Registrant {
@@ -31,6 +33,8 @@ interface Registrant {
   at: number;
   updatedAt: number;
   linkedAt: number | null;
+  /** How suspicious it looks among this event's sign-ups (server side). */
+  suspect: { score: number; reasons: SuspectReason[]; flagged: boolean } | null;
 }
 
 async function call<T>(path: string, init?: { method: string; body?: unknown }): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
@@ -78,9 +82,10 @@ export function OrgEvents({ onToast }: { onToast: (t: string) => void }) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<PreregEvent | "new" | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [guard, setGuard] = useState<{ turnstile: boolean; warn: boolean } | null>(null);
   const load = () =>
-    void call<{ events: PreregEvent[] }>("/api/jobfair/prereg-events").then((r) =>
-      r.ok ? (setList(r.data.events), setError("")) : setError(err(r.error, "Daftar event gagal dimuat.")),
+    void call<{ events: PreregEvent[]; antibot?: { turnstile: boolean; warn: boolean } }>("/api/jobfair/prereg-events").then((r) =>
+      r.ok ? (setList(r.data.events), setGuard(r.data.antibot ?? null), setError("")) : setError(err(r.error, "Daftar event gagal dimuat.")),
     );
   useEffect(load, []);
 
@@ -139,6 +144,17 @@ export function OrgEvents({ onToast }: { onToast: (t: string) => void }) {
           Pelamar mengisi data lewat link pendaftaran sebelum acara dibuka dan mendapat kode. Saat situs dibuka, mereka masuk dengan akun Google yang sama dan profilnya sudah
           terisi, jadi tidak perlu daftar ulang. Event yang dibuka juga tampil di halaman depan jobfair.co.id.
         </p>
+        {guard?.warn && (
+          <p className="pe-alert" role="alert">
+            <ShieldAlert size={16} aria-hidden /> Perlindungan anti-bot (Turnstile) belum aktif — isi TURNSTILE_SITE_KEY dan TURNSTILE_SECRET_KEY di Vercel
+          </p>
+        )}
+        {list?.some((e) => e.slowUntil) && (
+          <p className="pe-notice">
+            <ShieldAlert size={16} aria-hidden /> Ada lonjakan pendaftaran yang tidak wajar. Event bertanda &quot;Mode lambat&quot; sementara meminta verifikasi lebih berat dari
+            pendaftar; periksa pendaftar yang ditandai Mencurigakan.
+          </p>
+        )}
         {error && <p className="bk-err">{error}</p>}
         {!list && !error && <p className="muted small">Memuat…</p>}
         {list && list.length === 0 && <p className="muted small">Belum ada event. Buat event pertama untuk mendapatkan link pendaftaran.</p>}
@@ -166,6 +182,11 @@ export function OrgEvents({ onToast }: { onToast: (t: string) => void }) {
                   <span className="pe-state" data-s={e.state}>
                     {STATE[e.state]}
                   </span>
+                  {e.slowUntil && (
+                    <span className="pe-state" data-s="slow" title={`Sampai ${when(e.slowUntil)}`}>
+                      Mode lambat
+                    </span>
+                  )}
                   <b className="pe-count">
                     {e.count}
                     {e.capacity ? ` / ${e.capacity}` : ""} <small>pendaftar</small>
@@ -386,6 +407,8 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
   const [rows, setRows] = useState<Registrant[] | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [onlySuspect, setOnlySuspect] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const base = `/api/jobfair/prereg-events/${event.id}/registrants`;
   useEffect(() => {
     let gone = false;
@@ -425,7 +448,7 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
     if (!email || email === x.email) return;
     const r = await call<{ registrant: Registrant }>(`${base}/${x.id}`, { method: "PATCH", body: { email } });
     if (!r.ok) return setError(err(r.error, "Gagal memindahkan email."));
-    setRows((all) => all?.map((y) => (y.id === x.id ? r.data.registrant : y)) ?? null);
+    setRows((all) => all?.map((y) => (y.id === x.id ? { ...r.data.registrant, suspect: y.suspect } : y)) ?? null);
     onToast(`${x.code} dipindah ke ${email}`);
   };
   const remove = async (x: Registrant) => {
@@ -434,6 +457,27 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
     if (!r.ok) return setError(err(r.error, "Gagal menghapus."));
     setRows((all) => all?.filter((y) => y.id !== x.id) ?? null);
     onToast(`Pendaftaran ${x.code} dihapus`);
+    onChanged();
+  };
+
+  const suspects = rows?.filter((x) => x.suspect?.flagged) ?? [];
+  const shown = onlySuspect ? suspects : (rows ?? []);
+  const pick = (id: string) =>
+    setPicked((all) => {
+      const next = new Set(all);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const removeMany = async (ids: string[]) => {
+    if (!ids.length) return;
+    if (!confirm(`Hapus ${ids.length} pendaftaran? Pendaftar yang dihapus harus mendaftar ulang dan kodenya tidak berlaku lagi.`)) return;
+    const r = await call<{ deleted: number }>(base, { method: "DELETE", body: { ids } });
+    if (!r.ok) return setError(err(r.error, "Gagal menghapus."));
+    const gone = new Set(ids);
+    setRows((all) => all?.filter((y) => !gone.has(y.id)) ?? null);
+    setPicked(new Set());
+    onToast(`${r.data.deleted} pendaftaran dihapus`);
     onChanged();
   };
 
@@ -456,14 +500,38 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
         <Search size={15} aria-hidden />
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} maxLength={80} placeholder="Cari nama, email, kode, kota, atau kampus" aria-label="Cari pendaftar" />
       </label>
+      {rows && rows.length > 0 && (
+        <div className="org-row pe-bulk">
+          <label className="pe-filter">
+            <input type="checkbox" checked={onlySuspect} onChange={(e) => (setOnlySuspect(e.target.checked), setPicked(new Set()))} />
+            Hanya yang mencurigakan ({suspects.length})
+          </label>
+          {suspects.length > 0 && (
+            <button type="button" className="small-btn ghost" onClick={() => setPicked(new Set(suspects.map((x) => x.id)))}>
+              Pilih semua yang mencurigakan
+            </button>
+          )}
+          {picked.size > 0 && (
+            <>
+              <button type="button" className="small-btn" onClick={() => void removeMany([...picked])}>
+                <Trash2 size={14} aria-hidden /> Hapus {picked.size} terpilih
+              </button>
+              <button type="button" className="small-btn ghost" onClick={() => setPicked(new Set())}>
+                Batal pilih
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {error && <p className="bk-err">{error}</p>}
       {!rows && !error && <p className="muted small">Memuat…</p>}
-      {rows && rows.length === 0 && <p className="muted small">{q ? "Tidak ada yang cocok." : "Belum ada pendaftar."}</p>}
-      {rows && rows.length > 0 && (
+      {rows && shown.length === 0 && <p className="muted small">{onlySuspect ? "Tidak ada pendaftar yang mencurigakan." : q ? "Tidak ada yang cocok." : "Belum ada pendaftar."}</p>}
+      {rows && shown.length > 0 && (
         <div className="org-scroll">
           <table className="list cp-table pe-table">
             <thead>
               <tr>
+                <th aria-label="Pilih" />
                 <th>Kode</th>
                 <th>Nama</th>
                 <th>Email</th>
@@ -476,10 +544,12 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
               </tr>
             </thead>
             <tbody>
-              {rows.map((x) => (
+              {shown.map((x) => (
                 <RegistrantRow
                   key={x.id}
                   x={x}
+                  picked={picked.has(x.id)}
+                  onPick={() => pick(x.id)}
                   open={open === x.id}
                   onToggle={() => setOpen(open === x.id ? null : x.id)}
                   onMove={() => void moveEmail(x)}
@@ -492,22 +562,48 @@ function Registrants({ event, onToast, onChanged, onClose }: { event: PreregEven
       )}
       <p className="muted small" style={{ marginBottom: 0 }}>
         Data pendaftar hanya untuk panitia. &quot;Tertaut&quot; berarti pelamar sudah masuk dengan akun Google emailnya dan profilnya terisi. Salah email? Pindahkan ke email Google
-        yang benar; akun itu tertaut saat masuk.
+        yang benar; akun itu tertaut saat masuk. &quot;Mencurigakan&quot; hanya tanda (banyak dari jaringan yang sama, diisi sangat cepat, email sama ditulis berbeda, isian tidak
+        wajar); periksa dulu sebelum menghapus.
       </p>
     </div>
   );
 }
 
-function RegistrantRow({ x, open, onToggle, onMove, onRemove }: { x: Registrant; open: boolean; onToggle: () => void; onMove: () => void; onRemove: () => void }) {
+function RegistrantRow({
+  x,
+  picked,
+  onPick,
+  open,
+  onToggle,
+  onMove,
+  onRemove,
+}: {
+  x: Registrant;
+  picked: boolean;
+  onPick: () => void;
+  open: boolean;
+  onToggle: () => void;
+  onMove: () => void;
+  onRemove: () => void;
+}) {
   const d = x.data;
+  const why = x.suspect?.reasons.map((r) => SUSPECT_LABELS[r] ?? r).join(", ") ?? "";
   return (
     <>
       <tr className="pe-row" data-open={open ? "" : undefined} onClick={onToggle}>
+        <td onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={picked} onChange={onPick} aria-label={`Pilih ${d.fullName}`} />
+        </td>
         <td>
           <code className="pe-code">{x.code}</code>
         </td>
         <td>
           <b>{d.fullName}</b>
+          {x.suspect?.flagged && (
+            <span className="pe-suspect" title={why}>
+              Mencurigakan
+            </span>
+          )}
         </td>
         <td>{x.email}</td>
         <td>{d.whatsapp}</td>
@@ -522,7 +618,7 @@ function RegistrantRow({ x, open, onToggle, onMove, onRemove }: { x: Registrant;
       </tr>
       {open && (
         <tr className="pe-detail">
-          <td colSpan={9}>
+          <td colSpan={10}>
             <dl>
               <dt>Kampus / sekolah</dt>
               <dd>{d.institution}</dd>
@@ -552,6 +648,12 @@ function RegistrantRow({ x, open, onToggle, onMove, onRemove }: { x: Registrant;
                       {d.link}
                     </a>
                   </dd>
+                </>
+              )}
+              {x.suspect?.flagged && (
+                <>
+                  <dt>Mencurigakan</dt>
+                  <dd>{why}</dd>
                 </>
               )}
               <dt>Terdaftar</dt>
