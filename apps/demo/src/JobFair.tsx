@@ -96,7 +96,8 @@ import {
   parkLights,
 } from "@vwo/ui";
 import { InstallButton } from "./install";
-import { CharacterCreator, ReturningCard, loadCharacter, type Character } from "./CharacterCreator";
+import { CharacterCreator, ReturningCard } from "./CharacterCreator";
+import { type Character, loadCharacter } from "./character";
 import { AccountGate } from "./AccountGate";
 import { type Account, checkSession, currentAccount, logout, resendVerification } from "./account";
 import { applyErrorText, myApplications, sendApplication as sendToServer } from "./server-fair";
@@ -123,50 +124,59 @@ import { PING_REPLIES, PING_STARTERS, PING_TEXT, type Ping, PingLimiter, parsePi
 import { FollowBar, type PingCardView, PingCards } from "./fair/Pings";
 import { playPing } from "./fair/ringtone";
 import { COMPANY_TITLES, SEEKER_TITLES, levelOf, liveSeminar } from "./fair/content";
-import { FoodMenu } from "./fair/FoodMenu";
 import { CallScreen } from "./fair/Call";
 import { type RingSignal, canCallOtherTabs, listenForCalls, loadRelay, newCallId, onSignal, sendSignal } from "./fair/call";
 import { LiftPanel } from "./fair/Lift";
 import { ParkCard, libraryNpcLook, parkNpcLook } from "./fair/Park";
-import { PhoneBox } from "./fair/PhoneBox";
 import { phoneBook } from "./fair/phone-book";
 import { parkNow } from "./fair/park-clock";
 import { LevelBar } from "./fair/Modal";
-import { InviteCard, VisitCard } from "./fair/Invite";
 import { type GuidePlace, GuidePanel, PlaceIntro, markPlaceSeen, placeSeen, reachHint } from "./fair/Guide";
 import { NotifList } from "./fair/Notifs";
 import { PushCard } from "./fair/PushCard";
 import { Modal } from "./fair/Modal";
-import { SofaGames } from "./fair/Games";
-import { Library } from "./fair/Library";
-import { FriendsPanel, type FriendOnline } from "./fair/Friends";
+import type { FriendOnline } from "./fair/Friends";
 import { addFriend, friendOf, loadFriends, myTag, removeFriend, useFriends } from "./fair/friends";
 import { MissionsPanel } from "./fair/Missions";
-import { type MapPlace, MapPanel } from "./fair/Map";
+import type { MapPlace } from "./fair/Map";
 import { PromoCard } from "./fair/Promo";
-import { BoothMediaPanel, mediaOf } from "./fair/BoothMedia";
+import { mediaOf } from "./fair/booth-media";
 import { useStageFeed } from "./fair/stage";
 import { streamFor, useStageNow } from "./fair/stage-now";
 import { StageFeedPanel } from "./fair/StageFeed";
 import { LoungeDesk, type LoungeCallStart, type LoungeView, PEER_LINES } from "./fair/Lounge";
-import { PsychTest } from "./fair/PsychTest";
-import { SeminarView } from "./fair/Seminar";
 import { VerifyPanel } from "./fair/Verify";
-import { WalletPanel } from "./fair/Wallet";
 import { staffLook } from "./fair/staff-look";
-import { BookStand } from "./fair/BookStand";
-import { RentStall } from "./fair/RentStall";
 import { type CoinAsk, CoinConfirmModal } from "./fair/CoinConfirm";
-import { AulaBoard, type AulaTab } from "./fair/Aula";
+import type { AulaTab } from "./fair/Aula";
 import { useReminderAlerts } from "./fair/reminders";
 import { PROFILE_EVENT, type SeekerProfile, clearProfile, loadProfile, saveProfile } from "./profile";
-import { SeekerPanel, type SeekerTab } from "./SeekerPanel";
+import type { SeekerTab } from "./SeekerPanel";
 import { onFrame } from "./loop";
 import { loadSpot, saveSpot, setInside, wasInside } from "./fair/last-spot";
 import { fair, useFair } from "./useFair";
 import { claimAnomaly, startAnomalies, useAnomaly, useAnomalyCollection } from "./anomaly-sync";
 import { pollVisible } from "./poll";
 import { loadRuntimeConfig, runtimeConfig } from "./runtime-config";
+import { lazyPanel, preloadPanels } from "./lazy-panel";
+
+// Screens that open on demand load their code then (and in the background once the hall is up).
+const SeekerPanel = lazyPanel(() => import("./SeekerPanel").then((m) => m.SeekerPanel));
+const MapPanel = lazyPanel(() => import("./fair/Map").then((m) => m.MapPanel));
+const Library = lazyPanel(() => import("./fair/Library").then((m) => m.Library));
+const SofaGames = lazyPanel(() => import("./fair/Games").then((m) => m.SofaGames));
+const SeminarView = lazyPanel(() => import("./fair/Seminar").then((m) => m.SeminarView));
+const AulaBoard = lazyPanel(() => import("./fair/Aula").then((m) => m.AulaBoard));
+const BoothMediaPanel = lazyPanel(() => import("./fair/BoothMedia").then((m) => m.BoothMediaPanel));
+const PsychTest = lazyPanel(() => import("./fair/PsychTest").then((m) => m.PsychTest));
+const WalletPanel = lazyPanel(() => import("./fair/Wallet").then((m) => m.WalletPanel));
+const FriendsPanel = lazyPanel(() => import("./fair/Friends").then((m) => m.FriendsPanel));
+const BookStand = lazyPanel(() => import("./fair/BookStand").then((m) => m.BookStand));
+const RentStall = lazyPanel(() => import("./fair/RentStall").then((m) => m.RentStall));
+const FoodMenu = lazyPanel(() => import("./fair/FoodMenu").then((m) => m.FoodMenu));
+const PhoneBox = lazyPanel(() => import("./fair/PhoneBox").then((m) => m.PhoneBox));
+const InviteCard = lazyPanel(() => import("./fair/Invite").then((m) => m.InviteCard));
+const VisitCard = lazyPanel(() => import("./fair/Invite").then((m) => m.VisitCard));
 
 interface Session {
   visitorId: string;
@@ -284,6 +294,11 @@ export function JobFair() {
     // Often enough for a chat with HR to feel live (APPLICATIONS_POLL_SEC); a returning tab catches up at once.
     return pollVisible(pull, () => runtimeConfig().applicationsPollSec);
   }, [account?.email]);
+  // Once the player is in the hall, the screens they may open load quietly in the background.
+  const inHall = !!session;
+  useEffect(() => {
+    if (inHall) preloadPanels();
+  }, [inHall]);
   /** The saved character for this account: set once, then changed from the profile. */
   const character = account ? loadCharacter() : null;
   const [editLook, setEditLook] = useState(false);

@@ -34,6 +34,8 @@ const config: NextConfig = {
         source,
         headers: [{ key: "Content-Security-Policy", value: `script-src 'self' https://challenges.cloudflare.com; ${BASE_CSP}` }],
       })),
+      // Built files carry a hash of their content in the name, so a browser may keep them for good.
+      { source: "/play/assets/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },
 };

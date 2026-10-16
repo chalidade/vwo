@@ -2,7 +2,7 @@
 // reminded of and the seminars they registered for: the server's morning email and push, and the game's own alerts shortly before.
 // Times are Indonesian Western Time (WIB, UTC+7, no daylight saving), whatever the device's zone.
 import { type AulaEvent, DEFAULT_RUNDOWN } from "./aula";
-import type { ApplicationShared } from "./fair-api";
+import type { ApplicationShared } from "./fair-api-schema";
 
 const WIB_MS = 7 * 3_600_000;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;

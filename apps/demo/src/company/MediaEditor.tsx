@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { type CompanyBooth, type GateStyle, boothHasGate } from "@vwo/shared";
 import { GATE_STYLES, MASCOT_KINDS, Mascot } from "@vwo/ui";
-import { mediaOf } from "../fair/BoothMedia";
+import { mediaOf } from "../fair/booth-media";
 import { ACCESSORY_PRODUCTS } from "../fair/company";
 import { fair } from "../useFair";
 
@@ -34,7 +34,8 @@ export function MediaEditor({ booth }: { booth: CompanyBooth }) {
     <div className="card">
       <h2 className="cp-h2">Konten aksesoris premium</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Pengunjung bisa mengetuk aksesoris berbayar di stand: TV memutar video, standee membagikan brosur, merchandise dan kopi jadi voucher, photo booth membuat foto berbingkai brand kamu.
+        Pengunjung bisa mengetuk aksesoris berbayar di stand: TV memutar video, standee membagikan brosur, merchandise dan kopi jadi voucher, photo booth membuat foto berbingkai
+        brand kamu.
       </p>
       <table className="list cp-table cp-acc-stats">
         <thead>

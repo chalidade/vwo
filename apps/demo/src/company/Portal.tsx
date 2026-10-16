@@ -10,17 +10,24 @@ import { ACCOUNT_EVENT, checkSession, currentAccount } from "../account";
 import { AccountGate } from "../AccountGate";
 import { boothApplications, boothInboxRead, claimBooth, claimErrorText } from "../server-fair";
 import { fair, useFair } from "../useFair";
-import { Applicants } from "./Applicants";
-import { TalentPool } from "./TalentPool";
 import { sessionLogin, signedInCompany } from "./login";
-import { Billing } from "./Billing";
-import { Report } from "./Report";
 import { Bell, Briefcase, Coins, Building2, CircleHelp, Contact, FileChartColumn, LayoutDashboard, LogOut, Palette, Plug, Tent, Users, Wallet } from "lucide-react";
 import { DashShell } from "../Dash";
-import { BoothEditor, FaqEditor, JobsEditor, ProfileEditor } from "./Editors";
-import { Integrations } from "./Integrations";
 import { pollVisible } from "../poll";
 import { runtimeConfig } from "../runtime-config";
+import { lazyPanel } from "../lazy-panel";
+
+// Each tab loads its code when it is first opened.
+const loading = <p className="muted">Memuat…</p>;
+const Applicants = lazyPanel(() => import("./Applicants").then((m) => m.Applicants), loading);
+const TalentPool = lazyPanel(() => import("./TalentPool").then((m) => m.TalentPool), loading);
+const Billing = lazyPanel(() => import("./Billing").then((m) => m.Billing), loading);
+const Report = lazyPanel(() => import("./Report").then((m) => m.Report), loading);
+const Integrations = lazyPanel(() => import("./Integrations").then((m) => m.Integrations), loading);
+const BoothEditor = lazyPanel(() => import("./Editors").then((m) => m.BoothEditor), loading);
+const FaqEditor = lazyPanel(() => import("./Editors").then((m) => m.FaqEditor), loading);
+const JobsEditor = lazyPanel(() => import("./Editors").then((m) => m.JobsEditor), loading);
+const ProfileEditor = lazyPanel(() => import("./Editors").then((m) => m.ProfileEditor), loading);
 
 const TABS = [
   ["overview", LayoutDashboard, "Ringkasan"],

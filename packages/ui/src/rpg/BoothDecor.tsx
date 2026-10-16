@@ -9,31 +9,9 @@ import { INK } from "./Furniture";
 const ink = { stroke: INK, strokeWidth: 2, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 const T = 48;
 
-export type AccessorySlot = "floor" | "corner" | "air" | "wall" | "gate";
+export { type AccessorySlot, type BoothAccessory, BOOTH_ACCESSORIES, FLOOR_SLOTS } from "./booth-data";
+import { BOOTH_ACCESSORIES, FLOOR_SLOTS } from "./booth-data";
 
-export interface BoothAccessory {
-  id: string;
-  name: string;
-  emoji: string;
-  slot: AccessorySlot;
-}
-
-export const BOOTH_ACCESSORIES: BoothAccessory[] = [
-  { id: "plant", name: "Tanaman pot", emoji: "🪴", slot: "corner" },
-  { id: "flag", name: "Umbul-umbul", emoji: "🚩", slot: "floor" },
-  { id: "standee", name: "Maskot", emoji: "🐣", slot: "floor" },
-  { id: "giveaway", name: "Rak merchandise", emoji: "🎁", slot: "floor" },
-  { id: "coffee", name: "Coffee cart", emoji: "☕", slot: "floor" },
-  { id: "beanbag", name: "Bean bag", emoji: "🛋️", slot: "floor" },
-  { id: "tv", name: "TV video profil", emoji: "📺", slot: "floor" },
-  { id: "photobooth", name: "Photo booth", emoji: "📸", slot: "floor" },
-  { id: "balloons", name: "Balon", emoji: "🎈", slot: "air" },
-  { id: "neon", name: "Neon \"We're hiring\"", emoji: "💡", slot: "wall" },
-  { id: "gapura", name: "Gapura", emoji: "🎋", slot: "gate" },
-];
-
-/** At most this many floor items fit in a booth. */
-export const FLOOR_SLOTS = 4;
 const SLOTS = [
   { x: 0.1, y: 2.3 },
   { x: 1.0, y: 2.42 },
@@ -247,4 +225,3 @@ export function boothAccessoryExtras(booth: CompanyBooth, onUse?: (id: string) =
     }
   return out;
 }
-

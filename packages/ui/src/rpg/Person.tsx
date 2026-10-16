@@ -210,7 +210,7 @@ function Skateboard({ x, y }: { x: number; y: number }) {
   )
 }
 
-export const Person = memo(PersonSvg, (a, b) => a.size === b.size && JSON.stringify(a.look) === JSON.stringify(b.look))
+export const Person = /* @__PURE__ */ memo(PersonSvg, (a, b) => a.size === b.size && JSON.stringify(a.look) === JSON.stringify(b.look))
 
 function PersonSvg({ look: given, size = 1 }: { look: Look; size?: number }) {
   const id = useId().replace(/:/g, '')
@@ -241,7 +241,7 @@ function PersonSvg({ look: given, size = 1 }: { look: Look; size?: number }) {
  * a core shadow on the head, a rim of shade on the body and limbs, and a gloss on the hair.
  * Each Person has its own gradients (ids from useId), shared by its three views.
  */
-const Light = createContext('')
+const Light = /* @__PURE__ */ createContext('')
 
 function LightDefs({ id }: { id: string }) {
   return (

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { accountKey } from "./account";
+import { type Character, loadCharacter, saveCharacter } from "./character";
 import { type Face, type HairStyle, type Look, type Outfit, PLAYER_LOOK, Person, lookFor } from "@vwo/ui";
 
 const HAIR_STYLES: HairStyle[] = ["long", "short", "bob", "ponytail", "pigtails", "braid", "bun", "buns", "curly", "spiky", "afro", "messy", "mohawk", "bald"];
@@ -27,31 +27,6 @@ const HAT_NAMES: Record<string, string> = {
 };
 const extraOf = (l: Look): (typeof EXTRAS)[number] => (l.glasses && l.backpack ? "both" : l.glasses ? "glasses" : l.backpack ? "backpack" : "none");
 const DIRS = ["down", "side", "up"] as const;
-
-const STORE_KEY = "vwo:character";
-const storeKey = () => accountKey(STORE_KEY);
-
-export interface Character {
-  name: string;
-  look: Look;
-}
-
-export function loadCharacter(): Character | null {
-  try {
-    const raw = localStorage.getItem(storeKey());
-    return raw ? (JSON.parse(raw) as Character) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveCharacter(c: Character) {
-  try {
-    localStorage.setItem(storeKey(), JSON.stringify(c));
-  } catch {
-    // Private mode or blocked storage: the character just isn't remembered.
-  }
-}
 
 function cycle<T>(list: readonly T[], current: T, step: number): T {
   const i = list.indexOf(current);
