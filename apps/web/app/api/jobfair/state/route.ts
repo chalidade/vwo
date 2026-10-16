@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { guardCompanyDoc } from "@/lib/company-doc";
 import { db } from "@/lib/db";
 import { canManageBooth, isFairAdmin } from "@/lib/fair";
-import { fail, sameOrigin } from "@/lib/http";
+import { fail, readCapped, sameOrigin } from "@/lib/http";
 import { publicCache, stateCdnSec, stateInlineMax, stateSwrSec } from "@/lib/limits";
 import { allow } from "@/lib/ratelimit";
 import { kickSeminarPushes } from "@/lib/seminars";
@@ -46,8 +46,8 @@ export async function PUT(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "not_signed_in");
   if (!(await allow(`state:${user.id}`, 120, 600_000))) return fail(429, "too_many_requests");
-  const text = await req.text();
-  if (text.length > MAX_BYTES) return fail(413, "too_large");
+  const text = await readCapped(req, MAX_BYTES);
+  if (text === null) return fail(413, "too_large");
   let body: { key?: unknown; data?: unknown };
   try {
     body = JSON.parse(text) as typeof body;

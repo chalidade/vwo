@@ -1,6 +1,7 @@
 import { paymentById } from "@vwo/db";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { readCapped } from "@/lib/http";
 import { refresh } from "@/lib/payments";
 import { callbackTokenOk } from "@/lib/xendit";
 
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   if (!callbackTokenOk(req.headers.get("x-callback-token"))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const body = (await req.json().catch(() => null)) as { external_id?: unknown } | null;
+  const body = (await readCapped(req, 100_000)
+    .then((t) => JSON.parse(t ?? "null"))
+    .catch(() => null)) as { external_id?: unknown } | null;
   const id = typeof body?.external_id === "string" ? body.external_id : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ ok: true, ignored: true });
   const p = await paymentById(db, id);
