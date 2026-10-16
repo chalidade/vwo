@@ -5,7 +5,10 @@ import { type CSSProperties, type FormEvent, memo, useEffect, useId, useState } 
 import { BOOTH_H, BOOTH_W, type BoothTheme, type CompanyBooth, type GateStyle, type JobPosting, SPONSOR_H, SPONSOR_W, type SponsorView, VIP_WING, type VipStyle, boothFrame, boothHasGate, openJobs, safeImage, safeUrl, vipLounge } from "@vwo/shared";
 import { boothAccessoryExtras } from "./BoothDecor";
 import type { SceneExtra } from "./CafeScene";
+import { BoothLogo } from "./BoothLogo";
 import { INK } from "./Furniture";
+
+export { BoothLogo };
 
 const ink = { stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
 const T = 48;
@@ -61,7 +64,7 @@ export function HallWall({
 
 /** Spotlights and bunting along the top of the hall wall. Drawn once per size: a wide hall has a
  *  couple of hundred flags, and the scene re-renders every frame. */
-const HallRail = memo(function HallRail({ w, h }: { w: number; h: number }) {
+const HallRail = /* @__PURE__ */ memo(function HallRail({ w, h }: { w: number; h: number }) {
   const flags = Math.ceil(w / 26);
   const colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"];
   return (
@@ -168,16 +171,6 @@ export function SponsorCard({ sponsor, onClose }: { sponsor: SponsorView; onClos
         </div>
       </div>
     </div>
-  );
-}
-
-/** A company's logo as HTML: its uploaded picture, or the logo letters in its colour. */
-export function BoothLogo({ booth, className }: { booth: Pick<CompanyBooth, "logo" | "logoImg" | "color" | "company">; className?: string }) {
-  const img = safeImage(booth.logoImg);
-  return (
-    <span className={className} data-img={img ? "" : undefined} style={{ ["--c" as string]: booth.color }}>
-      {img ? <img src={img} alt={`Logo ${booth.company}`} /> : booth.logo}
-    </span>
   );
 }
 
@@ -348,7 +341,7 @@ function VipWing({ booth, side }: { booth: CompanyBooth; side: "l" | "r" }) {
   );
 }
 
-const BoothPanel = memo(function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
+const BoothPanel = /* @__PURE__ */ memo(function BoothPanel({ booth, rating }: { booth: CompanyBooth; rating?: BoothRating }) {
   const premium = booth.tier === "premium";
   const wing = premium ? VIP_WING * T : 0;
   return (
@@ -484,7 +477,7 @@ function BoothWall({ booth, rating }: { booth: CompanyBooth; rating?: BoothRatin
 }
 
 /** A VIP booth's big screen on the wall; tapping it plays the company video. */
-const VideoWall = memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
+const VideoWall = /* @__PURE__ */ memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
   const w = VIP_WING * T - 18;
   const h = 78;
   const id = useId().replace(/:/g, "");
@@ -520,7 +513,7 @@ const VideoWall = memo(function VideoWall({ booth }: { booth: CompanyBooth }) {
 }, sameProps);
 
 /** Two armchairs, a coffee table and a plant at the back of a VIP booth's right wing. */
-const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
+const VipLounge = /* @__PURE__ */ memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
   const v = vipLook(booth);
   const w = (VIP_WING - 0.4) * T;
   const h = 1.7 * T;
@@ -548,7 +541,7 @@ const VipLounge = memo(function VipLounge({ booth }: { booth: CompanyBooth }) {
 }, sameProps);
 
 /** Gold posts with a red velvet rope, across the front of a VIP wing. */
-const VelvetRope = memo(function VelvetRope({ width, trim = GOLD, rope = "#b91c1c" }: { width: number; trim?: string; rope?: string }) {
+const VelvetRope = /* @__PURE__ */ memo(function VelvetRope({ width, trim = GOLD, rope = "#b91c1c" }: { width: number; trim?: string; rope?: string }) {
   const n = Math.max(2, Math.round(width / 50) + 1);
   const xs = Array.from({ length: n }, (_, i) => 6 + (i * (width - 0)) / (n - 1));
   return (
@@ -582,7 +575,7 @@ const gateLook = (booth: CompanyBooth) => {
 };
 
 /** The gate's beam with its name plate, drawn behind the booth so it never hides the booth itself. */
-const GateBeam = memo(function GateBeam({ booth, width }: { booth: CompanyBooth; width: number }) {
+const GateBeam = /* @__PURE__ */ memo(function GateBeam({ booth, width }: { booth: CompanyBooth; width: number }) {
   const w = width * T;
   const { style, dark, fill } = gateLook(booth);
   // A "We're hiring" neon hangs on the beam's left half, where it would otherwise clash with the name plate.
@@ -636,7 +629,7 @@ const GateBeam = memo(function GateBeam({ booth, width }: { booth: CompanyBooth;
 }, sameProps);
 
 /** The gate's two posts at the front corners of the booth: short enough to keep the desk and screen in view. */
-const GatePosts = memo(function GatePosts({ booth, width }: { booth: CompanyBooth; width: number }) {
+const GatePosts = /* @__PURE__ */ memo(function GatePosts({ booth, width }: { booth: CompanyBooth; width: number }) {
   const w = width * T;
   const { style, fill } = gateLook(booth);
   const post = 20;
@@ -673,7 +666,7 @@ const GatePosts = memo(function GatePosts({ booth, width }: { booth: CompanyBoot
   );
 }, sameProps);
 
-const BoothDesk = memo(function BoothDesk({ booth }: { booth: CompanyBooth }) {
+const BoothDesk = /* @__PURE__ */ memo(function BoothDesk({ booth }: { booth: CompanyBooth }) {
   const w = 3 * T;
   const top = 22;
   const h = 1.55 * T;
@@ -696,7 +689,7 @@ const BoothDesk = memo(function BoothDesk({ booth }: { booth: CompanyBooth }) {
   );
 }, sameProps);
 
-const RollUp = memo(function RollUp({ booth }: { booth: CompanyBooth }) {
+const RollUp = /* @__PURE__ */ memo(function RollUp({ booth }: { booth: CompanyBooth }) {
   const w = 50;
   const h = 2.5 * T;
   return (

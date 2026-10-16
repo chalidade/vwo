@@ -25,7 +25,7 @@ function accentOf(id: string) {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** What stands above the park's top edge: sky, clouds, far hills and the city, and a hedge. */
-export const ParkSky = memo(function ParkSky({ w, h, dark = 0 }: { w: number; h: number; dark?: number }) {
+export const ParkSky = /* @__PURE__ */ memo(function ParkSky({ w, h, dark = 0 }: { w: number; h: number; dark?: number }) {
   const hills = Array.from({ length: Math.ceil(w / 260) + 1 }, (_, i) => i * 260 - 60);
   const towers = Array.from({ length: Math.ceil(w / 90) }, (_, i) => ({ x: i * 90 + 20, bw: 34 + ((i * 29) % 26), bh: 22 + ((i * 47) % 38) }));
   const stars = dark > 0 ? Array.from({ length: Math.ceil(w / 40) }, (_, i) => ({ x: (i * 97) % w, y: 6 + ((i * 53) % Math.max(10, h - 60)), r: i % 3 ? 1.2 : 1.9 })) : [];
@@ -74,7 +74,7 @@ function MoonAt({ x, y }: { x: number; y: number }) {
 }
 
 /** The event's own building: glass and stone, its name on the roof, and the way in. */
-const EventBuilding = memo(function EventBuilding({ name }: { name: string }) {
+const EventBuilding = /* @__PURE__ */ memo(function EventBuilding({ name }: { name: string }) {
   const W = PARK.main.width * T;
   const H = (PARK.main.height + 2.4) * T;
   const door = PARK.door.width * T;
@@ -139,7 +139,7 @@ const EventBuilding = memo(function EventBuilding({ name }: { name: string }) {
 
 /** Another event's building, still being built: a concrete frame in scaffolding, a crane, tape
  *  across the front and a banner saying when it opens. */
-const SoonBuilding = memo(function SoonBuilding({ name, date, accent }: { name: string; date?: string; accent: string }) {
+const SoonBuilding = /* @__PURE__ */ memo(function SoonBuilding({ name, date, accent }: { name: string; date?: string; accent: string }) {
   const W = PARK.plots[0]!.width * T;
   const H = (PARK.plots[0]!.height + 2) * T;
   const ground = H - 8;
@@ -217,7 +217,7 @@ const SoonBuilding = memo(function SoonBuilding({ name, date, accent }: { name: 
 });
 
 /** A plot nobody has taken: a little garden behind a low hedge. */
-const EmptyPlot = memo(function EmptyPlot() {
+const EmptyPlot = /* @__PURE__ */ memo(function EmptyPlot() {
   const W = PARK.plots[0]!.width * T;
   const H = PARK.plots[0]!.height * T + 40;
   const top = 40;
@@ -248,7 +248,7 @@ const EmptyPlot = memo(function EmptyPlot() {
 });
 
 /** A round tree; `seed` varies its shade. */
-const TreeSprite = memo(function TreeSprite({ seed }: { seed: number }) {
+const TreeSprite = /* @__PURE__ */ memo(function TreeSprite({ seed }: { seed: number }) {
   const green = ["#2f855a", "#38a169", "#276749"][seed % 3]!;
   return (
     <svg width={110} height={150} viewBox="0 0 110 150" style={{ display: "block", overflow: "visible" }}>
@@ -265,7 +265,7 @@ const TreeSprite = memo(function TreeSprite({ seed }: { seed: number }) {
 });
 
 /** A park bench seen from the front: backrest on top, seat below. */
-const BenchSprite = memo(function BenchSprite() {
+const BenchSprite = /* @__PURE__ */ memo(function BenchSprite() {
   const w = BENCH_W * T;
   return (
     <svg width={w} height={56} style={{ display: "block", overflow: "visible" }}>
@@ -279,7 +279,7 @@ const BenchSprite = memo(function BenchSprite() {
   );
 });
 
-const FlowerBed = memo(function FlowerBed({ w, h }: { w: number; h: number }) {
+const FlowerBed = /* @__PURE__ */ memo(function FlowerBed({ w, h }: { w: number; h: number }) {
   return (
     <svg width={w} height={h + 10} style={{ display: "block", overflow: "visible" }}>
       <rect x={0} y={6} width={w} height={h} rx={8} fill="#7c4a2a" {...ink} />
@@ -294,7 +294,7 @@ const FlowerBed = memo(function FlowerBed({ w, h }: { w: number; h: number }) {
 });
 
 /** The public phone box: a red booth with a handset inside and "TELEPON UMUM" over the door. */
-const PhoneBoxSprite = memo(function PhoneBoxSprite() {
+const PhoneBoxSprite = /* @__PURE__ */ memo(function PhoneBoxSprite() {
   const W = PARK.phoneBox.width * T;
   const H = 128;
   return (
@@ -318,7 +318,7 @@ const PhoneBoxSprite = memo(function PhoneBoxSprite() {
 });
 
 /** The vendor's cart: a wooden gerobak under a striped umbrella; es cendol by day, nasi goreng at night. */
-const FoodCart = memo(function FoodCart({ night }: { night: boolean }) {
+const FoodCart = /* @__PURE__ */ memo(function FoodCart({ night }: { night: boolean }) {
   const W = PARK.cart.width * T;
   const H = 120;
   const g = H - 6;
@@ -362,7 +362,7 @@ const FoodCart = memo(function FoodCart({ night }: { night: boolean }) {
 });
 
 /** A bicycle rack with two bikes. */
-const BikeRack = memo(function BikeRack() {
+const BikeRack = /* @__PURE__ */ memo(function BikeRack() {
   const W = PARK.bikes.width * T;
   const bike = (x: number, color: string) => (
     <g transform={`translate(${x}, 0)`}>
@@ -382,7 +382,7 @@ const BikeRack = memo(function BikeRack() {
 });
 
 /** The park's map board. */
-const Signboard = memo(function Signboard() {
+const Signboard = /* @__PURE__ */ memo(function Signboard() {
   const W = PARK.signboard.width * T;
   return (
     <svg width={W} height={70} style={{ display: "block", overflow: "visible" }}>
@@ -401,7 +401,7 @@ const Signboard = memo(function Signboard() {
 });
 
 /** The slide. */
-const Slide = memo(function Slide() {
+const Slide = /* @__PURE__ */ memo(function Slide() {
   const W = PARK.playground.slide.width * T;
   return (
     <svg width={W + 20} height={110} style={{ display: "block", overflow: "visible" }}>
@@ -416,7 +416,7 @@ const Slide = memo(function Slide() {
 });
 
 /** The swing: a frame with two seats swinging. */
-const Swing = memo(function Swing() {
+const Swing = /* @__PURE__ */ memo(function Swing() {
   const W = PARK.playground.swing.width * T;
   return (
     <svg width={W} height={100} style={{ display: "block", overflow: "visible" }}>
@@ -433,7 +433,7 @@ const Swing = memo(function Swing() {
   );
 });
 
-const Sandbox = memo(function Sandbox() {
+const Sandbox = /* @__PURE__ */ memo(function Sandbox() {
   const s = PARK.playground.sandbox;
   const W = s.width * T;
   const H = s.height * T;

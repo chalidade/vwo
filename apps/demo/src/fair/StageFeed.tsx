@@ -2,7 +2,7 @@ import type { StreamEmbed } from "@vwo/shared";
 import { useEffect, useRef, useState } from "react";
 import type { PeerInfo } from "./call";
 import type { StageLive } from "./stage";
-import { linkText } from "./StageWatch";
+import { linkText } from "./link-text";
 import { StreamPlayer } from "./StreamPlayer";
 
 /** The live broadcast in a corner of the screen while the job seeker is in the room it plays in:
@@ -49,7 +49,10 @@ export function StageFeedPanel({
     const v = ref.current;
     if (!v) return;
     v.muted = false;
-    void v.play().then(() => setBlocked(false)).catch(() => {});
+    void v
+      .play()
+      .then(() => setBlocked(false))
+      .catch(() => {});
   };
 
   return (

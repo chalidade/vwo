@@ -2,7 +2,7 @@
 // stamps, notifications, profile and character) is saved on the server, so it follows the player
 // to any device and never carries over to another account signing in on the same browser.
 import type { Account } from "./account";
-import { type Character, loadCharacter, saveCharacter } from "./CharacterCreator";
+import { type Character, loadCharacter, saveCharacter } from "./character";
 import type { PlayerProgress } from "./jobfair-engine";
 import { PROFILE_EVENT, loadProfile, saveProfile, type SeekerProfile } from "./profile";
 import { coinsPending } from "./coin-sync";

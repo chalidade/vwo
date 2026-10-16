@@ -1,7 +1,6 @@
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, Suspense, lazy, useEffect, useRef, useState } from "react";
 import { featuredFirst, openJobs, type JobPosting } from "@vwo/shared";
 import { BoothLogo } from "@vwo/ui";
-import { FloorScene } from "./fair/FloorScene";
 import { InstallButton } from "./install";
 import { fair } from "./useFair";
 
@@ -104,11 +103,12 @@ function useFairWhileVisible(ref: RefObject<HTMLElement | null>, everyMs = 125) 
       if (wait <= 0) {
         last = performance.now();
         bump((n) => n + 1);
-      } else timer ??= setTimeout(() => {
-        timer = null;
-        last = performance.now();
-        bump((n) => n + 1);
-      }, wait);
+      } else
+        timer ??= setTimeout(() => {
+          timer = null;
+          last = performance.now();
+          bump((n) => n + 1);
+        }, wait);
     };
     let onScreen = true;
     const sync = () => {
@@ -164,6 +164,9 @@ function OnlineCount() {
   return <span ref={ref}>{n > 0 ? `${n} pencari kerja sedang online` : "Job fair sedang buka"}</span>;
 }
 
+// The drawn floor is most of the app's code; it loads after the page text so the home page shows at once.
+const FloorScene = lazy(() => import("./fair/FloorScene").then((m) => ({ default: m.FloorScene })));
+
 /** The live look inside one floor, in the hero. */
 function LivePreview({ floorId, name, label }: { floorId: string; name: string; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -183,7 +186,9 @@ function LivePreview({ floorId, name, label }: { floorId: string; name: string; 
         <span className="lp-frame-count">{here} orang</span>
       </div>
       <a className="lp-frame-body" href="#/jobfair" aria-label={`Masuk job fair, mulai dari ${label}`}>
-        <FloorScene floorId={floorId} className="lp-scene" area="left" />
+        <Suspense fallback={<div className="lp-scene" />}>
+          <FloorScene floorId={floorId} className="lp-scene" area="left" />
+        </Suspense>
       </a>
     </div>
   );
@@ -298,7 +303,11 @@ export function Landing() {
               <OnlineCount />
             </p>
             <h1 className="lp-in" style={{ ["--d" as string]: 1 }}>
-              Langkah pertama ke <span className="lp-nw"><span className="lp-hl">karier impian</span>,</span> langsung dari HP.
+              Langkah pertama ke{" "}
+              <span className="lp-nw">
+                <span className="lp-hl">karier impian</span>,
+              </span>{" "}
+              langsung dari HP.
             </h1>
             <p className="lp-lead lp-in" style={{ ["--d" as string]: 2 }}>
               Jelajahi job fair virtual dengan karaktermu sendiri. Temui recruiter dari {booths.length} perusahaan, ikut seminar karier, dan kirim lamaran tanpa antre.

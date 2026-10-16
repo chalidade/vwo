@@ -8,7 +8,7 @@ import { type Root, createRoot } from "react-dom/client";
 import { type Look, Person } from "./Person";
 
 /** True while the scene is in crowd mode. */
-export const CrowdMode = createContext(false);
+export const CrowdMode = /* @__PURE__ */ createContext(false);
 
 /** Room around the 44×62 sprite for hats, hair and arms that reach past it. */
 const PAD = { x: 12, top: 16, bottom: 12 };

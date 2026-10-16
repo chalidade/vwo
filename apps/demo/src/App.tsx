@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Landing } from "./Landing";
-import { LiteMode } from "./lite/Lite";
 import { LIVE } from "./mode";
 import { fair } from "./useFair";
 import { ACCOUNT_EVENT, checkSession, currentAccount } from "./account";
@@ -74,6 +73,7 @@ const CompanyPortal = lazy(() => import("./company/Portal").then((m) => ({ defau
 const InvoicePage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicePage })));
 const InvoicesPage = lazy(() => import("./fair/Invoices").then((m) => ({ default: m.InvoicesPage })));
 const SpeakerStage = lazy(() => import("./organizer/Speaker").then((m) => ({ default: m.SpeakerStage })));
+const LiteMode = lazy(() => import("./lite/Lite").then((m) => ({ default: m.LiteMode })));
 const ConsultantPage = lazy(() => import("./fair/Consultant").then((m) => ({ default: m.ConsultantPage })));
 
 export function App() {

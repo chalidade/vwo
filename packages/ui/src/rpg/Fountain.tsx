@@ -289,7 +289,7 @@ function Column({ night }: { night: boolean }) {
 }
 
 /** The whole fountain, `W` by `H` pixels with its footprint along the bottom. */
-export const Fountain = memo(function Fountain({ night = false }: { night?: boolean }) {
+export const Fountain = /* @__PURE__ */ memo(function Fountain({ night = false }: { night?: boolean }) {
   return (
     <div className="pf" style={{ width: W, height: H }} data-night={night ? "" : undefined}>
       <Pool night={night} />

@@ -13,7 +13,7 @@ const font = "system-ui, sans-serif";
 const SPINES = LIBRARY_SHELVES.map((s) => s.color);
 
 /** A tall bookcase full of coloured spines, `w` by `h` pixels. `seed` varies the books. */
-const Bookcase = memo(function Bookcase({ w, h, seed, rows = 4 }: { w: number; h: number; seed: number; rows?: number }) {
+const Bookcase = /* @__PURE__ */ memo(function Bookcase({ w, h, seed, rows = 4 }: { w: number; h: number; seed: number; rows?: number }) {
   const rowH = (h - 14) / rows;
   return (
     <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
@@ -48,7 +48,7 @@ const Bookcase = memo(function Bookcase({ w, h, seed, rows = 4 }: { w: number; h
 
 /** The library in the park: a small classical building with four columns, a pediment with its name,
  *  steps up to a wooden door, and windows with books in them. */
-export const LibraryBuilding = memo(function LibraryBuilding() {
+export const LibraryBuilding = /* @__PURE__ */ memo(function LibraryBuilding() {
   const L = PARK.library;
   const W = L.width * T;
   const H = (L.height + 2.4) * T;
@@ -203,7 +203,7 @@ export function libraryRoomExtras(on: { books?: () => void } = {}): SceneExtra[]
 }
 
 /** A round beanbag, slumped a little. */
-const Beanbag = memo(function Beanbag() {
+const Beanbag = /* @__PURE__ */ memo(function Beanbag() {
   const w = (LIBRARY_ROOM.beanbag.width + 0.2) * T;
   return (
     <svg width={w} height={54} style={{ display: "block", overflow: "visible" }}>

@@ -1,20 +1,4 @@
-import { OrgFoodCourt } from "./organizer/FoodCourt";
 import { useEffect, useState } from "react";
-import { OrgAds } from "./organizer/Ads";
-import { OrgAula } from "./organizer/Aula";
-import { OrgBooths } from "./organizer/Booths";
-import { OrgConsultants } from "./organizer/Consultants";
-import { OrgFloors } from "./organizer/Floors";
-import { OrgInvoices } from "./organizer/Invoices";
-import { OrgLive } from "./organizer/Live";
-import { OrgPark } from "./organizer/Park";
-import { OrgPrices } from "./organizer/Prices";
-import { OrgPsych } from "./organizer/Psych";
-import { OrgEarlyAccess } from "./organizer/EarlyAccess";
-import { OrgEvents } from "./organizer/Events";
-import { OrgRegistrations } from "./organizer/Registrations";
-import { OrgReports } from "./organizer/Reports";
-import { OrgSeminars } from "./organizer/Seminars";
 import { LIVE } from "./mode";
 import { fair, useFair } from "./useFair";
 import {
@@ -40,6 +24,26 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import { DashShell } from "./Dash";
+import { lazyPanel } from "./lazy-panel";
+
+// Each tab loads its code when it is first opened.
+const loading = <p className="muted">Memuat…</p>;
+const OrgFoodCourt = lazyPanel(() => import("./organizer/FoodCourt").then((m) => m.OrgFoodCourt), loading);
+const OrgAds = lazyPanel(() => import("./organizer/Ads").then((m) => m.OrgAds), loading);
+const OrgAula = lazyPanel(() => import("./organizer/Aula").then((m) => m.OrgAula), loading);
+const OrgBooths = lazyPanel(() => import("./organizer/Booths").then((m) => m.OrgBooths), loading);
+const OrgConsultants = lazyPanel(() => import("./organizer/Consultants").then((m) => m.OrgConsultants), loading);
+const OrgFloors = lazyPanel(() => import("./organizer/Floors").then((m) => m.OrgFloors), loading);
+const OrgInvoices = lazyPanel(() => import("./organizer/Invoices").then((m) => m.OrgInvoices), loading);
+const OrgLive = lazyPanel(() => import("./organizer/Live").then((m) => m.OrgLive), loading);
+const OrgPark = lazyPanel(() => import("./organizer/Park").then((m) => m.OrgPark), loading);
+const OrgPrices = lazyPanel(() => import("./organizer/Prices").then((m) => m.OrgPrices), loading);
+const OrgPsych = lazyPanel(() => import("./organizer/Psych").then((m) => m.OrgPsych), loading);
+const OrgEarlyAccess = lazyPanel(() => import("./organizer/EarlyAccess").then((m) => m.OrgEarlyAccess), loading);
+const OrgEvents = lazyPanel(() => import("./organizer/Events").then((m) => m.OrgEvents), loading);
+const OrgRegistrations = lazyPanel(() => import("./organizer/Registrations").then((m) => m.OrgRegistrations), loading);
+const OrgReports = lazyPanel(() => import("./organizer/Reports").then((m) => m.OrgReports), loading);
+const OrgSeminars = lazyPanel(() => import("./organizer/Seminars").then((m) => m.OrgSeminars), loading);
 
 const TABS = [
   ["live", Radio, "Live"],

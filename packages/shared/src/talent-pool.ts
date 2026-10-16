@@ -2,8 +2,8 @@
 // the company can reach them again for a newer vacancy, plus the seekers who said any company may
 // contact them. Worked out from the applications and the seekers' saved profiles, with no table of
 // its own. The same functions run on the server (live site) and in the browser (demo).
-import { z } from "zod";
 import type { CompanyBooth, JobPosting } from "./jobfair";
+import type { PoolFilter } from "./talent-pool-schema";
 import { educationLevel, scoreJob } from "./recommend";
 import { canonicalSkill, parseSkills, provinceOf } from "./taxonomy";
 
@@ -108,16 +108,6 @@ export function outsiderMember(seeker: string, p: PoolProfile, at: number): Pool
     lastAt: at,
   };
 }
-
-export const poolFilterSchema = z.object({
-  q: z.string().trim().max(80).optional(),
-  skill: z.string().trim().max(80).optional(),
-  province: z.string().trim().max(80).optional(),
-  city: z.string().trim().max(80).optional(),
-  education: z.string().trim().max(80).optional(),
-  status: z.string().trim().max(40).optional(),
-});
-export type PoolFilter = z.infer<typeof poolFilterSchema>;
 
 const has = (text: string, term?: string) => !term || text.toLowerCase().includes(term.toLowerCase());
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -229,13 +219,6 @@ export interface TalentOffer {
   note?: string;
   at: number;
 }
-
-export const talentOfferSchema = z.object({
-  /** A past applicant's account id, or the handle an opted-in stranger got in "Kandidat cocok". */
-  seeker: z.string().regex(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|h_[0-9a-f]{32})$/i),
-  jobId: z.string().regex(/^[\w-]{1,80}$/),
-  note: z.string().trim().max(300).optional(),
-});
 
 /** How many offers a seeker keeps; the oldest drop off. */
 export const OFFER_LIMIT = 30;

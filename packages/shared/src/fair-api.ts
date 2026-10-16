@@ -1,42 +1,9 @@
 // What the live game sends to the server about applications, checked on both sides.
-import { z } from "zod";
+import type { ApplicationShared, FairApplicationInput } from "./fair-api-schema";
 
 export const FAIR_APPLICATION_STATUSES = ["Terkirim", "Dilihat", "Shortlist", "Diundang interview", "Lolos interview", "Kunjungan kantor", "Diterima", "Belum cocok"] as const;
 
-const key = z.string().regex(/^[\w-]{1,80}$/);
-const text = (max: number) => z.string().trim().max(max).optional();
-
-export const fairApplicationSchema = z.object({
-  boothId: key,
-  jobId: key,
-  company: z.string().trim().min(1).max(120),
-  jobTitle: z.string().trim().min(1).max(120),
-  name: z.string().trim().min(1).max(80),
-  email: z.string().trim().email().max(120),
-  phone: text(30),
-  cvUrl: z
-    .string()
-    .trim()
-    .max(300)
-    .refine((u) => u === "" || /^https?:\/\//i.test(u), "must be an http(s) link")
-    .optional(),
-  message: text(1000),
-  headline: text(200),
-  education: text(200),
-  skills: text(600),
-  city: text(80),
-  /** A small profile photo the game already shrank to 160 px. */
-  photo: z
-    .string()
-    .max(100_000)
-    .regex(/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i)
-    .optional(),
-  psych: z.number().int().min(0).max(100).optional(),
-  verified: z.boolean().optional(),
-});
-export type FairApplicationInput = z.infer<typeof fairApplicationSchema>;
-
-/** Filled in below; declared here so the response type can carry the conversation. */
+/** The conversation as applicationSharedSchema (fair-api-schema.ts) checks it; declared here so the response type can carry it. */
 interface ApplicationSharedFields {
   messages?: { at: number; from: "company" | "seeker"; text: string; rt?: number }[];
   interview?: { at: number; mode: string; place?: string; note?: string; reply?: "hadir" | "jadwal-ulang"; repliedAt?: number; sentAt?: number };
@@ -49,11 +16,6 @@ interface ApplicationSharedFields {
   calls?: { at: number; kind: "video" | "voice"; answered: boolean; seconds: number }[];
 }
 
-export const fairApplicationStatusSchema = z.object({
-  id: z.string().uuid(),
-  status: z.enum(FAIR_APPLICATION_STATUSES),
-});
-
 /** An application as the server sends it back to the game. */
 export interface FairApplicationOut extends FairApplicationInput, ApplicationSharedFields {
   id: string;
@@ -65,49 +27,6 @@ export interface FairApplicationOut extends FairApplicationInput, ApplicationSha
   /** The company's private notes; only in the booth's own list. */
   notes?: string;
 }
-
-// --- The conversation on one application, which the company and the applicant both add to.
-const message = z.object({
-  at: z.number().int().nonnegative(),
-  from: z.enum(["company", "seeker"]),
-  text: z.string().trim().min(1).max(600),
-  /** When the server received it; set by the server, so the order never depends on a device's clock. */
-  rt: z.number().int().nonnegative().optional(),
-});
-const interview = z.object({
-  at: z.number().int().nonnegative(),
-  mode: z.string().trim().max(60),
-  place: z.string().trim().max(300).optional(),
-  note: z.string().trim().max(600).optional(),
-  reply: z.enum(["hadir", "jadwal-ulang"]).optional(),
-  /** When the applicant answered; set by the server. */
-  repliedAt: z.number().int().nonnegative().optional(),
-  /** When the company sent it (its device's clock), so the applicant's notification keeps its time. */
-  sentAt: z.number().int().nonnegative().optional(),
-});
-/** An invitation to visit the office after a passed interview: when, and the office's address. */
-const visit = z.object({
-  at: z.number().int().nonnegative(),
-  address: z.string().trim().min(1).max(300),
-  note: z.string().trim().max(600).optional(),
-  reply: z.enum(["hadir", "jadwal-ulang"]).optional(),
-  repliedAt: z.number().int().nonnegative().optional(),
-  sentAt: z.number().int().nonnegative().optional(),
-});
-const callLog = z.object({ at: z.number().int().nonnegative(), kind: z.enum(["video", "voice"]), answered: z.boolean(), seconds: z.number().int().min(0).max(86_400) });
-
-export const applicationSharedSchema = z.object({
-  messages: z.array(message).max(300).optional(),
-  interview: interview.optional(),
-  visit: visit.optional(),
-  rating: z.number().int().min(1).max(5).optional(),
-  ratedAt: z.number().int().nonnegative().optional(),
-  feedback: z.string().trim().max(300).optional(),
-  calls: z.array(callLog).max(100).optional(),
-});
-export type ApplicationShared = z.infer<typeof applicationSharedSchema>;
-
-export const applicationSharedPutSchema = z.object({ as: z.enum(["company", "seeker"]), shared: applicationSharedSchema });
 
 const msgKey = (m: { at: number; from: string; text: string }) => `${m.at}|${m.from}|${m.text}`;
 
@@ -158,7 +77,11 @@ function answered<T extends Invitation>(stored: T, incoming: Invitation | undefi
 }
 
 /** What one side's update brought the other side, worth a notification outside the app; null when nothing. */
-export function sharedNews(before: ApplicationShared, after: ApplicationShared, as: "company" | "seeker"): { kind: "chat" | "interview" | "visit" | "call" | "rating" | "confirm"; text: string } | null {
+export function sharedNews(
+  before: ApplicationShared,
+  after: ApplicationShared,
+  as: "company" | "seeker",
+): { kind: "chat" | "interview" | "visit" | "call" | "rating" | "confirm"; text: string } | null {
   const had = new Set((before.messages ?? []).map(msgKey));
   const added = (after.messages ?? []).filter((m) => m.from === as && !had.has(msgKey(m)));
   if (as === "company") {
@@ -171,8 +94,10 @@ export function sharedNews(before: ApplicationShared, after: ApplicationShared, 
     return null;
   }
   const reply = (a?: { at: number; reply?: string }, b?: { at: number; reply?: string }) => !!a?.reply && (a.reply !== b?.reply || a.at !== b?.at);
-  if (reply(after.interview, before.interview)) return { kind: "confirm", text: after.interview!.reply === "hadir" ? "Pelamar konfirmasi hadir interview" : "Pelamar minta jadwal ulang interview" };
-  if (reply(after.visit, before.visit)) return { kind: "confirm", text: after.visit!.reply === "hadir" ? "Pelamar konfirmasi hadir kunjungan kantor" : "Pelamar minta jadwal ulang kunjungan kantor" };
+  if (reply(after.interview, before.interview))
+    return { kind: "confirm", text: after.interview!.reply === "hadir" ? "Pelamar konfirmasi hadir interview" : "Pelamar minta jadwal ulang interview" };
+  if (reply(after.visit, before.visit))
+    return { kind: "confirm", text: after.visit!.reply === "hadir" ? "Pelamar konfirmasi hadir kunjungan kantor" : "Pelamar minta jadwal ulang kunjungan kantor" };
   if (added.length) return { kind: "chat", text: added.at(-1)!.text.slice(0, 140) };
   return null;
 }
