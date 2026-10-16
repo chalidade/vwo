@@ -3,7 +3,7 @@ import { cleanSeller } from "@vwo/shared";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/fair";
-import { fail, sameOrigin } from "@/lib/http";
+import { fail, readCapped, sameOrigin } from "@/lib/http";
 import { readSeller } from "@/lib/invoices";
 import { allow } from "@/lib/ratelimit";
 import { currentUser } from "@/lib/session";
@@ -26,8 +26,8 @@ export async function PUT(req: Request) {
   const user = await currentUser();
   if (!user || !isOwnerAdmin(user)) return fail(403, "not_allowed");
   if (!(await allow(`invoice-seller:${user.id}`, 30, 600_000))) return fail(429, "too_many_requests");
-  const text = await req.text();
-  if (text.length > 4_000) return fail(413, "too_large");
+  const text = await readCapped(req, 4_000);
+  if (text === null) return fail(413, "too_large");
   let raw: unknown;
   try {
     raw = JSON.parse(text);

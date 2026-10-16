@@ -127,7 +127,8 @@ function makeBooth(input: NewBooth, id: string, stand: boolean): { booth: Compan
     x: input.x,
     y: input.y,
     recruiter: input.contact,
-    email: input.email,
+    // No email: the booth is public, and the address typed in the request is the contact person's own.
+    // It stays in the booking for the organiser; the company adds a public address in its portal.
     about: `${name} membuka lowongan di job fair ini. Profil lengkap diisi perusahaan lewat portal perusahaan.`,
     faq: [{ q: "Bagaimana cara melamar?", a: stand ? "Pilih lowongan di banner stand lalu kirim lamaran." : "Buka daftar lowongan di Pojok UMKM lalu kirim lamaran." }],
     jobs: [{ id: `${id}-staff`, title: "Staff Umum", type: "Full-time", location: "Jakarta", requirements: ["Lulusan SMA/SMK/S1", "Komunikatif"] }],

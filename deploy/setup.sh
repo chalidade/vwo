@@ -132,6 +132,10 @@ SITE="${DOMAIN:-:80}"
 cat > /etc/caddy/Caddyfile <<CADDY
 $SITE {
 	encode zstd gzip
+	# No request is bigger than a few MB (the largest is a tax invoice PDF); refuse floods before they reach the app.
+	request_body {
+		max_size 5MB
+	}
 	handle /socket.io/* {
 		reverse_proxy 127.0.0.1:4001
 	}

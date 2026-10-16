@@ -1,7 +1,7 @@
 import { readFairPlayer, writeFairPlayer } from "@vwo/db";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { fail, sameOrigin } from "@/lib/http";
+import { fail, readCapped, sameOrigin } from "@/lib/http";
 import { allow } from "@/lib/ratelimit";
 import { maybeCleanup } from "@/lib/cleanup";
 import { currentUser } from "@/lib/session";
@@ -42,8 +42,8 @@ export async function PUT(req: Request) {
   if (!user) return fail(401, "not_signed_in");
   maybeCleanup();
   if (!(await allow(`progress:${user.id}`, 240, 600_000))) return fail(429, "too_many_requests");
-  const text = await req.text();
-  if (text.length > MAX_BYTES) return fail(413, "too_large");
+  const text = await readCapped(req, MAX_BYTES);
+  if (text === null) return fail(413, "too_large");
   let body: { rev?: unknown; data?: unknown };
   try {
     body = JSON.parse(text) as typeof body;
